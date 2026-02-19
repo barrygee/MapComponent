@@ -1,0 +1,46 @@
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+#map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+}
+
+/* Dark mode for MapLibre navigation controls */
+.maplibregl-ctrl-group {
+    background-color: #252D3F !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.maplibregl-ctrl-group button+button {
+    border-top: none !important;
+}
+
+.maplibregl-ctrl-icon {
+    filter: invert(1) brightness(1.5) !important;
+}
+
+/* Hover state for dark mode buttons */
+.maplibregl-ctrl-group button:hover {
+    background-color: #323B52 !important;
+}
+
+/* Compass needle specific adjustment if needed, but filter 100% works well */
+.maplibregl-ctrl-compass .maplibregl-ctrl-icon {
+    filter: invert(1) brightness(2) !important;
+}
+
+/* Roads toggle button styling */
+.maplibregl-ctrl-group button {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}

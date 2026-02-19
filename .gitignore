@@ -1,0 +1,5 @@
+tiles/
+pmtiles
+*.pmtiles
+node_modules/
+.DS_Store
