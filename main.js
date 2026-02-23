@@ -162,6 +162,7 @@ map.on('error', (e) => {
     console.error('Map error:', e);
 });
 
+
 // Custom control for toggling roads
 class RoadsToggleControl {
     constructor() {
@@ -260,6 +261,7 @@ const roadsControl = new RoadsToggleControl();
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 map.addControl(roadsControl, 'top-right');
 
+
 // Custom control for toggling city names
 class NamesToggleControl {
     constructor() {
@@ -330,6 +332,7 @@ class NamesToggleControl {
 
 const namesControl = new NamesToggleControl();
 map.addControl(namesControl, 'top-right');
+
 
 // Custom control for toggling range rings
 class RangeRingsControl {
@@ -420,6 +423,7 @@ class RangeRingsControl {
 rangeRingsControl = new RangeRingsControl();
 map.addControl(rangeRingsControl, 'top-right');
 
+
 // --- UK Air-to-Air Refuelling Areas (AARA) ---
 const AARA_ZONES = {
     type: 'FeatureCollection',
@@ -456,7 +460,7 @@ class AARToggleControl {
 
         this.button = document.createElement('button');
         this.button.title = 'Toggle UK air-to-air refuelling areas';
-        this.button.textContent = '⛽';
+        this.button.textContent = '=';
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
@@ -499,7 +503,7 @@ class AARToggleControl {
             type: 'fill',
             source: 'aara-zones',
             layout: { visibility: 'none' },
-            paint: { 'fill-color': 'rgba(255, 180, 0, 0.12)', 'fill-outline-color': 'rgba(0,0,0,0)' }
+            paint: { 'fill-color': 'rgba(3, 17, 45, 0.25)', 'fill-outline-color': 'rgba(12, 105, 142, 0)' }
         });
 
         this.map.addLayer({
@@ -507,7 +511,7 @@ class AARToggleControl {
             type: 'line',
             source: 'aara-zones',
             layout: { visibility: 'none' },
-            paint: { 'line-color': 'rgba(255, 180, 0, 0.75)', 'line-width': 1.5, 'line-dasharray': [6, 3] }
+            paint: { 'line-color': 'rgba(255, 255, 255, 0.5)', 'line-width': 1.5, 'line-dasharray': [6, 3] }
         });
 
         this.map.addLayer({
@@ -519,12 +523,12 @@ class AARToggleControl {
                 'text-field': ['get', 'name'],
                 'text-size': 11,
                 'text-font': ['Noto Sans Bold'],
-                'text-anchor': 'center'
+                'text-anchor': 'center',
             },
             paint: {
-                'text-color': 'rgba(255, 180, 0, 0.9)',
+                'text-color': 'rgba(255, 255, 255, 255)',
                 'text-halo-color': 'rgba(0, 0, 0, 0.7)',
-                'text-halo-width': 1.5
+                'text-halo-width': 1
             }
         });
     }
