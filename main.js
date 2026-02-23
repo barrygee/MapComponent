@@ -2,6 +2,52 @@
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
 
+// --- Range rings ---
+const RING_DISTANCES_NM = [50, 100, 150, 200, 250];
+let rangeRingCenter = null;
+let rangeRingsControl = null;
+
+function _toRad(deg) { return deg * Math.PI / 180; }
+function _toDeg(rad) { return rad * 180 / Math.PI; }
+
+function generateGeodesicCircle(lng, lat, radiusNm) {
+    const d = radiusNm / 3440.065;
+    const latR = _toRad(lat);
+    const lngR = _toRad(lng);
+    const pts = [];
+    for (let i = 0; i <= 180; i++) {
+        const b = _toRad(i * 2);
+        const lat2 = Math.asin(Math.sin(latR) * Math.cos(d) + Math.cos(latR) * Math.sin(d) * Math.cos(b));
+        const lng2 = lngR + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(latR), Math.cos(d) - Math.sin(latR) * Math.sin(lat2));
+        pts.push([_toDeg(lng2), _toDeg(lat2)]);
+    }
+    return pts;
+}
+
+function buildRingsGeoJSON(lng, lat) {
+    const lines = { type: 'FeatureCollection', features: [] };
+    const labels = { type: 'FeatureCollection', features: [] };
+    const latR = _toRad(lat);
+    const lngR = _toRad(lng);
+    RING_DISTANCES_NM.forEach(nm => {
+        const d = nm / 3440.065;
+        lines.features.push({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: generateGeodesicCircle(lng, lat, nm) },
+            properties: {}
+        });
+        // Label at north (bearing 0)
+        const lat2 = Math.asin(Math.sin(latR) * Math.cos(d) + Math.cos(latR) * Math.sin(d));
+        labels.features.push({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [_toDeg(lngR), _toDeg(lat2)] },
+            properties: { label: nm + ' nm' }
+        });
+    });
+    return { lines, labels };
+}
+// --- End range rings helpers ---
+
 const origin = window.location.origin;
 
 const map = new maplibregl.Map({
@@ -287,7 +333,126 @@ class NamesToggleControl {
 const namesControl = new NamesToggleControl();
 map.addControl(namesControl, 'top-right');
 
+// Custom control for toggling range rings
+class RangeRingsControl {
+    constructor() {
+        this.ringsVisible = true;
+    }
+
+    onAdd(map) {
+        this.map = map;
+        this.container = document.createElement('div');
+        this.container.className = 'maplibregl-ctrl';
+        this.container.style.backgroundColor = '#1c2538';
+        this.container.style.borderRadius = '4px';
+        this.container.style.marginTop = '4px';
+
+        this.button = document.createElement('button');
+        this.button.title = 'Toggle range rings';
+        this.button.textContent = '◎';
+        this.button.style.width = '29px';
+        this.button.style.height = '29px';
+        this.button.style.border = 'none';
+        this.button.style.backgroundColor = '#1c2538';
+        this.button.style.cursor = 'pointer';
+        this.button.style.fontSize = '16px';
+        this.button.style.color = '#ffffff';
+        this.button.style.fontWeight = 'bold';
+        this.button.style.display = 'flex';
+        this.button.style.alignItems = 'center';
+        this.button.style.justifyContent = 'center';
+        this.button.style.transition = 'opacity 0.2s';
+        this.button.style.opacity = '1';
+        this.button.onclick = () => this.toggleRings();
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#27324a';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#1c2538';
+
+        this.container.appendChild(this.button);
+
+        if (this.map.isStyleLoaded()) {
+            this.initRings();
+        } else {
+            this.map.once('style.load', () => this.initRings());
+        }
+
+        return this.container;
+    }
+
+    onRemove() {
+        if (this.container && this.container.parentNode) {
+            this.container.parentNode.removeChild(this.container);
+        }
+        this.map = undefined;
+    }
+
+    initRings() {
+        const center = rangeRingCenter || [this.map.getCenter().lng, this.map.getCenter().lat];
+        const { lines, labels } = buildRingsGeoJSON(center[0], center[1]);
+
+        this.map.addSource('range-rings-lines', { type: 'geojson', data: lines });
+        this.map.addSource('range-rings-labels', { type: 'geojson', data: labels });
+
+        this.map.addLayer({
+            id: 'range-rings-lines',
+            type: 'line',
+            source: 'range-rings-lines',
+            paint: {
+                'line-color': 'rgba(0, 0, 0, 0.7)',
+                'line-width': 1,
+                'line-dasharray': [4, 4]
+            }
+        });
+
+        this.map.addLayer({
+            id: 'range-rings-labels',
+            type: 'symbol',
+            source: 'range-rings-labels',
+            layout: {
+                'text-field': ['get', 'label'],
+                'text-size': 11,
+                'text-anchor': 'bottom',
+                'text-font': ['Noto Sans Regular']
+            },
+            paint: {
+                'text-color': 'rgba(255, 255, 255, 0.7)',
+                'text-halo-color': 'rgba(0, 0, 0, 0.5)',
+                'text-halo-width': 1
+            }
+        });
+    }
+
+    updateCenter(lng, lat) {
+        if (!this.map || !this.map.getSource('range-rings-lines')) return;
+        const { lines, labels } = buildRingsGeoJSON(lng, lat);
+        this.map.getSource('range-rings-lines').setData(lines);
+        this.map.getSource('range-rings-labels').setData(labels);
+    }
+
+    toggleRings() {
+        this.ringsVisible = !this.ringsVisible;
+        const v = this.ringsVisible ? 'visible' : 'none';
+        try {
+            this.map.setLayoutProperty('range-rings-lines', 'visibility', v);
+            this.map.setLayoutProperty('range-rings-labels', 'visibility', v);
+        } catch (e) {}
+        this.button.style.opacity = this.ringsVisible ? '1' : '0.5';
+    }
+}
+
+rangeRingsControl = new RangeRingsControl();
+map.addControl(rangeRingsControl, 'top-right');
+
 let userMarker;
+
+function createMarkerElement() {
+    const el = document.createElement('div');
+    el.style.width = '1.5em';
+    el.style.height = '1.5em';
+    el.innerHTML = `<svg viewBox="0 0 20 20" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="10" cy="10" r="8" fill="black" stroke="white" stroke-width="2.5"/>
+    </svg>`;
+    return el;
+}
 
 function setUserLocation(position) {
     const { longitude, latitude } = position.coords;
@@ -296,10 +461,14 @@ function setUserLocation(position) {
     if (userMarker) {
         userMarker.setLngLat([longitude, latitude]);
     } else {
-        userMarker = new maplibregl.Marker({ color: '#007bff' })
+        userMarker = new maplibregl.Marker({ element: createMarkerElement(), anchor: 'center' })
             .setLngLat([longitude, latitude])
             .addTo(map);
     }
+
+    // Update range rings centre to user's location
+    rangeRingCenter = [longitude, latitude];
+    if (rangeRingsControl) rangeRingsControl.updateCenter(longitude, latitude);
 
     // Cache the coordinates and remember permission
     localStorage.setItem('userLocation', JSON.stringify({ longitude, latitude }));
