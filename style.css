@@ -16,7 +16,7 @@ html {
 
 /* Dark mode for MapLibre navigation controls */
 .maplibregl-ctrl-group {
-    background-color: #252D3F !important;
+    background-color: #1c2538 !important;
     border: none !important;
     box-shadow: none !important;
 }
@@ -31,7 +31,7 @@ html {
 
 /* Hover state for dark mode buttons */
 .maplibregl-ctrl-group button:hover {
-    background-color: #323B52 !important;
+    background-color: #27324a !important;
 }
 
 /* Compass needle specific adjustment if needed, but filter 100% works well */

@@ -1,6 +1,14 @@
 {
   "version": 8,
   "sources": {
+    "ne2_shaded": {
+      "maxzoom": 6,
+      "tileSize": 256,
+      "tiles": [
+        "https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png"
+      ],
+      "type": "raster"
+    },
     "openmaptiles": {
       "type": "vector",
       "url": "pmtiles://tiles/uk.pmtiles"
@@ -13,8 +21,14 @@
       "id": "background",
       "type": "background",
       "paint": {
-        "background-color": "#1a2a3a"
+        "background-color": "#45516E"
       }
+    },
+    {
+      "id": "ne2_shaded",
+      "type": "raster",
+      "source": "ne2_shaded",
+      "maxzoom": 6
     },
     {
       "id": "earth",
@@ -22,7 +36,7 @@
       "source": "openmaptiles",
       "source-layer": "earth",
       "paint": {
-        "fill-color": "#2c3447"
+        "fill-color": "#45516E"
       }
     },
     {
@@ -54,7 +68,7 @@
       ],
       "paint": {
         "fill-antialias": false,
-        "fill-color": "#1a2230"
+        "fill-color": "#38435C"
       }
     },
     {
@@ -763,7 +777,7 @@
       "type": "line",
       "source": "openmaptiles",
       "source-layer": "roads",
-      "maxzoom": 8,
+      "maxzoom": 11,
       "filter": [
         "all",
         [
@@ -799,9 +813,9 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "hsl(50,100%,55%)",
-        "line-opacity": 1,
-        "line-width": 3
+        "line-color": "#3D4355",
+        "line-opacity": 0.6,
+        "line-width": 2
       }
     },
     {
@@ -809,13 +823,13 @@
       "type": "line",
       "source": "openmaptiles",
       "source-layer": "roads",
-      "minzoom": 9,
+      "minzoom": 6,
       "layout": {
         "line-cap": "butt",
         "line-join": "miter"
       },
       "paint": {
-        "line-color": "#1f2632",
+        "line-color": "hsl(224,22%,45%)",
         "line-dasharray": [
           2,
           0
@@ -841,6 +855,7 @@
     },
     {
       "id": "highway_motorway_inner",
+      "minzoom": 6,
       "type": "line",
       "source": "openmaptiles",
       "source-layer": "roads",
@@ -850,7 +865,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "#1f2632",
+        "line-color": "hsl(224,20%,29%)",
         "line-width": [
           "interpolate",
           [
@@ -903,7 +918,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "#1f2632",
+        "line-color": "hsla(239,45%,69%,0.2)",
         "line-width": [
           "interpolate",
           [
@@ -1677,7 +1692,7 @@
         "text-transform": "uppercase"
       },
       "paint": {
-        "text-color": "hsl(190,65%,50%)",
+        "text-color": "hsl(195,37%,73%)",
         "text-halo-blur": 1,
         "text-halo-color": "hsla(228,60%,21%,0.7)",
         "text-halo-width": 1,
@@ -1768,7 +1783,7 @@
         "text-transform": "uppercase"
       },
       "paint": {
-        "text-color": "hsl(190,70%,55%)",
+        "text-color": "hsl(195,41%,49%)",
         "text-halo-blur": 1,
         "text-halo-color": "hsla(228,60%,21%,0.7)",
         "text-halo-width": 1
@@ -1860,7 +1875,7 @@
       },
       "paint": {
         "icon-opacity": 0.7,
-        "text-color": "hsl(190,70%,55%)",
+        "text-color": "hsl(195,41%,49%)",
         "text-halo-blur": 1,
         "text-halo-color": "hsla(228,60%,21%,0.7)",
         "text-halo-width": 1
@@ -1969,7 +1984,7 @@
       },
       "paint": {
         "icon-opacity": 0.7,
-        "text-color": "hsl(190,65%,50%)",
+        "text-color": "hsl(195,25%,76%)",
         "text-halo-blur": 1,
         "text-halo-color": "hsla(228,60%,21%,0.7)",
         "text-halo-width": 1
@@ -2191,7 +2206,7 @@
       },
       "paint": {
         "icon-opacity": 0.7,
-        "text-color": "hsl(190,65%,50%)",
+        "text-color": "hsl(195,25%,76%)",
         "text-halo-blur": 1,
         "text-halo-color": "hsla(228,60%,21%,0.7)",
         "text-halo-width": 1
@@ -2264,7 +2279,7 @@
         "text-transform": "uppercase"
       },
       "paint": {
-        "text-color": "hsl(190,70%,55%)",
+        "text-color": "rgb(113,129,144)",
         "text-halo-blur": 1,
         "text-halo-color": "hsla(228,60%,21%,0.7)",
         "text-halo-width": 1
@@ -2679,7 +2694,7 @@
         "text-transform": "uppercase"
       },
       "paint": {
-        "text-color": "hsl(190,65%,50%)",
+        "text-color": "hsl(0,0%,100%)",
         "text-halo-color": "hsla(228,60%,21%,0.7)",
         "text-halo-width": 1.4,
         "text-opacity": [

@@ -121,14 +121,14 @@ map.on('error', (e) => {
 // Custom control for toggling roads
 class RoadsToggleControl {
     constructor() {
-        this.roadsVisible = false; // Hidden by default
+        this.roadsVisible = true; // Visible by default
     }
 
     onAdd(map) {
         this.map = map;
         this.container = document.createElement('div');
         this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#252D3F';
+        this.container.style.backgroundColor = '#1c2538';
         this.container.style.borderRadius = '4px';
         this.container.style.marginTop = '4px';
         
@@ -139,7 +139,7 @@ class RoadsToggleControl {
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#252D3F';
+        this.button.style.backgroundColor = '#1c2538';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
         this.button.style.color = '#ffffff';
@@ -150,17 +150,20 @@ class RoadsToggleControl {
         this.button.style.transition = 'opacity 0.2s';
         this.button.style.opacity = '0.5';
         this.button.onclick = () => this.toggleRoads();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#323B52';
-        this.button.onmouseout = () => this.button.style.backgroundColor = '#252D3F';
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#27324a';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#1c2538';
         
         this.container.appendChild(this.button);
         
         // Listen to zoom changes to update button state
         this.map.on('zoom', () => this.updateButtonState());
-        
+
         // Set initial visibility based on zoom and toggle state
         this.updateRoadsVisibility();
-        
+
+        // Re-apply visibility after style loads (initial call may fail if style not loaded)
+        this.map.once('style.load', () => this.updateRoadsVisibility());
+
         return this.container;
     }
 
@@ -173,14 +176,14 @@ class RoadsToggleControl {
 
     updateButtonState() {
         const currentZoom = this.map.getZoom();
-        const zoomAllowsRoads = currentZoom >= 9;
+        const zoomAllowsRoads = true;
         const shouldBeVisible = this.roadsVisible && zoomAllowsRoads;
         this.button.style.opacity = shouldBeVisible ? '1' : '0.5';
     }
 
     updateRoadsVisibility() {
         const currentZoom = this.map.getZoom();
-        const zoomAllowsRoads = currentZoom >= 9;
+        const zoomAllowsRoads = true;
         const visibility = (this.roadsVisible && zoomAllowsRoads) ? 'visible' : 'none';
         
         const roadLayerIds = [
@@ -223,7 +226,7 @@ class NamesToggleControl {
         this.map = map;
         this.container = document.createElement('div');
         this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#252D3F';
+        this.container.style.backgroundColor = '#1c2538';
         this.container.style.borderRadius = '4px';
         this.container.style.marginTop = '4px';
         
@@ -234,7 +237,7 @@ class NamesToggleControl {
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#252D3F';
+        this.button.style.backgroundColor = '#1c2538';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
         this.button.style.color = '#ffffff';
@@ -245,8 +248,8 @@ class NamesToggleControl {
         this.button.style.transition = 'opacity 0.2s';
         this.button.style.opacity = '1';
         this.button.onclick = () => this.toggleNames();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#323B52';
-        this.button.onmouseout = () => this.button.style.backgroundColor = '#252D3F';
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#27324a';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#1c2538';
         
         this.container.appendChild(this.button);
         return this.container;
