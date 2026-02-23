@@ -1,6 +1,14 @@
 {
   "version": 8,
   "sources": {
+    "ne2_shaded": {
+      "maxzoom": 6,
+      "tileSize": 256,
+      "tiles": [
+        "/assets/tiles/world/{z}/{x}/{y}.png"
+      ],
+      "type": "raster"
+    },
     "openmaptiles": {
       "type": "vector",
       "url": "pmtiles://tiles/uk.pmtiles"
@@ -13,7 +21,19 @@
       "id": "background",
       "type": "background",
       "paint": {
-        "background-color": "#45516E"
+        "background-color": "#38435C"
+      }
+    },
+    {
+      "id": "ne2_shaded",
+      "type": "raster",
+      "source": "ne2_shaded",
+      "maxzoom": 6,
+      "paint": {
+        "raster-brightness-min": 0.26,
+        "raster-brightness-max": 0.34,
+        "raster-saturation": -1,
+        "raster-opacity": 1.0
       }
     },
     {
@@ -365,7 +385,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "hsl(224,22%,45%)",
+        "line-color": "hsl(185,30%,42%)",
         "line-opacity": 1,
         "line-width": [
           "interpolate",
@@ -406,7 +426,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "hsl(224,22%,45%)",
+        "line-color": "hsl(185,30%,42%)",
         "line-opacity": 1,
         "line-width": [
           "interpolate",
@@ -459,7 +479,7 @@
         ]
       ],
       "paint": {
-        "fill-color": "hsl(224,20%,29%)",
+        "fill-color": "hsl(185,22%,27%)",
         "fill-opacity": 1
       }
     },
@@ -502,7 +522,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "hsl(224,20%,29%)",
+        "line-color": "hsl(185,22%,22%)",
         "line-opacity": 1,
         "line-width": [
           "interpolate",
