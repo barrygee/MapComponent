@@ -27,3 +27,4 @@ docker compose down
 | `+` / `−` | Zoom in / out |
 | `R` | Toggle road network |
 | `N` | Toggle place name labels |
+
