@@ -19,6 +19,19 @@ _setConnStatus(_isOnline);
 window.addEventListener('online',  () => { _setConnStatus(true);  _switchStyle(true);  });
 window.addEventListener('offline', () => { _setConnStatus(false); _switchStyle(false); });
 
+// Poll real internet connectivity every 10 s as a reliable fallback.
+// mode:'no-cors' resolves for any reachable server; rejects only on network failure.
+let _connState = _isOnline;
+setInterval(() => {
+    fetch('https://tile.openstreetmap.org/favicon.ico', { method: 'HEAD', cache: 'no-store', mode: 'no-cors' })
+        .then(() => {
+            if (!_connState) { _connState = true;  _setConnStatus(true);  _switchStyle(true);  }
+        })
+        .catch(() => {
+            if (_connState)  { _connState = false; _setConnStatus(false); _switchStyle(false); }
+        });
+}, 10000);
+
 function _switchStyle(online) {
     if (typeof map === 'undefined' || !map.isStyleLoaded()) return;
     map.setStyle(online
