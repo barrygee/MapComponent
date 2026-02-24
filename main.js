@@ -2,6 +2,27 @@
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
 
+// --- Connectivity detection ---
+// navigator.onLine is set by the OS network stack — reliable for the main
+// cases (internet present / device fully offline). The browser fires
+// 'online'/'offline' events when connectivity changes, triggering a reload
+// so the correct tile source is always used. No background probe is used
+// because probing a third-party URL causes reload loops in environments
+// where that URL is blocked (corporate networks, offline labs, etc.).
+const _isOnline = navigator.onLine;
+
+function _setConnStatus(online) {
+    const el = document.getElementById('conn-status');
+    if (!el) return;
+    el.className = online ? 'conn-online' : 'conn-offline';
+    el.textContent = online ? '● ONLINE' : '● OFFLINE';
+}
+_setConnStatus(_isOnline);
+
+window.addEventListener('online',  () => window.location.reload());
+window.addEventListener('offline', () => window.location.reload());
+// --- End connectivity detection ---
+
 // --- Range rings ---
 const RING_DISTANCES_NM = [50, 100, 150, 200, 250];
 let rangeRingCenter = null;
@@ -89,9 +110,13 @@ function computeTextRotate(coordinates) {
 
 const origin = window.location.origin;
 
+const _styleURL = _isOnline
+    ? `${origin}/assets/fiord-online.json`
+    : `${origin}/assets/fiord.json`;
+
 const map = new maplibregl.Map({
     container: 'map',
-    style: `${origin}/assets/fiord.json`,
+    style: _styleURL,
     center: [-4.4815, 54.1453],
     zoom: 6,
     minZoom: 2,

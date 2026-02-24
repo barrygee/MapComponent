@@ -96,7 +96,20 @@ html {
 #footer-right {
     display: flex;
     align-items: center;
+    gap: 16px;
 }
+
+#conn-status {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.conn-online  { color: #c8ff00; }
+.conn-offline { color: rgba(255, 80, 80, 0.8); }
+.conn-checking { color: rgba(255, 255, 255, 0.2); }
 
 .footer-label {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
