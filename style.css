@@ -14,33 +14,45 @@ html {
     width: 100%;
 }
 
-/* Dark mode for MapLibre navigation controls */
+/* Anduril dark theme — pure black, sharp corners */
 .maplibregl-ctrl-group {
-    background-color: #1c2538 !important;
-    border: none !important;
+    background-color: #000000 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
 }
 
 .maplibregl-ctrl-group button+button {
-    border-top: none !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .maplibregl-ctrl-icon {
-    filter: invert(1) brightness(1.5) !important;
+    filter: invert(1) brightness(1.2) !important;
 }
 
-/* Hover state for dark mode buttons */
 .maplibregl-ctrl-group button:hover {
-    background-color: #27324a !important;
+    background-color: #111111 !important;
 }
 
-/* Compass needle specific adjustment if needed, but filter 100% works well */
 .maplibregl-ctrl-compass .maplibregl-ctrl-icon {
     filter: invert(1) brightness(2) !important;
 }
 
-/* Roads toggle button styling */
 .maplibregl-ctrl-group button {
     cursor: pointer;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, color 0.2s;
+}
+
+/* Custom controls — thin border, sharp corners */
+.maplibregl-ctrl:not(.maplibregl-ctrl-group) {
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 0 !important;
+}
+
+/* Monospace technical font for all map controls */
+.maplibregl-ctrl button {
+    font-family: 'Courier New', 'Courier', monospace !important;
+    letter-spacing: 0.06em !important;
+    font-weight: 500 !important;
+    transition: opacity 0.2s, color 0.2s !important;
 }

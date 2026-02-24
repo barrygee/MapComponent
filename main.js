@@ -196,8 +196,8 @@ class RoadsToggleControl {
         this.map = map;
         this.container = document.createElement('div');
         this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#1c2538';
-        this.container.style.borderRadius = '4px';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
         this.container.style.marginTop = '4px';
         
         this.button = document.createElement('button');
@@ -207,7 +207,7 @@ class RoadsToggleControl {
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#1c2538';
+        this.button.style.backgroundColor = '#000000';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
         this.button.style.color = '#ffffff';
@@ -216,10 +216,10 @@ class RoadsToggleControl {
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
         this.button.style.transition = 'opacity 0.2s';
-        this.button.style.opacity = '0.5';
+        this.button.style.opacity = '0.3';
         this.button.onclick = () => this.toggleRoads();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#27324a';
-        this.button.onmouseout = () => this.button.style.backgroundColor = '#1c2538';
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
         
         this.container.appendChild(this.button);
         
@@ -246,7 +246,8 @@ class RoadsToggleControl {
         const currentZoom = this.map.getZoom();
         const zoomAllowsRoads = true;
         const shouldBeVisible = this.roadsVisible && zoomAllowsRoads;
-        this.button.style.opacity = shouldBeVisible ? '1' : '0.5';
+        this.button.style.opacity = shouldBeVisible ? '1' : '0.3';
+        this.button.style.color = shouldBeVisible ? '#c8ff00' : '#ffffff';
     }
 
     updateRoadsVisibility() {
@@ -295,8 +296,8 @@ class NamesToggleControl {
         this.map = map;
         this.container = document.createElement('div');
         this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#1c2538';
-        this.container.style.borderRadius = '4px';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
         this.container.style.marginTop = '4px';
         
         this.button = document.createElement('button');
@@ -306,19 +307,19 @@ class NamesToggleControl {
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#1c2538';
+        this.button.style.backgroundColor = '#000000';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
-        this.button.style.color = '#ffffff';
+        this.button.style.color = '#c8ff00';
         this.button.style.fontWeight = 'bold';
         this.button.style.display = 'flex';
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
-        this.button.style.transition = 'opacity 0.2s';
+        this.button.style.transition = 'opacity 0.2s, color 0.2s';
         this.button.style.opacity = '1';
         this.button.onclick = () => this.toggleNames();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#27324a';
-        this.button.onmouseout = () => this.button.style.backgroundColor = '#1c2538';
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
         
         this.container.appendChild(this.button);
         return this.container;
@@ -349,7 +350,8 @@ class NamesToggleControl {
             }
         });
         
-        this.button.style.opacity = this.namesVisible ? '1' : '0.5';
+        this.button.style.opacity = this.namesVisible ? '1' : '0.3';
+        this.button.style.color = this.namesVisible ? '#c8ff00' : '#ffffff';
     }
 }
 
@@ -367,8 +369,8 @@ class RangeRingsControl {
         this.map = map;
         this.container = document.createElement('div');
         this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#1c2538';
-        this.container.style.borderRadius = '4px';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
         this.container.style.marginTop = '4px';
 
         this.button = document.createElement('button');
@@ -377,19 +379,19 @@ class RangeRingsControl {
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#1c2538';
+        this.button.style.backgroundColor = '#000000';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
-        this.button.style.color = '#ffffff';
+        this.button.style.color = '#c8ff00';
         this.button.style.fontWeight = 'bold';
         this.button.style.display = 'flex';
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
-        this.button.style.transition = 'opacity 0.2s';
+        this.button.style.transition = 'opacity 0.2s, color 0.2s';
         this.button.style.opacity = '1';
         this.button.onclick = () => this.toggleRings();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#27324a';
-        this.button.onmouseout = () => this.button.style.backgroundColor = '#1c2538';
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
 
         this.container.appendChild(this.button);
 
@@ -420,7 +422,7 @@ class RangeRingsControl {
             type: 'line',
             source: 'range-rings-lines',
             paint: {
-                'line-color': 'rgba(0, 0, 0, 0.7)',
+                'line-color': 'rgba(255, 255, 255, 0.18)',
                 'line-width': 1,
                 'line-dasharray': [4, 4]
             }
@@ -439,7 +441,8 @@ class RangeRingsControl {
         try {
             this.map.setLayoutProperty('range-rings-lines', 'visibility', v);
         } catch (e) {}
-        this.button.style.opacity = this.ringsVisible ? '1' : '0.5';
+        this.button.style.opacity = this.ringsVisible ? '1' : '0.3';
+        this.button.style.color = this.ringsVisible ? '#c8ff00' : '#ffffff';
     }
 }
 
@@ -477,8 +480,8 @@ class AARToggleControl {
         this.map = map;
         this.container = document.createElement('div');
         this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#1c2538';
-        this.container.style.borderRadius = '4px';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
         this.container.style.marginTop = '4px';
 
         this.button = document.createElement('button');
@@ -487,7 +490,7 @@ class AARToggleControl {
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#1c2538';
+        this.button.style.backgroundColor = '#000000';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
         this.button.style.color = '#ffffff';
@@ -495,10 +498,10 @@ class AARToggleControl {
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
         this.button.style.transition = 'opacity 0.2s';
-        this.button.style.opacity = '0.5';
+        this.button.style.opacity = '0.3';
         this.button.onclick = () => this.toggle();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#27324a';
-        this.button.onmouseout = () => this.button.style.backgroundColor = '#1c2538';
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
 
         this.container.appendChild(this.button);
 
@@ -531,7 +534,7 @@ class AARToggleControl {
             type: 'fill',
             source: 'aara-zones',
             layout: { visibility: 'none' },
-            paint: { 'fill-color': 'rgba(3, 17, 45, 0.25)', 'fill-outline-color': 'rgba(12, 105, 142, 0)' }
+            paint: { 'fill-color': 'rgba(200, 255, 0, 0.04)', 'fill-outline-color': 'rgba(0,0,0,0)' }
         });
 
         this.map.addLayer({
@@ -539,7 +542,7 @@ class AARToggleControl {
             type: 'line',
             source: 'aara-zones',
             layout: { visibility: 'none' },
-            paint: { 'line-color': 'rgba(124, 235, 21, 0.5)', 'line-width': 1.5, 'line-dasharray': [6, 3] }
+            paint: { 'line-color': 'rgba(200, 255, 0, 0.75)', 'line-width': 1.5, 'line-dasharray': [6, 3] }
         });
 
         this.map.addLayer({
@@ -571,7 +574,8 @@ class AARToggleControl {
         ['aara-fill', 'aara-outline', 'aara-labels'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', v); } catch (e) {}
         });
-        this.button.style.opacity = this.visible ? '1' : '0.5';
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
     }
 }
 
@@ -644,8 +648,8 @@ class AWACSToggleControl {
         this.map = map;
         this.container = document.createElement('div');
         this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#1c2538';
-        this.container.style.borderRadius = '4px';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
         this.container.style.marginTop = '4px';
 
         this.button = document.createElement('button');
@@ -654,19 +658,19 @@ class AWACSToggleControl {
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#1c2538';
+        this.button.style.backgroundColor = '#000000';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
         this.button.style.fontWeight = 'bold';
-        this.button.style.color = '#ffdc00';
+        this.button.style.color = '#ffffff';
         this.button.style.display = 'flex';
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
         this.button.style.transition = 'opacity 0.2s';
-        this.button.style.opacity = '0.5';
+        this.button.style.opacity = '0.3';
         this.button.onclick = () => this.toggle();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#27324a';
-        this.button.onmouseout = () => this.button.style.backgroundColor = '#1c2538';
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
 
         this.container.appendChild(this.button);
 
@@ -694,7 +698,7 @@ class AWACSToggleControl {
             type: 'fill',
             source: 'awacs-orbits',
             layout: { visibility: 'none' },
-            paint: { 'fill-color': 'rgba(255, 220, 0, 0.08)', 'fill-outline-color': 'rgba(0,0,0,0)' }
+            paint: { 'fill-color': 'rgba(200, 255, 0, 0.04)', 'fill-outline-color': 'rgba(0,0,0,0)' }
         });
 
         this.map.addLayer({
@@ -702,7 +706,7 @@ class AWACSToggleControl {
             type: 'line',
             source: 'awacs-orbits',
             layout: { visibility: 'none' },
-            paint: { 'line-color': 'rgba(255, 220, 0, 0.85)', 'line-width': 1.5 }
+            paint: { 'line-color': 'rgba(200, 255, 0, 0.75)', 'line-width': 1.5 }
         });
     }
 
@@ -712,7 +716,8 @@ class AWACSToggleControl {
         ['awacs-fill', 'awacs-outline'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', v); } catch (e) {}
         });
-        this.button.style.opacity = this.visible ? '1' : '0.5';
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
     }
 }
 
@@ -732,8 +737,8 @@ class ClearOverlaysControl {
         this.map = map;
         this.container = document.createElement('div');
         this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#1c2538';
-        this.container.style.borderRadius = '4px';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
         this.container.style.marginTop = '4px';
 
         this.button = document.createElement('button');
@@ -742,7 +747,7 @@ class ClearOverlaysControl {
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#1c2538';
+        this.button.style.backgroundColor = '#000000';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '14px';
         this.button.style.color = '#ffffff';
@@ -750,10 +755,10 @@ class ClearOverlaysControl {
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
         this.button.style.transition = 'opacity 0.2s';
-        this.button.style.opacity = '0.5';
+        this.button.style.opacity = '0.3';
         this.button.onclick = () => this.toggle();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#27324a';
-        this.button.onmouseout = () => this.button.style.backgroundColor = '#1c2538';
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
 
         this.container.appendChild(this.button);
         return this.container;
@@ -780,6 +785,7 @@ class ClearOverlaysControl {
             if (awacsControl && awacsControl.visible) awacsControl.toggle();
             this.cleared = true;
             this.button.style.opacity = '1';
+            this.button.style.color = '#c8ff00';
         } else {
             if (this.savedStates) {
                 if (roadsControl && this.savedStates.roads !== roadsControl.roadsVisible) roadsControl.toggleRoads();
@@ -788,7 +794,8 @@ class ClearOverlaysControl {
                 if (awacsControl && this.savedStates.awacs !== awacsControl.visible) awacsControl.toggle();
             }
             this.cleared = false;
-            this.button.style.opacity = '0.5';
+            this.button.style.opacity = '0.3';
+            this.button.style.color = '#ffffff';
         }
     }
 }
