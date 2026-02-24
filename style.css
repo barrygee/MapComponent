@@ -49,10 +49,10 @@ html {
     border-radius: 0 !important;
 }
 
-/* Monospace technical font for all map controls */
+/* Geometric sans-serif for all map controls */
 .maplibregl-ctrl button {
-    font-family: 'Courier New', 'Courier', monospace !important;
-    letter-spacing: 0.06em !important;
-    font-weight: 500 !important;
+    font-family: 'Rajdhani', 'Helvetica Neue', Arial, sans-serif !important;
+    letter-spacing: 0.08em !important;
+    font-weight: 600 !important;
     transition: opacity 0.2s, color 0.2s !important;
 }
