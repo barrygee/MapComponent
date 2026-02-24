@@ -44,7 +44,7 @@ html {
 }
 
 #logo-img {
-    height: 36px;
+    height: 24px;
     width: auto;
     display: block;
     /* Invert black SVG to white for the dark header */
