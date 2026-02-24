@@ -545,7 +545,8 @@ class AARToggleControl {
     }
 }
 
-map.addControl(new AARToggleControl(), 'top-right');
+const aarControl = new AARToggleControl();
+map.addControl(aarControl, 'top-right');
 // --- End UK AARA ---
 
 
@@ -619,15 +620,15 @@ class AWACSToggleControl {
 
         this.button = document.createElement('button');
         this.button.title = 'Toggle UK AWACS orbits';
-        this.button.textContent = 'W';
+        this.button.textContent = '○';
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
         this.button.style.backgroundColor = '#1c2538';
         this.button.style.cursor = 'pointer';
-        this.button.style.fontSize = '14px';
+        this.button.style.fontSize = '16px';
         this.button.style.fontWeight = 'bold';
-        this.button.style.color = '#ffffff';
+        this.button.style.color = '#ffdc00';
         this.button.style.display = 'flex';
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
@@ -685,8 +686,85 @@ class AWACSToggleControl {
     }
 }
 
-map.addControl(new AWACSToggleControl(), 'top-right');
+const awacsControl = new AWACSToggleControl();
+map.addControl(awacsControl, 'top-right');
 // --- End UK AWACS Orbits ---
+
+
+// --- Clear all overlays ---
+class ClearOverlaysControl {
+    constructor() {
+        this.cleared = false;
+        this.savedStates = null;
+    }
+
+    onAdd(map) {
+        this.map = map;
+        this.container = document.createElement('div');
+        this.container.className = 'maplibregl-ctrl';
+        this.container.style.backgroundColor = '#1c2538';
+        this.container.style.borderRadius = '4px';
+        this.container.style.marginTop = '4px';
+
+        this.button = document.createElement('button');
+        this.button.title = 'Toggle all overlays';
+        this.button.textContent = '✕';
+        this.button.style.width = '29px';
+        this.button.style.height = '29px';
+        this.button.style.border = 'none';
+        this.button.style.backgroundColor = '#1c2538';
+        this.button.style.cursor = 'pointer';
+        this.button.style.fontSize = '14px';
+        this.button.style.color = '#ffffff';
+        this.button.style.display = 'flex';
+        this.button.style.alignItems = 'center';
+        this.button.style.justifyContent = 'center';
+        this.button.style.transition = 'opacity 0.2s';
+        this.button.style.opacity = '0.5';
+        this.button.onclick = () => this.toggle();
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#27324a';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#1c2538';
+
+        this.container.appendChild(this.button);
+        return this.container;
+    }
+
+    onRemove() {
+        if (this.container && this.container.parentNode) {
+            this.container.parentNode.removeChild(this.container);
+        }
+        this.map = undefined;
+    }
+
+    toggle() {
+        if (!this.cleared) {
+            this.savedStates = {
+                roads: roadsControl ? roadsControl.roadsVisible : false,
+                rings: rangeRingsControl ? rangeRingsControl.ringsVisible : false,
+                aar: aarControl ? aarControl.visible : false,
+                awacs: awacsControl ? awacsControl.visible : false,
+            };
+            if (roadsControl && roadsControl.roadsVisible) roadsControl.toggleRoads();
+            if (rangeRingsControl && rangeRingsControl.ringsVisible) rangeRingsControl.toggleRings();
+            if (aarControl && aarControl.visible) aarControl.toggle();
+            if (awacsControl && awacsControl.visible) awacsControl.toggle();
+            this.cleared = true;
+            this.button.style.opacity = '1';
+        } else {
+            if (this.savedStates) {
+                if (roadsControl && this.savedStates.roads !== roadsControl.roadsVisible) roadsControl.toggleRoads();
+                if (rangeRingsControl && this.savedStates.rings !== rangeRingsControl.ringsVisible) rangeRingsControl.toggleRings();
+                if (aarControl && this.savedStates.aar !== aarControl.visible) aarControl.toggle();
+                if (awacsControl && this.savedStates.awacs !== awacsControl.visible) awacsControl.toggle();
+            }
+            this.cleared = false;
+            this.button.style.opacity = '0.5';
+        }
+    }
+}
+
+map.addControl(new ClearOverlaysControl(), 'top-right');
+// --- End clear all overlays ---
 
 let userMarker;
 
