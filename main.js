@@ -202,10 +202,33 @@ map.on('error', (e) => {
 });
 
 
+// --- Overlay state persistence ---
+// Defaults: everything ON on first load; subsequent loads restore last state.
+const _OVERLAY_DEFAULTS = { roads: true, names: true, rings: true, aar: true, awacs: true };
+const _overlayStates = (() => {
+    try {
+        const saved = localStorage.getItem('overlayStates');
+        return saved ? Object.assign({}, _OVERLAY_DEFAULTS, JSON.parse(saved)) : Object.assign({}, _OVERLAY_DEFAULTS);
+    } catch (e) { return Object.assign({}, _OVERLAY_DEFAULTS); }
+})();
+function _saveOverlayStates() {
+    try {
+        localStorage.setItem('overlayStates', JSON.stringify({
+            roads: roadsControl ? roadsControl.roadsVisible : _overlayStates.roads,
+            names: namesControl ? namesControl.namesVisible : _overlayStates.names,
+            rings: rangeRingsControl ? rangeRingsControl.ringsVisible : _overlayStates.rings,
+            aar: aarControl ? aarControl.visible : _overlayStates.aar,
+            awacs: awacsControl ? awacsControl.visible : _overlayStates.awacs,
+        }));
+    } catch (e) {}
+}
+// --- End overlay state persistence ---
+
+
 // Custom control for toggling roads
 class RoadsToggleControl {
     constructor() {
-        this.roadsVisible = true; // Visible by default
+        this.roadsVisible = _overlayStates.roads;
     }
 
     onAdd(map) {
@@ -294,6 +317,7 @@ class RoadsToggleControl {
     toggleRoads() {
         this.roadsVisible = !this.roadsVisible;
         this.updateRoadsVisibility();
+        _saveOverlayStates();
     }
 }
 
@@ -305,7 +329,7 @@ map.addControl(roadsControl, 'top-right');
 // Custom control for toggling city names
 class NamesToggleControl {
     constructor() {
-        this.namesVisible = true;
+        this.namesVisible = _overlayStates.names;
     }
 
     onAdd(map) {
@@ -315,7 +339,7 @@ class NamesToggleControl {
         this.container.style.backgroundColor = '#000000';
         this.container.style.borderRadius = '0';
         this.container.style.marginTop = '4px';
-        
+
         this.button = document.createElement('button');
         this.button.className = 'names-toggle-btn';
         this.button.title = 'Toggle city names';
@@ -326,18 +350,25 @@ class NamesToggleControl {
         this.button.style.backgroundColor = '#000000';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
-        this.button.style.color = '#c8ff00';
         this.button.style.fontWeight = 'bold';
         this.button.style.display = 'flex';
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
         this.button.style.transition = 'opacity 0.2s, color 0.2s';
-        this.button.style.opacity = '1';
+        this.button.style.opacity = this.namesVisible ? '1' : '0.3';
+        this.button.style.color = this.namesVisible ? '#c8ff00' : '#ffffff';
         this.button.onclick = () => this.toggleNames();
         this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
         this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
-        
+
         this.container.appendChild(this.button);
+
+        if (this.map.isStyleLoaded()) {
+            this.applyNamesVisibility();
+        } else {
+            this.map.once('style.load', () => this.applyNamesVisibility());
+        }
+
         return this.container;
     }
 
@@ -348,26 +379,24 @@ class NamesToggleControl {
         this.map = undefined;
     }
 
-    toggleNames() {
-        this.namesVisible = !this.namesVisible;
+    applyNamesVisibility() {
         const visibility = this.namesVisible ? 'visible' : 'none';
-        
         const nameLayerIds = [
-            'place_suburb', 'place_village', 'place_town', 
+            'place_suburb', 'place_village', 'place_town',
             'place_city', 'place_state', 'place_country',
             'place_country_other', 'water_name'
         ];
-        
         nameLayerIds.forEach(layerId => {
-            try {
-                this.map.setLayoutProperty(layerId, 'visibility', visibility);
-            } catch (e) {
-                // Layer might not exist, skip it
-            }
+            try { this.map.setLayoutProperty(layerId, 'visibility', visibility); } catch (e) {}
         });
-        
         this.button.style.opacity = this.namesVisible ? '1' : '0.3';
         this.button.style.color = this.namesVisible ? '#c8ff00' : '#ffffff';
+    }
+
+    toggleNames() {
+        this.namesVisible = !this.namesVisible;
+        this.applyNamesVisibility();
+        _saveOverlayStates();
     }
 }
 
@@ -378,7 +407,7 @@ map.addControl(namesControl, 'top-right');
 // Custom control for toggling range rings
 class RangeRingsControl {
     constructor() {
-        this.ringsVisible = true;
+        this.ringsVisible = _overlayStates.rings;
     }
 
     onAdd(map) {
@@ -398,13 +427,13 @@ class RangeRingsControl {
         this.button.style.backgroundColor = '#000000';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
-        this.button.style.color = '#c8ff00';
         this.button.style.fontWeight = 'bold';
         this.button.style.display = 'flex';
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
         this.button.style.transition = 'opacity 0.2s, color 0.2s';
-        this.button.style.opacity = '1';
+        this.button.style.opacity = this.ringsVisible ? '1' : '0.3';
+        this.button.style.color = this.ringsVisible ? '#c8ff00' : '#ffffff';
         this.button.onclick = () => this.toggleRings();
         this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
         this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
@@ -437,6 +466,7 @@ class RangeRingsControl {
             id: 'range-rings-lines',
             type: 'line',
             source: 'range-rings-lines',
+            layout: { visibility: this.ringsVisible ? 'visible' : 'none' },
             paint: {
                 'line-color': 'rgba(255, 255, 255, 0.18)',
                 'line-width': 1,
@@ -459,6 +489,7 @@ class RangeRingsControl {
         } catch (e) {}
         this.button.style.opacity = this.ringsVisible ? '1' : '0.3';
         this.button.style.color = this.ringsVisible ? '#c8ff00' : '#ffffff';
+        _saveOverlayStates();
     }
 }
 
@@ -489,7 +520,7 @@ const AARA_ZONES = {
 
 class AARToggleControl {
     constructor() {
-        this.visible = false;
+        this.visible = _overlayStates.aar;
     }
 
     onAdd(map) {
@@ -509,12 +540,12 @@ class AARToggleControl {
         this.button.style.backgroundColor = '#000000';
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
-        this.button.style.color = '#ffffff';
         this.button.style.display = 'flex';
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
-        this.button.style.transition = 'opacity 0.2s';
-        this.button.style.opacity = '0.3';
+        this.button.style.transition = 'opacity 0.2s, color 0.2s';
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
         this.button.onclick = () => this.toggle();
         this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
         this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
@@ -557,11 +588,13 @@ class AARToggleControl {
         };
         this.map.addSource('aara-label-points', { type: 'geojson', data: aaraLabelPoints });
 
+        const aarVis = this.visible ? 'visible' : 'none';
+
         this.map.addLayer({
             id: 'aara-fill',
             type: 'fill',
             source: 'aara-zones',
-            layout: { visibility: 'none' },
+            layout: { visibility: aarVis },
             paint: { 'fill-color': 'rgba(200, 255, 0, 0.04)', 'fill-outline-color': 'rgba(0,0,0,0)' }
         });
 
@@ -569,7 +602,7 @@ class AARToggleControl {
             id: 'aara-outline',
             type: 'line',
             source: 'aara-zones',
-            layout: { visibility: 'none' },
+            layout: { visibility: aarVis },
             paint: { 'line-color': 'rgba(200, 255, 0, 0.75)', 'line-width': 1.5, 'line-dasharray': [6, 3] }
         });
 
@@ -578,7 +611,7 @@ class AARToggleControl {
             type: 'symbol',
             source: 'aara-label-points',
             layout: {
-                visibility: 'none',
+                visibility: aarVis,
                 'symbol-placement': 'point',
                 'text-field': ['get', 'name'],
                 'text-size': 11,
@@ -604,6 +637,7 @@ class AARToggleControl {
         });
         this.button.style.opacity = this.visible ? '1' : '0.3';
         this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        _saveOverlayStates();
     }
 }
 
@@ -669,7 +703,7 @@ const AWACS_ORBITS = {
 
 class AWACSToggleControl {
     constructor() {
-        this.visible = false;
+        this.visible = _overlayStates.awacs;
     }
 
     onAdd(map) {
@@ -690,12 +724,12 @@ class AWACSToggleControl {
         this.button.style.cursor = 'pointer';
         this.button.style.fontSize = '16px';
         this.button.style.fontWeight = 'bold';
-        this.button.style.color = '#ffffff';
         this.button.style.display = 'flex';
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
-        this.button.style.transition = 'opacity 0.2s';
-        this.button.style.opacity = '0.3';
+        this.button.style.transition = 'opacity 0.2s, color 0.2s';
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
         this.button.onclick = () => this.toggle();
         this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
         this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
@@ -721,11 +755,13 @@ class AWACSToggleControl {
     initLayers() {
         this.map.addSource('awacs-orbits', { type: 'geojson', data: AWACS_ORBITS });
 
+        const awacsVis = this.visible ? 'visible' : 'none';
+
         this.map.addLayer({
             id: 'awacs-fill',
             type: 'fill',
             source: 'awacs-orbits',
-            layout: { visibility: 'none' },
+            layout: { visibility: awacsVis },
             paint: { 'fill-color': 'rgba(200, 255, 0, 0.04)', 'fill-outline-color': 'rgba(0,0,0,0)' }
         });
 
@@ -733,7 +769,7 @@ class AWACSToggleControl {
             id: 'awacs-outline',
             type: 'line',
             source: 'awacs-orbits',
-            layout: { visibility: 'none' },
+            layout: { visibility: awacsVis },
             paint: { 'line-color': 'rgba(200, 255, 0, 0.75)', 'line-width': 1.5 }
         });
     }
@@ -746,6 +782,7 @@ class AWACSToggleControl {
         });
         this.button.style.opacity = this.visible ? '1' : '0.3';
         this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        _saveOverlayStates();
     }
 }
 
@@ -803,11 +840,13 @@ class ClearOverlaysControl {
         if (!this.cleared) {
             this.savedStates = {
                 roads: roadsControl ? roadsControl.roadsVisible : false,
+                names: namesControl ? namesControl.namesVisible : false,
                 rings: rangeRingsControl ? rangeRingsControl.ringsVisible : false,
                 aar: aarControl ? aarControl.visible : false,
                 awacs: awacsControl ? awacsControl.visible : false,
             };
             if (roadsControl && roadsControl.roadsVisible) roadsControl.toggleRoads();
+            if (namesControl && namesControl.namesVisible) namesControl.toggleNames();
             if (rangeRingsControl && rangeRingsControl.ringsVisible) rangeRingsControl.toggleRings();
             if (aarControl && aarControl.visible) aarControl.toggle();
             if (awacsControl && awacsControl.visible) awacsControl.toggle();
@@ -817,6 +856,7 @@ class ClearOverlaysControl {
         } else {
             if (this.savedStates) {
                 if (roadsControl && this.savedStates.roads !== roadsControl.roadsVisible) roadsControl.toggleRoads();
+                if (namesControl && this.savedStates.names !== namesControl.namesVisible) namesControl.toggleNames();
                 if (rangeRingsControl && this.savedStates.rings !== rangeRingsControl.ringsVisible) rangeRingsControl.toggleRings();
                 if (aarControl && this.savedStates.aar !== aarControl.visible) aarControl.toggle();
                 if (awacsControl && this.savedStates.awacs !== awacsControl.visible) awacsControl.toggle();
