@@ -873,12 +873,21 @@ map.addControl(new ClearOverlaysControl(), 'top-right');
 
 let userMarker;
 
-function createMarkerElement() {
+function createMarkerElement(longitude, latitude) {
     const el = document.createElement('div');
-    el.style.width = '1.5em';
-    el.style.height = '1.5em';
-    el.innerHTML = `<svg viewBox="0 0 20 20" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="10" cy="10" r="8" fill="black" stroke="white" stroke-width="2.5"/>
+    el.style.width = '60px';
+    el.style.height = '60px';
+    const latText = latitude !== undefined ? latitude.toFixed(3) : '';
+    const lonText = longitude !== undefined ? longitude.toFixed(3) : '';
+    el.innerHTML = `<svg viewBox="0 0 60 60" width="60" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <rect x="16" y="17" width="28" height="26" fill="black" fill-opacity="0.15"/>
+        <polyline points="21,17 16,17 16,22" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
+        <polyline points="39,17 44,17 44,22" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
+        <polyline points="21,43 16,43 16,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
+        <polyline points="39,43 44,43 44,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
+        <rect x="28" y="28" width="4" height="4" fill="white"/>
+        <text x="48" y="28" fill="white" font-size="7.5" font-family="monospace" class="marker-lat">${latText}</text>
+        <text x="48" y="38" fill="white" font-size="7.5" font-family="monospace" class="marker-lon">${lonText}</text>
     </svg>`;
     return el;
 }
@@ -889,8 +898,13 @@ function setUserLocation(position) {
     // Add or update marker for user's location
     if (userMarker) {
         userMarker.setLngLat([longitude, latitude]);
+        const el = userMarker.getElement();
+        const latEl = el.querySelector('.marker-lat');
+        const lonEl = el.querySelector('.marker-lon');
+        if (latEl) latEl.textContent = latitude.toFixed(3);
+        if (lonEl) lonEl.textContent = longitude.toFixed(3);
     } else {
-        userMarker = new maplibregl.Marker({ element: createMarkerElement(), anchor: 'center' })
+        userMarker = new maplibregl.Marker({ element: createMarkerElement(longitude, latitude), anchor: 'center' })
             .setLngLat([longitude, latitude])
             .addTo(map);
     }
