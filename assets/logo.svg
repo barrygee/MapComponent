@@ -1,0 +1,19 @@
+<svg width="400" height="120" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(20, 20)">
+    <circle cx="40" cy="40" r="38" fill="none" stroke="black" stroke-width="2"/>
+    
+    <path d="M40 2 L40 78 M2 40 L78 40 M12 12 L68 68 M12 68 L68 12 M40 2 L68 12 L78 40 L68 68 L40 78 L12 68 L2 40 L12 12 Z" 
+          fill="none" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
+    
+    <circle cx="40" cy="2" r="3" fill="black"/>
+    <circle cx="78" cy="40" r="3" fill="black"/>
+    <circle cx="40" cy="78" r="3" fill="black"/>
+    <circle cx="2" cy="40" r="3" fill="black"/>
+    <circle cx="12" cy="12" r="3" fill="black"/>
+    <circle cx="68" cy="12" r="3" fill="black"/>
+    <circle cx="68" cy="68" r="3" fill="black"/>
+    <circle cx="12" cy="68" r="3" fill="black"/>
+    <circle cx="40" cy="40" r="4" fill="black"/> </g>
+
+  <text x="110" y="72" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="42" letter-spacing="1">SENTINEL</text>
+</svg>
