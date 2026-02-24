@@ -1023,28 +1023,50 @@ function setUserLocation(position) {
     rangeRingCenter = [longitude, latitude];
     if (rangeRingsControl) rangeRingsControl.updateCenter(longitude, latitude);
 
-    // Cache the coordinates and remember permission
-    localStorage.setItem('userLocation', JSON.stringify({ longitude, latitude }));
+    // Cache the coordinates with a timestamp
+    localStorage.setItem('userLocation', JSON.stringify({ longitude, latitude, ts: Date.now() }));
     localStorage.setItem('geolocationGranted', 'true');
-}
 
-// Check for cached location on load
+    // Update footer country via reverse geocoding (throttled to once per 2 minutes)
+    const now = Date.now();
+    if (now - setUserLocation._lastGeocode > 2 * 60 * 1000) {
+        setUserLocation._lastGeocode = now;
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
+            headers: { 'Accept-Language': 'en' }
+        })
+            .then(r => r.json())
+            .then(data => {
+                const country = data.address && data.address.country;
+                if (country) {
+                    const el = document.getElementById('footer-location');
+                    if (el) el.textContent = country.toUpperCase();
+                }
+            })
+            .catch(() => {});
+    }
+}
+setUserLocation._lastGeocode = 0;
+
+// Load cached location if less than 5 minutes old
 const cachedLocation = localStorage.getItem('userLocation');
 if (cachedLocation) {
     try {
-        const { longitude, latitude } = JSON.parse(cachedLocation);
-        setUserLocation({ coords: { longitude, latitude } });
+        const { longitude, latitude, ts } = JSON.parse(cachedLocation);
+        if (Date.now() - (ts || 0) < 5 * 60 * 1000) {
+            setUserLocation({ coords: { longitude, latitude } });
+        } else {
+            localStorage.removeItem('userLocation');
+        }
     } catch (e) {
-        console.error('Error parsing cached location:', e);
+        localStorage.removeItem('userLocation');
     }
 }
 
-// Only get user's current location if we don't have it yet
-if ('geolocation' in navigator && !cachedLocation) {
-    navigator.geolocation.getCurrentPosition(
+// Continuously watch for location changes
+if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(
         setUserLocation,
-        (error) => {
-            console.error('Error getting geolocation:', error);
-        }
+        (error) => { console.error('Error getting geolocation:', error); },
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
     );
 }
