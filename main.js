@@ -48,6 +48,29 @@ function buildRingsGeoJSON(lng, lat) {
 }
 // --- End range rings helpers ---
 
+// Compute the MapLibre text-rotate value that aligns a label with the
+// long axis of a polygon.  Returns a value in (-90, 90] degrees.
+function computeTextRotate(coordinates) {
+    const ring = coordinates[0];
+    let maxLen = -1, bearing = 0;
+    for (let i = 0; i < ring.length - 1; i++) {
+        const dLng = ring[i + 1][0] - ring[i][0];
+        const dLat = ring[i + 1][1] - ring[i][1];
+        const len = Math.sqrt(dLng * dLng + dLat * dLat);
+        if (len > maxLen) {
+            maxLen = len;
+            // Clockwise bearing from north, corrected for Mercator cos(lat) scaling
+            const midLat = (ring[i][1] + ring[i + 1][1]) / 2;
+            bearing = Math.atan2(dLng * Math.cos(midLat * Math.PI / 180), dLat) * 180 / Math.PI;
+        }
+    }
+    // Convert bearing to text-rotate, keeping in (-90, 90] so text reads left-to-right
+    let rot = bearing - 90;
+    if (rot >  90) rot -= 180;
+    if (rot <= -90) rot += 180;
+    return Math.round(rot * 10) / 10;
+}
+
 const origin = window.location.origin;
 
 const map = new maplibregl.Map({
@@ -496,6 +519,11 @@ class AARToggleControl {
     }
 
     initLayers() {
+        // Stamp each feature with its long-axis rotation angle
+        AARA_ZONES.features.forEach(f => {
+            f.properties.text_rotate = computeTextRotate(f.geometry.coordinates);
+        });
+
         this.map.addSource('aara-zones', { type: 'geojson', data: AARA_ZONES });
 
         this.map.addLayer({
@@ -526,6 +554,8 @@ class AARToggleControl {
                 'text-font': ['Noto Sans Bold'],
                 'text-anchor': 'center',
                 'text-justify': 'center',
+                'text-rotate': ['get', 'text_rotate'],
+                'text-rotation-alignment': 'map',
             },
             paint: {
                 'text-color': 'rgba(255, 255, 255, 255)',
