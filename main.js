@@ -3,12 +3,9 @@ const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile.bind(protocol));
 
 // --- Connectivity detection ---
-// navigator.onLine is set by the OS network stack — reliable for the main
-// cases (internet present / device fully offline). The browser fires
-// 'online'/'offline' events when connectivity changes, triggering a reload
-// so the correct tile source is always used. No background probe is used
-// because probing a third-party URL causes reload loops in environments
-// where that URL is blocked (corporate networks, offline labs, etc.).
+// navigator.onLine reflects the OS network stack. The browser fires
+// 'online'/'offline' events when connectivity changes; the footer updates
+// immediately and the map style is swapped to match without a full reload.
 const _isOnline = navigator.onLine;
 
 function _setConnStatus(online) {
@@ -19,8 +16,16 @@ function _setConnStatus(online) {
 }
 _setConnStatus(_isOnline);
 
-window.addEventListener('online',  () => window.location.reload());
-window.addEventListener('offline', () => window.location.reload());
+window.addEventListener('online',  () => { _setConnStatus(true);  _switchStyle(true);  });
+window.addEventListener('offline', () => { _setConnStatus(false); _switchStyle(false); });
+
+function _switchStyle(online) {
+    if (typeof map === 'undefined' || !map.isStyleLoaded()) return;
+    map.setStyle(online
+        ? `${window.location.origin}/assets/fiord-online.json`
+        : `${window.location.origin}/assets/fiord.json`
+    );
+}
 // --- End connectivity detection ---
 
 // --- Range rings ---
@@ -124,6 +129,8 @@ const map = new maplibregl.Map({
     transformRequest: (url) => ({ url })
 });
 
+let _styleLoadedOnce = false;
+
 map.on('style.load', () => {
     console.log('Style loaded successfully');
     
@@ -171,14 +178,16 @@ map.on('style.load', () => {
                 });
                 matchExpression.push(false); // Default: false (hide if not in list)
                 
+                // class (OFM/online schema) or kind_detail/kind (offline UK pmtiles schema)
+                const classExpr = ['coalesce', ['get', 'class'], ['get', 'kind_detail'], ['get', 'kind']];
                 const newFilter = [
                     'all',
                     ['match', ['geometry-type'], ['MultiPoint', 'Point'], true, false],
-                    ['all', ['match', ['coalesce', ['get', 'kind_detail'], ['get', 'kind']], ['city'], true, false], ['>', ['get', 'population_rank'], 3]],
+                    ['match', classExpr, ['city'], true, false],
                     matchExpression
                 ];
                 map.setFilter('place_city', newFilter);
-                
+
                 // Apply same filter to place_town
                 const townMatchExpression = ['match', ['get', 'name']];
                 majorCities.forEach(city => {
@@ -186,27 +195,28 @@ map.on('style.load', () => {
                     townMatchExpression.push(true);
                 });
                 townMatchExpression.push(false);
-                
+
                 const townFilter = [
                     'all',
                     ['match', ['geometry-type'], ['MultiPoint', 'Point'], true, false],
-                    ['all', ['match', ['coalesce', ['get', 'kind_detail'], ['get', 'kind']], ['town'], true, false]],
+                    ['match', classExpr, ['town'], true, false],
                     townMatchExpression
                 ];
                 map.setFilter('place_town', townFilter);
             } else {
                 // Show all cities and towns below zoom 7
+                const classExpr = ['coalesce', ['get', 'class'], ['get', 'kind_detail'], ['get', 'kind']];
                 const baseFilter = [
                     'all',
                     ['match', ['geometry-type'], ['MultiPoint', 'Point'], true, false],
-                    ['all', ['match', ['coalesce', ['get', 'kind_detail'], ['get', 'kind']], ['city'], true, false], ['>', ['get', 'population_rank'], 3]]
+                    ['match', classExpr, ['city'], true, false]
                 ];
                 map.setFilter('place_city', baseFilter);
-                
+
                 const townFilter = [
                     'all',
                     ['match', ['geometry-type'], ['MultiPoint', 'Point'], true, false],
-                    ['all', ['match', ['coalesce', ['get', 'kind_detail'], ['get', 'kind']], ['town'], true, false]]
+                    ['match', classExpr, ['town'], true, false]
                 ];
                 map.setFilter('place_town', townFilter);
             }
@@ -217,9 +227,21 @@ map.on('style.load', () => {
     
     // Update on first load
     updateCityFilter();
-    
+
     // Update filter when zoom changes
     map.on('zoom', updateCityFilter);
+
+    // After a style switch (setStyle), re-initialise custom overlay layers.
+    // Guard with _styleLoadedOnce so we don't double-init on the very first load
+    // (controls register their own map.once('style.load') during onAdd).
+    if (_styleLoadedOnce) {
+        if (roadsControl)      roadsControl.updateRoadsVisibility();
+        if (namesControl)      namesControl.applyNamesVisibility();
+        if (rangeRingsControl) rangeRingsControl.initRings();
+        if (aarControl)        aarControl.initLayers();
+        if (awacsControl)      awacsControl.initLayers();
+    }
+    _styleLoadedOnce = true;
 });
 
 map.on('error', (e) => {
