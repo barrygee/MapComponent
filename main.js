@@ -48,6 +48,22 @@ function buildRingsGeoJSON(lng, lat) {
 }
 // --- End range rings helpers ---
 
+// Compute the area-weighted centroid of a polygon ring, returned as [lng, lat].
+function computeCentroid(coordinates) {
+    const ring = coordinates[0];
+    let area = 0, cx = 0, cy = 0;
+    for (let i = 0; i < ring.length - 1; i++) {
+        const x0 = ring[i][0],     y0 = ring[i][1];
+        const x1 = ring[i + 1][0], y1 = ring[i + 1][1];
+        const cross = x0 * y1 - x1 * y0;
+        area += cross;
+        cx   += (x0 + x1) * cross;
+        cy   += (y0 + y1) * cross;
+    }
+    area *= 0.5;
+    return [cx / (6 * area), cy / (6 * area)];
+}
+
 // Compute the MapLibre text-rotate value that aligns a label with the
 // long axis of a polygon.  Returns a value in (-90, 90] degrees.
 function computeTextRotate(coordinates) {
@@ -529,6 +545,18 @@ class AARToggleControl {
 
         this.map.addSource('aara-zones', { type: 'geojson', data: AARA_ZONES });
 
+        // Build a dedicated point source at each polygon's true geometric centroid
+        // so labels are horizontally centred inside their boxes at every zoom level.
+        const aaraLabelPoints = {
+            type: 'FeatureCollection',
+            features: AARA_ZONES.features.map(f => ({
+                type: 'Feature',
+                properties: { name: f.properties.name, text_rotate: f.properties.text_rotate },
+                geometry: { type: 'Point', coordinates: computeCentroid(f.geometry.coordinates) }
+            }))
+        };
+        this.map.addSource('aara-label-points', { type: 'geojson', data: aaraLabelPoints });
+
         this.map.addLayer({
             id: 'aara-fill',
             type: 'fill',
@@ -548,7 +576,7 @@ class AARToggleControl {
         this.map.addLayer({
             id: 'aara-labels',
             type: 'symbol',
-            source: 'aara-zones',
+            source: 'aara-label-points',
             layout: {
                 visibility: 'none',
                 'symbol-placement': 'point',
