@@ -4,14 +4,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenFreeMap - Fjord</title>
+    <title>SENTINEL</title>
     <link href='./assets/maplibre-gl.css' rel='stylesheet' />
-    <link href='https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600&display=swap' rel='stylesheet' />
-    <link rel="stylesheet" href="style.css?v=6">
+    <link href='https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700;900&family=Barlow+Condensed:wght@400;500;600;700;900&display=swap' rel='stylesheet' />
+    <link rel="stylesheet" href="style.css?v=7">
 </head>
 
 <body>
+    <header id="nav">
+        <div id="nav-logo">
+            <img src="assets/logo.svg" alt="SENTINEL" id="logo-img">
+        </div>
+        <div id="nav-right"></div>
+    </header>
+
     <div id="map"></div>
+
+    <footer id="footer">
+        <div id="footer-left">
+            <span class="footer-label">SURVEILLANCE &amp; TACTICAL MAPPING</span>
+            <span class="footer-code">[SENTINEL]</span>
+        </div>
+        <div id="footer-right">
+            <span class="footer-label">UNITED KINGDOM</span>
+        </div>
+    </footer>
+
     <script src="./assets/pmtiles.js"></script>
     <script src='./assets/maplibre-gl.js'></script>
     <script src="main.js?v=23"></script>
