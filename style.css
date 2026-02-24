@@ -52,7 +52,30 @@ html {
 #nav-right {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 32px;
+}
+
+.nav-link {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.3);
+    transition: color 0.2s;
+}
+
+.nav-link:hover {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.nav-link--active {
+    color: #c8ff00;
+}
+
+.nav-link--active:hover {
+    color: #c8ff00;
 }
 
 
