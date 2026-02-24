@@ -915,11 +915,11 @@ class ClearOverlaysControl {
             this.button.style.color = '#c8ff00';
         } else {
             if (this.savedStates) {
-                if (roadsControl && this.savedStates.roads !== roadsControl.roadsVisible) roadsControl.toggleRoads();
-                if (namesControl && this.savedStates.names !== namesControl.namesVisible) namesControl.toggleNames();
-                if (rangeRingsControl && this.savedStates.rings !== rangeRingsControl.ringsVisible) rangeRingsControl.toggleRings();
-                if (aarControl && this.savedStates.aar !== aarControl.visible) aarControl.toggle();
-                if (awacsControl && this.savedStates.awacs !== awacsControl.visible) awacsControl.toggle();
+                if (roadsControl && this.savedStates.roads && !roadsControl.roadsVisible) roadsControl.toggleRoads();
+                if (namesControl && this.savedStates.names && !namesControl.namesVisible) namesControl.toggleNames();
+                if (rangeRingsControl && this.savedStates.rings && !rangeRingsControl.ringsVisible) rangeRingsControl.toggleRings();
+                if (aarControl && this.savedStates.aar && !aarControl.visible) aarControl.toggle();
+                if (awacsControl && this.savedStates.awacs && !awacsControl.visible) awacsControl.toggle();
             }
             this.cleared = false;
             this.button.style.opacity = '0.3';
@@ -988,13 +988,14 @@ function createMarkerElement(longitude, latitude) {
     el.style.height = '60px';
     const latText = latitude !== undefined ? latitude.toFixed(3) : '';
     const lonText = longitude !== undefined ? longitude.toFixed(3) : '';
+    el.classList.add('user-location-marker');
     el.innerHTML = `<svg viewBox="0 0 60 60" width="60" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-        <rect x="16" y="17" width="28" height="26" fill="black" fill-opacity="0.15"/>
+        <rect class="marker-bg" x="16" y="17" width="28" height="26" fill="black" fill-opacity="0.15"/>
         <polyline points="21,17 16,17 16,22" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
         <polyline points="39,17 44,17 44,22" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
         <polyline points="21,43 16,43 16,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
         <polyline points="39,43 44,43 44,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
-        <rect x="28" y="28" width="4" height="4" fill="white"/>
+        <rect class="marker-dot" x="28" y="28" width="4" height="4" fill="white"/>
         <text x="48" y="28" fill="white" font-size="7.5" font-family="monospace" class="marker-lat">${latText}</text>
         <text x="48" y="38" fill="white" font-size="7.5" font-family="monospace" class="marker-lon">${lonText}</text>
     </svg>`;

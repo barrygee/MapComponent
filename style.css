@@ -47,8 +47,6 @@ html {
     height: 24px;
     width: auto;
     display: block;
-    /* Invert black SVG to white for the dark header */
-    filter: invert(1);
 }
 
 #nav-right {
@@ -166,6 +164,28 @@ html {
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 0 !important;
 }
+
+/* ============================================================
+   USER LOCATION MARKER
+   ============================================================ */
+@keyframes marker-dot-pulse {
+    0%, 100% { fill: white; }
+    50%       { fill: #c8ff00; }
+}
+
+@keyframes marker-bg-pulse {
+    0%, 100% { fill: black;   fill-opacity: 0.15; }
+    50%       { fill: #c8ff00; fill-opacity: 0.15; }
+}
+
+.user-location-marker:hover .marker-dot {
+    animation: marker-dot-pulse 2s ease-in-out 1;
+}
+
+.user-location-marker:hover .marker-bg {
+    animation: marker-bg-pulse 2s ease-in-out 1;
+}
+
 
 /* Font for all map control buttons */
 .maplibregl-ctrl button {
