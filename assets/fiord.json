@@ -45,7 +45,6 @@
       "type": "fill",
       "source": "surroundings",
       "source-layer": "earth",
-      "minzoom": 7,
       "paint": {
         "fill-color": "#45516E"
       }
@@ -55,7 +54,6 @@
       "type": "fill",
       "source": "surroundings",
       "source-layer": "water",
-      "minzoom": 7,
       "filter": [
         "match",
         ["geometry-type"],
@@ -73,7 +71,6 @@
       "type": "line",
       "source": "surroundings",
       "source-layer": "earth",
-      "minzoom": 7,
       "paint": {
         "line-color": "hsla(220, 20%, 50%, 0.3)",
         "line-width": 1
@@ -84,7 +81,6 @@
       "type": "line",
       "source": "surroundings",
       "source-layer": "boundaries",
-      "minzoom": 7,
       "filter": ["==", ["get", "kind_detail"], 2],
       "layout": {
         "line-cap": "round",
@@ -109,7 +105,6 @@
       "type": "line",
       "source": "surroundings",
       "source-layer": "roads",
-      "minzoom": 7,
       "filter": [
         "all",
         ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
@@ -135,7 +130,7 @@
       "type": "symbol",
       "source": "surroundings",
       "source-layer": "places",
-      "minzoom": 7,
+      "minzoom": 5,
       "filter": [
         "all",
         ["match", ["geometry-type"], ["MultiPoint", "Point"], true, false],
