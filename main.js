@@ -34,6 +34,8 @@ function _checkConn() {
 _checkConn(); // immediate check on page load
 setInterval(_checkConn, 2000);
 
+const _OFFLINE_BOUNDS = [[-20, 44], [32, 67]];
+
 function _switchStyle(online) {
     if (typeof map === 'undefined') return;
     map.setMinZoom(online ? 2 : 5);
@@ -136,13 +138,11 @@ const _styleURL = _isOnline
     ? `${origin}/assets/fiord-online.json`
     : `${origin}/assets/fiord.json`;
 
-const _OFFLINE_BOUNDS = [[-20, 44], [32, 67]];
-
 const map = new maplibregl.Map({
     container: 'map',
     style: _styleURL,
-    center: [-4.4815, 54.1453],
-    zoom: 6,
+    center: _isOnline ? [-4.4815, 54.1453] : [-4.5481, 54.2361],
+    zoom: _isOnline ? 6 : 5,
     minZoom: _isOnline ? 2 : 5,
     maxBounds: _isOnline ? null : _OFFLINE_BOUNDS,
     attributionControl: false,
@@ -155,7 +155,7 @@ map.on('style.load', () => {
     console.log('Style loaded successfully');
     map.setMinZoom(_connState ? 2 : 5);
     map.setMaxBounds(_connState ? null : _OFFLINE_BOUNDS);
-    
+
     // Define cities to show at zoom 1-8
     const majorCities = [
         'Newcastle upon Tyne',
@@ -262,6 +262,7 @@ map.on('style.load', () => {
         if (rangeRingsControl) rangeRingsControl.initRings();
         if (aarControl)        aarControl.initLayers();
         if (awacsControl)      awacsControl.initLayers();
+        if (airportsControl)   airportsControl.initLayers();
     }
     _styleLoadedOnce = true;
 });
@@ -273,7 +274,7 @@ map.on('error', (e) => {
 
 // --- Overlay state persistence ---
 // Defaults: everything ON on first load; subsequent loads restore last state.
-const _OVERLAY_DEFAULTS = { roads: true, names: true, rings: true, aar: true, awacs: true };
+const _OVERLAY_DEFAULTS = { roads: true, names: true, rings: true, aar: true, awacs: true, airports: true };
 const _overlayStates = (() => {
     try {
         const saved = localStorage.getItem('overlayStates');
@@ -288,6 +289,7 @@ function _saveOverlayStates() {
             rings: rangeRingsControl ? rangeRingsControl.ringsVisible : _overlayStates.rings,
             aar: aarControl ? aarControl.visible : _overlayStates.aar,
             awacs: awacsControl ? awacsControl.visible : _overlayStates.awacs,
+            airports: airportsControl ? airportsControl.visible : _overlayStates.airports,
         }));
     } catch (e) {}
 }
@@ -860,6 +862,141 @@ map.addControl(awacsControl, 'top-right');
 // --- End UK AWACS Orbits ---
 
 
+// --- Airports ---
+const AIRPORTS_DATA = {
+    type: 'FeatureCollection',
+    features: [
+        { type: 'Feature', properties: { icao: 'EGLL', iata: 'LHR', name: 'London Heathrow'       }, geometry: { type: 'Point', coordinates: [-0.4614,  51.4775] } },
+        { type: 'Feature', properties: { icao: 'EGKK', iata: 'LGW', name: 'London Gatwick'         }, geometry: { type: 'Point', coordinates: [-0.1903,  51.1481] } },
+        { type: 'Feature', properties: { icao: 'EGGW', iata: 'LTN', name: 'London Luton'           }, geometry: { type: 'Point', coordinates: [-0.3683,  51.8747] } },
+        { type: 'Feature', properties: { icao: 'EGSS', iata: 'STN', name: 'London Stansted'        }, geometry: { type: 'Point', coordinates: [ 0.2350,  51.8850] } },
+        { type: 'Feature', properties: { icao: 'EGCC', iata: 'MAN', name: 'Manchester'             }, geometry: { type: 'Point', coordinates: [-2.2749,  53.3650] } },
+        { type: 'Feature', properties: { icao: 'EGNT', iata: 'NCL', name: 'Newcastle International'}, geometry: { type: 'Point', coordinates: [-1.6917,  55.0375] } },
+        { type: 'Feature', properties: { icao: 'EGPF', iata: 'GLA', name: 'Glasgow'                }, geometry: { type: 'Point', coordinates: [-4.4330,  55.8719] } },
+        { type: 'Feature', properties: { icao: 'EGPH', iata: 'EDI', name: 'Edinburgh'              }, geometry: { type: 'Point', coordinates: [-3.3725,  55.9508] } },
+        { type: 'Feature', properties: { icao: 'EGGD', iata: 'BRS', name: 'Bristol'                }, geometry: { type: 'Point', coordinates: [-2.7191,  51.3827] } },
+        { type: 'Feature', properties: { icao: 'EGBB', iata: 'BHX', name: 'Birmingham'             }, geometry: { type: 'Point', coordinates: [-1.7480,  52.4539] } },
+        { type: 'Feature', properties: { icao: 'EGAC', iata: 'BHD', name: 'Belfast City'           }, geometry: { type: 'Point', coordinates: [-5.8725,  54.6181] } },
+        { type: 'Feature', properties: { icao: 'EGAA', iata: 'BFS', name: 'Belfast International'  }, geometry: { type: 'Point', coordinates: [-6.2158,  54.6575] } },
+        { type: 'Feature', properties: { icao: 'EGNV', iata: 'MME', name: 'Teesside International' }, geometry: { type: 'Point', coordinates: [-1.4294,  54.5092] } },
+    ]
+};
+
+class AirportsToggleControl {
+    constructor() {
+        this.visible = _overlayStates.airports;
+    }
+
+    onAdd(map) {
+        this.map = map;
+        this.container = document.createElement('div');
+        this.container.className = 'maplibregl-ctrl';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
+        this.container.style.marginTop = '4px';
+
+        this.button = document.createElement('button');
+        this.button.title = 'Toggle airports';
+        this.button.textContent = 'A';
+        this.button.style.width = '29px';
+        this.button.style.height = '29px';
+        this.button.style.border = 'none';
+        this.button.style.backgroundColor = '#000000';
+        this.button.style.cursor = 'pointer';
+        this.button.style.fontSize = '13px';
+        this.button.style.fontWeight = 'bold';
+        this.button.style.display = 'flex';
+        this.button.style.alignItems = 'center';
+        this.button.style.justifyContent = 'center';
+        this.button.style.transition = 'opacity 0.2s, color 0.2s';
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        this.button.onclick = () => this.toggle();
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout  = () => this.button.style.backgroundColor = '#000000';
+
+        this.container.appendChild(this.button);
+
+        if (this.map.isStyleLoaded()) {
+            this.initLayers();
+        } else {
+            this.map.once('style.load', () => this.initLayers());
+        }
+
+        return this.container;
+    }
+
+    onRemove() {
+        if (this.container && this.container.parentNode) this.container.parentNode.removeChild(this.container);
+        this.map = undefined;
+    }
+
+    initLayers() {
+        const vis = this.visible ? 'visible' : 'none';
+
+        if (this.map.getSource('airports')) {
+            this.map.removeLayer('airports-circle');
+            this.map.removeLayer('airports-label');
+            this.map.removeSource('airports');
+        }
+
+        this.map.addSource('airports', { type: 'geojson', data: AIRPORTS_DATA });
+
+        this.map.addLayer({
+            id: 'airports-circle',
+            type: 'circle',
+            source: 'airports',
+            layout: { visibility: vis },
+            paint: {
+                'circle-radius': 5,
+                'circle-color': '#c8ff00',
+                'circle-opacity': 0.9,
+                'circle-stroke-width': 1.5,
+                'circle-stroke-color': '#000000',
+                'circle-stroke-opacity': 0.7
+            }
+        });
+
+        this.map.addLayer({
+            id: 'airports-label',
+            type: 'symbol',
+            source: 'airports',
+            layout: {
+                visibility: vis,
+                'text-field': ['concat', ['get', 'icao'], '\n', ['get', 'iata']],
+                'text-font': ['Noto Sans Bold'],
+                'text-size': 10,
+                'text-anchor': 'left',
+                'text-offset': [0.8, 0],
+                'text-allow-overlap': false,
+                'text-ignore-placement': false
+            },
+            paint: {
+                'text-color': '#c8ff00',
+                'text-halo-color': 'rgba(0,0,0,0.8)',
+                'text-halo-width': 1.5
+            }
+        });
+    }
+
+    toggle() {
+        this.visible = !this.visible;
+        const v = this.visible ? 'visible' : 'none';
+        ['airports-circle', 'airports-label'].forEach(id => {
+            try { this.map.setLayoutProperty(id, 'visibility', v); } catch (e) {}
+        });
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        _saveOverlayStates();
+    }
+}
+
+let airportsControl = null;
+airportsControl = new AirportsToggleControl();
+map.addControl(airportsControl, 'top-right');
+// --- End Airports ---
+
+
 // --- Clear all overlays ---
 class ClearOverlaysControl {
     constructor() {
@@ -913,12 +1050,14 @@ class ClearOverlaysControl {
                 rings: rangeRingsControl ? rangeRingsControl.ringsVisible : false,
                 aar: aarControl ? aarControl.visible : false,
                 awacs: awacsControl ? awacsControl.visible : false,
+                airports: airportsControl ? airportsControl.visible : false,
             };
             if (roadsControl && roadsControl.roadsVisible) roadsControl.toggleRoads();
             if (namesControl && namesControl.namesVisible) namesControl.toggleNames();
             if (rangeRingsControl && rangeRingsControl.ringsVisible) rangeRingsControl.toggleRings();
             if (aarControl && aarControl.visible) aarControl.toggle();
             if (awacsControl && awacsControl.visible) awacsControl.toggle();
+            if (airportsControl && airportsControl.visible) airportsControl.toggle();
             this.cleared = true;
             this.button.style.opacity = '1';
             this.button.style.color = '#c8ff00';
@@ -929,6 +1068,7 @@ class ClearOverlaysControl {
                 if (rangeRingsControl && this.savedStates.rings && !rangeRingsControl.ringsVisible) rangeRingsControl.toggleRings();
                 if (aarControl && this.savedStates.aar && !aarControl.visible) aarControl.toggle();
                 if (awacsControl && this.savedStates.awacs && !awacsControl.visible) awacsControl.toggle();
+                if (airportsControl && this.savedStates.airports && !airportsControl.visible) airportsControl.toggle();
             }
             this.cleared = false;
             this.button.style.opacity = '0.3';
