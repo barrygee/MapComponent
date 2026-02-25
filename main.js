@@ -263,6 +263,7 @@ map.on('style.load', () => {
         if (aarControl)        aarControl.initLayers();
         if (awacsControl)      awacsControl.initLayers();
         if (airportsControl)   airportsControl.initLayers();
+        if (rafControl)        rafControl.initLayers();
     }
     _styleLoadedOnce = true;
 });
@@ -274,7 +275,7 @@ map.on('error', (e) => {
 
 // --- Overlay state persistence ---
 // Defaults: everything ON on first load; subsequent loads restore last state.
-const _OVERLAY_DEFAULTS = { roads: true, names: true, rings: true, aar: true, awacs: true, airports: true };
+const _OVERLAY_DEFAULTS = { roads: true, names: true, rings: true, aar: true, awacs: true, airports: true, raf: true };
 const _overlayStates = (() => {
     try {
         const saved = localStorage.getItem('overlayStates');
@@ -290,6 +291,7 @@ function _saveOverlayStates() {
             aar: aarControl ? aarControl.visible : _overlayStates.aar,
             awacs: awacsControl ? awacsControl.visible : _overlayStates.awacs,
             airports: airportsControl ? airportsControl.visible : _overlayStates.airports,
+            raf: rafControl ? rafControl.visible : _overlayStates.raf,
         }));
     } catch (e) {}
 }
@@ -353,7 +355,6 @@ class RoadsToggleControl {
     }
 
     updateButtonState() {
-        const currentZoom = this.map.getZoom();
         const zoomAllowsRoads = true;
         const shouldBeVisible = this.roadsVisible && zoomAllowsRoads;
         this.button.style.opacity = shouldBeVisible ? '1' : '0.3';
@@ -361,7 +362,6 @@ class RoadsToggleControl {
     }
 
     updateRoadsVisibility() {
-        const currentZoom = this.map.getZoom();
         const zoomAllowsRoads = true;
         const visibility = (this.roadsVisible && zoomAllowsRoads) ? 'visible' : 'none';
         
@@ -507,6 +507,7 @@ class AirportsToggleControl {
     }
 
     onRemove() {
+        if (this._markers) this._markers.forEach(m => m.remove());
         if (this.container && this.container.parentNode) this.container.parentNode.removeChild(this.container);
         this.map = undefined;
     }
@@ -516,7 +517,6 @@ class AirportsToggleControl {
 
         if (this.map.getSource('airports')) {
             this.map.removeLayer('airports-circle');
-            this.map.removeLayer('airports-label');
             this.map.removeSource('airports');
         }
 
@@ -528,43 +528,36 @@ class AirportsToggleControl {
             source: 'airports',
             layout: { visibility: vis },
             paint: {
-                'circle-radius': 5,
+                'circle-radius': 3,
                 'circle-color': '#ffffff',
-                'circle-opacity': 0.9,
-                'circle-stroke-width': 1.5,
+                'circle-opacity': 1,
+                'circle-stroke-width': 1,
                 'circle-stroke-color': '#000000',
                 'circle-stroke-opacity': 0.7
             }
         });
 
-        this.map.addLayer({
-            id: 'airports-label',
-            type: 'symbol',
-            source: 'airports',
-            layout: {
-                visibility: vis,
-                'text-field': ['concat', ['get', 'icao'], '\n', ['get', 'iata']],
-                'text-font': ['Noto Sans Bold'],
-                'text-size': 10,
-                'text-anchor': 'left',
-                'text-offset': [0.8, 0],
-                'text-allow-overlap': false,
-                'text-ignore-placement': false
-            },
-            paint: {
-                'text-color': 'rgba(255, 255, 255, 255)',
-                'text-halo-color': 'rgba(0, 0, 0, 0.7)',
-                'text-halo-width': 1
-            }
-        });
+        // Create HTML label markers once — they survive style changes as DOM nodes
+        if (!this._markers) {
+            this._markers = AIRPORTS_DATA.features.map(f => {
+                const el = document.createElement('div');
+                el.style.cssText = 'color:#ffffff;font-family:monospace;font-size:10px;line-height:1.4;pointer-events:none;white-space:nowrap;';
+                el.innerHTML = `${f.properties.icao}<br>${f.properties.iata}`;
+                return new maplibregl.Marker({ element: el, anchor: 'left', offset: [12, 7] })
+                    .setLngLat(f.geometry.coordinates);
+            });
+            if (this.visible) this._markers.forEach(m => m.addTo(this.map));
+        }
     }
 
     toggle() {
         this.visible = !this.visible;
         const v = this.visible ? 'visible' : 'none';
-        ['airports-circle', 'airports-label'].forEach(id => {
-            try { this.map.setLayoutProperty(id, 'visibility', v); } catch (e) {}
-        });
+        try { this.map.setLayoutProperty('airports-circle', 'visibility', v); } catch (e) {}
+        if (this._markers) {
+            if (this.visible) this._markers.forEach(m => m.addTo(this.map));
+            else              this._markers.forEach(m => m.remove());
+        }
         this.button.style.opacity = this.visible ? '1' : '0.3';
         this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
         _saveOverlayStates();
@@ -574,10 +567,153 @@ class AirportsToggleControl {
 let airportsControl = new AirportsToggleControl();
 // --- End Airports ---
 
+// --- RAF Bases ---
+const RAF_DATA = {
+    type: 'FeatureCollection',
+    features: [
+        { type: 'Feature', properties: { icao: 'EGUB', name: 'RAF Benson'        }, geometry: { type: 'Point', coordinates: [ -1.0972,  51.6164] } },
+        { type: 'Feature', properties: { icao: 'EGIZ', name: 'RAF Boulmer'       }, geometry: { type: 'Point', coordinates: [ -1.6061,  55.4222] } },
+        { type: 'Feature', properties: { icao: 'EGVN', name: 'RAF Brize Norton'  }, geometry: { type: 'Point', coordinates: [ -1.5836,  51.7500] } },
+        { type: 'Feature', properties: { icao: 'EGXC', name: 'RAF Coningsby'     }, geometry: { type: 'Point', coordinates: [ -0.1664,  53.0930] } },
+        { type: 'Feature', properties: { icao: 'EGSC', name: 'RAF Cosford'       }, geometry: { type: 'Point', coordinates: [ -2.3056,  52.6403] } },
+        { type: 'Feature', properties: { icao: 'EGYC', name: 'RAF Cranwell'      }, geometry: { type: 'Point', coordinates: [ -0.4833,  53.0303] } },
+        { type: 'Feature', properties: { icao: 'EGYD', name: 'RAF Digby'         }, geometry: { type: 'Point', coordinates: [ -0.4194,  53.0886] } },
+        { type: 'Feature', properties: { icao: '',     name: 'RAF Fylingdales'   }, geometry: { type: 'Point', coordinates: [ -0.6706,  54.3606] } },
+        { type: 'Feature', properties: { icao: 'EGXH', name: 'RAF Honington'     }, geometry: { type: 'Point', coordinates: [  0.7731,  52.3425] } },
+        { type: 'Feature', properties: { icao: 'EGGE', name: 'RAF Leeming'       }, geometry: { type: 'Point', coordinates: [ -1.5353,  54.2992] } },
+        { type: 'Feature', properties: { icao: 'EGQL', name: 'RAF Lossiemouth'   }, geometry: { type: 'Point', coordinates: [ -3.3392,  57.7053] } },
+        { type: 'Feature', properties: { icao: 'EGYM', name: 'RAF Marham'        }, geometry: { type: 'Point', coordinates: [  0.5506,  52.6481] } },
+        { type: 'Feature', properties: { icao: 'EGWU', name: 'RAF Northolt'      }, geometry: { type: 'Point', coordinates: [ -0.4183,  51.5530] } },
+        { type: 'Feature', properties: { icao: 'EGVO', name: 'RAF Odiham'        }, geometry: { type: 'Point', coordinates: [ -1.0036,  51.2341] } },
+        { type: 'Feature', properties: { icao: 'EGOS', name: 'RAF Shawbury'      }, geometry: { type: 'Point', coordinates: [ -2.6650,  52.7983] } },
+        { type: 'Feature', properties: { icao: '',     name: 'RAF Spadeadam'     }, geometry: { type: 'Point', coordinates: [ -2.5467,  54.9003] } },
+        { type: 'Feature', properties: { icao: 'EGOV', name: 'RAF Valley'        }, geometry: { type: 'Point', coordinates: [ -4.5353,  53.2481] } },
+        { type: 'Feature', properties: { icao: 'EGXW', name: 'RAF Waddington'    }, geometry: { type: 'Point', coordinates: [ -0.5228,  53.1664] } },
+        { type: 'Feature', properties: { icao: 'EGXT', name: 'RAF Wittering'     }, geometry: { type: 'Point', coordinates: [ -0.4767,  52.6128] } },
+        { type: 'Feature', properties: { icao: 'EGOW', name: 'RAF Woodvale'      }, geometry: { type: 'Point', coordinates: [ -3.0517,  53.5811] } },
+        { type: 'Feature', properties: { icao: 'EGUY', name: 'RAF Wyton'         }, geometry: { type: 'Point', coordinates: [ -0.1097,  52.3572] } },
+        { type: 'Feature', properties: { icao: 'EGUY', name: 'RAF Alconbury'     }, geometry: { type: 'Point', coordinates: [ -0.0781,  52.3636] } },
+        { type: 'Feature', properties: { icao: '',     name: 'RAF Croughton'     }, geometry: { type: 'Point', coordinates: [ -1.2125,  52.0761] } },
+        { type: 'Feature', properties: { icao: 'EGVA', name: 'RAF Fairford'      }, geometry: { type: 'Point', coordinates: [ -1.7900,  51.6822] } },
+        { type: 'Feature', properties: { icao: 'EGUL', name: 'RAF Lakenheath'    }, geometry: { type: 'Point', coordinates: [  0.5611,  52.4094] } },
+        { type: 'Feature', properties: { icao: 'EGUN', name: 'RAF Mildenhall'    }, geometry: { type: 'Point', coordinates: [  0.4864,  52.3619] } },
+    ]
+};
+
+class RAFToggleControl {
+    constructor() {
+        this.visible = _overlayStates.raf;
+    }
+
+    onAdd(map) {
+        this.map = map;
+        this.container = document.createElement('div');
+        this.container.className = 'maplibregl-ctrl';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
+        this.container.style.marginTop = '4px';
+
+        this.button = document.createElement('button');
+        this.button.title = 'Toggle RAF bases';
+        this.button.textContent = 'RAF';
+        this.button.style.width = '29px';
+        this.button.style.height = '29px';
+        this.button.style.border = 'none';
+        this.button.style.backgroundColor = '#000000';
+        this.button.style.cursor = 'pointer';
+        this.button.style.fontSize = '8px';
+        this.button.style.fontWeight = 'bold';
+        this.button.style.display = 'flex';
+        this.button.style.alignItems = 'center';
+        this.button.style.justifyContent = 'center';
+        this.button.style.transition = 'opacity 0.2s, color 0.2s';
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        this.button.onclick = () => this.toggle();
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout  = () => this.button.style.backgroundColor = '#000000';
+
+        this.container.appendChild(this.button);
+
+        if (this.map.isStyleLoaded()) {
+            this.initLayers();
+        } else {
+            this.map.once('style.load', () => this.initLayers());
+        }
+
+        return this.container;
+    }
+
+    onRemove() {
+        if (this._markers) this._markers.forEach(m => m.remove());
+        if (this.container && this.container.parentNode) this.container.parentNode.removeChild(this.container);
+        this.map = undefined;
+    }
+
+    initLayers() {
+        const vis = this.visible ? 'visible' : 'none';
+
+        if (this.map.getSource('raf-bases')) {
+            this.map.removeLayer('raf-circle');
+            this.map.removeSource('raf-bases');
+        }
+
+        this.map.addSource('raf-bases', { type: 'geojson', data: RAF_DATA });
+
+        this.map.addLayer({
+            id: 'raf-circle',
+            type: 'circle',
+            source: 'raf-bases',
+            layout: { visibility: vis },
+            paint: {
+                'circle-radius': 3,
+                'circle-color': '#ffffff',
+                'circle-opacity': 1,
+                'circle-stroke-width': 1,
+                'circle-stroke-color': '#000000',
+                'circle-stroke-opacity': 0.7
+            }
+        });
+
+        // Create HTML label markers once — they survive style changes as DOM nodes
+        if (!this._markers) {
+            this._markers = RAF_DATA.features.map(f => {
+                const el = document.createElement('div');
+                el.style.cssText = 'color:#ffffff;font-family:monospace;font-size:10px;line-height:1.4;pointer-events:none;white-space:nowrap;';
+                const hasIcao = f.properties.icao !== '';
+                el.innerHTML = hasIcao
+                    ? `${f.properties.icao}<br>${f.properties.name}`
+                    : f.properties.name;
+                const offset = hasIcao ? [12, 7] : [12, 0];
+                return new maplibregl.Marker({ element: el, anchor: 'left', offset })
+                    .setLngLat(f.geometry.coordinates);
+            });
+            if (this.visible) this._markers.forEach(m => m.addTo(this.map));
+        }
+    }
+
+    toggle() {
+        this.visible = !this.visible;
+        const v = this.visible ? 'visible' : 'none';
+        try { this.map.setLayoutProperty('raf-circle', 'visibility', v); } catch (e) {}
+        if (this._markers) {
+            if (this.visible) this._markers.forEach(m => m.addTo(this.map));
+            else              this._markers.forEach(m => m.remove());
+        }
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        _saveOverlayStates();
+    }
+}
+
+let rafControl = new RAFToggleControl();
+// --- End RAF Bases ---
+
 const roadsControl = new RoadsToggleControl();
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 map.addControl(new ResetViewControl(), 'top-right');
 map.addControl(airportsControl, 'top-right');
+map.addControl(rafControl, 'top-right');
 map.addControl(roadsControl, 'top-right');
 
 
@@ -817,6 +953,7 @@ class AARToggleControl {
     }
 
     onRemove() {
+        if (this._labelMarkers) this._labelMarkers.forEach(m => m.remove());
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }
@@ -824,26 +961,9 @@ class AARToggleControl {
     }
 
     initLayers() {
-        // Stamp each feature with its long-axis rotation angle
-        AARA_ZONES.features.forEach(f => {
-            f.properties.text_rotate = computeTextRotate(f.geometry.coordinates);
-        });
+        const aarVis = this.visible ? 'visible' : 'none';
 
         this.map.addSource('aara-zones', { type: 'geojson', data: AARA_ZONES });
-
-        // Build a dedicated point source at each polygon's true geometric centroid
-        // so labels are horizontally centred inside their boxes at every zoom level.
-        const aaraLabelPoints = {
-            type: 'FeatureCollection',
-            features: AARA_ZONES.features.map(f => ({
-                type: 'Feature',
-                properties: { name: f.properties.name, text_rotate: f.properties.text_rotate },
-                geometry: { type: 'Point', coordinates: computeCentroid(f.geometry.coordinates) }
-            }))
-        };
-        this.map.addSource('aara-label-points', { type: 'geojson', data: aaraLabelPoints });
-
-        const aarVis = this.visible ? 'visible' : 'none';
 
         this.map.addLayer({
             id: 'aara-fill',
@@ -861,35 +981,36 @@ class AARToggleControl {
             paint: { 'line-color': 'rgba(200, 255, 0, 0.75)', 'line-width': 1.5, 'line-dasharray': [6, 3] }
         });
 
-        this.map.addLayer({
-            id: 'aara-labels',
-            type: 'symbol',
-            source: 'aara-label-points',
-            layout: {
-                visibility: aarVis,
-                'symbol-placement': 'point',
-                'text-field': ['get', 'name'],
-                'text-size': 11,
-                'text-font': ['Noto Sans Bold'],
-                'text-anchor': 'center',
-                'text-justify': 'center',
-                'text-rotate': ['get', 'text_rotate'],
-                'text-rotation-alignment': 'map',
-            },
-            paint: {
-                'text-color': 'rgba(255, 255, 255, 255)',
-                'text-halo-color': 'rgba(0, 0, 0, 0.7)',
-                'text-halo-width': 1
-            }
-        });
+        // Create HTML label markers once — DOM nodes survive style changes
+        if (!this._labelMarkers) {
+            this._labelMarkers = AARA_ZONES.features.map(f => {
+                const coords = computeCentroid(f.geometry.coordinates);
+                const rotate = computeTextRotate(f.geometry.coordinates);
+                // MapLibre sets its positioning transform on the outer element —
+                // put the rotation on an inner child so it isn't overwritten.
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'pointer-events:none;';
+                const label = document.createElement('div');
+                label.style.cssText = `color:#ffffff;font-family:monospace;font-size:10px;white-space:nowrap;text-align:center;transform:rotate(${rotate}deg);`;
+                label.textContent = f.properties.name;
+                wrapper.appendChild(label);
+                return new maplibregl.Marker({ element: wrapper, anchor: 'center' })
+                    .setLngLat(coords);
+            });
+            if (this.visible) this._labelMarkers.forEach(m => m.addTo(this.map));
+        }
     }
 
     toggle() {
         this.visible = !this.visible;
         const v = this.visible ? 'visible' : 'none';
-        ['aara-fill', 'aara-outline', 'aara-labels'].forEach(id => {
+        ['aara-fill', 'aara-outline'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', v); } catch (e) {}
         });
+        if (this._labelMarkers) {
+            if (this.visible) this._labelMarkers.forEach(m => m.addTo(this.map));
+            else              this._labelMarkers.forEach(m => m.remove());
+        }
         this.button.style.opacity = this.visible ? '1' : '0.3';
         this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
         _saveOverlayStates();
@@ -1100,6 +1221,7 @@ class ClearOverlaysControl {
                 aar: aarControl ? aarControl.visible : false,
                 awacs: awacsControl ? awacsControl.visible : false,
                 airports: airportsControl ? airportsControl.visible : false,
+                raf: rafControl ? rafControl.visible : false,
             };
             if (roadsControl && roadsControl.roadsVisible) roadsControl.toggleRoads();
             if (namesControl && namesControl.namesVisible) namesControl.toggleNames();
@@ -1107,6 +1229,7 @@ class ClearOverlaysControl {
             if (aarControl && aarControl.visible) aarControl.toggle();
             if (awacsControl && awacsControl.visible) awacsControl.toggle();
             if (airportsControl && airportsControl.visible) airportsControl.toggle();
+            if (rafControl && rafControl.visible) rafControl.toggle();
             this.cleared = true;
             this.button.style.opacity = '1';
             this.button.style.color = '#c8ff00';
@@ -1118,6 +1241,7 @@ class ClearOverlaysControl {
                 if (aarControl && this.savedStates.aar && !aarControl.visible) aarControl.toggle();
                 if (awacsControl && this.savedStates.awacs && !awacsControl.visible) awacsControl.toggle();
                 if (airportsControl && this.savedStates.airports && !airportsControl.visible) airportsControl.toggle();
+                if (rafControl && this.savedStates.raf && !rafControl.visible) rafControl.toggle();
             }
             this.cleared = false;
             this.button.style.opacity = '0.3';
