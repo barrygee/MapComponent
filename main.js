@@ -1346,28 +1346,59 @@ if ('geolocation' in navigator) {
     );
 }
 
-// --- Logo typewriter animation ---
+// --- Logo animation (bracket draw-in + typewriter) ---
 (function () {
+    const logoSvg    = document.getElementById('logo-img');
     const logoTextEl = document.getElementById('logo-text-el');
-    if (!logoTextEl) return;
-    const WORD = 'SENTINEL';
-    let i = 0;
-    function typeNext() {
-        if (i < WORD.length) {
-            logoTextEl.textContent = WORD.slice(0, ++i) + '|';
-            setTimeout(typeNext, 75);
-        } else {
-            // Blink cursor a few times then settle on just the word
-            let blinks = 0;
-            const blink = setInterval(() => {
-                blinks++;
-                logoTextEl.textContent = WORD + (blinks % 2 === 0 ? '|' : ' ');
-                if (blinks >= 6) {
-                    clearInterval(blink);
-                    logoTextEl.textContent = WORD;
-                }
-            }, 300);
+    if (!logoSvg || !logoTextEl) return;
+
+    let typeTimer  = null;
+    let blinkTimer = null;
+
+    function playLogoAnimation() {
+        // Cancel any in-flight timers from a previous run
+        clearTimeout(typeTimer);
+        clearInterval(blinkTimer);
+
+        // Reset text
+        logoTextEl.textContent = '';
+
+        // Restart CSS animations on corners, bg pulse, and dot by forcing a reflow
+        const corners = logoSvg.querySelectorAll('.logo-corner');
+        const bg      = logoSvg.querySelector('.logo-bg');
+        const dot     = logoSvg.querySelector('.logo-dot');
+        [...corners, bg, dot].forEach(el => {
+            el.style.animation = 'none';
+            el.getBoundingClientRect(); // force reflow
+            el.style.animation = '';
+        });
+
+        // Typewriter — starts after corners draw (0.43s) + 2 bg pulses (2×0.4s) = 1.23s
+        const WORD = 'SENTINEL';
+        let i = 0;
+        function typeNext() {
+            if (i < WORD.length) {
+                logoTextEl.textContent = WORD.slice(0, ++i) + '|';
+                typeTimer = setTimeout(typeNext, 75);
+            } else {
+                let blinks = 0;
+                blinkTimer = setInterval(() => {
+                    blinks++;
+                    logoTextEl.textContent = WORD + (blinks % 2 === 0 ? '|' : ' ');
+                    if (blinks >= 6) {
+                        clearInterval(blinkTimer);
+                        logoTextEl.textContent = WORD;
+                    }
+                }, 300);
+            }
         }
+        typeTimer = setTimeout(typeNext, 1250);
     }
-    setTimeout(typeNext, 480); // Start after bracket/dot animation finishes
+
+    // Play on load
+    playLogoAnimation();
+
+    // Replay on click
+    logoSvg.style.cursor = 'pointer';
+    logoSvg.addEventListener('click', playLogoAnimation);
 })();
