@@ -879,6 +879,9 @@ const AIRPORTS_DATA = {
         { type: 'Feature', properties: { icao: 'EGAC', iata: 'BHD', name: 'Belfast City'           }, geometry: { type: 'Point', coordinates: [-5.8725,  54.6181] } },
         { type: 'Feature', properties: { icao: 'EGAA', iata: 'BFS', name: 'Belfast International'  }, geometry: { type: 'Point', coordinates: [-6.2158,  54.6575] } },
         { type: 'Feature', properties: { icao: 'EGNV', iata: 'MME', name: 'Teesside International' }, geometry: { type: 'Point', coordinates: [-1.4294,  54.5092] } },
+        { type: 'Feature', properties: { icao: 'EGGP', iata: 'LPL', name: 'Liverpool John Lennon'  }, geometry: { type: 'Point', coordinates: [-2.8497,  53.3336] } },
+        { type: 'Feature', properties: { icao: 'EGNH', iata: 'BLK', name: 'Blackpool'              }, geometry: { type: 'Point', coordinates: [-3.0286,  53.7717] } },
+        { type: 'Feature', properties: { icao: 'EGNS', iata: 'IOM', name: 'Isle of Man Ronaldsway' }, geometry: { type: 'Point', coordinates: [-4.6239,  54.0833] } },
     ]
 };
 
@@ -972,9 +975,9 @@ class AirportsToggleControl {
                 'text-ignore-placement': false
             },
             paint: {
-                'text-color': '#c8ff00',
-                'text-halo-color': 'rgba(0,0,0,0.8)',
-                'text-halo-width': 1.5
+                'text-color': 'rgba(255, 255, 255, 255)',
+                'text-halo-color': 'rgba(0, 0, 0, 0.7)',
+                'text-halo-width': 1
             }
         });
     }
