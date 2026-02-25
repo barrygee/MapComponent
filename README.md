@@ -4,12 +4,6 @@ An interactive dark-themed situational awareness map covering the UK and surroun
 
 ---
 
-## Screenshots
-
-| ![Overview](docs/screenshots/overview.png)
-
----
-
 ## Requirements
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
