@@ -392,8 +392,192 @@ class RoadsToggleControl {
     }
 }
 
+// --- Home / reset view ---
+class ResetViewControl {
+    onAdd(map) {
+        this.map = map;
+        this.container = document.createElement('div');
+        this.container.className = 'maplibregl-ctrl';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
+        this.container.style.marginTop = '4px';
+
+        this.button = document.createElement('button');
+        this.button.title = 'Reset view to home';
+        this.button.innerHTML = `<svg viewBox="14 15 32 30" width="26" height="26" xmlns="http://www.w3.org/2000/svg">
+            <polyline points="21,17 16,17 16,22" fill="none" stroke="#c8ff00" stroke-width="2" stroke-linecap="square"/>
+            <polyline points="39,17 44,17 44,22" fill="none" stroke="#c8ff00" stroke-width="2" stroke-linecap="square"/>
+            <polyline points="21,43 16,43 16,38" fill="none" stroke="#c8ff00" stroke-width="2" stroke-linecap="square"/>
+            <polyline points="39,43 44,43 44,38" fill="none" stroke="#c8ff00" stroke-width="2" stroke-linecap="square"/>
+            <rect x="28" y="28" width="4" height="4" fill="white"/>
+        </svg>`;
+        this.button.style.width = '29px';
+        this.button.style.height = '29px';
+        this.button.style.border = 'none';
+        this.button.style.backgroundColor = '#000000';
+        this.button.style.cursor = 'pointer';
+        this.button.style.display = 'flex';
+        this.button.style.alignItems = 'center';
+        this.button.style.justifyContent = 'center';
+        this.button.style.transition = 'opacity 0.2s';
+        this.button.onclick = () => {
+            this.map.flyTo({ center: [-4.4815, 54.1453], zoom: 6 });
+        };
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
+
+        this.container.appendChild(this.button);
+        return this.container;
+    }
+
+    onRemove() {
+        if (this.container && this.container.parentNode) {
+            this.container.parentNode.removeChild(this.container);
+        }
+        this.map = undefined;
+    }
+}
+// --- End home / reset view ---
+
+// --- Airports ---
+const AIRPORTS_DATA = {
+    type: 'FeatureCollection',
+    features: [
+        { type: 'Feature', properties: { icao: 'EGLL', iata: 'LHR', name: 'London Heathrow'       }, geometry: { type: 'Point', coordinates: [-0.4614,  51.4775] } },
+        { type: 'Feature', properties: { icao: 'EGKK', iata: 'LGW', name: 'London Gatwick'         }, geometry: { type: 'Point', coordinates: [-0.1903,  51.1481] } },
+        { type: 'Feature', properties: { icao: 'EGGW', iata: 'LTN', name: 'London Luton'           }, geometry: { type: 'Point', coordinates: [-0.3683,  51.8747] } },
+        { type: 'Feature', properties: { icao: 'EGSS', iata: 'STN', name: 'London Stansted'        }, geometry: { type: 'Point', coordinates: [ 0.2350,  51.8850] } },
+        { type: 'Feature', properties: { icao: 'EGCC', iata: 'MAN', name: 'Manchester'             }, geometry: { type: 'Point', coordinates: [-2.2749,  53.3650] } },
+        { type: 'Feature', properties: { icao: 'EGNT', iata: 'NCL', name: 'Newcastle International'}, geometry: { type: 'Point', coordinates: [-1.6917,  55.0375] } },
+        { type: 'Feature', properties: { icao: 'EGPF', iata: 'GLA', name: 'Glasgow'                }, geometry: { type: 'Point', coordinates: [-4.4330,  55.8719] } },
+        { type: 'Feature', properties: { icao: 'EGPH', iata: 'EDI', name: 'Edinburgh'              }, geometry: { type: 'Point', coordinates: [-3.3725,  55.9508] } },
+        { type: 'Feature', properties: { icao: 'EGGD', iata: 'BRS', name: 'Bristol'                }, geometry: { type: 'Point', coordinates: [-2.7191,  51.3827] } },
+        { type: 'Feature', properties: { icao: 'EGBB', iata: 'BHX', name: 'Birmingham'             }, geometry: { type: 'Point', coordinates: [-1.7480,  52.4539] } },
+        { type: 'Feature', properties: { icao: 'EGAC', iata: 'BHD', name: 'Belfast City'           }, geometry: { type: 'Point', coordinates: [-5.8725,  54.6181] } },
+        { type: 'Feature', properties: { icao: 'EGAA', iata: 'BFS', name: 'Belfast International'  }, geometry: { type: 'Point', coordinates: [-6.2158,  54.6575] } },
+        { type: 'Feature', properties: { icao: 'EGNV', iata: 'MME', name: 'Teesside International' }, geometry: { type: 'Point', coordinates: [-1.4294,  54.5092] } },
+        { type: 'Feature', properties: { icao: 'EGGP', iata: 'LPL', name: 'Liverpool John Lennon'  }, geometry: { type: 'Point', coordinates: [-2.8497,  53.3336] } },
+        { type: 'Feature', properties: { icao: 'EGNH', iata: 'BLK', name: 'Blackpool'              }, geometry: { type: 'Point', coordinates: [-3.0286,  53.7717] } },
+        { type: 'Feature', properties: { icao: 'EGNS', iata: 'IOM', name: 'Isle of Man Ronaldsway' }, geometry: { type: 'Point', coordinates: [-4.6239,  54.0833] } },
+    ]
+};
+
+class AirportsToggleControl {
+    constructor() {
+        this.visible = _overlayStates.airports;
+    }
+
+    onAdd(map) {
+        this.map = map;
+        this.container = document.createElement('div');
+        this.container.className = 'maplibregl-ctrl';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
+        this.container.style.marginTop = '4px';
+
+        this.button = document.createElement('button');
+        this.button.title = 'Toggle airports';
+        this.button.textContent = 'A';
+        this.button.style.width = '29px';
+        this.button.style.height = '29px';
+        this.button.style.border = 'none';
+        this.button.style.backgroundColor = '#000000';
+        this.button.style.cursor = 'pointer';
+        this.button.style.fontSize = '13px';
+        this.button.style.fontWeight = 'bold';
+        this.button.style.display = 'flex';
+        this.button.style.alignItems = 'center';
+        this.button.style.justifyContent = 'center';
+        this.button.style.transition = 'opacity 0.2s, color 0.2s';
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        this.button.onclick = () => this.toggle();
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout  = () => this.button.style.backgroundColor = '#000000';
+
+        this.container.appendChild(this.button);
+
+        if (this.map.isStyleLoaded()) {
+            this.initLayers();
+        } else {
+            this.map.once('style.load', () => this.initLayers());
+        }
+
+        return this.container;
+    }
+
+    onRemove() {
+        if (this.container && this.container.parentNode) this.container.parentNode.removeChild(this.container);
+        this.map = undefined;
+    }
+
+    initLayers() {
+        const vis = this.visible ? 'visible' : 'none';
+
+        if (this.map.getSource('airports')) {
+            this.map.removeLayer('airports-circle');
+            this.map.removeLayer('airports-label');
+            this.map.removeSource('airports');
+        }
+
+        this.map.addSource('airports', { type: 'geojson', data: AIRPORTS_DATA });
+
+        this.map.addLayer({
+            id: 'airports-circle',
+            type: 'circle',
+            source: 'airports',
+            layout: { visibility: vis },
+            paint: {
+                'circle-radius': 5,
+                'circle-color': '#ffffff',
+                'circle-opacity': 0.9,
+                'circle-stroke-width': 1.5,
+                'circle-stroke-color': '#000000',
+                'circle-stroke-opacity': 0.7
+            }
+        });
+
+        this.map.addLayer({
+            id: 'airports-label',
+            type: 'symbol',
+            source: 'airports',
+            layout: {
+                visibility: vis,
+                'text-field': ['concat', ['get', 'icao'], '\n', ['get', 'iata']],
+                'text-font': ['Noto Sans Bold'],
+                'text-size': 10,
+                'text-anchor': 'left',
+                'text-offset': [0.8, 0],
+                'text-allow-overlap': false,
+                'text-ignore-placement': false
+            },
+            paint: {
+                'text-color': 'rgba(255, 255, 255, 255)',
+                'text-halo-color': 'rgba(0, 0, 0, 0.7)',
+                'text-halo-width': 1
+            }
+        });
+    }
+
+    toggle() {
+        this.visible = !this.visible;
+        const v = this.visible ? 'visible' : 'none';
+        ['airports-circle', 'airports-label'].forEach(id => {
+            try { this.map.setLayoutProperty(id, 'visibility', v); } catch (e) {}
+        });
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        _saveOverlayStates();
+    }
+}
+
+let airportsControl = new AirportsToggleControl();
+// --- End Airports ---
+
 const roadsControl = new RoadsToggleControl();
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+map.addControl(new ResetViewControl(), 'top-right');
+map.addControl(airportsControl, 'top-right');
 map.addControl(roadsControl, 'top-right');
 
 
@@ -862,144 +1046,6 @@ map.addControl(awacsControl, 'top-right');
 // --- End UK AWACS Orbits ---
 
 
-// --- Airports ---
-const AIRPORTS_DATA = {
-    type: 'FeatureCollection',
-    features: [
-        { type: 'Feature', properties: { icao: 'EGLL', iata: 'LHR', name: 'London Heathrow'       }, geometry: { type: 'Point', coordinates: [-0.4614,  51.4775] } },
-        { type: 'Feature', properties: { icao: 'EGKK', iata: 'LGW', name: 'London Gatwick'         }, geometry: { type: 'Point', coordinates: [-0.1903,  51.1481] } },
-        { type: 'Feature', properties: { icao: 'EGGW', iata: 'LTN', name: 'London Luton'           }, geometry: { type: 'Point', coordinates: [-0.3683,  51.8747] } },
-        { type: 'Feature', properties: { icao: 'EGSS', iata: 'STN', name: 'London Stansted'        }, geometry: { type: 'Point', coordinates: [ 0.2350,  51.8850] } },
-        { type: 'Feature', properties: { icao: 'EGCC', iata: 'MAN', name: 'Manchester'             }, geometry: { type: 'Point', coordinates: [-2.2749,  53.3650] } },
-        { type: 'Feature', properties: { icao: 'EGNT', iata: 'NCL', name: 'Newcastle International'}, geometry: { type: 'Point', coordinates: [-1.6917,  55.0375] } },
-        { type: 'Feature', properties: { icao: 'EGPF', iata: 'GLA', name: 'Glasgow'                }, geometry: { type: 'Point', coordinates: [-4.4330,  55.8719] } },
-        { type: 'Feature', properties: { icao: 'EGPH', iata: 'EDI', name: 'Edinburgh'              }, geometry: { type: 'Point', coordinates: [-3.3725,  55.9508] } },
-        { type: 'Feature', properties: { icao: 'EGGD', iata: 'BRS', name: 'Bristol'                }, geometry: { type: 'Point', coordinates: [-2.7191,  51.3827] } },
-        { type: 'Feature', properties: { icao: 'EGBB', iata: 'BHX', name: 'Birmingham'             }, geometry: { type: 'Point', coordinates: [-1.7480,  52.4539] } },
-        { type: 'Feature', properties: { icao: 'EGAC', iata: 'BHD', name: 'Belfast City'           }, geometry: { type: 'Point', coordinates: [-5.8725,  54.6181] } },
-        { type: 'Feature', properties: { icao: 'EGAA', iata: 'BFS', name: 'Belfast International'  }, geometry: { type: 'Point', coordinates: [-6.2158,  54.6575] } },
-        { type: 'Feature', properties: { icao: 'EGNV', iata: 'MME', name: 'Teesside International' }, geometry: { type: 'Point', coordinates: [-1.4294,  54.5092] } },
-        { type: 'Feature', properties: { icao: 'EGGP', iata: 'LPL', name: 'Liverpool John Lennon'  }, geometry: { type: 'Point', coordinates: [-2.8497,  53.3336] } },
-        { type: 'Feature', properties: { icao: 'EGNH', iata: 'BLK', name: 'Blackpool'              }, geometry: { type: 'Point', coordinates: [-3.0286,  53.7717] } },
-        { type: 'Feature', properties: { icao: 'EGNS', iata: 'IOM', name: 'Isle of Man Ronaldsway' }, geometry: { type: 'Point', coordinates: [-4.6239,  54.0833] } },
-    ]
-};
-
-class AirportsToggleControl {
-    constructor() {
-        this.visible = _overlayStates.airports;
-    }
-
-    onAdd(map) {
-        this.map = map;
-        this.container = document.createElement('div');
-        this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#000000';
-        this.container.style.borderRadius = '0';
-        this.container.style.marginTop = '4px';
-
-        this.button = document.createElement('button');
-        this.button.title = 'Toggle airports';
-        this.button.textContent = 'A';
-        this.button.style.width = '29px';
-        this.button.style.height = '29px';
-        this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#000000';
-        this.button.style.cursor = 'pointer';
-        this.button.style.fontSize = '13px';
-        this.button.style.fontWeight = 'bold';
-        this.button.style.display = 'flex';
-        this.button.style.alignItems = 'center';
-        this.button.style.justifyContent = 'center';
-        this.button.style.transition = 'opacity 0.2s, color 0.2s';
-        this.button.style.opacity = this.visible ? '1' : '0.3';
-        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
-        this.button.onclick = () => this.toggle();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
-        this.button.onmouseout  = () => this.button.style.backgroundColor = '#000000';
-
-        this.container.appendChild(this.button);
-
-        if (this.map.isStyleLoaded()) {
-            this.initLayers();
-        } else {
-            this.map.once('style.load', () => this.initLayers());
-        }
-
-        return this.container;
-    }
-
-    onRemove() {
-        if (this.container && this.container.parentNode) this.container.parentNode.removeChild(this.container);
-        this.map = undefined;
-    }
-
-    initLayers() {
-        const vis = this.visible ? 'visible' : 'none';
-
-        if (this.map.getSource('airports')) {
-            this.map.removeLayer('airports-circle');
-            this.map.removeLayer('airports-label');
-            this.map.removeSource('airports');
-        }
-
-        this.map.addSource('airports', { type: 'geojson', data: AIRPORTS_DATA });
-
-        this.map.addLayer({
-            id: 'airports-circle',
-            type: 'circle',
-            source: 'airports',
-            layout: { visibility: vis },
-            paint: {
-                'circle-radius': 5,
-                'circle-color': '#c8ff00',
-                'circle-opacity': 0.9,
-                'circle-stroke-width': 1.5,
-                'circle-stroke-color': '#000000',
-                'circle-stroke-opacity': 0.7
-            }
-        });
-
-        this.map.addLayer({
-            id: 'airports-label',
-            type: 'symbol',
-            source: 'airports',
-            layout: {
-                visibility: vis,
-                'text-field': ['concat', ['get', 'icao'], '\n', ['get', 'iata']],
-                'text-font': ['Noto Sans Bold'],
-                'text-size': 10,
-                'text-anchor': 'left',
-                'text-offset': [0.8, 0],
-                'text-allow-overlap': false,
-                'text-ignore-placement': false
-            },
-            paint: {
-                'text-color': 'rgba(255, 255, 255, 255)',
-                'text-halo-color': 'rgba(0, 0, 0, 0.7)',
-                'text-halo-width': 1
-            }
-        });
-    }
-
-    toggle() {
-        this.visible = !this.visible;
-        const v = this.visible ? 'visible' : 'none';
-        ['airports-circle', 'airports-label'].forEach(id => {
-            try { this.map.setLayoutProperty(id, 'visibility', v); } catch (e) {}
-        });
-        this.button.style.opacity = this.visible ? '1' : '0.3';
-        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
-        _saveOverlayStates();
-    }
-}
-
-let airportsControl = null;
-airportsControl = new AirportsToggleControl();
-map.addControl(airportsControl, 'top-right');
-// --- End Airports ---
-
-
 // --- Clear all overlays ---
 class ClearOverlaysControl {
     constructor() {
@@ -1083,54 +1129,6 @@ class ClearOverlaysControl {
 map.addControl(new ClearOverlaysControl(), 'top-right');
 // --- End clear all overlays ---
 
-// --- Home / reset view ---
-class ResetViewControl {
-    onAdd(map) {
-        this.map = map;
-        this.container = document.createElement('div');
-        this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#000000';
-        this.container.style.borderRadius = '0';
-        this.container.style.marginTop = '4px';
-
-        this.button = document.createElement('button');
-        this.button.title = 'Reset view to home';
-        this.button.innerHTML = `<svg viewBox="14 15 32 30" width="26" height="26" xmlns="http://www.w3.org/2000/svg">
-            <polyline points="21,17 16,17 16,22" fill="none" stroke="#c8ff00" stroke-width="2" stroke-linecap="square"/>
-            <polyline points="39,17 44,17 44,22" fill="none" stroke="#c8ff00" stroke-width="2" stroke-linecap="square"/>
-            <polyline points="21,43 16,43 16,38" fill="none" stroke="#c8ff00" stroke-width="2" stroke-linecap="square"/>
-            <polyline points="39,43 44,43 44,38" fill="none" stroke="#c8ff00" stroke-width="2" stroke-linecap="square"/>
-            <rect x="28" y="28" width="4" height="4" fill="white"/>
-        </svg>`;
-        this.button.style.width = '29px';
-        this.button.style.height = '29px';
-        this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#000000';
-        this.button.style.cursor = 'pointer';
-        this.button.style.display = 'flex';
-        this.button.style.alignItems = 'center';
-        this.button.style.justifyContent = 'center';
-        this.button.style.transition = 'opacity 0.2s';
-        this.button.onclick = () => {
-            this.map.flyTo({ center: [-4.4815, 54.1453], zoom: 6 });
-        };
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
-        this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
-
-        this.container.appendChild(this.button);
-        return this.container;
-    }
-
-    onRemove() {
-        if (this.container && this.container.parentNode) {
-            this.container.parentNode.removeChild(this.container);
-        }
-        this.map = undefined;
-    }
-}
-
-map.addControl(new ResetViewControl(), 'top-right');
-// --- End home / reset view ---
 
 let userMarker;
 
