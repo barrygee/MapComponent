@@ -477,13 +477,13 @@ class AirportsToggleControl {
 
         this.button = document.createElement('button');
         this.button.title = 'Toggle airports';
-        this.button.textContent = 'A';
+        this.button.textContent = 'CVL';
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
         this.button.style.backgroundColor = '#000000';
         this.button.style.cursor = 'pointer';
-        this.button.style.fontSize = '13px';
+        this.button.style.fontSize = '8px';
         this.button.style.fontWeight = 'bold';
         this.button.style.display = 'flex';
         this.button.style.alignItems = 'center';
