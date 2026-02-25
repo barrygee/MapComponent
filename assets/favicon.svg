@@ -1,20 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60">
   <style>
-    .bg { fill: #000; }
-    .inner { fill: #0d0d0d; }
     .bracket { stroke: #c8ff00; }
     .dot { fill: #fff; }
     @media (prefers-color-scheme: light) {
-      .bg { fill: #fff; }
-      .inner { fill: #f0f0f0; }
-      .bracket { stroke: #5a7a00; }
-      .dot { fill: #000; }
+      .bracket { stroke: #3d6b00; }
+      .dot { fill: #3d6b00; }
     }
   </style>
-  <!-- background -->
-  <rect class="bg" width="60" height="60"/>
-  <!-- inner box -->
-  <rect class="inner" x="16" y="17" width="28" height="26"/>
   <!-- top-left bracket -->
   <polyline class="bracket" points="21,17 16,17 16,22" fill="none" stroke-width="3.5" stroke-linecap="square"/>
   <!-- top-right bracket -->
