@@ -264,6 +264,7 @@ map.on('style.load', () => {
         if (awacsControl)      awacsControl.initLayers();
         if (airportsControl)   airportsControl.initLayers();
         if (rafControl)        rafControl.initLayers();
+        if (adsbControl)       adsbControl.initLayers();
     }
     _styleLoadedOnce = true;
 });
@@ -275,7 +276,7 @@ map.on('error', (e) => {
 
 // --- Overlay state persistence ---
 // Defaults: everything ON on first load; subsequent loads restore last state.
-const _OVERLAY_DEFAULTS = { roads: true, names: true, rings: true, aar: true, awacs: true, airports: true, raf: true };
+const _OVERLAY_DEFAULTS = { roads: true, names: true, rings: true, aar: true, awacs: true, airports: true, raf: true, adsb: true };
 const _overlayStates = (() => {
     try {
         const saved = localStorage.getItem('overlayStates');
@@ -292,6 +293,7 @@ function _saveOverlayStates() {
             awacs: awacsControl ? awacsControl.visible : _overlayStates.awacs,
             airports: airportsControl ? airportsControl.visible : _overlayStates.airports,
             raf: rafControl ? rafControl.visible : _overlayStates.raf,
+            adsb: adsbControl ? adsbControl.visible : _overlayStates.adsb,
         }));
     } catch (e) {}
 }
@@ -1168,6 +1170,190 @@ map.addControl(awacsControl, 'top-right');
 // --- End UK AWACS Orbits ---
 
 
+// --- ADS-B Live Feed ---
+class AdsbLiveControl {
+    constructor() {
+        this.visible = _overlayStates.adsb;
+        this._pollInterval = null;
+        this._geojson = { type: 'FeatureCollection', features: [] };
+    }
+
+    onAdd(map) {
+        this.map = map;
+        this.container = document.createElement('div');
+        this.container.className = 'maplibregl-ctrl';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
+        this.container.style.marginTop = '4px';
+
+        this.button = document.createElement('button');
+        this.button.title = 'Toggle live ADS-B aircraft';
+        this.button.textContent = 'ADS';
+        this.button.style.width = '29px';
+        this.button.style.height = '29px';
+        this.button.style.border = 'none';
+        this.button.style.backgroundColor = '#000000';
+        this.button.style.cursor = 'pointer';
+        this.button.style.fontSize = '8px';
+        this.button.style.fontWeight = 'bold';
+        this.button.style.display = 'flex';
+        this.button.style.alignItems = 'center';
+        this.button.style.justifyContent = 'center';
+        this.button.style.transition = 'opacity 0.2s, color 0.2s';
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        this.button.onclick = () => this.toggle();
+        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
+        this.button.onmouseout  = () => this.button.style.backgroundColor = '#000000';
+
+        this.container.appendChild(this.button);
+
+        if (this.map.isStyleLoaded()) {
+            this.initLayers();
+        } else {
+            this.map.once('style.load', () => this.initLayers());
+        }
+
+        if (this.visible) this._startPolling();
+
+        return this.container;
+    }
+
+    onRemove() {
+        this._stopPolling();
+        if (this.container && this.container.parentNode) this.container.parentNode.removeChild(this.container);
+        this.map = undefined;
+    }
+
+    initLayers() {
+        const vis = this.visible ? 'visible' : 'none';
+
+        ['adsb-labels', 'adsb-icons'].forEach(id => {
+            try { this.map.removeLayer(id); } catch(e) {}
+        });
+        if (this.map.getSource('adsb-live')) {
+            this.map.removeSource('adsb-live');
+        }
+
+        this.map.addSource('adsb-live', { type: 'geojson', data: this._geojson });
+
+        this.map.addLayer({
+            id: 'adsb-icons',
+            type: 'circle',
+            source: 'adsb-live',
+            layout: { visibility: vis },
+            paint: {
+                'circle-radius': 3,
+                'circle-color': '#ffffff',
+                'circle-opacity': 1,
+                'circle-opacity-transition': { duration: 0 },
+            }
+        });
+
+        this.map.addLayer({
+            id: 'adsb-labels',
+            type: 'symbol',
+            source: 'adsb-live',
+            layout: {
+                visibility: vis,
+                'text-field': ['coalesce', ['get', 'flight'], ['get', 'r'], ['get', 'hex']],
+                'text-font': ['Noto Sans Regular'],
+                'text-size': 9,
+                'text-offset': [1.2, 0],
+                'text-anchor': 'left',
+                'text-allow-overlap': false,
+            },
+            paint: {
+                'text-color': '#ffffff',
+                'text-opacity-transition': { duration: 0 },
+            }
+        });
+    }
+
+    async _fetch() {
+        if (!this.map) return;
+        let lat, lon;
+        const cached = localStorage.getItem('userLocation');
+        if (cached) {
+            try {
+                const loc = JSON.parse(cached);
+                if (Date.now() - (loc.ts || 0) < 10 * 60 * 1000) {
+                    lat = loc.latitude;
+                    lon = loc.longitude;
+                }
+            } catch(e) {}
+        }
+        if (lat === undefined) {
+            const c = this.map.getCenter();
+            lat = c.lat;
+            lon = c.lng;
+        }
+        try {
+            const url = `https://api.airplanes.live/v2/point/${lat.toFixed(4)}/${lon.toFixed(4)}/250`;
+            const resp = await fetch(url);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const aircraft = data.ac || [];
+            this._geojson = {
+                type: 'FeatureCollection',
+                features: aircraft
+                    .filter(a => a.lat != null && a.lon != null)
+                    .map(a => ({
+                        type: 'Feature',
+                        geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
+                        properties: {
+                            hex:      a.hex              || '',
+                            flight:   (a.flight || '').trim(),
+                            r:        a.r                || '',
+                            t:        a.t                || '',
+                            alt_baro: a.alt_baro          ?? '',
+                            gs:       a.gs               ?? 0,
+                            track:    a.track            ?? 0,
+                        }
+                    }))
+            };
+            if (this.map && this.map.getSource('adsb-live')) {
+                this.map.getSource('adsb-live').setData(this._geojson);
+            }
+        } catch(e) {
+            console.warn('ADS-B fetch error:', e);
+        }
+    }
+
+    _startPolling() {
+        this._fetch();
+        this._pollInterval = setInterval(() => this._fetch(), 5000);
+    }
+
+    _stopPolling() {
+        if (this._pollInterval) {
+            clearInterval(this._pollInterval);
+            this._pollInterval = null;
+        }
+    }
+
+    toggle() {
+        this.visible = !this.visible;
+        const v = this.visible ? 'visible' : 'none';
+        ['adsb-icons', 'adsb-labels'].forEach(id => {
+            try { this.map.setLayoutProperty(id, 'visibility', v); } catch(e) {}
+        });
+        if (this.visible) {
+            this._startPolling();
+        } else {
+            this._stopPolling();
+        }
+        this.button.style.opacity = this.visible ? '1' : '0.3';
+        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        _saveOverlayStates();
+    }
+}
+
+let adsbControl = new AdsbLiveControl();
+map.addControl(adsbControl, 'top-right');
+// --- End ADS-B Live Feed ---
+
+
 // --- Clear all overlays ---
 class ClearOverlaysControl {
     constructor() {
@@ -1223,6 +1409,7 @@ class ClearOverlaysControl {
                 awacs: awacsControl ? awacsControl.visible : false,
                 airports: airportsControl ? airportsControl.visible : false,
                 raf: rafControl ? rafControl.visible : false,
+                adsb: adsbControl ? adsbControl.visible : false,
             };
             if (roadsControl && roadsControl.roadsVisible) roadsControl.toggleRoads();
             if (namesControl && namesControl.namesVisible) namesControl.toggleNames();
@@ -1231,6 +1418,7 @@ class ClearOverlaysControl {
             if (awacsControl && awacsControl.visible) awacsControl.toggle();
             if (airportsControl && airportsControl.visible) airportsControl.toggle();
             if (rafControl && rafControl.visible) rafControl.toggle();
+            if (adsbControl && adsbControl.visible) adsbControl.toggle();
             this.cleared = true;
             this.button.style.opacity = '1';
             this.button.style.color = '#c8ff00';
@@ -1243,6 +1431,7 @@ class ClearOverlaysControl {
                 if (awacsControl && this.savedStates.awacs && !awacsControl.visible) awacsControl.toggle();
                 if (airportsControl && this.savedStates.airports && !airportsControl.visible) airportsControl.toggle();
                 if (rafControl && this.savedStates.raf && !rafControl.visible) rafControl.toggle();
+                if (adsbControl && this.savedStates.adsb && !adsbControl.visible) adsbControl.toggle();
             }
             this.cleared = false;
             this.button.style.opacity = '0.3';
