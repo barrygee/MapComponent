@@ -237,22 +237,21 @@ html {
    USER LOCATION MARKER
    ============================================================ */
 @keyframes marker-dot-pulse {
-    0%, 100% { fill: white; }
-    50%       { fill: #c8ff00; }
+    0%   { fill: white; }
+    50%  { fill: #c8ff00; }
+    100% { fill: white; }
 }
 
 @keyframes marker-bg-pulse {
-    0%, 100% { fill: black;   fill-opacity: 0.15; }
-    50%       { fill: #c8ff00; fill-opacity: 0.15; }
-}
-
-.user-location-marker:hover .marker-dot {
-    animation: marker-dot-pulse 2s ease-in-out 1;
+    0%   { fill-opacity: 0; }
+    50%  { fill-opacity: 0.18; }
+    100% { fill-opacity: 0; }
 }
 
 .user-location-marker:hover .marker-bg {
-    animation: marker-bg-pulse 2s ease-in-out 1;
+    animation: marker-bg-pulse 0.4s ease-in-out 2;
 }
+
 
 
 /* Font for all map control buttons */

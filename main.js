@@ -1261,19 +1261,52 @@ function createMarkerElement(longitude, latitude) {
     const el = document.createElement('div');
     el.style.width = '60px';
     el.style.height = '60px';
+    el.style.overflow = 'visible';
     const latText = latitude !== undefined ? latitude.toFixed(3) : '';
     const lonText = longitude !== undefined ? longitude.toFixed(3) : '';
     el.classList.add('user-location-marker');
-    el.innerHTML = `<svg viewBox="0 0 60 60" width="60" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-        <rect class="marker-bg" x="16" y="17" width="28" height="26" fill="black" fill-opacity="0.15"/>
-        <polyline points="21,17 16,17 16,22" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
-        <polyline points="39,17 44,17 44,22" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
-        <polyline points="21,43 16,43 16,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
-        <polyline points="39,43 44,43 44,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
-        <rect class="marker-dot" x="28" y="28" width="4" height="4" fill="white"/>
-        <text x="52" y="28" fill="white" font-size="7.5" font-family="monospace" class="marker-lat">${latText}</text>
-        <text x="52" y="38" fill="white" font-size="7.5" font-family="monospace" class="marker-lon">${lonText}</text>
+    el.innerHTML = `<svg viewBox="0 0 110 60" width="110" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <rect class="marker-bg" x="16" y="17" width="28" height="26" fill="#c8ff00" fill-opacity="0"/>
+        <polyline class="marker-corner" points="21,17 16,17 16,22" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square" stroke-dasharray="10" stroke-dashoffset="10"/>
+        <polyline class="marker-corner" points="39,17 44,17 44,22" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square" stroke-dasharray="10" stroke-dashoffset="10"/>
+        <polyline class="marker-corner" points="21,43 16,43 16,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square" stroke-dasharray="10" stroke-dashoffset="10"/>
+        <polyline class="marker-corner" points="39,43 44,43 44,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square" stroke-dasharray="10" stroke-dashoffset="10"/>
+        <rect class="marker-dot" x="28" y="28" width="4" height="4" fill="white" opacity="0"/>
+        <text x="52" y="28" fill="white" font-size="7.5" font-family="monospace" class="marker-lat"></text>
+        <text x="52" y="38" fill="white" font-size="7.5" font-family="monospace" class="marker-lon"></text>
     </svg>`;
+
+    const corners = el.querySelectorAll('.marker-corner');
+    const bg      = el.querySelector('.marker-bg');
+    const dot     = el.querySelector('.marker-dot');
+    const latEl   = el.querySelector('.marker-lat');
+    const lonEl   = el.querySelector('.marker-lon');
+
+    // Corners draw in sequentially
+    corners.forEach((c, idx) => {
+        c.style.animation = `logo-draw 0.22s ease-out ${idx * 0.07}s forwards`;
+    });
+    // Background pulses twice after corners finish
+    bg.style.animation = 'logo-bg-pulse 0.4s ease-in-out 0.43s 2 both';
+    // Dot fades in
+    dot.style.animation = 'logo-dot-in 0.15s ease-out 0.38s forwards';
+
+    // Coordinates type in after draw + pulse sequence.
+    // animDone gates setUserLocation updates until the animation finishes.
+    el.dataset.animDone = '0';
+    let i = 0, j = 0;
+    function step() {
+        let more = false;
+        if (i < latText.length) { latEl.textContent = latText.slice(0, ++i); more = true; }
+        if (j < lonText.length) { lonEl.textContent = lonText.slice(0, ++j); more = true; }
+        if (more) {
+            setTimeout(step, 75);
+        } else {
+            el.dataset.animDone = '1';
+        }
+    }
+    setTimeout(step, 1250);
+
     return el;
 }
 
@@ -1286,8 +1319,10 @@ function setUserLocation(position) {
         const el = userMarker.getElement();
         const latEl = el.querySelector('.marker-lat');
         const lonEl = el.querySelector('.marker-lon');
-        if (latEl) latEl.textContent = latitude.toFixed(3);
-        if (lonEl) lonEl.textContent = longitude.toFixed(3);
+        if (el.dataset.animDone === '1') {
+            if (latEl) latEl.textContent = latitude.toFixed(3);
+            if (lonEl) lonEl.textContent = longitude.toFixed(3);
+        }
     } else {
         userMarker = new maplibregl.Marker({ element: createMarkerElement(longitude, latitude), anchor: 'center' })
             .setLngLat([longitude, latitude])
