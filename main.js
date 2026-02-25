@@ -443,22 +443,25 @@ class ResetViewControl {
 const AIRPORTS_DATA = {
     type: 'FeatureCollection',
     features: [
-        { type: 'Feature', properties: { icao: 'EGLL', iata: 'LHR', name: 'London Heathrow'       }, geometry: { type: 'Point', coordinates: [-0.4614,  51.4775] } },
-        { type: 'Feature', properties: { icao: 'EGKK', iata: 'LGW', name: 'London Gatwick'         }, geometry: { type: 'Point', coordinates: [-0.1903,  51.1481] } },
-        { type: 'Feature', properties: { icao: 'EGGW', iata: 'LTN', name: 'London Luton'           }, geometry: { type: 'Point', coordinates: [-0.3683,  51.8747] } },
-        { type: 'Feature', properties: { icao: 'EGSS', iata: 'STN', name: 'London Stansted'        }, geometry: { type: 'Point', coordinates: [ 0.2350,  51.8850] } },
-        { type: 'Feature', properties: { icao: 'EGCC', iata: 'MAN', name: 'Manchester'             }, geometry: { type: 'Point', coordinates: [-2.2749,  53.3650] } },
-        { type: 'Feature', properties: { icao: 'EGNT', iata: 'NCL', name: 'Newcastle International'}, geometry: { type: 'Point', coordinates: [-1.6917,  55.0375] } },
-        { type: 'Feature', properties: { icao: 'EGPF', iata: 'GLA', name: 'Glasgow'                }, geometry: { type: 'Point', coordinates: [-4.4330,  55.8719] } },
-        { type: 'Feature', properties: { icao: 'EGPH', iata: 'EDI', name: 'Edinburgh'              }, geometry: { type: 'Point', coordinates: [-3.3725,  55.9508] } },
-        { type: 'Feature', properties: { icao: 'EGGD', iata: 'BRS', name: 'Bristol'                }, geometry: { type: 'Point', coordinates: [-2.7191,  51.3827] } },
-        { type: 'Feature', properties: { icao: 'EGBB', iata: 'BHX', name: 'Birmingham'             }, geometry: { type: 'Point', coordinates: [-1.7480,  52.4539] } },
-        { type: 'Feature', properties: { icao: 'EGAC', iata: 'BHD', name: 'Belfast City'           }, geometry: { type: 'Point', coordinates: [-5.8725,  54.6181] } },
-        { type: 'Feature', properties: { icao: 'EGAA', iata: 'BFS', name: 'Belfast International'  }, geometry: { type: 'Point', coordinates: [-6.2158,  54.6575] } },
-        { type: 'Feature', properties: { icao: 'EGNV', iata: 'MME', name: 'Teesside International' }, geometry: { type: 'Point', coordinates: [-1.4294,  54.5092] } },
-        { type: 'Feature', properties: { icao: 'EGGP', iata: 'LPL', name: 'Liverpool John Lennon'  }, geometry: { type: 'Point', coordinates: [-2.8497,  53.3336] } },
-        { type: 'Feature', properties: { icao: 'EGNH', iata: 'BLK', name: 'Blackpool'              }, geometry: { type: 'Point', coordinates: [-3.0286,  53.7717] } },
-        { type: 'Feature', properties: { icao: 'EGNS', iata: 'IOM', name: 'Isle of Man Ronaldsway' }, geometry: { type: 'Point', coordinates: [-4.6239,  54.0833] } },
+        { type: 'Feature', properties: { icao: 'EGLL', iata: 'LHR', name: 'Heathrow'              }, geometry: { type: 'Point', coordinates: [-0.4614,  51.4775] } },
+        { type: 'Feature', properties: { icao: 'EGKK', iata: 'LGW', name: 'Gatwick'               }, geometry: { type: 'Point', coordinates: [-0.1903,  51.1481] } },
+        { type: 'Feature', properties: { icao: 'EGGW', iata: 'LTN', name: 'Luton'                 }, geometry: { type: 'Point', coordinates: [-0.3683,  51.8747] } },
+        { type: 'Feature', properties: { icao: 'EGSS', iata: 'STN', name: 'Stansted'              }, geometry: { type: 'Point', coordinates: [ 0.2350,  51.8850] } },
+        { type: 'Feature', properties: { icao: 'EGCC', iata: 'MAN', name: 'Manchester'            }, geometry: { type: 'Point', coordinates: [-2.2749,  53.3650] } },
+        { type: 'Feature', properties: { icao: 'EGNT', iata: 'NCL', name: 'Newcastle'             }, geometry: { type: 'Point', coordinates: [-1.6917,  55.0375] } },
+        { type: 'Feature', properties: { icao: 'EGPF', iata: 'GLA', name: 'Glasgow'               }, geometry: { type: 'Point', coordinates: [-4.4330,  55.8719] } },
+        { type: 'Feature', properties: { icao: 'EGPH', iata: 'EDI', name: 'Edinburgh'             }, geometry: { type: 'Point', coordinates: [-3.3725,  55.9508] } },
+        { type: 'Feature', properties: { icao: 'EGGD', iata: 'BRS', name: 'Bristol'               }, geometry: { type: 'Point', coordinates: [-2.7191,  51.3827] } },
+        { type: 'Feature', properties: { icao: 'EGBB', iata: 'BHX', name: 'Birmingham'            }, geometry: { type: 'Point', coordinates: [-1.7480,  52.4539] } },
+        { type: 'Feature', properties: { icao: 'EGAC', iata: 'BHD', name: 'Belfast City'          }, geometry: { type: 'Point', coordinates: [-5.8725,  54.6181] } },
+        { type: 'Feature', properties: { icao: 'EGAA', iata: 'BFS', name: 'Aldergrove'            }, geometry: { type: 'Point', coordinates: [-6.2158,  54.6575] } },
+        { type: 'Feature', properties: { icao: 'EGNV', iata: 'MME', name: 'Teesside'              }, geometry: { type: 'Point', coordinates: [-1.4294,  54.5092] } },
+        { type: 'Feature', properties: { icao: 'EGGP', iata: 'LPL', name: 'Liverpool' }, geometry: { type: 'Point', coordinates: [-2.8497,  53.3336] } },
+        { type: 'Feature', properties: { icao: 'EGNH', iata: 'BLK', name: 'Blackpool'             }, geometry: { type: 'Point', coordinates: [-3.0286,  53.7717] } },
+        { type: 'Feature', properties: { icao: 'EGNS', iata: 'IOM', name: 'Isle of Man'}, geometry: { type: 'Point', coordinates: [-4.6239,  54.0833] } },
+        { type: 'Feature', properties: { icao: 'EGPK', iata: 'PIK', name: 'Prestwick'         }, geometry: { type: 'Point', coordinates: [-4.5869,  55.5094] } },
+        { type: 'Feature', properties: { icao: 'EGNM', iata: 'LBA', name: 'Leeds'     }, geometry: { type: 'Point', coordinates: [-1.6606,  53.8659] } },
+        { type: 'Feature', properties: { icao: 'EIDW', iata: 'DUB', name: 'Dublin'             }, geometry: { type: 'Point', coordinates: [-6.2700,  53.4213] } },
     ]
 };
 
@@ -542,7 +545,7 @@ class AirportsToggleControl {
             this._markers = AIRPORTS_DATA.features.map(f => {
                 const el = document.createElement('div');
                 el.style.cssText = 'color:#ffffff;font-family:monospace;font-size:10px;line-height:1.4;pointer-events:none;white-space:nowrap;';
-                el.innerHTML = `${f.properties.icao}<br>${f.properties.iata}`;
+                el.innerHTML = `${f.properties.icao}<br>${f.properties.name.toUpperCase()}`;
                 return new maplibregl.Marker({ element: el, anchor: 'left', offset: [8, 7] })
                     .setLngLat(f.geometry.coordinates);
             });
