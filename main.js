@@ -543,7 +543,7 @@ class AirportsToggleControl {
                 const el = document.createElement('div');
                 el.style.cssText = 'color:#ffffff;font-family:monospace;font-size:10px;line-height:1.4;pointer-events:none;white-space:nowrap;';
                 el.innerHTML = `${f.properties.icao}<br>${f.properties.iata}`;
-                return new maplibregl.Marker({ element: el, anchor: 'left', offset: [12, 7] })
+                return new maplibregl.Marker({ element: el, anchor: 'left', offset: [8, 7] })
                     .setLngLat(f.geometry.coordinates);
             });
             if (this.visible) this._markers.forEach(m => m.addTo(this.map));
@@ -684,7 +684,7 @@ class RAFToggleControl {
                 el.innerHTML = hasIcao
                     ? `${f.properties.icao}<br>${f.properties.name}`
                     : f.properties.name;
-                const offset = hasIcao ? [12, 7] : [12, 0];
+                const offset = hasIcao ? [8, 7] : [8, 0];
                 return new maplibregl.Marker({ element: el, anchor: 'left', offset })
                     .setLngLat(f.geometry.coordinates);
             });
@@ -1270,8 +1270,8 @@ function createMarkerElement(longitude, latitude) {
         <polyline points="21,43 16,43 16,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
         <polyline points="39,43 44,43 44,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square"/>
         <rect class="marker-dot" x="28" y="28" width="4" height="4" fill="white"/>
-        <text x="48" y="28" fill="white" font-size="7.5" font-family="monospace" class="marker-lat">${latText}</text>
-        <text x="48" y="38" fill="white" font-size="7.5" font-family="monospace" class="marker-lon">${lonText}</text>
+        <text x="52" y="28" fill="white" font-size="7.5" font-family="monospace" class="marker-lat">${latText}</text>
+        <text x="52" y="38" fill="white" font-size="7.5" font-family="monospace" class="marker-lon">${lonText}</text>
     </svg>`;
     return el;
 }
