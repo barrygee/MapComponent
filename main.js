@@ -1345,3 +1345,29 @@ if ('geolocation' in navigator) {
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
     );
 }
+
+// --- Logo typewriter animation ---
+(function () {
+    const logoTextEl = document.getElementById('logo-text-el');
+    if (!logoTextEl) return;
+    const WORD = 'SENTINEL';
+    let i = 0;
+    function typeNext() {
+        if (i < WORD.length) {
+            logoTextEl.textContent = WORD.slice(0, ++i) + '|';
+            setTimeout(typeNext, 75);
+        } else {
+            // Blink cursor a few times then settle on just the word
+            let blinks = 0;
+            const blink = setInterval(() => {
+                blinks++;
+                logoTextEl.textContent = WORD + (blinks % 2 === 0 ? '|' : ' ');
+                if (blinks >= 6) {
+                    clearInterval(blink);
+                    logoTextEl.textContent = WORD;
+                }
+            }, 300);
+        }
+    }
+    setTimeout(typeNext, 480); // Start after bracket/dot animation finishes
+})();
