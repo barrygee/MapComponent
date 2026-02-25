@@ -6,5 +6,5 @@
     <polyline points="39,43 44,43 44,38" fill="none" stroke="white" stroke-width="3" stroke-linecap="square"/>
     <rect x="28" y="28" width="4" height="4" fill="white"/>
   </svg>
-  <text x="68" y="43" font-family="'Barlow', 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="36" letter-spacing="4" fill="white">SENTINEL</text>
+  <text x="68" y="43" font-family="'Barlow', 'Helvetica Neue', Arial, sans-serif" font-weight="400" font-size="36" letter-spacing="4" fill="white">SENTINEL</text>
 </svg>
