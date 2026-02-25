@@ -34,6 +34,7 @@ setInterval(() => {
 
 function _switchStyle(online) {
     if (typeof map === 'undefined' || !map.isStyleLoaded()) return;
+    map.setMaxZoom(online ? 28 : 8);
     map.setStyle(online
         ? `${window.location.origin}/assets/fiord-online.json`
         : `${window.location.origin}/assets/fiord.json`
@@ -138,6 +139,7 @@ const map = new maplibregl.Map({
     center: [-4.4815, 54.1453],
     zoom: 6,
     minZoom: 2,
+    maxZoom: _isOnline ? 28 : 8,
     attributionControl: false,
     transformRequest: (url) => ({ url })
 });
@@ -146,6 +148,7 @@ let _styleLoadedOnce = false;
 
 map.on('style.load', () => {
     console.log('Style loaded successfully');
+    map.setMaxZoom(_connState ? 28 : 8);
     
     // Define cities to show at zoom 1-8
     const majorCities = [
