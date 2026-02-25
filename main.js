@@ -19,10 +19,10 @@ _setConnStatus(_isOnline);
 window.addEventListener('online',  () => { _connState = true;  _setConnStatus(true);  _switchStyle(true);  });
 window.addEventListener('offline', () => { _connState = false; _setConnStatus(false); _switchStyle(false); });
 
-// Poll real internet connectivity every 10 s as a reliable fallback.
+// Poll real internet connectivity every 2 s and also check immediately on load.
 // mode:'no-cors' resolves for any reachable server; rejects only on network failure.
 let _connState = _isOnline;
-setInterval(() => {
+function _checkConn() {
     fetch('https://tile.openstreetmap.org/favicon.ico', { method: 'HEAD', cache: 'no-store', mode: 'no-cors' })
         .then(() => {
             if (!_connState) { _connState = true;  _setConnStatus(true);  _switchStyle(true);  }
@@ -30,11 +30,14 @@ setInterval(() => {
         .catch(() => {
             if (_connState)  { _connState = false; _setConnStatus(false); _switchStyle(false); }
         });
-}, 2000);
+}
+_checkConn(); // immediate check on page load
+setInterval(_checkConn, 2000);
 
 function _switchStyle(online) {
-    if (typeof map === 'undefined' || !map.isStyleLoaded()) return;
-    map.setMinZoom(online ? 2 : 6);
+    if (typeof map === 'undefined') return;
+    map.setMinZoom(online ? 2 : 5);
+    map.setMaxBounds(online ? null : _OFFLINE_BOUNDS);
     map.setStyle(online
         ? `${window.location.origin}/assets/fiord-online.json`
         : `${window.location.origin}/assets/fiord.json`
@@ -133,12 +136,15 @@ const _styleURL = _isOnline
     ? `${origin}/assets/fiord-online.json`
     : `${origin}/assets/fiord.json`;
 
+const _OFFLINE_BOUNDS = [[-20, 44], [32, 67]];
+
 const map = new maplibregl.Map({
     container: 'map',
     style: _styleURL,
     center: [-4.4815, 54.1453],
     zoom: 6,
-    minZoom: _isOnline ? 2 : 6,
+    minZoom: _isOnline ? 2 : 5,
+    maxBounds: _isOnline ? null : _OFFLINE_BOUNDS,
     attributionControl: false,
     transformRequest: (url) => ({ url })
 });
@@ -148,6 +154,7 @@ let _styleLoadedOnce = false;
 map.on('style.load', () => {
     console.log('Style loaded successfully');
     map.setMinZoom(_connState ? 2 : 5);
+    map.setMaxBounds(_connState ? null : _OFFLINE_BOUNDS);
     
     // Define cities to show at zoom 1-8
     const majorCities = [

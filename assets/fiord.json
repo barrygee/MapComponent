@@ -1,14 +1,6 @@
 {
   "version": 8,
   "sources": {
-    "ne2_shaded": {
-      "maxzoom": 6,
-      "tileSize": 256,
-      "tiles": [
-        "/assets/tiles/world/{z}/{x}/{y}.png"
-      ],
-      "type": "raster"
-    },
     "openmaptiles": {
       "type": "vector",
       "url": "pmtiles://tiles/uk.pmtiles"
@@ -26,18 +18,6 @@
       "type": "background",
       "paint": {
         "background-color": "#38435C"
-      }
-    },
-    {
-      "id": "ne2_shaded",
-      "type": "raster",
-      "source": "ne2_shaded",
-      "maxzoom": 6,
-      "paint": {
-        "raster-brightness-min": 0.26,
-        "raster-brightness-max": 0.34,
-        "raster-saturation": -1,
-        "raster-opacity": 1.0
       }
     },
     {
