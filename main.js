@@ -1476,15 +1476,15 @@ class AdsbLiveControl {
         // When tracking, show only callsign + button — data is in the status bar below.
         if (isTracked) {
             return `<div style="` +
-                `background:rgba(0,0,0,0.88);` +
+                `background:rgba(0,0,0,0.7);` +
                 `border:1px solid rgba(255,255,255,0.15);` +
                 `color:#fff;` +
                 `font-family:'Barlow Condensed','Barlow',sans-serif;` +
-                `font-size:14px;font-weight:400;` +
-                `padding:6px 10px;` +
+                `font-size:13px;font-weight:400;` +
+                `padding:1px 8px;` +
                 `pointer-events:none;white-space:nowrap;user-select:none">` +
                 `<div style="display:flex;align-items:center;gap:12px;pointer-events:auto">` +
-                `<span style="font-size:13px;font-weight:600;letter-spacing:.12em;color:#fff">${callsign}</span>` +
+                `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:#fff">${callsign}</span>` +
                 `${trkBtn}</div></div>`;
         }
 
@@ -1512,12 +1512,11 @@ class AdsbLiveControl {
         ).join('');
 
         return `<div style="` +
-            `background:rgba(0,0,0,0.88);` +
-            `border:1px solid rgba(255,255,255,0.15);` +
+            `background:rgba(0,0,0,0.7);` +
             `color:#fff;` +
             `font-family:'Barlow Condensed','Barlow',sans-serif;` +
             `font-size:14px;font-weight:400;` +
-            `padding:10px 14px 9px;` +
+            `padding:6px 14px 9px;` +
             `pointer-events:none;white-space:nowrap;user-select:none">` +
             `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;` +
             `font-weight:600;font-size:15px;letter-spacing:.12em;` +
@@ -1691,19 +1690,16 @@ class AdsbLiveControl {
         const color = props.military ? '#ffffff' : '#ffffff';
         const el = document.createElement('div');
         el.style.cssText = [
-            'background:rgba(0,0,0,0.88)',
-            'border:1px solid rgba(255,255,255,0.15)',
+            'background:rgba(0,0,0,0.5)',
             `color:${color}`,
             "font-family:'Barlow Condensed','Barlow',sans-serif",
             'font-size:13px',
             'font-weight:400',
             'letter-spacing:.12em',
-            'height:20px',
             'box-sizing:border-box',
             'display:flex',
             'align-items:center',
-            'padding:0 8px',
-            'line-height:1',
+            'padding:1px 8px',
             'cursor:pointer',
             'white-space:nowrap',
             'user-select:none',
