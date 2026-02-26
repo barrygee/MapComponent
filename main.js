@@ -1358,7 +1358,7 @@ class AdsbLiveControl {
                 'circle-radius': 2.5,
                 'circle-opacity': ['get', 'opacity'],
                 'circle-stroke-width': 0,
-                'circle-color': '#888888',
+                'circle-color': '#c8ff00',
             }
         });
 
