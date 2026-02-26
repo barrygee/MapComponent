@@ -1190,6 +1190,7 @@ class AdsbLiveControl {
         this._tagMarker = null;   // MapLibre Marker showing selected-aircraft data tag
         this._tagHex    = null;
         this._followEnabled = false;
+        this._callsignMarkers = {};  // hex -> MapLibre Marker (HTML callsign label)
     }
 
     onAdd(map) {
@@ -1248,41 +1249,85 @@ class AdsbLiveControl {
         return typeof alt_baro === 'number' ? alt_baro : parseFloat(alt_baro) || 0;
     }
 
-    // Filled directional triangle pointing north (up) — rotated by icon-rotate to
-    // match the aircraft track.  White fill, thin black outline for contrast.
-    _createRadarBlip() {
-        const S  = 32;
-        const cx = S / 2;
+    // Small solid directional triangle pointing north — rotated by icon-rotate
+    // to match aircraft track. S=64 canvas, pixelRatio 2 → 32px logical.
+    _createRadarBlip(color = '#ffffff') {
+        const S  = 64;
+        const cx = S / 2, cy = S / 2;
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = S;
         const ctx = canvas.getContext('2d');
 
         ctx.beginPath();
-        ctx.moveTo(cx,     3);       // apex — points north
-        ctx.lineTo(S - 5,  S - 4);  // bottom-right
-        ctx.lineTo(5,      S - 4);  // bottom-left
+        ctx.moveTo(cx,      cy - 10);  // apex — points north
+        ctx.lineTo(cx + 7,  cy + 8);   // bottom-right
+        ctx.lineTo(cx - 7,  cy + 8);   // bottom-left
         ctx.closePath();
 
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fillStyle = color;
         ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
 
         return ctx.getImageData(0, 0, S, S);
     }
 
+    // Axis-aligned bracket corners matching the location marker style.
+    // S=64 canvas, pixelRatio 2 → 32px logical, bracket centred at (32,32).
+    _createBracket() {
+        const S   = 64;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = S;
+        const ctx = canvas.getContext('2d');
+
+        // Map location-marker SVG coords (viewBox 14 15 32 30) to canvas 2:1 scale
+        // SVG bracket: x=[16,44], y=[17,43]; arms 5 SVG units → 10 canvas px
+        const x1 = 4, y1 = 4, x2 = 60, y2 = 56, arm = 10;
+
+        ctx.strokeStyle = '#c8ff00';
+        ctx.lineWidth   = 3;       // 1.5 logical, matching location marker
+        ctx.lineCap     = 'square';
+
+        // Top-left
+        ctx.beginPath(); ctx.moveTo(x1 + arm, y1); ctx.lineTo(x1, y1); ctx.lineTo(x1, y1 + arm); ctx.stroke();
+        // Top-right
+        ctx.beginPath(); ctx.moveTo(x2 - arm, y1); ctx.lineTo(x2, y1); ctx.lineTo(x2, y1 + arm); ctx.stroke();
+        // Bottom-left
+        ctx.beginPath(); ctx.moveTo(x1 + arm, y2); ctx.lineTo(x1, y2); ctx.lineTo(x1, y2 - arm); ctx.stroke();
+        // Bottom-right
+        ctx.beginPath(); ctx.moveTo(x2 - arm, y2); ctx.lineTo(x2, y2); ctx.lineTo(x2, y2 - arm); ctx.stroke();
+
+        return ctx.getImageData(0, 0, S, S);
+    }
+
+    // Solid filled lime-green rectangle for military aircraft markers.
+    _createMilBracket() {
+        const S = 64;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = S;
+        const ctx = canvas.getContext('2d');
+        const x1 = 4, y1 = 4, x2 = 60, y2 = 56;
+        ctx.fillStyle = '#c8ff00';
+        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        return ctx.getImageData(0, 0, S, S);
+    }
+
     _registerIcons() {
-        if (this.map.hasImage('adsb-blip')) this.map.removeImage('adsb-blip');
-        this.map.addImage('adsb-blip', this._createRadarBlip(), { pixelRatio: 2, sdf: false });
+        if (this.map.hasImage('adsb-bracket'))     this.map.removeImage('adsb-bracket');
+        if (this.map.hasImage('adsb-bracket-mil')) this.map.removeImage('adsb-bracket-mil');
+        if (this.map.hasImage('adsb-blip'))        this.map.removeImage('adsb-blip');
+        if (this.map.hasImage('adsb-blip-mil'))    this.map.removeImage('adsb-blip-mil');
+        this.map.addImage('adsb-bracket',     this._createBracket(),            { pixelRatio: 2, sdf: false });
+        this.map.addImage('adsb-bracket-mil', this._createMilBracket(),         { pixelRatio: 2, sdf: false });
+        this.map.addImage('adsb-blip',        this._createRadarBlip('#ffffff'), { pixelRatio: 2, sdf: false });
+        this.map.addImage('adsb-blip-mil',    this._createRadarBlip('#000000'), { pixelRatio: 2, sdf: false });
     }
 
     initLayers() {
         const vis = this.visible ? 'visible' : 'none';
 
-        ['adsb-labels', 'adsb-icons', 'adsb-trails'].forEach(id => {
+        ['adsb-icons', 'adsb-bracket', 'adsb-trails'].forEach(id => {
             try { this.map.removeLayer(id); } catch(e) {}
         });
+        this._clearCallsignMarkers();
         ['adsb-live', 'adsb-trails-source'].forEach(id => {
             if (this.map.getSource(id)) this.map.removeSource(id);
         });
@@ -1307,8 +1352,27 @@ class AdsbLiveControl {
         // Aircraft positions
         this.map.addSource('adsb-live', { type: 'geojson', data: this._geojson });
 
-        // Aircraft icons — bracket / crosshair matching location-marker style
-        // Ground aircraft only shown at zoom ≥ 10
+        // Bracket corners — viewport-aligned (never rotate), always visible
+        this.map.addLayer({
+            id: 'adsb-bracket',
+            type: 'symbol',
+            source: 'adsb-live',
+            filter: ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
+            layout: {
+                visibility: vis,
+                'icon-image': ['case', ['boolean', ['get', 'military'], false], 'adsb-bracket-mil', 'adsb-bracket'],
+                'icon-size': 0.75,
+                'icon-rotation-alignment': 'viewport',
+                'icon-allow-overlap': true,
+                'icon-ignore-placement': true,
+            },
+            paint: {
+                'icon-opacity': 1,
+                'icon-opacity-transition': { duration: 0 },
+            }
+        });
+
+        // Directional triangle — rotates with aircraft track, always visible
         this.map.addLayer({
             id: 'adsb-icons',
             type: 'symbol',
@@ -1316,8 +1380,8 @@ class AdsbLiveControl {
             filter: ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
             layout: {
                 visibility: vis,
-                'icon-image': 'adsb-blip',
-                'icon-size': 1.0,
+                'icon-image': ['case', ['boolean', ['get', 'military'], false], 'adsb-blip-mil', 'adsb-blip'],
+                'icon-size': 0.75,
                 'icon-rotate': ['get', 'track'],
                 'icon-rotation-alignment': 'map',
                 'icon-allow-overlap': true,
@@ -1329,43 +1393,20 @@ class AdsbLiveControl {
             }
         });
 
-        // Callsign label — hidden for selected aircraft (HTML tag takes over)
-        // Ground aircraft follow the same zoom-10 rule as the icons
-        this.map.addLayer({
-            id: 'adsb-labels',
-            type: 'symbol',
-            source: 'adsb-live',
-            filter: ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
-            layout: {
-                visibility: vis,
-                'text-field': ['coalesce', ['get', 'flight'], ['get', 'r'], ['get', 'hex']],
-                'text-font': ['Noto Sans Regular'],
-                'text-size': 10,
-                'text-letter-spacing': 0.06,
-                'text-offset': [1.2, -0.3],
-                'text-anchor': 'left',
-                'text-allow-overlap': true,
-                'text-ignore-placement': true,
-            },
-            paint: {
-                'text-color': '#ffffff',
-                'text-halo-color': 'rgba(0,0,0,0.6)',
-                'text-halo-width': 1.5,
-                'text-opacity-transition': { duration: 0 },
-            }
-        });
-
         // Click/hover handlers — added once only to avoid duplicates on style reload
         if (!this._eventsAdded) {
             this._eventsAdded = true;
 
-            this.map.on('click', 'adsb-icons', (e) => {
+            const handleAircraftClick = (e) => {
                 if (!e.features || !e.features.length) return;
                 const hex = e.features[0].properties.hex;
                 this._selectedHex = (hex === this._selectedHex) ? null : hex;
                 this._applySelection();
                 e.originalEvent._adsbHandled = true;
-            });
+            };
+
+            this.map.on('click', 'adsb-bracket', handleAircraftClick);
+            this.map.on('click', 'adsb-icons',  handleAircraftClick);
 
             this.map.on('click', (e) => {
                 if (e.originalEvent._adsbHandled) return;
@@ -1375,19 +1416,18 @@ class AdsbLiveControl {
                 }
             });
 
-            this.map.on('mouseenter', 'adsb-icons', () => { this.map.getCanvas().style.cursor = 'pointer'; });
-            this.map.on('mouseleave', 'adsb-icons', () => { this.map.getCanvas().style.cursor = ''; });
+            this.map.on('mouseenter', 'adsb-bracket', () => { this.map.getCanvas().style.cursor = 'pointer'; });
+            this.map.on('mouseleave', 'adsb-bracket', () => { this.map.getCanvas().style.cursor = ''; });
+            this.map.on('mouseenter', 'adsb-icons',   () => { this.map.getCanvas().style.cursor = 'pointer'; });
+            this.map.on('mouseleave', 'adsb-icons',   () => { this.map.getCanvas().style.cursor = ''; });
         }
 
-        // Explicitly raise ADS-B layers above everything else (AARA, AWACS, etc.)
-        // moveLayer() without a beforeId moves the layer to the top of the stack.
-        ['adsb-trails', 'adsb-icons', 'adsb-labels'].forEach(id => {
-            try { this.map.moveLayer(id); } catch(e) {}
-        });
+        this._raiseLayers();
     }
 
     _buildTagHTML(props) {
-        const callsign = props.flight || props.r || props.hex || '???';
+        const raw      = (props.flight || '').trim() || (props.r || '').trim() || (props.hex || '').trim();
+        const callsign = raw || 'UNKNOWN';
         const alt      = props.alt_baro ?? 0;
         const vrt      = props.baro_rate ?? 0;
         const altStr   = alt === 0 ? 'GND'
@@ -1410,12 +1450,12 @@ class AdsbLiveControl {
             `<span>${val}</span></div>`
         ).join('');
 
-        const trkColor = this._followEnabled ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+        const trkColor   = this._followEnabled ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+        const trkBtnText = this._followEnabled ? 'TRACKING' : 'TRACK';
         const trkBtn = `<button class="tag-follow-btn" style="` +
             `background:none;border:none;cursor:pointer;padding:0;pointer-events:auto;` +
-            `color:${trkColor};` +
-            `font-family:'Barlow Condensed','Barlow',sans-serif;` +
-            `font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1">${this._followEnabled ? 'TRACKING' : 'TRACK'}</button>`;
+            `color:${trkColor};font-family:'Barlow Condensed','Barlow',sans-serif;` +
+            `font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1">${trkBtnText}</button>`;
 
         return `<div style="` +
             `background:rgba(0,0,0,0.88);` +
@@ -1465,16 +1505,94 @@ class AdsbLiveControl {
         this._tagHex = null;
     }
 
+    // Build a simple HTML callsign label element styled like the selected popup header.
+    _buildCallsignLabelEl(props) {
+        const raw = (props.flight || '').trim() || (props.r || '').trim() || (props.hex || '').trim();
+        const callsign = raw || 'UNKNOWN';
+        const color = props.military ? '#c8ff00' : '#ffffff';
+        const el = document.createElement('div');
+        el.style.cssText = [
+            'background:rgba(0,0,0,0.88)',
+            'border:1px solid rgba(255,255,255,0.15)',
+            `color:${color}`,
+            "font-family:'Barlow Condensed','Barlow',sans-serif",
+            'font-size:13px',
+            'font-weight:600',
+            'letter-spacing:.12em',
+            'padding:4px 8px',
+            'pointer-events:none',
+            'white-space:nowrap',
+            'user-select:none',
+        ].join(';');
+        el.textContent = callsign;
+        return el;
+    }
+
+    // Create/update HTML callsign markers for all non-selected aircraft.
+    _updateCallsignMarkers() {
+        if (!this.map) return;
+        const features = this._geojson.features;
+        const seen = new Set();
+
+        for (const f of features) {
+            const hex = f.properties.hex;
+            if (!hex) continue;
+            seen.add(hex);
+
+            // Selected aircraft uses the full popup instead.
+            if (hex === this._selectedHex) {
+                if (this._callsignMarkers[hex]) {
+                    this._callsignMarkers[hex].remove();
+                    delete this._callsignMarkers[hex];
+                }
+                continue;
+            }
+
+            const lngLat = f.geometry.coordinates;
+
+            if (this._callsignMarkers[hex]) {
+                this._callsignMarkers[hex].setLngLat(lngLat);
+                // Refresh text and colour in case callsign/military flag changed.
+                const inner = this._callsignMarkers[hex].getElement().firstChild;
+                if (inner) {
+                    const raw = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || f.properties.hex || '';
+                    inner.textContent = raw || 'UNKNOWN';
+                    inner.style.color = f.properties.military ? '#c8ff00' : '#ffffff';
+                }
+            } else {
+                const wrapper = document.createElement('div');
+                wrapper.appendChild(this._buildCallsignLabelEl(f.properties));
+                const marker = new maplibregl.Marker({ element: wrapper, anchor: 'left', offset: [14, 0] })
+                    .setLngLat(lngLat)
+                    .addTo(this.map);
+                this._callsignMarkers[hex] = marker;
+            }
+        }
+
+        // Remove markers for aircraft that have left the feed.
+        for (const hex of Object.keys(this._callsignMarkers)) {
+            if (!seen.has(hex)) {
+                this._callsignMarkers[hex].remove();
+                delete this._callsignMarkers[hex];
+            }
+        }
+    }
+
+    _clearCallsignMarkers() {
+        for (const marker of Object.values(this._callsignMarkers)) marker.remove();
+        this._callsignMarkers = {};
+    }
+
     _applySelection() {
         if (!this.map) return;
 
-        // Hide the callsign label for the selected aircraft; the HTML tag shows instead
-        const labelFilter = this._selectedHex
-            ? ['all',
-                ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
-                ['!=', ['get', 'hex'], this._selectedHex]]
-            : ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]];
-        try { this.map.setFilter('adsb-labels', labelFilter); } catch(e) {}
+        const baseFilter = ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]];
+        // Bracket and directional arrow always visible for all planes
+        try { this.map.setFilter('adsb-bracket', baseFilter); } catch(e) {}
+        try { this.map.setFilter('adsb-icons',   baseFilter); } catch(e) {}
+
+        // HTML callsign markers — selected aircraft gets the full popup instead.
+        this._updateCallsignMarkers();
 
         if (this._selectedHex) {
             const f = this._geojson.features.find(f => f.properties.hex === this._selectedHex);
@@ -1539,14 +1657,18 @@ class AdsbLiveControl {
             this.map.getSource('adsb-live').setData(interpolated);
         }
 
-        // Keep the selected-aircraft tag on the interpolated position; only pan if tracking
-        if (this._tagHex) {
-            const f = interpolated.features.find(f => f.properties.hex === this._tagHex);
-            if (f) {
-                if (this._tagMarker) this._tagMarker.setLngLat(f.geometry.coordinates);
+        // Keep all HTML markers on interpolated positions.
+        for (const f of interpolated.features) {
+            const hex = f.properties.hex;
+            if (!hex) continue;
+            if (this._tagMarker && hex === this._tagHex) {
+                this._tagMarker.setLngLat(f.geometry.coordinates);
                 if (this._followEnabled) {
                     this.map.easeTo({ center: f.geometry.coordinates, duration: 1100, easing: t => t });
                 }
+            }
+            if (this._callsignMarkers[hex]) {
+                this._callsignMarkers[hex].setLngLat(f.geometry.coordinates);
             }
         }
     }
@@ -1603,6 +1725,10 @@ class AdsbLiveControl {
                         }
 
                         const gs = a.gs ?? 0;
+                        const hexInt = parseInt(hex, 16);
+                        const military = a.military === true
+                            || (hexInt >= 0x43C000 && hexInt <= 0x43FFFF)  // UK military
+                            || (hexInt >= 0xAE0000 && hexInt <= 0xAFFFFF); // US military
 
                         return {
                             type: 'Feature',
@@ -1616,6 +1742,7 @@ class AdsbLiveControl {
                                 gs,
                                 track:     a.track ?? 0,
                                 baro_rate: a.baro_rate ?? 0,
+                                military,
                             }
                         };
                     })
@@ -1645,9 +1772,21 @@ class AdsbLiveControl {
                     this._hideSelectedTag();   // aircraft left the area
                 }
             }
+            // Refresh HTML callsign markers for all aircraft.
+            this._updateCallsignMarkers();
+            // Keep ADS-B layers above all other map layers
+            this._raiseLayers();
         } catch(e) {
             console.warn('ADS-B fetch error:', e);
         }
+    }
+
+    // Raise all ADS-B layers to the top of the map layer stack.
+    _raiseLayers() {
+        if (!this.map) return;
+        ['adsb-trails', 'adsb-bracket', 'adsb-icons'].forEach(id => {
+            try { this.map.moveLayer(id); } catch(e) {}
+        });
     }
 
     _startPolling() {
@@ -1664,7 +1803,7 @@ class AdsbLiveControl {
     toggle() {
         this.visible = !this.visible;
         const v = this.visible ? 'visible' : 'none';
-        ['adsb-trails', 'adsb-icons', 'adsb-labels'].forEach(id => {
+        ['adsb-trails', 'adsb-bracket', 'adsb-icons'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', v); } catch(e) {}
         });
         if (this.visible) {
@@ -1672,6 +1811,7 @@ class AdsbLiveControl {
         } else {
             this._stopPolling();
             this._hideSelectedTag();
+            this._clearCallsignMarkers();
         }
         this.button.style.opacity = this.visible ? '1' : '0.3';
         this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
