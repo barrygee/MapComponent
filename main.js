@@ -51,6 +51,7 @@ function _switchStyle(online) {
 const RING_DISTANCES_NM = [50, 100, 150, 200, 250];
 let rangeRingCenter = null;
 let rangeRingsControl = null;
+let adsbLabelsControl = null;
 
 function _toRad(deg) { return deg * Math.PI / 180; }
 function _toDeg(rad) { return rad * 180 / Math.PI; }
@@ -277,7 +278,7 @@ map.on('error', (e) => {
 
 // --- Overlay state persistence ---
 // Defaults: everything ON on first load; subsequent loads restore last state.
-const _OVERLAY_DEFAULTS = { roads: true, names: true, rings: true, aar: true, awacs: true, airports: true, raf: true, adsb: true };
+const _OVERLAY_DEFAULTS = { roads: true, names: true, rings: true, aar: true, awacs: true, airports: true, raf: true, adsb: true, adsbLabels: true };
 const _overlayStates = (() => {
     try {
         const saved = localStorage.getItem('overlayStates');
@@ -295,6 +296,7 @@ function _saveOverlayStates() {
             airports: airportsControl ? airportsControl.visible : _overlayStates.airports,
             raf: rafControl ? rafControl.visible : _overlayStates.raf,
             adsb: adsbControl ? adsbControl.visible : _overlayStates.adsb,
+            adsbLabels: adsbLabelsControl ? adsbLabelsControl.labelsVisible : _overlayStates.adsbLabels,
         }));
     } catch (e) {}
 }
@@ -1191,6 +1193,7 @@ class AdsbLiveControl {
         this._tagHex    = null;
         this._followEnabled = false;
         this._callsignMarkers = {};  // hex -> MapLibre Marker (HTML callsign label)
+        this.labelsVisible = _overlayStates.adsbLabels ?? true;
     }
 
     onAdd(map) {
@@ -1517,9 +1520,14 @@ class AdsbLiveControl {
             `color:${color}`,
             "font-family:'Barlow Condensed','Barlow',sans-serif",
             'font-size:13px',
-            'font-weight:600',
+            'font-weight:500',
             'letter-spacing:.12em',
-            'padding:4px 8px',
+            'height:20px',
+            'box-sizing:border-box',
+            'display:flex',
+            'align-items:center',
+            'padding:0 8px',
+            'line-height:1',
             'pointer-events:none',
             'white-space:nowrap',
             'user-select:none',
@@ -1528,9 +1536,18 @@ class AdsbLiveControl {
         return el;
     }
 
+    setLabelsVisible(v) {
+        this.labelsVisible = v;
+        if (!v) {
+            this._clearCallsignMarkers();
+        } else {
+            this._updateCallsignMarkers();
+        }
+    }
+
     // Create/update HTML callsign markers for all non-selected aircraft.
     _updateCallsignMarkers() {
-        if (!this.map) return;
+        if (!this.map || !this.labelsVisible) return;
         const features = this._geojson.features;
         const seen = new Set();
 
@@ -1553,16 +1570,13 @@ class AdsbLiveControl {
             if (this._callsignMarkers[hex]) {
                 this._callsignMarkers[hex].setLngLat(lngLat);
                 // Refresh text and colour in case callsign/military flag changed.
-                const inner = this._callsignMarkers[hex].getElement().firstChild;
-                if (inner) {
-                    const raw = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || f.properties.hex || '';
-                    inner.textContent = raw || 'UNKNOWN';
-                    inner.style.color = f.properties.military ? '#c8ff00' : '#ffffff';
-                }
+                const labelEl = this._callsignMarkers[hex].getElement();
+                const raw = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || f.properties.hex || '';
+                labelEl.textContent = raw || 'UNKNOWN';
+                labelEl.style.color = f.properties.military ? '#c8ff00' : '#ffffff';
             } else {
-                const wrapper = document.createElement('div');
-                wrapper.appendChild(this._buildCallsignLabelEl(f.properties));
-                const marker = new maplibregl.Marker({ element: wrapper, anchor: 'left', offset: [14, 0] })
+                const labelEl = this._buildCallsignLabelEl(f.properties);
+                const marker = new maplibregl.Marker({ element: labelEl, anchor: 'left', offset: [14, 0] })
                     .setLngLat(lngLat)
                     .addTo(this.map);
                 this._callsignMarkers[hex] = marker;
@@ -1821,6 +1835,63 @@ class AdsbLiveControl {
 
 let adsbControl = new AdsbLiveControl();
 map.addControl(adsbControl, 'top-right');
+
+// --- ADS-B Label Toggle ---
+class AdsbLabelsToggleControl {
+    constructor() {
+        this.labelsVisible = _overlayStates.adsbLabels ?? true;
+    }
+
+    onAdd(map) {
+        this.map = map;
+        this.container = document.createElement('div');
+        this.container.className = 'maplibregl-ctrl';
+        this.container.style.backgroundColor = '#000000';
+        this.container.style.borderRadius = '0';
+        this.container.style.marginTop = '4px';
+
+        this.button = document.createElement('button');
+        this.button.title = 'Toggle aircraft labels';
+        this.button.textContent = 'L';
+        this.button.style.width = '29px';
+        this.button.style.height = '29px';
+        this.button.style.border = 'none';
+        this.button.style.backgroundColor = '#000000';
+        this.button.style.cursor = 'pointer';
+        this.button.style.fontSize = '16px';
+        this.button.style.fontWeight = 'bold';
+        this.button.style.display = 'flex';
+        this.button.style.alignItems = 'center';
+        this.button.style.justifyContent = 'center';
+        this.button.style.transition = 'opacity 0.2s, color 0.2s';
+        this.button.style.opacity = this.labelsVisible ? '1' : '0.3';
+        this.button.style.color = this.labelsVisible ? '#c8ff00' : '#ffffff';
+        this.button.onclick = () => this.toggle();
+        this.button.onmouseover = () => { this.button.style.backgroundColor = '#111111'; };
+        this.button.onmouseout  = () => { this.button.style.backgroundColor = '#000000'; };
+
+        this.container.appendChild(this.button);
+        return this.container;
+    }
+
+    onRemove() {
+        if (this.container && this.container.parentNode) {
+            this.container.parentNode.removeChild(this.container);
+        }
+        this.map = undefined;
+    }
+
+    toggle() {
+        this.labelsVisible = !this.labelsVisible;
+        this.button.style.opacity = this.labelsVisible ? '1' : '0.3';
+        this.button.style.color = this.labelsVisible ? '#c8ff00' : '#ffffff';
+        if (adsbControl) adsbControl.setLabelsVisible(this.labelsVisible);
+        _saveOverlayStates();
+    }
+}
+adsbLabelsControl = new AdsbLabelsToggleControl();
+map.addControl(adsbLabelsControl, 'top-right');
+// --- End ADS-B Label Toggle ---
 // --- End ADS-B Live Feed ---
 
 
