@@ -618,7 +618,7 @@ class RAFToggleControl {
 
         this.button = document.createElement('button');
         this.button.title = 'Toggle RAF bases';
-        this.button.textContent = 'RAF';
+        this.button.textContent = 'MIL';
         this.button.style.width = '29px';
         this.button.style.height = '29px';
         this.button.style.border = 'none';
@@ -1261,7 +1261,8 @@ class AdsbLiveControl {
                 'text-size': 9,
                 'text-offset': [1.2, 0],
                 'text-anchor': 'left',
-                'text-allow-overlap': false,
+                'text-allow-overlap': true,
+                'text-ignore-placement': true,
             },
             paint: {
                 'text-color': '#ffffff',
