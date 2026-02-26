@@ -1378,6 +1378,7 @@ class AdsbLiveControl {
                 'icon-image': ['case', ['boolean', ['get', 'military'], false], 'adsb-bracket-mil', 'adsb-bracket'],
                 'icon-size': 0.75,
                 'icon-rotation-alignment': 'viewport',
+                'icon-pitch-alignment': 'viewport',
                 'icon-allow-overlap': true,
                 'icon-ignore-placement': true,
             },
@@ -1399,6 +1400,7 @@ class AdsbLiveControl {
                 'icon-size': 0.75,
                 'icon-rotate': ['get', 'track'],
                 'icon-rotation-alignment': 'map',
+                'icon-pitch-alignment': 'map',
                 'icon-allow-overlap': true,
                 'icon-ignore-placement': true,
             },
@@ -1427,6 +1429,7 @@ class AdsbLiveControl {
 
             this.map.on('click', (e) => {
                 if (e.originalEvent._adsbHandled) return;
+                if (this._followEnabled) return; // don't deselect while tracking
                 if (this._selectedHex) {
                     this._selectedHex = null;
                     this._applySelection();
@@ -1566,6 +1569,7 @@ class AdsbLiveControl {
 
         return `<div class="adsb-sb-header">` +
             `<span class="adsb-sb-callsign" style="color:${headerColor}">${callsign}</span>` +
+            `<button class="adsb-sb-untrack-btn">UNTRACK</button>` +
             `</div>` +
             `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
     }
@@ -1579,6 +1583,7 @@ class AdsbLiveControl {
         }
         bar.innerHTML = this._buildStatusBarHTML(props);
         bar.classList.add('adsb-sb-visible');
+        this._wireStatusBarUntrack(bar);
     }
 
     _hideStatusBar() {
@@ -1591,7 +1596,34 @@ class AdsbLiveControl {
         const bar = document.getElementById('adsb-status-bar');
         if (!bar || !bar.classList.contains('adsb-sb-visible')) return;
         const f = this._geojson.features.find(f => f.properties.hex === this._selectedHex);
-        if (f) bar.innerHTML = this._buildStatusBarHTML(f.properties);
+        if (f) {
+            bar.innerHTML = this._buildStatusBarHTML(f.properties);
+            this._wireStatusBarUntrack(bar);
+        }
+    }
+
+    _wireStatusBarUntrack(bar) {
+        const btn = bar.querySelector('.adsb-sb-untrack-btn');
+        if (!btn) return;
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._followEnabled = false;
+            // Rebuild the tag marker without tracking state
+            if (this._tagHex) {
+                const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
+                if (f) {
+                    const coords = this._interpolatedCoords(this._tagHex) || f.geometry.coordinates;
+                    const newEl = document.createElement('div');
+                    newEl.innerHTML = this._buildTagHTML(f.properties);
+                    this._wireTagButton(newEl);
+                    if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
+                    this._tagMarker = new maplibregl.Marker({ element: newEl, anchor: 'top-left', offset: [14, -13] })
+                        .setLngLat(coords)
+                        .addTo(this.map);
+                }
+            }
+            this._hideStatusBar();
+        });
     }
 
     _wireTagButton(el) {

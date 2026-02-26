@@ -273,7 +273,7 @@ html {
     padding: 13px 28px;
     z-index: 999;
     display: none;
-    pointer-events: none;
+    pointer-events: auto;
     user-select: none;
     box-sizing: border-box;
 }
@@ -289,6 +289,23 @@ html {
     margin-bottom: 8px;
     padding-bottom: 7px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    position: relative;
+}
+
+.adsb-sb-untrack-btn {
+    position: absolute;
+    bottom: 7px;
+    right: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: #c8ff00;
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    line-height: 1;
 }
 
 .adsb-sb-callsign {
