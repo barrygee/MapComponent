@@ -263,6 +263,7 @@ html {
     left: 50%;
     transform: translateX(-50%);
     width: max-content;
+    max-width: calc(100vw - 28px);
     background: rgba(0, 0, 0, 0.92);
     border: 1px solid rgba(255, 255, 255, 0.15);
     color: #fff;
@@ -274,6 +275,7 @@ html {
     display: none;
     pointer-events: none;
     user-select: none;
+    box-sizing: border-box;
 }
 
 #adsb-status-bar.adsb-sb-visible {
@@ -304,9 +306,8 @@ html {
 
 .adsb-sb-fields {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 0 24px;
-    white-space: nowrap;
 }
 
 .adsb-sb-field {
