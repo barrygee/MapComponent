@@ -1462,15 +1462,17 @@ class AdsbLiveControl {
         const raw      = (props.flight || '').trim() || (props.r || '').trim() || (props.hex || '').trim();
         const callsign = raw || 'UNKNOWN';
 
-        const trkColor   = this._followEnabled ? '#c8ff00' : 'rgba(255,255,255,0.3)';
-        const trkBtnText = this._followEnabled ? 'TRACKING' : 'TRACK';
+        // Tracking mode only applies to the specific plane being tracked.
+        const isTracked  = this._followEnabled && props.hex === this._tagHex;
+        const trkColor   = isTracked ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+        const trkBtnText = isTracked ? 'TRACKING' : 'TRACK';
         const trkBtn = `<button class="tag-follow-btn" style="` +
             `background:none;border:none;cursor:pointer;padding:0;pointer-events:auto;` +
             `color:${trkColor};font-family:'Barlow Condensed','Barlow',sans-serif;` +
             `font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1">${trkBtnText}</button>`;
 
         // When tracking, show only callsign + button — data is in the status bar below.
-        if (this._followEnabled) {
+        if (isTracked) {
             return `<div style="` +
                 `background:rgba(0,0,0,0.88);` +
                 `border:1px solid rgba(255,255,255,0.15);` +
@@ -2021,6 +2023,8 @@ class AdsbLiveControl {
             this._startPolling();
         } else {
             this._stopPolling();
+            this._selectedHex = null;
+            this._followEnabled = false;
             this._hideSelectedTag();
             this._hideHoverTag();
             this._hideStatusBar();
@@ -2028,6 +2032,7 @@ class AdsbLiveControl {
         }
         this.button.style.opacity = this.visible ? '1' : '0.3';
         this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        if (adsbLabelsControl) adsbLabelsControl.syncToAdsb(this.visible);
         _saveOverlayStates();
     }
 }
@@ -2063,8 +2068,10 @@ class AdsbLabelsToggleControl {
         this.button.style.alignItems = 'center';
         this.button.style.justifyContent = 'center';
         this.button.style.transition = 'opacity 0.2s, color 0.2s';
-        this.button.style.opacity = this.labelsVisible ? '1' : '0.3';
-        this.button.style.color = this.labelsVisible ? '#c8ff00' : '#ffffff';
+        const adsbOn = adsbControl ? adsbControl.visible : true;
+        this.button.style.opacity = (adsbOn && this.labelsVisible) ? '1' : '0.3';
+        this.button.style.color = (adsbOn && this.labelsVisible) ? '#c8ff00' : '#ffffff';
+        this.button.style.pointerEvents = adsbOn ? 'auto' : 'none';
         this.button.onclick = () => this.toggle();
         this.button.onmouseover = () => { this.button.style.backgroundColor = '#111111'; };
         this.button.onmouseout  = () => { this.button.style.backgroundColor = '#000000'; };
@@ -2086,6 +2093,13 @@ class AdsbLabelsToggleControl {
         this.button.style.color = this.labelsVisible ? '#c8ff00' : '#ffffff';
         if (adsbControl) adsbControl.setLabelsVisible(this.labelsVisible);
         _saveOverlayStates();
+    }
+
+    syncToAdsb(adsbVisible) {
+        if (!this.button) return;
+        this.button.style.pointerEvents = adsbVisible ? 'auto' : 'none';
+        this.button.style.opacity = (adsbVisible && this.labelsVisible) ? '1' : '0.3';
+        this.button.style.color = (adsbVisible && this.labelsVisible) ? '#c8ff00' : '#ffffff';
     }
 }
 adsbLabelsControl = new AdsbLabelsToggleControl();
