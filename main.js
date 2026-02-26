@@ -1472,7 +1472,7 @@ class AdsbLiveControl {
             `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;` +
             `font-weight:600;font-size:15px;letter-spacing:.12em;` +
             `margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
-            `<span>${callsign}</span>${trkBtn}</div>` +
+            `<span style="font-size:13px;font-weight:400">${callsign}</span>${trkBtn}</div>` +
             rowsHTML + `</div>`;
     }
 
@@ -1513,7 +1513,7 @@ class AdsbLiveControl {
     _buildCallsignLabelEl(props) {
         const raw = (props.flight || '').trim() || (props.r || '').trim() || (props.hex || '').trim();
         const callsign = raw || 'UNKNOWN';
-        const color = props.military ? '#c8ff00' : '#ffffff';
+        const color = props.military ? '#ffffff' : '#ffffff';
         const el = document.createElement('div');
         el.style.cssText = [
             'background:rgba(0,0,0,0.88)',
@@ -1574,7 +1574,7 @@ class AdsbLiveControl {
                 const labelEl = this._callsignMarkers[hex].getElement();
                 const raw = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || f.properties.hex || '';
                 labelEl.textContent = raw || 'UNKNOWN';
-                labelEl.style.color = f.properties.military ? '#c8ff00' : '#ffffff';
+                labelEl.style.color = f.properties.military ? '#ffffff' : '#ffffff';
             } else {
                 const labelEl = this._buildCallsignLabelEl(f.properties);
                 const marker = new maplibregl.Marker({ element: labelEl, anchor: 'left', offset: [14, 0] })
