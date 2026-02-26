@@ -1401,6 +1401,7 @@ class AdsbLiveControl {
             this._eventsAdded = true;
 
             const handleAircraftClick = (e) => {
+                if (e.originalEvent._adsbHandled) return; // dedupe: bracket + icons both fire for same click
                 if (!e.features || !e.features.length) return;
                 const hex = e.features[0].properties.hex;
                 this._selectedHex = (hex === this._selectedHex) ? null : hex;
