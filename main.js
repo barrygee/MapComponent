@@ -146,6 +146,7 @@ const map = new maplibregl.Map({
     minZoom: _isOnline ? 2 : 5,
     maxBounds: _isOnline ? null : _OFFLINE_BOUNDS,
     attributionControl: false,
+    fadeDuration: 0,
     transformRequest: (url) => ({ url })
 });
 
@@ -1171,11 +1172,24 @@ map.addControl(awacsControl, 'top-right');
 
 
 // --- ADS-B Live Feed ---
+// Aircraft symbol drawn programmatically — traditional ATC radar blip (filled triangle)
+
 class AdsbLiveControl {
     constructor() {
         this.visible = _overlayStates.adsb;
         this._pollInterval = null;
         this._geojson = { type: 'FeatureCollection', features: [] };
+        this._trails = {};
+        this._trailsGeojson = { type: 'FeatureCollection', features: [] };
+        this._MAX_TRAIL = 100;
+        this._selectedHex = null;
+        this._eventsAdded = false;
+        this._lastPositions = {};   // hex -> { lon, lat, gs, track, ts }
+        this._interpolateInterval = null;
+        this._spriteReady = Promise.resolve();
+        this._tagMarker = null;   // MapLibre Marker showing selected-aircraft data tag
+        this._tagHex    = null;
+        this._followEnabled = false;
     }
 
     onAdd(map) {
@@ -1208,11 +1222,15 @@ class AdsbLiveControl {
 
         this.container.appendChild(this.button);
 
-        if (this.map.isStyleLoaded()) {
-            this.initLayers();
-        } else {
-            this.map.once('style.load', () => this.initLayers());
-        }
+        // Wait for sprite before initialising layers — sprite is local so loads fast
+        this._spriteReady.then(() => {
+            if (!this.map) return;
+            if (this.map.isStyleLoaded()) {
+                this.initLayers();
+            } else {
+                this.map.once('style.load', () => this.initLayers());
+            }
+        });
 
         if (this.visible) this._startPolling();
 
@@ -1225,50 +1243,312 @@ class AdsbLiveControl {
         this.map = undefined;
     }
 
+    _parseAlt(alt_baro) {
+        if (alt_baro === 'ground' || alt_baro === '' || alt_baro == null) return 0;
+        return typeof alt_baro === 'number' ? alt_baro : parseFloat(alt_baro) || 0;
+    }
+
+    // Filled directional triangle pointing north (up) — rotated by icon-rotate to
+    // match the aircraft track.  White fill, thin black outline for contrast.
+    _createRadarBlip() {
+        const S  = 32;
+        const cx = S / 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = S;
+        const ctx = canvas.getContext('2d');
+
+        ctx.beginPath();
+        ctx.moveTo(cx,     3);       // apex — points north
+        ctx.lineTo(S - 5,  S - 4);  // bottom-right
+        ctx.lineTo(5,      S - 4);  // bottom-left
+        ctx.closePath();
+
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        return ctx.getImageData(0, 0, S, S);
+    }
+
+    _registerIcons() {
+        if (this.map.hasImage('adsb-blip')) this.map.removeImage('adsb-blip');
+        this.map.addImage('adsb-blip', this._createRadarBlip(), { pixelRatio: 2, sdf: false });
+    }
+
     initLayers() {
         const vis = this.visible ? 'visible' : 'none';
 
-        ['adsb-labels', 'adsb-icons'].forEach(id => {
+        ['adsb-labels', 'adsb-icons', 'adsb-trails'].forEach(id => {
             try { this.map.removeLayer(id); } catch(e) {}
         });
-        if (this.map.getSource('adsb-live')) {
-            this.map.removeSource('adsb-live');
-        }
+        ['adsb-live', 'adsb-trails-source'].forEach(id => {
+            if (this.map.getSource(id)) this.map.removeSource(id);
+        });
 
-        this.map.addSource('adsb-live', { type: 'geojson', data: this._geojson });
+        this._registerIcons();
 
+        // Position-history dots for selected aircraft (rendered behind icons)
+        this.map.addSource('adsb-trails-source', { type: 'geojson', data: this._trailsGeojson });
         this.map.addLayer({
-            id: 'adsb-icons',
+            id: 'adsb-trails',
             type: 'circle',
-            source: 'adsb-live',
+            source: 'adsb-trails-source',
             layout: { visibility: vis },
             paint: {
-                'circle-radius': 3,
-                'circle-color': '#ffffff',
-                'circle-opacity': 1,
-                'circle-opacity-transition': { duration: 0 },
+                'circle-radius': 2.5,
+                'circle-opacity': ['get', 'opacity'],
+                'circle-stroke-width': 0,
+                'circle-color': '#888888',
             }
         });
 
+        // Aircraft positions
+        this.map.addSource('adsb-live', { type: 'geojson', data: this._geojson });
+
+        // Aircraft icons — bracket / crosshair matching location-marker style
+        // Ground aircraft only shown at zoom ≥ 10
+        this.map.addLayer({
+            id: 'adsb-icons',
+            type: 'symbol',
+            source: 'adsb-live',
+            filter: ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
+            layout: {
+                visibility: vis,
+                'icon-image': 'adsb-blip',
+                'icon-size': 1.0,
+                'icon-rotate': ['get', 'track'],
+                'icon-rotation-alignment': 'map',
+                'icon-allow-overlap': true,
+                'icon-ignore-placement': true,
+            },
+            paint: {
+                'icon-opacity': 1,
+                'icon-opacity-transition': { duration: 0 },
+            }
+        });
+
+        // Callsign label — hidden for selected aircraft (HTML tag takes over)
+        // Ground aircraft follow the same zoom-10 rule as the icons
         this.map.addLayer({
             id: 'adsb-labels',
             type: 'symbol',
             source: 'adsb-live',
+            filter: ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
             layout: {
                 visibility: vis,
                 'text-field': ['coalesce', ['get', 'flight'], ['get', 'r'], ['get', 'hex']],
                 'text-font': ['Noto Sans Regular'],
-                'text-size': 9,
-                'text-offset': [1.2, 0],
+                'text-size': 10,
+                'text-letter-spacing': 0.06,
+                'text-offset': [1.2, -0.3],
                 'text-anchor': 'left',
                 'text-allow-overlap': true,
                 'text-ignore-placement': true,
             },
             paint: {
                 'text-color': '#ffffff',
+                'text-halo-color': 'rgba(0,0,0,0.6)',
+                'text-halo-width': 1.5,
                 'text-opacity-transition': { duration: 0 },
             }
         });
+
+        // Click/hover handlers — added once only to avoid duplicates on style reload
+        if (!this._eventsAdded) {
+            this._eventsAdded = true;
+
+            this.map.on('click', 'adsb-icons', (e) => {
+                if (!e.features || !e.features.length) return;
+                const hex = e.features[0].properties.hex;
+                this._selectedHex = (hex === this._selectedHex) ? null : hex;
+                this._applySelection();
+                e.originalEvent._adsbHandled = true;
+            });
+
+            this.map.on('click', (e) => {
+                if (e.originalEvent._adsbHandled) return;
+                if (this._selectedHex) {
+                    this._selectedHex = null;
+                    this._applySelection();
+                }
+            });
+
+            this.map.on('mouseenter', 'adsb-icons', () => { this.map.getCanvas().style.cursor = 'pointer'; });
+            this.map.on('mouseleave', 'adsb-icons', () => { this.map.getCanvas().style.cursor = ''; });
+        }
+
+        // Explicitly raise ADS-B layers above everything else (AARA, AWACS, etc.)
+        // moveLayer() without a beforeId moves the layer to the top of the stack.
+        ['adsb-trails', 'adsb-icons', 'adsb-labels'].forEach(id => {
+            try { this.map.moveLayer(id); } catch(e) {}
+        });
+    }
+
+    _buildTagHTML(props) {
+        const callsign = props.flight || props.r || props.hex || '???';
+        const alt      = props.alt_baro ?? 0;
+        const vrt      = props.baro_rate ?? 0;
+        const altStr   = alt === 0 ? 'GND'
+            : alt >= 18000 ? 'FL' + String(Math.round(alt / 100)).padStart(3, '0')
+            : alt.toLocaleString() + ' ft';
+        const vrtArrow = vrt >  200 ? ' ↑' : vrt < -200 ? ' ↓' : '';
+        const spdStr   = Math.round(props.gs ?? 0) + ' kt';
+        const hdgStr   = Math.round(props.track ?? 0) + '°';
+        const rows = [
+            ['ALT', altStr + vrtArrow],
+            ['SPD', spdStr],
+            ['HDG', hdgStr],
+        ];
+        if (props.t) rows.push(['TYP', props.t]);
+        if (props.r) rows.push(['REG', props.r]);
+
+        const rowsHTML = rows.map(([lbl, val]) =>
+            `<div style="display:flex;gap:14px;line-height:1.8">` +
+            `<span style="opacity:0.5;min-width:34px;letter-spacing:.05em">${lbl}</span>` +
+            `<span>${val}</span></div>`
+        ).join('');
+
+        const trkColor = this._followEnabled ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+        const trkBtn = `<button class="tag-follow-btn" style="` +
+            `background:none;border:none;cursor:pointer;padding:0;pointer-events:auto;` +
+            `color:${trkColor};` +
+            `font-family:'Barlow Condensed','Barlow',sans-serif;` +
+            `font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1">${this._followEnabled ? 'TRACKING' : 'TRACK'}</button>`;
+
+        return `<div style="` +
+            `background:rgba(0,0,0,0.88);` +
+            `border:1px solid rgba(255,255,255,0.15);` +
+            `color:#fff;` +
+            `font-family:'Barlow Condensed','Barlow',sans-serif;` +
+            `font-size:14px;font-weight:400;` +
+            `padding:10px 14px 9px;` +
+            `pointer-events:none;white-space:nowrap;user-select:none">` +
+            `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;` +
+            `font-weight:600;font-size:15px;letter-spacing:.12em;` +
+            `margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
+            `<span>${callsign}</span>${trkBtn}</div>` +
+            rowsHTML + `</div>`;
+    }
+
+    _wireTagButton(el) {
+        const btn = el.querySelector('.tag-follow-btn');
+        if (!btn) return;
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._followEnabled = !this._followEnabled;
+            btn.style.color = this._followEnabled ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+            btn.textContent = this._followEnabled ? 'TRACKING' : 'TRACK';
+            if (this._followEnabled && this._tagHex) {
+                const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
+                if (f) this.map.easeTo({ center: f.geometry.coordinates, duration: 400 });
+            }
+        });
+    }
+
+    _showSelectedTag(feature) {
+        this._hideSelectedTag();
+        if (!feature || !this.map) return;
+        this._followEnabled = false;
+        const el = document.createElement('div');
+        el.innerHTML = this._buildTagHTML(feature.properties);
+        this._wireTagButton(el);
+        this._tagMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -12] })
+            .setLngLat(feature.geometry.coordinates)
+            .addTo(this.map);
+        this._tagHex = feature.properties.hex;
+    }
+
+    _hideSelectedTag() {
+        if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
+        this._tagHex = null;
+    }
+
+    _applySelection() {
+        if (!this.map) return;
+
+        // Hide the callsign label for the selected aircraft; the HTML tag shows instead
+        const labelFilter = this._selectedHex
+            ? ['all',
+                ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
+                ['!=', ['get', 'hex'], this._selectedHex]]
+            : ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]];
+        try { this.map.setFilter('adsb-labels', labelFilter); } catch(e) {}
+
+        if (this._selectedHex) {
+            const f = this._geojson.features.find(f => f.properties.hex === this._selectedHex);
+            this._showSelectedTag(f || null);
+        } else {
+            this._hideSelectedTag();
+        }
+        this._rebuildTrails();
+    }
+
+    _rebuildTrails() {
+        const trailFeatures = [];
+        if (this._selectedHex && this._trails[this._selectedHex]) {
+            const points = this._trails[this._selectedHex];
+            const n = points.length;
+            for (let i = 0; i < n; i++) {
+                const p = points[i];
+                trailFeatures.push({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+                    properties: {
+                        alt:     p.alt,
+                        opacity: (i + 1) / n,   // oldest = near 0, newest = 1.0
+                    }
+                });
+            }
+        }
+        this._trailsGeojson = { type: 'FeatureCollection', features: trailFeatures };
+        if (this.map && this.map.getSource('adsb-trails-source')) {
+            this.map.getSource('adsb-trails-source').setData(this._trailsGeojson);
+        }
+    }
+
+    // Dead-reckoning: runs every second, extrapolates positions between API polls
+    // using each aircraft's ground speed and track so movement looks continuous.
+    _interpolate() {
+        if (!this.map || !this._geojson.features.length) return;
+        const now = Date.now();
+        // 1 knot = 1 nm/hr; 1 nm = 1/60 degree latitude
+        const NM_DEG = 1 / 60;
+        const HR_SEC = 3600;
+
+        const interpolated = {
+            type: 'FeatureCollection',
+            features: this._geojson.features.map(f => {
+                const pos = this._lastPositions[f.properties.hex];
+                if (!pos || pos.gs < 10) return f; // don't move slow/parked aircraft
+                const dt = (now - pos.ts) / 1000; // seconds since last real fix
+                if (dt <= 0 || dt > 15) return f;  // don't extrapolate beyond 15 s
+                const trackRad = pos.track * Math.PI / 180;
+                const nmPerSec = pos.gs / HR_SEC;
+                const dLat = nmPerSec * Math.cos(trackRad) * NM_DEG * dt;
+                const dLon = nmPerSec * Math.sin(trackRad) * NM_DEG * dt / Math.cos(pos.lat * Math.PI / 180);
+                return {
+                    ...f,
+                    geometry: { type: 'Point', coordinates: [pos.lon + dLon, pos.lat + dLat] }
+                };
+            })
+        };
+
+        if (this.map.getSource('adsb-live')) {
+            this.map.getSource('adsb-live').setData(interpolated);
+        }
+
+        // Keep the selected-aircraft tag on the interpolated position; only pan if tracking
+        if (this._tagHex) {
+            const f = interpolated.features.find(f => f.properties.hex === this._tagHex);
+            if (f) {
+                if (this._tagMarker) this._tagMarker.setLngLat(f.geometry.coordinates);
+                if (this._followEnabled) {
+                    this.map.easeTo({ center: f.geometry.coordinates, duration: 1100, easing: t => t });
+                }
+            }
+        }
     }
 
     async _fetch() {
@@ -1295,26 +1575,75 @@ class AdsbLiveControl {
             if (!resp.ok) return;
             const data = await resp.json();
             const aircraft = data.ac || [];
+            const seen = new Set();
+
             this._geojson = {
                 type: 'FeatureCollection',
                 features: aircraft
                     .filter(a => a.lat != null && a.lon != null)
-                    .map(a => ({
-                        type: 'Feature',
-                        geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
-                        properties: {
-                            hex:      a.hex              || '',
-                            flight:   (a.flight || '').trim(),
-                            r:        a.r                || '',
-                            t:        a.t                || '',
-                            alt_baro: a.alt_baro          ?? '',
-                            gs:       a.gs               ?? 0,
-                            track:    a.track            ?? 0,
+                    .map(a => {
+                        const alt = this._parseAlt(a.alt_baro);
+                        const hex = a.hex || '';
+                        seen.add(hex);
+
+                        // Update trail history and store real position for interpolation
+                        if (hex) {
+                            if (!this._trails[hex]) this._trails[hex] = [];
+                            const trail = this._trails[hex];
+                            const last = trail[trail.length - 1];
+                            if (!last || last.lon !== a.lon || last.lat !== a.lat) {
+                                trail.push({ lon: a.lon, lat: a.lat, alt });
+                                if (trail.length > this._MAX_TRAIL) trail.shift();
+                            }
+                            this._lastPositions[hex] = {
+                                lon: a.lon, lat: a.lat,
+                                gs: a.gs ?? 0, track: a.track ?? 0,
+                                ts: Date.now()
+                            };
                         }
-                    }))
+
+                        const gs = a.gs ?? 0;
+
+                        return {
+                            type: 'Feature',
+                            geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
+                            properties: {
+                                hex,
+                                flight:    (a.flight || '').trim(),
+                                r:         a.r || '',
+                                t:         a.t || '',
+                                alt_baro:  alt,
+                                gs,
+                                track:     a.track ?? 0,
+                                baro_rate: a.baro_rate ?? 0,
+                            }
+                        };
+                    })
             };
+
+            // Remove stale aircraft data
+            for (const hex of Object.keys(this._trails)) {
+                if (!seen.has(hex)) delete this._trails[hex];
+            }
+            for (const hex of Object.keys(this._lastPositions)) {
+                if (!seen.has(hex)) delete this._lastPositions[hex];
+            }
+
             if (this.map && this.map.getSource('adsb-live')) {
                 this.map.getSource('adsb-live').setData(this._geojson);
+            }
+
+            // Rebuild trail and refresh data tag for selected aircraft
+            this._rebuildTrails();
+            if (this._tagHex && this._tagMarker) {
+                const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
+                if (f) {
+                    const el = this._tagMarker.getElement();
+                    el.innerHTML = this._buildTagHTML(f.properties);
+                    this._wireTagButton(el);
+                } else {
+                    this._hideSelectedTag();   // aircraft left the area
+                }
             }
         } catch(e) {
             console.warn('ADS-B fetch error:', e);
@@ -1324,25 +1653,25 @@ class AdsbLiveControl {
     _startPolling() {
         this._fetch();
         this._pollInterval = setInterval(() => this._fetch(), 5000);
+        this._interpolateInterval = setInterval(() => this._interpolate(), 1000);
     }
 
     _stopPolling() {
-        if (this._pollInterval) {
-            clearInterval(this._pollInterval);
-            this._pollInterval = null;
-        }
+        if (this._pollInterval) { clearInterval(this._pollInterval); this._pollInterval = null; }
+        if (this._interpolateInterval) { clearInterval(this._interpolateInterval); this._interpolateInterval = null; }
     }
 
     toggle() {
         this.visible = !this.visible;
         const v = this.visible ? 'visible' : 'none';
-        ['adsb-icons', 'adsb-labels'].forEach(id => {
+        ['adsb-trails', 'adsb-icons', 'adsb-labels'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', v); } catch(e) {}
         });
         if (this.visible) {
             this._startPolling();
         } else {
             this._stopPolling();
+            this._hideSelectedTag();
         }
         this.button.style.opacity = this.visible ? '1' : '0.3';
         this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
