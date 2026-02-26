@@ -1519,7 +1519,6 @@ class AdsbLiveControl {
         const vrtStr   = vrt === 0 ? '0 fpm' : (vrt > 0 ? '+' : '') + Math.round(vrt).toLocaleString() + ' fpm';
 
         const fields = [];
-        fields.push(['CALLSIGN', callsign]);
         if (props.r)            fields.push(['REG',     props.r]);
         if (props.t)            fields.push(['TYPE',    props.t]);
         fields.push(['ALT',     altStr + vrtArrow]);
