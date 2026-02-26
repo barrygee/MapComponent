@@ -1192,6 +1192,8 @@ class AdsbLiveControl {
         this._tagMarker = null;   // MapLibre Marker showing selected-aircraft data tag
         this._tagHex    = null;
         this._followEnabled = false;
+        this._hoverMarker = null; // MapLibre Marker showing hovered-aircraft data tag
+        this._hoverHex    = null;
         this._callsignMarkers = {};  // hex -> MapLibre Marker (HTML callsign label)
         this.labelsVisible = _overlayStates.adsbLabels ?? true;
     }
@@ -1415,6 +1417,7 @@ class AdsbLiveControl {
                 if (!e.features || !e.features.length) return;
                 const hex = e.features[0].properties.hex;
                 this._selectedHex = (hex === this._selectedHex) ? null : hex;
+                this._hideHoverTag(); // hover tag replaced by selected tag
                 this._applySelection();
                 e.originalEvent._adsbHandled = true;
             };
@@ -1430,10 +1433,22 @@ class AdsbLiveControl {
                 }
             });
 
-            this.map.on('mouseenter', 'adsb-bracket', () => { this.map.getCanvas().style.cursor = 'pointer'; });
-            this.map.on('mouseleave', 'adsb-bracket', () => { this.map.getCanvas().style.cursor = ''; });
-            this.map.on('mouseenter', 'adsb-icons',   () => { this.map.getCanvas().style.cursor = 'pointer'; });
-            this.map.on('mouseleave', 'adsb-icons',   () => { this.map.getCanvas().style.cursor = ''; });
+            const handleHoverEnter = (e) => {
+                this.map.getCanvas().style.cursor = 'pointer';
+                if (!e.features || !e.features.length) return;
+                const hex = e.features[0].properties.hex;
+                const f = this._geojson.features.find(f => f.properties.hex === hex);
+                if (f) this._showHoverTag(f);
+            };
+            const handleHoverLeave = () => {
+                this.map.getCanvas().style.cursor = '';
+                this._hideHoverTag();
+            };
+
+            this.map.on('mouseenter', 'adsb-bracket', handleHoverEnter);
+            this.map.on('mouseleave', 'adsb-bracket', handleHoverLeave);
+            this.map.on('mouseenter', 'adsb-icons',   handleHoverEnter);
+            this.map.on('mouseleave', 'adsb-icons',   handleHoverLeave);
         }
 
         this._raiseLayers();
@@ -1619,6 +1634,33 @@ class AdsbLiveControl {
     _hideSelectedTag() {
         if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
         this._tagHex = null;
+    }
+
+    _showHoverTag(feature) {
+        if (!feature || !this.map) return;
+        const hex = feature.properties.hex;
+        // Don't show hover tag over the already-selected plane
+        if (hex === this._selectedHex) return;
+        // Already showing hover tag for this plane — just update position
+        const coords = this._interpolatedCoords(hex) || feature.geometry.coordinates;
+        if (this._hoverHex === hex && this._hoverMarker) {
+            this._hoverMarker.setLngLat(coords);
+            return;
+        }
+        this._hideHoverTag();
+        const el = document.createElement('div');
+        el.innerHTML = this._buildTagHTML(feature.properties);
+        // Hover tag has no interactive TRACK button
+        el.style.pointerEvents = 'none';
+        this._hoverMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -12] })
+            .setLngLat(coords)
+            .addTo(this.map);
+        this._hoverHex = hex;
+    }
+
+    _hideHoverTag() {
+        if (this._hoverMarker) { this._hoverMarker.remove(); this._hoverMarker = null; }
+        this._hoverHex = null;
     }
 
     // Build a simple HTML callsign label element styled like the selected popup header.
@@ -1980,6 +2022,7 @@ class AdsbLiveControl {
         } else {
             this._stopPolling();
             this._hideSelectedTag();
+            this._hideHoverTag();
             this._hideStatusBar();
             this._clearCallsignMarkers();
         }
