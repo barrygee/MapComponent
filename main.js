@@ -1449,6 +1449,8 @@ class AdsbLiveControl {
             this.map.on('mouseleave', 'adsb-bracket', handleHoverLeave);
             this.map.on('mouseenter', 'adsb-icons',   handleHoverEnter);
             this.map.on('mouseleave', 'adsb-icons',   handleHoverLeave);
+
+            this.map.on('zoomend', () => this._updateCallsignMarkers());
         }
 
         this._raiseLayers();
@@ -1554,7 +1556,7 @@ class AdsbLiveControl {
         if (props.military)     fields.push(['CLASS',   'MILITARY']);
 
         const isEmergency = props.emergency && props.emergency !== 'none';
-        const headerColor = isEmergency ? '#ff4040' : props.military ? '#ffffff' : '#c8ff00';
+        const headerColor = isEmergency ? '#ff4040' : '#c8ff00';
 
         const fieldsHTML = fields.map(([lbl, val]) =>
             `<div class="adsb-sb-field">` +
@@ -1600,13 +1602,20 @@ class AdsbLiveControl {
             e.stopPropagation();
             this._followEnabled = !this._followEnabled;
 
-            // Rebuild the tag to switch between compact (tracking) and full (selected) modes.
-            if (this._tagMarker && this._tagHex) {
+            // Re-create the marker so the anchor updates (top-left for data box, left for tracking).
+            if (this._tagHex) {
                 const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
                 if (f) {
-                    const tagEl = this._tagMarker.getElement();
-                    tagEl.innerHTML = this._buildTagHTML(f.properties);
-                    this._wireTagButton(tagEl);
+                    const coords = this._interpolatedCoords(this._tagHex) || f.geometry.coordinates;
+                    const newEl = document.createElement('div');
+                    newEl.innerHTML = this._buildTagHTML(f.properties);
+                    this._wireTagButton(newEl);
+                    if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
+                    const anchor = this._followEnabled ? 'left' : 'top-left';
+                    const offset = this._followEnabled ? [14, 0] : [14, -13];
+                    this._tagMarker = new maplibregl.Marker({ element: newEl, anchor, offset })
+                        .setLngLat(coords)
+                        .addTo(this.map);
                     if (this._followEnabled) {
                         this._showStatusBar(f.properties);
                         this.map.easeTo({ center: f.geometry.coordinates, duration: 400 });
@@ -1627,7 +1636,9 @@ class AdsbLiveControl {
         el.innerHTML = this._buildTagHTML(feature.properties);
         this._wireTagButton(el);
         const coords = this._interpolatedCoords(feature.properties.hex) || feature.geometry.coordinates;
-        this._tagMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -12] })
+        // Data box: top-left aligned. Tracking label: vertically centred (left anchor).
+        const anchor = this._followEnabled ? 'left' : 'top-left';
+        this._tagMarker = new maplibregl.Marker({ element: el, anchor, offset: [14, -13] })
             .setLngLat(coords)
             .addTo(this.map);
         this._tagHex = feature.properties.hex;
@@ -1654,13 +1665,21 @@ class AdsbLiveControl {
         el.innerHTML = this._buildTagHTML(feature.properties);
         // Hover tag has no interactive TRACK button
         el.style.pointerEvents = 'none';
-        this._hoverMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -12] })
+        this._hoverMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -13] })
             .setLngLat(coords)
             .addTo(this.map);
         this._hoverHex = hex;
+        // Hide the callsign label for this aircraft while the data box is showing
+        if (this._callsignMarkers[hex]) {
+            this._callsignMarkers[hex].getElement().style.visibility = 'hidden';
+        }
     }
 
     _hideHoverTag() {
+        // Restore the callsign label for the previously hovered aircraft
+        if (this._hoverHex && this._callsignMarkers[this._hoverHex]) {
+            this._callsignMarkers[this._hoverHex].getElement().style.visibility = '';
+        }
         if (this._hoverMarker) { this._hoverMarker.remove(); this._hoverMarker = null; }
         this._hoverHex = null;
     }
@@ -1685,11 +1704,18 @@ class AdsbLiveControl {
             'align-items:center',
             'padding:0 8px',
             'line-height:1',
-            'pointer-events:none',
+            'cursor:pointer',
             'white-space:nowrap',
             'user-select:none',
         ].join(';');
         el.textContent = callsign;
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const hex = props.hex;
+            this._selectedHex = (hex === this._selectedHex) ? null : hex;
+            this._hideHoverTag();
+            this._applySelection();
+        });
         return el;
     }
 
@@ -1712,6 +1738,17 @@ class AdsbLiveControl {
             const hex = f.properties.hex;
             if (!hex) continue;
             seen.add(hex);
+
+            // Only show label if the icon is visible (mirrors the layer filter).
+            const zoom = this.map.getZoom();
+            const iconVisible = (f.properties.alt_baro > 0) || (zoom >= 10);
+            if (!iconVisible) {
+                if (this._callsignMarkers[hex]) {
+                    this._callsignMarkers[hex].remove();
+                    delete this._callsignMarkers[hex];
+                }
+                continue;
+            }
 
             // Selected aircraft uses the full popup instead.
             if (hex === this._selectedHex) {
@@ -1845,6 +1882,9 @@ class AdsbLiveControl {
             const hex = f.properties.hex;
             if (hex && this._callsignMarkers[hex]) {
                 this._callsignMarkers[hex].setLngLat(f.geometry.coordinates);
+            }
+            if (hex && hex === this._hoverHex && this._hoverMarker) {
+                this._hoverMarker.setLngLat(f.geometry.coordinates);
             }
         }
     }
