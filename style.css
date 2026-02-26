@@ -254,6 +254,88 @@ html {
 
 
 
+/* ============================================================
+   ADS-B SELECTED AIRCRAFT STATUS BAR
+   ============================================================ */
+#adsb-status-bar {
+    position: fixed;
+    bottom: calc(44px + 14px); /* footer height + gap matching control button margin */
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    background: rgba(0, 0, 0, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    padding: 10px 24px;
+    z-index: 999;
+    display: none;
+    pointer-events: none;
+    user-select: none;
+}
+
+#adsb-status-bar.adsb-sb-visible {
+    display: block;
+}
+
+.adsb-sb-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 8px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.adsb-sb-callsign {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+}
+
+.adsb-sb-hex {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    opacity: 0.4;
+}
+
+.adsb-sb-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 28px;
+}
+
+.adsb-sb-field {
+    display: flex;
+    gap: 4px;
+    align-items: baseline;
+    line-height: 1.7;
+}
+
+.adsb-sb-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    opacity: 0.45;
+    min-width: 52px;
+    text-transform: uppercase;
+}
+
+.adsb-sb-value {
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+}
+
+.adsb-sb-emrg {
+    color: #ff4040;
+    font-weight: 600;
+}
+
+
 /* Font for all map control buttons */
 .maplibregl-ctrl button {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif !important;

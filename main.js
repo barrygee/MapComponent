@@ -1226,13 +1226,24 @@ class AdsbLiveControl {
 
         this.container.appendChild(this.button);
 
+        // Pre-fetch ADS-B data immediately so planes are ready to display as
+        // soon as the map style finishes loading, rather than waiting for the
+        // first poll to complete after layers are initialised.
+        if (this.visible) this._fetch();
+
         // Wait for sprite before initialising layers — sprite is local so loads fast
         this._spriteReady.then(() => {
             if (!this.map) return;
+            console.time('[ADSB] style.load → initLayers');
             if (this.map.isStyleLoaded()) {
+                console.log('[ADSB] style already loaded, calling initLayers immediately');
                 this.initLayers();
             } else {
-                this.map.once('style.load', () => this.initLayers());
+                console.log('[ADSB] waiting for style.load...');
+                this.map.once('style.load', () => {
+                    console.timeEnd('[ADSB] style.load → initLayers');
+                    this.initLayers();
+                });
             }
         });
 
@@ -1323,6 +1334,7 @@ class AdsbLiveControl {
     }
 
     initLayers() {
+        console.log('[ADSB] initLayers called, geojson features:', this._geojson.features.length);
         const vis = this.visible ? 'visible' : 'none';
 
         ['adsb-icons', 'adsb-bracket', 'adsb-trails'].forEach(id => {
@@ -1434,6 +1446,29 @@ class AdsbLiveControl {
     _buildTagHTML(props) {
         const raw      = (props.flight || '').trim() || (props.r || '').trim() || (props.hex || '').trim();
         const callsign = raw || 'UNKNOWN';
+
+        const trkColor   = this._followEnabled ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+        const trkBtnText = this._followEnabled ? 'TRACKING' : 'TRACK';
+        const trkBtn = `<button class="tag-follow-btn" style="` +
+            `background:none;border:none;cursor:pointer;padding:0;pointer-events:auto;` +
+            `color:${trkColor};font-family:'Barlow Condensed','Barlow',sans-serif;` +
+            `font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1">${trkBtnText}</button>`;
+
+        // When tracking, show only callsign + button — data is in the status bar below.
+        if (this._followEnabled) {
+            return `<div style="` +
+                `background:rgba(0,0,0,0.88);` +
+                `border:1px solid rgba(255,255,255,0.15);` +
+                `color:#fff;` +
+                `font-family:'Barlow Condensed','Barlow',sans-serif;` +
+                `font-size:14px;font-weight:400;` +
+                `padding:6px 10px;` +
+                `pointer-events:none;white-space:nowrap;user-select:none">` +
+                `<div style="display:flex;align-items:center;gap:12px;pointer-events:auto">` +
+                `<span style="font-size:13px;font-weight:600;letter-spacing:.12em;color:#fff">${callsign}</span>` +
+                `${trkBtn}</div></div>`;
+        }
+
         const alt      = props.alt_baro ?? 0;
         const vrt      = props.baro_rate ?? 0;
         const altStr   = alt === 0 ? 'GND'
@@ -1449,19 +1484,13 @@ class AdsbLiveControl {
         ];
         if (props.t) rows.push(['TYP', props.t]);
         if (props.r) rows.push(['REG', props.r]);
+        if (props.squawk) rows.push(['SQK', props.squawk]);
 
         const rowsHTML = rows.map(([lbl, val]) =>
             `<div style="display:flex;gap:14px;line-height:1.8">` +
             `<span style="opacity:0.5;min-width:34px;letter-spacing:.05em">${lbl}</span>` +
             `<span>${val}</span></div>`
         ).join('');
-
-        const trkColor   = this._followEnabled ? '#c8ff00' : 'rgba(255,255,255,0.3)';
-        const trkBtnText = this._followEnabled ? 'TRACKING' : 'TRACK';
-        const trkBtn = `<button class="tag-follow-btn" style="` +
-            `background:none;border:none;cursor:pointer;padding:0;pointer-events:auto;` +
-            `color:${trkColor};font-family:'Barlow Condensed','Barlow',sans-serif;` +
-            `font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1">${trkBtnText}</button>`;
 
         return `<div style="` +
             `background:rgba(0,0,0,0.88);` +
@@ -1478,23 +1507,104 @@ class AdsbLiveControl {
             rowsHTML + `</div>`;
     }
 
+    _buildStatusBarHTML(props) {
+        const raw      = (props.flight || '').trim() || (props.r || '').trim() || (props.hex || '').trim();
+        const callsign = raw || 'UNKNOWN';
+        const alt      = props.alt_baro ?? 0;
+        const vrt      = props.baro_rate ?? 0;
+        const altStr   = alt === 0 ? 'GND'
+            : alt >= 18000 ? 'FL' + String(Math.round(alt / 100)).padStart(3, '0')
+            : alt.toLocaleString() + ' ft';
+        const vrtArrow = vrt > 200 ? ' ↑' : vrt < -200 ? ' ↓' : '';
+        const vrtStr   = vrt === 0 ? '0 fpm' : (vrt > 0 ? '+' : '') + Math.round(vrt).toLocaleString() + ' fpm';
+
+        const fields = [];
+        fields.push(['CALLSIGN', callsign]);
+        if (props.r)            fields.push(['REG',     props.r]);
+        if (props.t)            fields.push(['TYPE',    props.t]);
+        fields.push(['ALT',     altStr + vrtArrow]);
+        if (props.alt_geom != null) fields.push(['ALT GEO', props.alt_geom.toLocaleString() + ' ft']);
+        fields.push(['V/S',     vrtStr]);
+        fields.push(['GS',      Math.round(props.gs ?? 0) + ' kt']);
+        if (props.ias != null)  fields.push(['IAS',     Math.round(props.ias) + ' kt']);
+        if (props.mach != null) fields.push(['MACH',    'M' + props.mach.toFixed(2)]);
+        fields.push(['HDG',     Math.round(props.track ?? 0) + '°']);
+        if (props.nav_altitude != null) fields.push(['NAV ALT', props.nav_altitude.toLocaleString() + ' ft']);
+        if (props.nav_heading  != null) fields.push(['NAV HDG', Math.round(props.nav_heading) + '°']);
+        if (props.squawk)       fields.push(['SQUAWK',  props.squawk]);
+        if (props.category)     fields.push(['CAT',     props.category]);
+        if (props.emergency && props.emergency !== 'none') fields.push(['EMRG', props.emergency.toUpperCase()]);
+        if (props.rssi != null) fields.push(['RSSI',    props.rssi.toFixed(1) + ' dBFS']);
+        if (props.military)     fields.push(['CLASS',   'MILITARY']);
+
+        const isEmergency = props.emergency && props.emergency !== 'none';
+        const headerColor = isEmergency ? '#ff4040' : props.military ? '#ffffff' : '#c8ff00';
+
+        const fieldsHTML = fields.map(([lbl, val]) =>
+            `<div class="adsb-sb-field">` +
+            `<span class="adsb-sb-label">${lbl}</span>` +
+            `<span class="adsb-sb-value${lbl === 'EMRG' ? ' adsb-sb-emrg' : ''}">${val}</span>` +
+            `</div>`
+        ).join('');
+
+        return `<div class="adsb-sb-header">` +
+            `<span class="adsb-sb-callsign" style="color:${headerColor}">${callsign}</span>` +
+            `</div>` +
+            `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
+    }
+
+    _showStatusBar(props) {
+        let bar = document.getElementById('adsb-status-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'adsb-status-bar';
+            document.body.appendChild(bar);
+        }
+        bar.innerHTML = this._buildStatusBarHTML(props);
+        bar.classList.add('adsb-sb-visible');
+    }
+
+    _hideStatusBar() {
+        const bar = document.getElementById('adsb-status-bar');
+        if (bar) bar.classList.remove('adsb-sb-visible');
+    }
+
+    _updateStatusBar() {
+        if (!this._followEnabled || !this._selectedHex) return;
+        const bar = document.getElementById('adsb-status-bar');
+        if (!bar || !bar.classList.contains('adsb-sb-visible')) return;
+        const f = this._geojson.features.find(f => f.properties.hex === this._selectedHex);
+        if (f) bar.innerHTML = this._buildStatusBarHTML(f.properties);
+    }
+
     _wireTagButton(el) {
         const btn = el.querySelector('.tag-follow-btn');
         if (!btn) return;
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             this._followEnabled = !this._followEnabled;
-            btn.style.color = this._followEnabled ? '#c8ff00' : 'rgba(255,255,255,0.3)';
-            btn.textContent = this._followEnabled ? 'TRACKING' : 'TRACK';
-            if (this._followEnabled && this._tagHex) {
+
+            // Rebuild the tag to switch between compact (tracking) and full (selected) modes.
+            if (this._tagMarker && this._tagHex) {
                 const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
-                if (f) this.map.easeTo({ center: f.geometry.coordinates, duration: 400 });
+                if (f) {
+                    const tagEl = this._tagMarker.getElement();
+                    tagEl.innerHTML = this._buildTagHTML(f.properties);
+                    this._wireTagButton(tagEl);
+                    if (this._followEnabled) {
+                        this._showStatusBar(f.properties);
+                        this.map.easeTo({ center: f.geometry.coordinates, duration: 400 });
+                    } else {
+                        this._hideStatusBar();
+                    }
+                }
             }
         });
     }
 
     _showSelectedTag(feature) {
         this._hideSelectedTag();
+        this._hideStatusBar();
         if (!feature || !this.map) return;
         this._followEnabled = false;
         const el = document.createElement('div');
@@ -1617,6 +1727,7 @@ class AdsbLiveControl {
             this._showSelectedTag(f || null);
         } else {
             this._hideSelectedTag();
+            this._hideStatusBar();
         }
         this._rebuildTrails();
     }
@@ -1672,6 +1783,9 @@ class AdsbLiveControl {
 
         if (this.map.getSource('adsb-live')) {
             this.map.getSource('adsb-live').setData(interpolated);
+            console.log('[ADSB] _interpolate: setData called with', interpolated.features.length, 'features');
+        } else {
+            console.log('[ADSB] _interpolate: source not ready yet');
         }
 
         // Keep tag and callsign markers on interpolated positions.
@@ -1722,9 +1836,12 @@ class AdsbLiveControl {
         }
         try {
             const url = `https://api.airplanes.live/v2/point/${lat.toFixed(4)}/${lon.toFixed(4)}/250`;
+            console.time('[ADSB] API fetch');
             const resp = await fetch(url);
+            console.timeEnd('[ADSB] API fetch');
             if (!resp.ok) return;
             const data = await resp.json();
+            console.log('[ADSB] aircraft count:', (data.ac || []).length);
             const aircraft = data.ac || [];
             const seen = new Set();
 
@@ -1777,13 +1894,22 @@ class AdsbLiveControl {
                             geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
                             properties: {
                                 hex,
-                                flight:    (a.flight || '').trim(),
-                                r:         a.r || '',
-                                t:         a.t || '',
-                                alt_baro:  alt,
+                                flight:       (a.flight || '').trim(),
+                                r:            a.r || '',
+                                t:            a.t || '',
+                                alt_baro:     alt,
+                                alt_geom:     a.alt_geom ?? null,
                                 gs,
-                                track:     a.track ?? 0,
-                                baro_rate: a.baro_rate ?? 0,
+                                ias:          a.ias ?? null,
+                                mach:         a.mach ?? null,
+                                track:        a.track ?? 0,
+                                baro_rate:    a.baro_rate ?? 0,
+                                nav_altitude: a.nav_altitude_mcp ?? a.nav_altitude_fms ?? null,
+                                nav_heading:  a.nav_heading ?? null,
+                                category:     a.category || '',
+                                emergency:    a.emergency || '',
+                                squawk:       a.squawk || '',
+                                rssi:         a.rssi ?? null,
                                 military,
                             }
                         };
@@ -1810,8 +1936,10 @@ class AdsbLiveControl {
                     const el = this._tagMarker.getElement();
                     el.innerHTML = this._buildTagHTML(f.properties);
                     this._wireTagButton(el);
+                    this._updateStatusBar();
                 } else {
                     this._hideSelectedTag();   // aircraft left the area
+                    this._hideStatusBar();
                 }
             }
             // Refresh HTML callsign markers for all aircraft.
@@ -1853,6 +1981,7 @@ class AdsbLiveControl {
         } else {
             this._stopPolling();
             this._hideSelectedTag();
+            this._hideStatusBar();
             this._clearCallsignMarkers();
         }
         this.button.style.opacity = this.visible ? '1' : '0.3';
