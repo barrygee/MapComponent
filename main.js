@@ -1236,8 +1236,6 @@ class AdsbLiveControl {
             }
         });
 
-        if (this.visible) this._startPolling();
-
         return this.container;
     }
 
@@ -1427,6 +1425,10 @@ class AdsbLiveControl {
         }
 
         this._raiseLayers();
+
+        // Start polling only once the map source exists so the first fetch
+        // can immediately display planes rather than silently dropping data.
+        if (this.visible && !this._pollInterval) this._startPolling();
     }
 
     _buildTagHTML(props) {
@@ -1498,8 +1500,9 @@ class AdsbLiveControl {
         const el = document.createElement('div');
         el.innerHTML = this._buildTagHTML(feature.properties);
         this._wireTagButton(el);
+        const coords = this._interpolatedCoords(feature.properties.hex) || feature.geometry.coordinates;
         this._tagMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -12] })
-            .setLngLat(feature.geometry.coordinates)
+            .setLngLat(coords)
             .addTo(this.map);
         this._tagHex = feature.properties.hex;
     }
@@ -1566,7 +1569,7 @@ class AdsbLiveControl {
                 continue;
             }
 
-            const lngLat = f.geometry.coordinates;
+            const lngLat = this._interpolatedCoords(hex) || f.geometry.coordinates;
 
             if (this._callsignMarkers[hex]) {
                 this._callsignMarkers[hex].setLngLat(lngLat);
@@ -1650,42 +1653,53 @@ class AdsbLiveControl {
         const NM_DEG = 1 / 60;
         const HR_SEC = 3600;
 
-        const interpolated = {
-            type: 'FeatureCollection',
-            features: this._geojson.features.map(f => {
-                const pos = this._lastPositions[f.properties.hex];
-                if (!pos || pos.gs < 10) return f; // don't move slow/parked aircraft
-                const dt = (now - pos.ts) / 1000; // seconds since last real fix
-                if (dt <= 0 || dt > 15) return f;  // don't extrapolate beyond 15 s
-                const trackRad = pos.track * Math.PI / 180;
-                const nmPerSec = pos.gs / HR_SEC;
-                const dLat = nmPerSec * Math.cos(trackRad) * NM_DEG * dt;
-                const dLon = nmPerSec * Math.sin(trackRad) * NM_DEG * dt / Math.cos(pos.lat * Math.PI / 180);
-                return {
-                    ...f,
-                    geometry: { type: 'Point', coordinates: [pos.lon + dLon, pos.lat + dLat] }
-                };
-            })
-        };
+        this._interpolatedFeatures = this._geojson.features.map(f => {
+            const pos = this._lastPositions[f.properties.hex];
+            if (!pos || pos.gs < 10) return f; // don't move slow/parked aircraft
+            const dt = (now - pos.ts) / 1000; // seconds since last real fix
+            if (dt <= 0 || dt > 30) return f;  // don't extrapolate beyond 30 s
+            const trackRad = pos.track * Math.PI / 180;
+            const nmPerSec = pos.gs / HR_SEC;
+            const dLat = nmPerSec * Math.cos(trackRad) * NM_DEG * dt;
+            const dLon = nmPerSec * Math.sin(trackRad) * NM_DEG * dt / Math.cos(pos.lat * Math.PI / 180);
+            return {
+                ...f,
+                geometry: { type: 'Point', coordinates: [pos.lon + dLon, pos.lat + dLat] }
+            };
+        });
+
+        const interpolated = { type: 'FeatureCollection', features: this._interpolatedFeatures };
 
         if (this.map.getSource('adsb-live')) {
             this.map.getSource('adsb-live').setData(interpolated);
         }
 
-        // Keep all HTML markers on interpolated positions.
-        for (const f of interpolated.features) {
-            const hex = f.properties.hex;
-            if (!hex) continue;
-            if (this._tagMarker && hex === this._tagHex) {
+        // Keep tag and callsign markers on interpolated positions.
+        if (this._tagMarker && this._tagHex) {
+            const f = this._interpolatedFeatures.find(f => f.properties.hex === this._tagHex);
+            if (f) {
                 this._tagMarker.setLngLat(f.geometry.coordinates);
                 if (this._followEnabled) {
                     this.map.easeTo({ center: f.geometry.coordinates, duration: 1100, easing: t => t });
                 }
             }
-            if (this._callsignMarkers[hex]) {
+        }
+        for (const f of this._interpolatedFeatures) {
+            const hex = f.properties.hex;
+            if (hex && this._callsignMarkers[hex]) {
                 this._callsignMarkers[hex].setLngLat(f.geometry.coordinates);
             }
         }
+    }
+
+    // Returns the interpolated coordinates for a given hex, falling back to raw API coords.
+    _interpolatedCoords(hex) {
+        if (this._interpolatedFeatures) {
+            const f = this._interpolatedFeatures.find(f => f.properties.hex === hex);
+            if (f) return f.geometry.coordinates;
+        }
+        const f = this._geojson.features.find(f => f.properties.hex === hex);
+        return f ? f.geometry.coordinates : null;
     }
 
     async _fetch() {
@@ -1728,15 +1742,28 @@ class AdsbLiveControl {
                             if (!this._trails[hex]) this._trails[hex] = [];
                             const trail = this._trails[hex];
                             const last = trail[trail.length - 1];
-                            if (!last || last.lon !== a.lon || last.lat !== a.lat) {
+                            const posChanged = !last || last.lon !== a.lon || last.lat !== a.lat;
+                            if (posChanged) {
                                 trail.push({ lon: a.lon, lat: a.lat, alt });
                                 if (trail.length > this._MAX_TRAIL) trail.shift();
                             }
-                            this._lastPositions[hex] = {
-                                lon: a.lon, lat: a.lat,
-                                gs: a.gs ?? 0, track: a.track ?? 0,
-                                ts: Date.now()
-                            };
+                            // Only reset the interpolation clock when the API gives us a
+                            // genuinely new position. If the same fix comes back again,
+                            // keep the existing entry so the extrapolation clock keeps
+                            // running forward and the plane doesn't snap backwards.
+                            if (posChanged || !this._lastPositions[hex]) {
+                                const ageSec = a.seen_pos ?? a.seen ?? 0;
+                                this._lastPositions[hex] = {
+                                    lon: a.lon, lat: a.lat,
+                                    gs: a.gs ?? 0, track: a.track ?? 0,
+                                    ts: Date.now() - ageSec * 1000
+                                };
+                            } else {
+                                // Position unchanged — update speed/track in case they
+                                // changed, but leave lon/lat/ts alone.
+                                this._lastPositions[hex].gs = a.gs ?? 0;
+                                this._lastPositions[hex].track = a.track ?? 0;
+                            }
                         }
 
                         const gs = a.gs ?? 0;
@@ -1771,9 +1798,9 @@ class AdsbLiveControl {
                 if (!seen.has(hex)) delete this._lastPositions[hex];
             }
 
-            if (this.map && this.map.getSource('adsb-live')) {
-                this.map.getSource('adsb-live').setData(this._geojson);
-            }
+            // Don't push raw API coords to the map — let _interpolate() be the sole
+            // writer so there's no backward snap when new data arrives.
+            this._interpolate();
 
             // Rebuild trail and refresh data tag for selected aircraft
             this._rebuildTrails();
