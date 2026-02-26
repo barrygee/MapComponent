@@ -1520,7 +1520,7 @@ class AdsbLiveControl {
             `color:${color}`,
             "font-family:'Barlow Condensed','Barlow',sans-serif",
             'font-size:13px',
-            'font-weight:500',
+            'font-weight:400',
             'letter-spacing:.12em',
             'height:20px',
             'box-sizing:border-box',
