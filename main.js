@@ -2439,9 +2439,11 @@ class AdsbLabelsToggleControl {
 
     syncToAdsb(adsbVisible) {
         if (!this.button) return;
+        if (adsbVisible) this.labelsVisible = false;
         this.button.style.pointerEvents = adsbVisible ? 'auto' : 'none';
         this.button.style.opacity = (adsbVisible && this.labelsVisible) ? '1' : '0.3';
         this.button.style.color = (adsbVisible && this.labelsVisible) ? '#c8ff00' : '#ffffff';
+        if (adsbVisible) adsbControl.setLabelsVisible(false);
     }
 }
 adsbLabelsControl = new AdsbLabelsToggleControl();
@@ -2536,8 +2538,153 @@ class ClearOverlaysControl {
     }
 }
 
-map.addControl(new ClearOverlaysControl(), 'top-right');
+const clearControl = new ClearOverlaysControl();
+map.addControl(clearControl, 'top-right');
 // --- End clear all overlays ---
+
+
+// --- Side Menu ---
+// Build a single collapsible panel that wraps all the right-side controls.
+// Each control is still added to the map (it manages layers/sources), but its
+// maplibre container is hidden. The side menu calls through to the controls'
+// own toggle methods and mirrors their active state.
+
+(function buildSideMenu() {
+    // Hide the maplibre ctrl-top-right container (controls still manage their layers).
+    function hideCtrlContainers() {
+        const ctrlTopRight = document.querySelector('.maplibregl-ctrl-top-right');
+        if (!ctrlTopRight) { setTimeout(hideCtrlContainers, 50); return; }
+        ctrlTopRight.style.display = 'none';
+    }
+    hideCtrlContainers();
+
+    let expanded = false;
+
+    const panel = document.createElement('div');
+    panel.id = 'side-menu';
+
+    // ---- Helper: create a .sm-group wrapper ----
+    function makeGroup(id) {
+        const g = document.createElement('div');
+        g.className = 'sm-group';
+        if (id) g.id = id;
+        return g;
+    }
+
+    // ---- Helper: nav button (zoom / location) ----
+    const LOC_SVG = `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>`;
+    // SVG replicates the canvas marker exactly. Canvas coords: bracket x=4..60 y=4..56 arm=10,
+    // triangle cx=32 cy=32 apex=(32,22) base=(25,40)+(39,40). ViewBox offset by (4,4) → 0 0 56 52.
+    const PLANE_SVG = `<svg width="16" height="15" viewBox="0 0 56 52" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="28,14 40,40 28,33 16,40" fill="#ffffff" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" transform="rotate(-45 28 27)"/><polyline points="10,0 0,0 0,10" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="46,0 56,0 56,10" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="10,52 0,52 0,42" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="46,52 56,52 56,42" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/></svg>`;
+
+    function makeNavBtn(content, title, onClick, isHTML) {
+        const btn = document.createElement('button');
+        btn.className = 'sm-nav-btn';
+        btn.title = title;
+        if (isHTML) btn.innerHTML = content;
+        else btn.textContent = content;
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    // ---- Helper: overlay toggle button ----
+    // iconFontSize: CSS font-size string for the icon span (matches original per-button sizes)
+    // isHTML: if true, icon is set as innerHTML (for SVG icons)
+    function makeOverlayBtn(icon, iconFontSize, label, getActive, doToggle, isHTML) {
+        const btn = document.createElement('button');
+        btn.className = 'sm-btn';
+
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'sm-icon';
+        if (isHTML) iconSpan.innerHTML = icon;
+        else iconSpan.textContent = icon;
+        iconSpan.style.fontSize = iconFontSize;
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'sm-label';
+        labelSpan.textContent = label;
+
+        btn.appendChild(iconSpan);
+        btn.appendChild(labelSpan);
+
+        function sync() { btn.classList.toggle('active', getActive()); }
+
+        btn.addEventListener('click', () => { doToggle(); sync(); });
+        sync();
+        return btn;
+    }
+
+
+    // ---- Group 1: expand toggle ----
+    const toggleGroup = makeGroup('sm-group-toggle');
+    const toggleBtn = document.createElement('button');
+    toggleBtn.id = 'side-menu-toggle';
+    toggleBtn.textContent = '‹';
+    toggleBtn.title = 'Expand / collapse menu';
+    toggleBtn.addEventListener('click', () => {
+        expanded = !expanded;
+        panel.classList.toggle('expanded', expanded);
+        toggleBtn.textContent = expanded ? '›' : '‹';
+    });
+    toggleGroup.appendChild(toggleBtn);
+    panel.appendChild(toggleGroup);
+
+    // ---- Group 2: zoom + location (horizontal in expanded) ----
+    const navGroup = makeGroup('sm-group-nav');
+    navGroup.appendChild(makeNavBtn('+', 'Zoom in', () => map.zoomIn()));
+    navGroup.appendChild(makeNavBtn('−', 'Zoom out', () => map.zoomOut()));
+    navGroup.appendChild(makeNavBtn(LOC_SVG, 'Go to my location', goToUserLocation, true));
+    panel.appendChild(navGroup);
+
+    // ---- Groups 3+: overlays in original addControl order ----
+    // Original order: Reset, CVL, MIL, R, N, ◎, =, ○, ADS, L, ✕
+    function adsbToggle() {
+        adsbControl.toggle();
+        if (adsbLabelsControl) adsbLabelsControl.syncToAdsb(adsbControl.visible);
+    }
+
+    const overlayGroup = makeGroup();
+    overlayGroup.appendChild(makeOverlayBtn('CVL', '8px',  'AIRPORTS',       () => airportsControl ? airportsControl.visible : false,         () => { if (airportsControl) airportsControl.toggle(); }));
+    overlayGroup.appendChild(makeOverlayBtn('MIL', '8px',  'MILITARY BASES', () => rafControl ? rafControl.visible : false,                   () => { if (rafControl) rafControl.toggle(); }));
+    const roadsBtn = makeOverlayBtn('R', '14px', 'ROADS',  () => roadsControl ? roadsControl.roadsVisible : false, () => { if (roadsControl) roadsControl.toggleRoads(); });
+    roadsBtn.classList.add('sm-expanded-only');
+    overlayGroup.appendChild(roadsBtn);
+    const citiesBtn = makeOverlayBtn('N', '14px', 'CITIES', () => namesControl ? namesControl.namesVisible : false, () => { if (namesControl) namesControl.toggleNames(); });
+    citiesBtn.classList.add('sm-expanded-only');
+    overlayGroup.appendChild(citiesBtn);
+    overlayGroup.appendChild(makeOverlayBtn('◎',   '16px', 'RANGE RINGS',    () => rangeRingsControl ? rangeRingsControl.ringsVisible : false, () => { if (rangeRingsControl) rangeRingsControl.toggleRings(); }));
+    overlayGroup.appendChild(makeOverlayBtn('=',   '16px', 'A2A REFUELING',  () => aarControl ? aarControl.visible : false,                   () => { if (aarControl) aarControl.toggle(); }));
+    overlayGroup.appendChild(makeOverlayBtn('○',   '16px', 'AWACS',          () => awacsControl ? awacsControl.visible : false,               () => { if (awacsControl) awacsControl.toggle(); }));
+    const labelsBtn = makeOverlayBtn('LBL', '8px', 'PLANE LABELS', () => adsbLabelsControl ? adsbLabelsControl.labelsVisible : false, () => { if (adsbLabelsControl) adsbLabelsControl.toggle(); });
+    function syncLabelsBtn() {
+        const planesOn = adsbControl ? adsbControl.visible : false;
+        labelsBtn.classList.toggle('sm-planes-off', !planesOn);
+        labelsBtn.classList.toggle('active', planesOn && adsbLabelsControl ? adsbLabelsControl.labelsVisible : false);
+    }
+    overlayGroup.appendChild(makeOverlayBtn(PLANE_SVG, '8px', 'PLANES', () => adsbControl ? adsbControl.visible : false, () => { adsbToggle(); syncLabelsBtn(); }, true));
+    overlayGroup.appendChild(labelsBtn);
+    labelsBtn.addEventListener('click', syncLabelsBtn);
+    syncLabelsBtn();
+    panel.appendChild(overlayGroup);
+
+    const clearGroup = makeGroup();
+    clearGroup.appendChild(makeOverlayBtn('✕', '14px', 'CLEAR ALL', () => clearControl ? clearControl.cleared : false, () => { if (clearControl) clearControl.toggle(); }));
+    panel.appendChild(clearGroup);
+
+    document.body.appendChild(panel);
+})();
+
+// Helper: fly to user's geolocation (uses rangeRingCenter which is kept live)
+function goToUserLocation() {
+    if (rangeRingCenter) {
+        map.flyTo({ center: rangeRingCenter, zoom: 10 });
+    } else if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+            map.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 10 });
+        });
+    }
+}
+// --- End Side Menu ---
 
 
 let userMarker;

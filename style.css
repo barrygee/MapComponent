@@ -363,3 +363,187 @@ html {
     font-weight: 600 !important;
     transition: opacity 0.2s, color 0.2s !important;
 }
+
+
+/* ============================================================
+   SIDE MENU
+   ============================================================ */
+
+/*
+   Layout: a column of "groups". Each group is a div with class .sm-group.
+   Groups are separated by 4px gap. Each button carries its own border.
+*/
+
+#side-menu {
+    position: fixed;
+    top: 80px;
+    right: 14px;
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+}
+
+/* Each group: transparent bg, no borders */
+.sm-group {
+    background: transparent;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 4px;
+    /* minimised width matches expanded nav button width */
+    width: calc((148px - 8px) / 3);
+    transition: width 0.2s ease;
+}
+
+#side-menu.expanded .sm-group {
+    width: 148px;
+}
+
+/* In expanded mode the zoom/location group rows horizontally */
+#side-menu.expanded #sm-group-nav {
+    flex-direction: row;
+    gap: 4px;
+    background: transparent;
+    border-color: transparent;
+}
+
+#side-menu.expanded .sm-nav-btn {
+    flex: 1;
+    width: auto;
+}
+
+/* toggle group keeps its width in expanded mode */
+#side-menu.expanded #sm-group-toggle {
+    gap: 0;
+    width: calc((148px - 8px) / 3);
+}
+
+/* ---- Toggle button (its own group) ---- */
+#side-menu-toggle {
+    width: 100%;
+    height: 36px;
+    background: #000;
+    border: none;
+    color: rgba(255,255,255,0.35);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, background 0.2s;
+}
+
+#side-menu-toggle:hover {
+    background: #111;
+    color: rgba(255,255,255,0.75);
+}
+
+/* ---- Zoom + location buttons ---- */
+.sm-nav-btn {
+    flex: none;
+    width: 100%;
+    height: 36px;
+    background: #000;
+    border: none;
+    color: rgba(255,255,255,0.6);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 18px;
+    font-weight: 300;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+}
+
+.sm-nav-btn:hover {
+    background: #111;
+    color: #fff;
+}
+
+/* ---- Overlay toggle buttons ---- */
+.sm-btn {
+    width: 100%;
+    height: 36px;
+    background: #000;
+    border: none;
+    color: #fff;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, opacity 0.2s, color 0.2s;
+    opacity: 0.3;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    padding: 0;
+}
+
+.sm-btn:hover {
+    background: #111;
+}
+
+.sm-btn.active {
+    opacity: 1;
+    color: rgba(200, 255, 0, 0.75);
+}
+
+.sm-btn.sm-planes-off {
+    opacity: 0.1;
+    pointer-events: none;
+}
+
+/* Icon span: visible in minimised, hidden in expanded */
+.sm-btn .sm-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 29px;
+    flex-shrink: 0;
+}
+
+.sm-btn .sm-icon svg {
+    display: block;
+    flex-shrink: 0;
+    width: auto;
+    height: 15px;
+}
+
+/* Label span: hidden in minimised, visible in expanded */
+.sm-btn .sm-label {
+    display: none;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+}
+
+#side-menu.expanded .sm-btn {
+    justify-content: flex-start;
+    padding: 0 14px;
+}
+
+#side-menu.expanded .sm-btn .sm-icon {
+    display: none;
+}
+
+#side-menu.expanded .sm-btn .sm-label {
+    display: flex;
+}
+
+/* Buttons that only appear in the expanded menu */
+.sm-btn.sm-expanded-only {
+    display: none;
+}
+#side-menu.expanded .sm-btn.sm-expanded-only {
+    display: flex;
+}
+
