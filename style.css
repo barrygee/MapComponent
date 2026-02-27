@@ -264,7 +264,7 @@ html {
     transform: translateX(-50%);
     width: max-content;
     max-width: calc(100vw - 28px);
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.9);
     color: #fff;
     font-family: 'Barlow Condensed', 'Barlow', sans-serif;
     font-size: 15px;
