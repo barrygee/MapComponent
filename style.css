@@ -377,6 +377,14 @@ html {
     font-weight: 600;
 }
 
+@media (min-width: 601px) and (max-width: 1024px) {
+    .adsb-sb-fields {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0 20px;
+    }
+}
+
 @media (max-width: 600px) {
     #adsb-status-bar {
         left: 0;
@@ -390,7 +398,7 @@ html {
 
     .adsb-sb-fields {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: repeat(3, 1fr);
         gap: 0 16px;
     }
 
