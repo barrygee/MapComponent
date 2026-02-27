@@ -726,30 +726,30 @@ let airportsControl = new AirportsToggleControl();
 const RAF_DATA = {
     type: 'FeatureCollection',
     features: [
-        { type: 'Feature', properties: { icao: 'EGUB', name: 'RAF Benson'        }, geometry: { type: 'Point', coordinates: [ -1.0972,  51.6164] } },
-        { type: 'Feature', properties: { icao: 'EGIZ', name: 'RAF Boulmer'       }, geometry: { type: 'Point', coordinates: [ -1.6061,  55.4222] } },
-        { type: 'Feature', properties: { icao: 'EGVN', name: 'RAF Brize Norton'  }, geometry: { type: 'Point', coordinates: [ -1.5836,  51.7500] } },
-        { type: 'Feature', properties: { icao: 'EGXC', name: 'RAF Coningsby'     }, geometry: { type: 'Point', coordinates: [ -0.1664,  53.0930] } },
-        { type: 'Feature', properties: { icao: 'EGSC', name: 'RAF Cosford'       }, geometry: { type: 'Point', coordinates: [ -2.3056,  52.6403] } },
-        { type: 'Feature', properties: { icao: 'EGYC', name: 'RAF Cranwell'      }, geometry: { type: 'Point', coordinates: [ -0.4833,  53.0303] } },
-        { type: 'Feature', properties: { icao: '',     name: 'RAF Fylingdales'   }, geometry: { type: 'Point', coordinates: [ -0.6706,  54.3606] } },
-        { type: 'Feature', properties: { icao: 'EGXH', name: 'RAF Honington'     }, geometry: { type: 'Point', coordinates: [  0.7731,  52.3425] } },
-        { type: 'Feature', properties: { icao: 'EGGE', name: 'RAF Leeming'       }, geometry: { type: 'Point', coordinates: [ -1.5353,  54.2992] } },
-        { type: 'Feature', properties: { icao: 'EGQL', name: 'RAF Lossiemouth'   }, geometry: { type: 'Point', coordinates: [ -3.3392,  57.7053] } },
-        { type: 'Feature', properties: { icao: 'EGYM', name: 'RAF Marham'        }, geometry: { type: 'Point', coordinates: [  0.5506,  52.6481] } },
-        { type: 'Feature', properties: { icao: 'EGWU', name: 'RAF Northolt'      }, geometry: { type: 'Point', coordinates: [ -0.4183,  51.5530] } },
-        { type: 'Feature', properties: { icao: 'EGVO', name: 'RAF Odiham'        }, geometry: { type: 'Point', coordinates: [ -1.0036,  51.2341] } },
-        { type: 'Feature', properties: { icao: 'EGOS', name: 'RAF Shawbury'      }, geometry: { type: 'Point', coordinates: [ -2.6650,  52.7983] } },
-        { type: 'Feature', properties: { icao: 'EGOM', name: 'RAF Spadeadam'     }, geometry: { type: 'Point', coordinates: [ -2.5467,  54.9003] } },
-        { type: 'Feature', properties: { icao: 'EGOV', name: 'RAF Valley'        }, geometry: { type: 'Point', coordinates: [ -4.5353,  53.2481] } },
-        { type: 'Feature', properties: { icao: 'EGXW', name: 'RAF Waddington'    }, geometry: { type: 'Point', coordinates: [ -0.5228,  53.1664] } },
-        { type: 'Feature', properties: { icao: 'EGXT', name: 'RAF Wittering'     }, geometry: { type: 'Point', coordinates: [ -0.4767,  52.6128] } },
-        { type: 'Feature', properties: { icao: 'EGOW', name: 'RAF Woodvale'      }, geometry: { type: 'Point', coordinates: [ -3.0517,  53.5811] } },
-        { type: 'Feature', properties: { icao: 'EGUY', name: 'RAF Wyton'         }, geometry: { type: 'Point', coordinates: [ -0.1097,  52.3572] } },
-        { type: 'Feature', properties: { icao: 'EGUY', name: 'RAF Alconbury'     }, geometry: { type: 'Point', coordinates: [ -0.0781,  52.3636] } },
-        { type: 'Feature', properties: { icao: 'EGVA', name: 'RAF Fairford'      }, geometry: { type: 'Point', coordinates: [ -1.7900,  51.6822] } },
-        { type: 'Feature', properties: { icao: 'EGUL', name: 'RAF Lakenheath'    }, geometry: { type: 'Point', coordinates: [  0.5611,  52.4094] } },
-        { type: 'Feature', properties: { icao: 'EGUN', name: 'RAF Mildenhall'    }, geometry: { type: 'Point', coordinates: [  0.4864,  52.3619] } },
+        { type: 'Feature', properties: { icao: 'EGUB', name: 'RAF Benson',       bounds: [-1.1200, 51.6020, -1.0720, 51.6300] }, geometry: { type: 'Point', coordinates: [ -1.0972,  51.6164] } },
+        { type: 'Feature', properties: { icao: 'EGIZ', name: 'RAF Boulmer',      bounds: [-1.6300, 55.4100, -1.5820, 55.4350] }, geometry: { type: 'Point', coordinates: [ -1.6061,  55.4222] } },
+        { type: 'Feature', properties: { icao: 'EGVN', name: 'RAF Brize Norton', bounds: [-1.6280, 51.7250, -1.5400, 51.7750] }, geometry: { type: 'Point', coordinates: [ -1.5836,  51.7500] } },
+        { type: 'Feature', properties: { icao: 'EGXC', name: 'RAF Coningsby',    bounds: [-0.2100, 53.0700, -0.1200, 53.1160] }, geometry: { type: 'Point', coordinates: [ -0.1664,  53.0930] } },
+        { type: 'Feature', properties: { icao: 'EGSC', name: 'RAF Cosford',      bounds: [-2.3300, 52.6250, -2.2800, 52.6550] }, geometry: { type: 'Point', coordinates: [ -2.3056,  52.6403] } },
+        { type: 'Feature', properties: { icao: 'EGYC', name: 'RAF Cranwell',     bounds: [-0.5300, 53.0100, -0.4350, 53.0500] }, geometry: { type: 'Point', coordinates: [ -0.4833,  53.0303] } },
+        { type: 'Feature', properties: { icao: '',     name: 'RAF Fylingdales',  bounds: [-0.7000, 54.3450, -0.6400, 54.3750] }, geometry: { type: 'Point', coordinates: [ -0.6706,  54.3606] } },
+        { type: 'Feature', properties: { icao: 'EGXH', name: 'RAF Honington',    bounds: [  0.7400, 52.3250,  0.8050, 52.3600] }, geometry: { type: 'Point', coordinates: [  0.7731,  52.3425] } },
+        { type: 'Feature', properties: { icao: 'EGGE', name: 'RAF Leeming',      bounds: [-1.5750, 54.2750, -1.4950, 54.3250] }, geometry: { type: 'Point', coordinates: [ -1.5353,  54.2992] } },
+        { type: 'Feature', properties: { icao: 'EGQL', name: 'RAF Lossiemouth',  bounds: [-3.4000, 57.6800, -3.2800, 57.7300] }, geometry: { type: 'Point', coordinates: [ -3.3392,  57.7053] } },
+        { type: 'Feature', properties: { icao: 'EGYM', name: 'RAF Marham',       bounds: [  0.5100, 52.6250,  0.5900, 52.6700] }, geometry: { type: 'Point', coordinates: [  0.5506,  52.6481] } },
+        { type: 'Feature', properties: { icao: 'EGWU', name: 'RAF Northolt',     bounds: [-0.4550, 51.5350, -0.3820, 51.5700] }, geometry: { type: 'Point', coordinates: [ -0.4183,  51.5530] } },
+        { type: 'Feature', properties: { icao: 'EGVO', name: 'RAF Odiham',       bounds: [-1.0350, 51.2150, -0.9720, 51.2530] }, geometry: { type: 'Point', coordinates: [ -1.0036,  51.2341] } },
+        { type: 'Feature', properties: { icao: 'EGOS', name: 'RAF Shawbury',     bounds: [-2.6950, 52.7800, -2.6350, 52.8150] }, geometry: { type: 'Point', coordinates: [ -2.6650,  52.7983] } },
+        { type: 'Feature', properties: { icao: 'EGOM', name: 'RAF Spadeadam',    bounds: [-2.6000, 54.8750, -2.4950, 54.9250] }, geometry: { type: 'Point', coordinates: [ -2.5467,  54.9003] } },
+        { type: 'Feature', properties: { icao: 'EGOV', name: 'RAF Valley',       bounds: [-4.5750, 53.2250, -4.4950, 53.2700] }, geometry: { type: 'Point', coordinates: [ -4.5353,  53.2481] } },
+        { type: 'Feature', properties: { icao: 'EGXW', name: 'RAF Waddington',   bounds: [-0.5600, 53.1450, -0.4850, 53.1880] }, geometry: { type: 'Point', coordinates: [ -0.5228,  53.1664] } },
+        { type: 'Feature', properties: { icao: 'EGXT', name: 'RAF Wittering',    bounds: [-0.5100, 52.5900, -0.4450, 52.6350] }, geometry: { type: 'Point', coordinates: [ -0.4767,  52.6128] } },
+        { type: 'Feature', properties: { icao: 'EGOW', name: 'RAF Woodvale',     bounds: [-3.0800, 53.5650, -3.0250, 53.5980] }, geometry: { type: 'Point', coordinates: [ -3.0517,  53.5811] } },
+        { type: 'Feature', properties: { icao: 'EGUY', name: 'RAF Wyton',        bounds: [-0.1400, 52.3400, -0.0800, 52.3750] }, geometry: { type: 'Point', coordinates: [ -0.1097,  52.3572] } },
+        { type: 'Feature', properties: { icao: 'EGUY', name: 'RAF Alconbury',    bounds: [-0.1100, 52.3450, -0.0480, 52.3800] }, geometry: { type: 'Point', coordinates: [ -0.0781,  52.3636] } },
+        { type: 'Feature', properties: { icao: 'EGVA', name: 'RAF Fairford',     bounds: [-1.8300, 51.6600, -1.7500, 51.7050] }, geometry: { type: 'Point', coordinates: [ -1.7900,  51.6822] } },
+        { type: 'Feature', properties: { icao: 'EGUL', name: 'RAF Lakenheath',   bounds: [  0.5250, 52.3900,  0.5950, 52.4300] }, geometry: { type: 'Point', coordinates: [  0.5611,  52.4094] } },
+        { type: 'Feature', properties: { icao: 'EGUN', name: 'RAF Mildenhall',   bounds: [  0.4550, 52.3400,  0.5180, 52.3850] }, geometry: { type: 'Point', coordinates: [  0.4864,  52.3619] } },
     ]
 };
 
@@ -831,18 +831,111 @@ class RAFToggleControl {
         // Create HTML label markers once — they survive style changes as DOM nodes
         if (!this._markers) {
             this._markers = RAF_DATA.features.map(f => {
+                const p = f.properties;
+
                 const el = document.createElement('div');
-                el.style.cssText = 'color:#ffffff;font-family:monospace;font-size:10px;line-height:1.4;pointer-events:none;white-space:nowrap;';
-                const hasIcao = f.properties.icao !== '';
-                el.innerHTML = hasIcao
-                    ? `${f.properties.icao}<br>${f.properties.name}`
-                    : f.properties.name;
-                const offset = hasIcao ? [8, 7] : [8, 0];
-                return new maplibregl.Marker({ element: el, anchor: 'left', offset })
+                el.style.cssText = [
+                    'padding:6px 16px 6px 0',
+                    'cursor:pointer',
+                    'pointer-events:auto',
+                    'user-select:none',
+                ].join(';');
+
+                const label = document.createElement('div');
+                label.style.cssText = [
+                    'color:#ffffff',
+                    "font-family:'Barlow Condensed','Barlow',monospace",
+                    'font-size:10px',
+                    'font-weight:700',
+                    'letter-spacing:.08em',
+                    'line-height:1.5',
+                    'white-space:nowrap',
+                    'pointer-events:none',
+                ].join(';');
+                label.innerHTML = p.icao
+                    ? `<span style="color:#c8ff00">${p.icao}</span><br><span style="opacity:0.7;font-weight:400">${p.name.toUpperCase()}</span>`
+                    : `<span style="opacity:0.7;font-weight:400">${p.name.toUpperCase()}</span>`;
+                el.appendChild(label);
+
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const b = p.bounds;
+                    const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right');
+                    const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
+                    const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
+                    const pad = 80;
+                    const topExtra = Math.max(0, ctrlH / 2 - pad);
+                    this.map.fitBounds(
+                        [[b[0], b[1]], [b[2], b[3]]],
+                        {
+                            padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW },
+                            maxZoom: 13,
+                            duration: 800,
+                        }
+                    );
+                    this._showRAFPanel(p, f.geometry.coordinates);
+                });
+
+                let freqPanel = null;
+                el.addEventListener('mouseenter', () => {
+                    if (!freqPanel) {
+                        freqPanel = document.createElement('div');
+                        freqPanel.style.cssText = 'pointer-events:none;margin-top:4px;';
+                        freqPanel.innerHTML = `<div style="display:inline-block;background:rgba(0,0,0,0.7);color:#fff;` +
+                            `font-family:'Barlow Condensed','Barlow',sans-serif;font-size:12px;font-weight:400;` +
+                            `padding:5px 12px 7px;white-space:nowrap;user-select:none">` +
+                            `<span style="opacity:0.5;letter-spacing:.05em">CLICK TO ZOOM</span></div>`;
+                        el.appendChild(freqPanel);
+                    }
+                });
+                el.addEventListener('mouseleave', () => {
+                    if (freqPanel) { freqPanel.remove(); freqPanel = null; }
+                });
+
+                return new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [8, -6] })
                     .setLngLat(f.geometry.coordinates);
             });
             if (this.visible) this._markers.forEach(m => m.addTo(this.map));
         }
+    }
+
+    _buildRAFPanelHTML(p, coords) {
+        const lat = coords[1].toFixed(4);
+        const lng = coords[0].toFixed(4);
+        const fields = [
+            ['ICAO', p.icao || '—'],
+            ['LAT',  lat],
+            ['LON',  lng],
+        ];
+        const fieldsHTML = fields.map(([lbl, val]) =>
+            `<div class="adsb-sb-field">` +
+            `<span class="adsb-sb-label">${lbl}</span>` +
+            `<span class="adsb-sb-value">${val}</span>` +
+            `</div>`
+        ).join('');
+        return `<div class="adsb-sb-header">` +
+            `<span class="adsb-sb-callsign" style="color:#ffffff">${p.name.toUpperCase()}</span>` +
+            `<button class="adsb-sb-untrack-btn" id="apt-panel-close">CLOSE</button>` +
+            `</div>` +
+            `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
+    }
+
+    _showRAFPanel(p, coords) {
+        let bar = document.getElementById('adsb-status-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'adsb-status-bar';
+            document.body.appendChild(bar);
+        }
+        bar.dataset.apt = '1';
+        bar.innerHTML = this._buildRAFPanelHTML(p, coords);
+        bar.classList.add('adsb-sb-visible');
+        bar.querySelector('#apt-panel-close').addEventListener('click', (e) => {
+            e.stopPropagation();
+            bar.classList.remove('adsb-sb-visible');
+            delete bar.dataset.apt;
+            this.map.flyTo({ center: [-4.4815, 54.1453], zoom: 6, duration: 800 });
+        });
     }
 
     toggle() {
