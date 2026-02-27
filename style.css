@@ -236,20 +236,42 @@ html {
 /* ============================================================
    USER LOCATION MARKER
    ============================================================ */
+
+/* Circle draws on via stroke-dashoffset */
+@keyframes marker-circle-draw {
+    to { stroke-dashoffset: 0; }
+}
+
+/* Dot intro pulse: white → green → white (used on first appearance) */
 @keyframes marker-dot-pulse {
-    0%   { fill: white; }
-    50%  { fill: #c8ff00; }
-    100% { fill: white; }
+    0%   { opacity: 1; fill: white; }
+    50%  { opacity: 1; fill: #c8ff00; }
+    100% { opacity: 1; fill: white; }
 }
 
-@keyframes marker-bg-pulse {
-    0%   { fill-opacity: 0; }
-    50%  { fill-opacity: 0.18; }
-    100% { fill-opacity: 0; }
+/* Dot end pulse: dips near-transparent each cycle, ends fully opaque white */
+@keyframes marker-dot-end-pulse {
+    0%   { opacity: 1;    fill: white; }
+    40%  { opacity: 0.08; fill: white; }
+    100% { opacity: 1;    fill: white; }
 }
 
-.user-location-marker:hover .marker-bg {
-    animation: marker-bg-pulse 0.4s ease-in-out 2;
+/* Coord background slides in left→right via clip-path */
+@keyframes marker-coord-bg-in {
+    from { clip-path: inset(0 100% 0 0); }
+    to   { clip-path: inset(0 0% 0 0); }
+}
+
+/* Coord background slides out right→left (right inset grows) */
+@keyframes marker-coord-bg-out {
+    from { clip-path: inset(0 0% 0 0); }
+    to   { clip-path: inset(0 100% 0 0); }
+}
+
+.user-location-marker {
+    cursor: pointer;
+    position: relative;
+    z-index: 9999;
 }
 
 

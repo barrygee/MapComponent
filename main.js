@@ -2747,46 +2747,196 @@ function createMarkerElement(longitude, latitude) {
     el.style.width = '60px';
     el.style.height = '60px';
     el.style.overflow = 'visible';
-    const latText = latitude !== undefined ? latitude.toFixed(3) : '';
-    const lonText = longitude !== undefined ? longitude.toFixed(3) : '';
+    el.style.position = 'relative';
+    el.style.zIndex = '9999';
     el.classList.add('user-location-marker');
-    el.innerHTML = `<svg viewBox="0 0 110 60" width="110" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-        <circle class="marker-bg" cx="30" cy="30" r="13" fill="#c8ff00" fill-opacity="0"/>
-        <circle class="marker-corner" cx="30" cy="30" r="13" fill="none" stroke="#c8ff00" stroke-width="1.8"/>
-        <circle class="marker-dot" cx="30" cy="30" r="3.5" fill="white" opacity="0"/>
-        <text x="52" y="28" fill="white" font-size="7.5" font-family="monospace" class="marker-lat"></text>
-        <text x="52" y="38" fill="white" font-size="7.5" font-family="monospace" class="marker-lon"></text>
+
+    // Circle circumference for stroke-dasharray draw-on animation
+    const R = 13;
+    const CIRC = +(2 * Math.PI * R).toFixed(2); // ~81.68
+
+    const CY = 30;
+    const BG_RIGHT = 116;
+    // Background capped exactly to circle height (cy=30, r=13 → y=17 to y=43)
+    const BG_Y1 = CY - R; // 17
+    const BG_Y2 = CY + R; // 43
+    // At top/bottom tangent points arcX = CY (sqrt(r²-r²) = 0)
+    const arcX1 = CY;
+    const arcX2 = CY;
+
+    el.innerHTML = `<svg viewBox="0 0 120 60" width="120" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <!-- Coord background: left edge is concave arc matching circle, capped at circle top/bottom -->
+        <path class="marker-coord-bg"
+              d="M ${arcX1},${BG_Y1} A ${R},${R} 0 0,1 ${CY + R},${CY} A ${R},${R} 0 0,1 ${arcX2},${BG_Y2} L ${BG_RIGHT},${BG_Y2} L ${BG_RIGHT},${BG_Y1} Z"
+              fill="black" opacity="0.75"
+              style="clip-path:inset(0 100% 0 0)"/>
+        <!-- Outer circle draws on -->
+        <circle class="marker-ring" cx="${CY}" cy="${CY}" r="${R}" fill="none" stroke="#c8ff00" stroke-width="1.8"
+                stroke-dasharray="${CIRC}" stroke-dashoffset="${CIRC}"/>
+        <!-- Centre dot -->
+        <circle class="marker-dot" cx="${CY}" cy="${CY}" r="3.5" fill="white" opacity="0"/>
+        <!-- Coordinates: centred vertically within the 26px panel (y17→43), baselines at 26 and 39 -->
+        <text x="52" y="26" fill="white" font-size="7.5" font-family="monospace">
+            <tspan class="marker-lat-label" fill="#c8ff00" font-size="6"></tspan><tspan class="marker-lat"></tspan>
+        </text>
+        <text x="52" y="39" fill="white" font-size="7.5" font-family="monospace">
+            <tspan class="marker-lon-label" fill="#c8ff00" font-size="6"></tspan><tspan class="marker-lon"></tspan>
+        </text>
     </svg>`;
 
-    const circle  = el.querySelector('.marker-corner');
-    const bg      = el.querySelector('.marker-bg');
-    const dot     = el.querySelector('.marker-dot');
-    const latEl   = el.querySelector('.marker-lat');
-    const lonEl   = el.querySelector('.marker-lon');
+    const ring        = el.querySelector('.marker-ring');
+    const dot         = el.querySelector('.marker-dot');
+    const coordBg     = el.querySelector('.marker-coord-bg');
+    const latLabelEl  = el.querySelector('.marker-lat-label');
+    const lonLabelEl  = el.querySelector('.marker-lon-label');
+    const latEl       = el.querySelector('.marker-lat');
+    const lonEl       = el.querySelector('.marker-lon');
 
-    // Circle fades in
-    circle.style.opacity = '0';
-    circle.style.animation = 'logo-dot-in 0.22s ease-out 0s forwards';
-    // Background pulses twice after circle appears
-    bg.style.animation = 'logo-bg-pulse 0.4s ease-in-out 0.28s 2 both';
-    // Dot fades in
-    dot.style.animation = 'logo-dot-in 0.15s ease-out 0.22s forwards';
+    const LAT_LABEL = 'LAT ';
+    const LON_LABEL = 'LON ';
 
-    // Coordinates type in after draw + pulse sequence.
-    // animDone gates setUserLocation updates until the animation finishes.
-    el.dataset.animDone = '0';
-    let i = 0, j = 0;
-    function step() {
-        let more = false;
-        if (i < latText.length) { latEl.textContent = latText.slice(0, ++i); more = true; }
-        if (j < lonText.length) { lonEl.textContent = lonText.slice(0, ++j); more = true; }
-        if (more) {
-            setTimeout(step, 75);
-        } else {
-            el.dataset.animDone = '1';
-        }
+    // Timers so we can cancel on re-trigger
+    let timers = [];
+    const after = (ms, fn) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
+
+    function cancelAll() {
+        timers.forEach(clearTimeout);
+        timers = [];
     }
-    setTimeout(step, 1250);
+
+    function playCoordSequence(latText, lonText) {
+        // 1. Slide coord background in
+        coordBg.style.animation = 'none';
+        coordBg.offsetWidth; // reflow
+        coordBg.style.animation = 'marker-coord-bg-in 0.3s ease-out forwards';
+
+        // 2. Type label then value on each line in parallel
+        // Each line: type LAT_LABEL chars, then latText chars sequentially
+        latLabelEl.textContent = '';
+        lonLabelEl.textContent = '';
+        latEl.textContent = '';
+        lonEl.textContent = '';
+
+        // Build full strings per line: label + value
+        const latFull = LAT_LABEL + latText;
+        const lonFull = LON_LABEL + lonText;
+        let i = 0, j = 0;
+
+        function typeStep() {
+            let more = false;
+            if (i < latFull.length) {
+                const ch = latFull.slice(0, ++i);
+                latLabelEl.textContent = ch.slice(0, Math.min(i, LAT_LABEL.length));
+                latEl.textContent      = ch.slice(LAT_LABEL.length);
+                more = true;
+            }
+            if (j < lonFull.length) {
+                const ch = lonFull.slice(0, ++j);
+                lonLabelEl.textContent = ch.slice(0, Math.min(j, LON_LABEL.length));
+                lonEl.textContent      = ch.slice(LON_LABEL.length);
+                more = true;
+            }
+            if (more) after(65, typeStep);
+            else scheduleHideCoords(latFull, lonFull);
+        }
+        after(300, typeStep);
+    }
+
+    function scheduleHideCoords(latFull, lonFull) {
+        // Hold 3 seconds then reverse
+        after(3000, () => {
+            // Erase character by character right-to-left (value first, then label)
+            let i = latFull.length, j = lonFull.length;
+            function eraseStep() {
+                let more = false;
+                if (i > 0) {
+                    const ch = latFull.slice(0, --i);
+                    latLabelEl.textContent = ch.slice(0, Math.min(i, LAT_LABEL.length));
+                    latEl.textContent      = ch.slice(LAT_LABEL.length);
+                    more = true;
+                }
+                if (j > 0) {
+                    const ch = lonFull.slice(0, --j);
+                    lonLabelEl.textContent = ch.slice(0, Math.min(j, LON_LABEL.length));
+                    lonEl.textContent      = ch.slice(LON_LABEL.length);
+                    more = true;
+                }
+                if (more) {
+                    after(45, eraseStep);
+                } else {
+                    // All text erased — slide background out right→left
+                    coordBg.style.animation = 'none';
+                    coordBg.offsetWidth;
+                    coordBg.style.animation = 'marker-coord-bg-out 0.3s ease-in forwards';
+                    // After bg gone, pulse dot 3× fast (dips transparent, ends opaque)
+                    after(300, () => {
+                        dot.style.animation = 'none';
+                        dot.offsetWidth;
+                        dot.style.animation = 'marker-dot-end-pulse 0.18s ease-in-out 3 forwards';
+                        after(540, () => { el.dataset.animDone = '1'; });
+                    });
+                }
+            }
+            eraseStep();
+        });
+    }
+
+    function runIntroAnimation() {
+        cancelAll();
+        el.dataset.animDone = '0';
+
+        const latText = longitude !== undefined ? latitude.toFixed(3) : '';
+        const lonText = longitude !== undefined ? longitude.toFixed(3) : '';
+
+        // Reset states
+        ring.style.strokeDashoffset = String(CIRC);
+        ring.style.animation = 'none';
+        dot.style.opacity = '0';
+        dot.style.animation = 'none';
+        dot.style.fill = 'white';
+        coordBg.style.animation = 'none';
+        coordBg.style.clipPath = 'inset(0 100% 0 0)';
+        latLabelEl.textContent = '';
+        lonLabelEl.textContent = '';
+        latEl.textContent = '';
+        lonEl.textContent = '';
+
+        // Step 1: draw circle on (0.5s)
+        after(20, () => {
+            ring.style.animation = `marker-circle-draw 0.5s ease-out forwards`;
+        });
+
+        // Step 2: dot pulses twice (starts at 0.55s, 2× 0.2s = 0.4s)
+        after(550, () => {
+            dot.style.opacity = '1';
+            dot.style.animation = 'marker-dot-pulse 0.2s ease-in-out 2 forwards';
+        });
+
+        // Step 3: coord background + typing (starts at 0.55 + 0.4 = 0.95s)
+        after(950, () => playCoordSequence(latText, lonText));
+    }
+
+    // Store live coords on element for click handler
+    el.dataset.lat = latitude !== undefined ? latitude.toFixed(3) : '';
+    el.dataset.lon = longitude !== undefined ? longitude.toFixed(3) : '';
+
+    // Click replays the coord sequence using current stored coords
+    el.addEventListener('click', () => {
+        const latText = el.dataset.lat || '';
+        const lonText = el.dataset.lon || '';
+        cancelAll();
+        // Reset coord area
+        coordBg.style.animation = 'none';
+        coordBg.offsetWidth;
+        coordBg.style.clipPath = 'inset(0 100% 0 0)';
+        latLabelEl.textContent = '';
+        lonLabelEl.textContent = '';
+        latEl.textContent = '';
+        lonEl.textContent = '';
+        playCoordSequence(latText, lonText);
+    });
+
+    runIntroAnimation();
 
     return el;
 }
@@ -2798,9 +2948,13 @@ function setUserLocation(position) {
     if (userMarker) {
         userMarker.setLngLat([longitude, latitude]);
         const el = userMarker.getElement();
-        const latEl = el.querySelector('.marker-lat');
-        const lonEl = el.querySelector('.marker-lon');
+        // Always keep live coords up to date for click replay
+        el.dataset.lat = latitude.toFixed(3);
+        el.dataset.lon = longitude.toFixed(3);
+        // Update displayed text only after intro animation finishes
         if (el.dataset.animDone === '1') {
+            const latEl = el.querySelector('.marker-lat');
+            const lonEl = el.querySelector('.marker-lon');
             if (latEl) latEl.textContent = latitude.toFixed(3);
             if (lonEl) lonEl.textContent = longitude.toFixed(3);
         }
