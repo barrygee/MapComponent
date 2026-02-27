@@ -2581,6 +2581,7 @@ map.addControl(clearControl, 'top-right');
         const btn = document.createElement('button');
         btn.className = 'sm-nav-btn';
         btn.title = title;
+        btn.dataset.tooltip = title;
         if (isHTML) btn.innerHTML = content;
         else btn.textContent = content;
         btn.addEventListener('click', onClick);
@@ -2593,6 +2594,7 @@ map.addControl(clearControl, 'top-right');
     function makeOverlayBtn(icon, iconFontSize, label, getActive, doToggle, isHTML) {
         const btn = document.createElement('button');
         btn.className = 'sm-btn';
+        btn.dataset.tooltip = label;
 
         const iconSpan = document.createElement('span');
         iconSpan.className = 'sm-icon';
@@ -2621,6 +2623,7 @@ map.addControl(clearControl, 'top-right');
     toggleBtn.id = 'side-menu-toggle';
     toggleBtn.textContent = '‹';
     toggleBtn.title = 'Expand / collapse menu';
+    toggleBtn.dataset.tooltip = 'EXPAND MENU';
     toggleBtn.addEventListener('click', () => {
         expanded = !expanded;
         panel.classList.toggle('expanded', expanded);
