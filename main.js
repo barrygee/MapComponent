@@ -1712,9 +1712,10 @@ class AdsbLiveControl {
         const trkColor   = isTracked ? '#c8ff00' : 'rgba(255,255,255,0.3)';
         const trkBtnText = isTracked ? 'TRACKING' : 'TRACK';
         const trkBtn = `<button class="tag-follow-btn" style="` +
-            `background:none;border:none;cursor:pointer;padding:0;pointer-events:auto;` +
+            `background:none;border:none;cursor:pointer;padding:8px 12px;` +
             `color:${trkColor};font-family:'Barlow Condensed','Barlow',sans-serif;` +
-            `font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1">${trkBtnText}</button>`;
+            `font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1;` +
+            `touch-action:manipulation;-webkit-tap-highlight-color:transparent">${trkBtnText}</button>`;
 
         // When tracking, show only callsign + button — data is in the status bar below.
         if (isTracked) {
@@ -1725,9 +1726,9 @@ class AdsbLiveControl {
                 `font-family:'Barlow Condensed','Barlow',sans-serif;` +
                 `font-size:13px;font-weight:400;` +
                 `padding:1px 8px;` +
-                `pointer-events:none;white-space:nowrap;user-select:none">` +
-                `<div style="display:flex;align-items:center;gap:12px;pointer-events:auto">` +
-                `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:#fff">${callsign}</span>` +
+                `white-space:nowrap;user-select:none">` +
+                `<div style="display:flex;align-items:center;gap:12px">` +
+                `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:#fff;pointer-events:none">${callsign}</span>` +
                 `${trkBtn}</div></div>`;
         }
 
@@ -1760,12 +1761,12 @@ class AdsbLiveControl {
             `font-family:'Barlow Condensed','Barlow',sans-serif;` +
             `font-size:14px;font-weight:400;` +
             `padding:6px 14px 9px;` +
-            `pointer-events:none;white-space:nowrap;user-select:none">` +
+            `white-space:nowrap;user-select:none">` +
             `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;` +
             `font-weight:600;font-size:15px;letter-spacing:.12em;` +
             `margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
-            `<span style="font-size:13px;font-weight:400">${callsign}</span>${trkBtn}</div>` +
-            rowsHTML + `</div>`;
+            `<span style="font-size:13px;font-weight:400;pointer-events:none">${callsign}</span>${trkBtn}</div>` +
+            `<div style="pointer-events:none">` + rowsHTML + `</div></div>`;
     }
 
     _buildStatusBarHTML(props) {
@@ -1871,6 +1872,11 @@ class AdsbLiveControl {
         const btn = el.querySelector('.tag-follow-btn');
         if (!btn) return;
 
+        // MapLibre calls e.preventDefault() on every mousedown on the marker element,
+        // which suppresses the subsequent click event. Stop propagation from the button
+        // so MapLibre's mousedown handler never sees presses originating here.
+        btn.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+
         // Hover over the whole label: swap TRACKING ↔ UNTRACK
         if (btn.textContent === 'TRACKING') {
             el.addEventListener('mouseenter', () => { btn.textContent = 'UNTRACK'; });
@@ -1884,7 +1890,7 @@ class AdsbLiveControl {
             // Re-create the marker so the anchor updates (top-left for data box, left for tracking).
             if (this._tagHex) {
                 const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
-                if (f) {
+                    if (f) {
                     const coords = this._interpolatedCoords(this._tagHex) || f.geometry.coordinates;
                     const newEl = document.createElement('div');
                     newEl.innerHTML = this._buildTagHTML(f.properties);
