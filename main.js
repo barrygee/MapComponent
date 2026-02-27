@@ -2549,6 +2549,9 @@ map.addControl(clearControl, 'top-right');
 // maplibre container is hidden. The side menu calls through to the controls'
 // own toggle methods and mirrors their active state.
 
+// Callback set by the side-menu IIFE to activate the location button.
+let _onGoToUserLocation = null;
+
 (function buildSideMenu() {
     // Hide the maplibre ctrl-top-right container (controls still manage their layers).
     function hideCtrlContainers() {
@@ -2572,7 +2575,7 @@ map.addControl(clearControl, 'top-right');
     }
 
     // ---- Helper: nav button (zoom / location) ----
-    const LOC_SVG = `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>`;
+    const LOC_SVG = `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="7.5" stroke="#c8ff00" stroke-width="1.8"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>`;
     // SVG replicates the canvas marker exactly. Canvas coords: bracket x=4..60 y=4..56 arm=10,
     // triangle cx=32 cy=32 apex=(32,22) base=(25,40)+(39,40). ViewBox offset by (4,4) → 0 0 56 52.
     const PLANE_SVG = `<svg width="16" height="15" viewBox="0 0 56 52" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="28,14 40,40 28,33 16,40" fill="#ffffff" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" transform="rotate(-45 28 27)"/><polyline points="10,0 0,0 0,10" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="46,0 56,0 56,10" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="10,52 0,52 0,42" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="46,52 56,52 56,42" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/></svg>`;
@@ -2636,7 +2639,46 @@ map.addControl(clearControl, 'top-right');
     const navGroup = makeGroup('sm-group-nav');
     navGroup.appendChild(makeNavBtn('+', 'Zoom in', () => map.zoomIn()));
     navGroup.appendChild(makeNavBtn('−', 'Zoom out', () => map.zoomOut()));
-    navGroup.appendChild(makeNavBtn(LOC_SVG, 'Go to my location', goToUserLocation, true));
+    const locBtn = makeNavBtn(LOC_SVG, 'Go to my location', goToUserLocation, true);
+    navGroup.appendChild(locBtn);
+
+    // Deactivate location button when zoom drops 2+ levels from when it was activated,
+    // or when the user location marker leaves the viewport.
+    let locActiveZoom = null;
+    let locFlying = false;
+
+    function isUserLocationInView() {
+        if (!rangeRingCenter) return false;
+        const bounds = map.getBounds();
+        const [lng, lat] = rangeRingCenter;
+        return bounds.contains([lng, lat]);
+    }
+
+    function deactivateLocBtn() {
+        locBtn.classList.remove('active');
+        locActiveZoom = null;
+    }
+
+    map.on('zoom', () => {
+        if (locActiveZoom === null || locFlying) return;
+        if (map.getZoom() <= locActiveZoom - 2) deactivateLocBtn();
+    });
+
+    map.on('moveend', () => {
+        if (locFlying) {
+            locFlying = false;
+            locActiveZoom = map.getZoom();
+            return;
+        }
+        if (locActiveZoom === null) return;
+        if (!isUserLocationInView()) deactivateLocBtn();
+    });
+
+    _onGoToUserLocation = () => {
+        locBtn.classList.add('active');
+        locActiveZoom = null;
+        locFlying = true;
+    };
     panel.appendChild(navGroup);
 
     // ---- Groups 3+: overlays in original addControl order ----
@@ -2681,9 +2723,11 @@ map.addControl(clearControl, 'top-right');
 function goToUserLocation() {
     if (rangeRingCenter) {
         map.flyTo({ center: rangeRingCenter, zoom: 10 });
+        if (_onGoToUserLocation) _onGoToUserLocation();
     } else if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             map.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 10 });
+            if (_onGoToUserLocation) _onGoToUserLocation();
         });
     }
 }

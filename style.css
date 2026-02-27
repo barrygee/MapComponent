@@ -466,6 +466,11 @@ html {
     color: #fff;
 }
 
+.sm-nav-btn.active {
+    background: #111;
+    color: #c8ff00;
+}
+
 /* ---- Overlay toggle buttons ---- */
 .sm-btn {
     width: 100%;
