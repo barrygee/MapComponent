@@ -377,6 +377,28 @@ html {
     font-weight: 600;
 }
 
+@media (max-width: 600px) {
+    #adsb-status-bar {
+        left: 0;
+        right: 0;
+        transform: none;
+        width: 100%;
+        max-width: 100%;
+        padding: 10px 16px;
+        box-sizing: border-box;
+    }
+
+    .adsb-sb-fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0 16px;
+    }
+
+    .adsb-sb-field {
+        gap: 6px;
+    }
+}
+
 
 /* Font for all map control buttons */
 .maplibregl-ctrl button {

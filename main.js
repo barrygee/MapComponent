@@ -1868,7 +1868,7 @@ class AdsbLiveControl {
         });
     }
 
-    _wireTagButton(el) {
+    _wireTagButton(el, overrideHex = null) {
         const btn = el.querySelector('.tag-follow-btn');
         if (!btn) return;
 
@@ -1885,12 +1885,43 @@ class AdsbLiveControl {
 
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
+
+            // Resolve which hex to act on — overrideHex is used when clicking
+            // TRACK from the hover tag (plane not yet selected).
+            const hex = overrideHex || this._tagHex;
+            if (!hex) return;
+
+            // If clicking from the hover tag, select the plane first.
+            if (overrideHex && overrideHex !== this._selectedHex) {
+                this._selectedHex = overrideHex;
+                this._hideHoverTagNow();
+                this._applySelection();
+                // _applySelection will create the tag marker and show the selected tag.
+                // Enable tracking after the marker is created.
+                this._followEnabled = true;
+                const f = this._geojson.features.find(f => f.properties.hex === hex);
+                if (f) {
+                    this._showStatusBar(f.properties);
+                    this.map.easeTo({ center: f.geometry.coordinates, duration: 400 });
+                    // Rebuild the tag marker in tracking layout.
+                    const coords = this._interpolatedCoords(hex) || f.geometry.coordinates;
+                    const newEl = document.createElement('div');
+                    newEl.innerHTML = this._buildTagHTML(f.properties);
+                    this._wireTagButton(newEl);
+                    if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
+                    this._tagMarker = new maplibregl.Marker({ element: newEl, anchor: 'left', offset: [14, 0] })
+                        .setLngLat(coords)
+                        .addTo(this.map);
+                }
+                return;
+            }
+
             this._followEnabled = !this._followEnabled;
 
             // Re-create the marker so the anchor updates (top-left for data box, left for tracking).
             if (this._tagHex) {
                 const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
-                    if (f) {
+                if (f) {
                     const coords = this._interpolatedCoords(this._tagHex) || f.geometry.coordinates;
                     const newEl = document.createElement('div');
                     newEl.innerHTML = this._buildTagHTML(f.properties);
@@ -1950,15 +1981,14 @@ class AdsbLiveControl {
         this._hideHoverTagNow();
         const el = document.createElement('div');
         el.innerHTML = this._buildTagHTML(feature.properties);
-        // When triggered from the label, enable pointer events on the data box so
-        // the cursor moving onto it keeps the box alive (no flicker).
-        el.style.pointerEvents = fromLabel ? 'auto' : 'none';
-        if (fromLabel) {
-            el.addEventListener('mouseenter', () => {
-                if (this._hoverHideTimer) { clearTimeout(this._hoverHideTimer); this._hoverHideTimer = null; }
-            });
-            el.addEventListener('mouseleave', () => this._hideHoverTag());
-        }
+        // Always enable pointer events so the track button is clickable and
+        // moving the cursor onto the box keeps it alive.
+        el.style.pointerEvents = 'auto';
+        el.addEventListener('mouseenter', () => {
+            if (this._hoverHideTimer) { clearTimeout(this._hoverHideTimer); this._hoverHideTimer = null; }
+        });
+        el.addEventListener('mouseleave', () => this._hideHoverTag());
+        this._wireTagButton(el, hex);
         this._hoverMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -13] })
             .setLngLat(coords)
             .addTo(this.map);
