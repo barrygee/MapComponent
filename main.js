@@ -445,28 +445,38 @@ class ResetViewControl {
 // --- End home / reset view ---
 
 // --- Airports ---
+// bounds: [minLng, minLat, maxLng, maxLat] covering full runway extent
+// freqs: { tower, radar, approach, atis }
 const AIRPORTS_DATA = {
     type: 'FeatureCollection',
     features: [
-        { type: 'Feature', properties: { icao: 'EGLL', iata: 'LHR', name: 'Heathrow'              }, geometry: { type: 'Point', coordinates: [-0.4614,  51.4775] } },
-        { type: 'Feature', properties: { icao: 'EGKK', iata: 'LGW', name: 'Gatwick'               }, geometry: { type: 'Point', coordinates: [-0.1903,  51.1481] } },
-        { type: 'Feature', properties: { icao: 'EGGW', iata: 'LTN', name: 'Luton'                 }, geometry: { type: 'Point', coordinates: [-0.3683,  51.8747] } },
-        { type: 'Feature', properties: { icao: 'EGSS', iata: 'STN', name: 'Stansted'              }, geometry: { type: 'Point', coordinates: [ 0.2350,  51.8850] } },
-        { type: 'Feature', properties: { icao: 'EGCC', iata: 'MAN', name: 'Manchester'            }, geometry: { type: 'Point', coordinates: [-2.2749,  53.3650] } },
-        { type: 'Feature', properties: { icao: 'EGNT', iata: 'NCL', name: 'Newcastle'             }, geometry: { type: 'Point', coordinates: [-1.6917,  55.0375] } },
-        { type: 'Feature', properties: { icao: 'EGPF', iata: 'GLA', name: 'Glasgow'               }, geometry: { type: 'Point', coordinates: [-4.4330,  55.8719] } },
-        { type: 'Feature', properties: { icao: 'EGPH', iata: 'EDI', name: 'Edinburgh'             }, geometry: { type: 'Point', coordinates: [-3.3725,  55.9508] } },
-        { type: 'Feature', properties: { icao: 'EGGD', iata: 'BRS', name: 'Bristol'               }, geometry: { type: 'Point', coordinates: [-2.7191,  51.3827] } },
-        { type: 'Feature', properties: { icao: 'EGBB', iata: 'BHX', name: 'Birmingham'            }, geometry: { type: 'Point', coordinates: [-1.7480,  52.4539] } },
-        { type: 'Feature', properties: { icao: 'EGAC', iata: 'BHD', name: 'Belfast City'          }, geometry: { type: 'Point', coordinates: [-5.8725,  54.6181] } },
-        { type: 'Feature', properties: { icao: 'EGAA', iata: 'BFS', name: 'Aldergrove'            }, geometry: { type: 'Point', coordinates: [-6.2158,  54.6575] } },
-        { type: 'Feature', properties: { icao: 'EGNV', iata: 'MME', name: 'Teesside'              }, geometry: { type: 'Point', coordinates: [-1.4294,  54.5092] } },
-        { type: 'Feature', properties: { icao: 'EGGP', iata: 'LPL', name: 'Liverpool' }, geometry: { type: 'Point', coordinates: [-2.8497,  53.3336] } },
-        { type: 'Feature', properties: { icao: 'EGNH', iata: 'BLK', name: 'Blackpool'             }, geometry: { type: 'Point', coordinates: [-3.0286,  53.7717] } },
-        { type: 'Feature', properties: { icao: 'EGNS', iata: 'IOM', name: 'Isle of Man'}, geometry: { type: 'Point', coordinates: [-4.6239,  54.0833] } },
-        { type: 'Feature', properties: { icao: 'EGPK', iata: 'PIK', name: 'Prestwick'         }, geometry: { type: 'Point', coordinates: [-4.5869,  55.5094] } },
-        { type: 'Feature', properties: { icao: 'EGNM', iata: 'LBA', name: 'Leeds'     }, geometry: { type: 'Point', coordinates: [-1.6606,  53.8659] } },
-        { type: 'Feature', properties: { icao: 'EIDW', iata: 'DUB', name: 'Dublin'             }, geometry: { type: 'Point', coordinates: [-6.2700,  53.4213] } },
+        { type: 'Feature', properties: { icao: 'EGLL', iata: 'LHR', name: 'Heathrow',     bounds: [-0.5050, 51.4620, -0.4180, 51.4930], freqs: { tower: '118.500 / 118.700', radar: '119.725', approach: '119.725', atis: '113.750' } }, geometry: { type: 'Point', coordinates: [-0.4614, 51.4775] } },
+        { type: 'Feature', properties: { icao: 'EGKK', iata: 'LGW', name: 'Gatwick',      bounds: [-0.2250, 51.1340, -0.1560, 51.1620], freqs: { tower: '124.225', radar: '126.825', approach: '126.825', atis: '136.525' } }, geometry: { type: 'Point', coordinates: [-0.1903, 51.1481] } },
+        { type: 'Feature', properties: { icao: 'EGGW', iata: 'LTN', name: 'Luton',        bounds: [-0.4020, 51.8640, -0.3340, 51.8870], freqs: { tower: '132.550', radar: '129.550', approach: '129.550', atis: '120.575' } }, geometry: { type: 'Point', coordinates: [-0.3683, 51.8747] } },
+        { type: 'Feature', properties: { icao: 'EGSS', iata: 'STN', name: 'Stansted',     bounds: [ 0.2000, 51.8720,  0.2720, 51.8980], freqs: { tower: '123.800', radar: '126.950', approach: '126.950', atis: '127.175' } }, geometry: { type: 'Point', coordinates: [ 0.2350, 51.8850] } },
+        { type: 'Feature', properties: { icao: 'EGCC', iata: 'MAN', name: 'Manchester',   bounds: [-2.3180, 53.3440, -2.2340, 53.3880], freqs: { tower: '118.625', radar: '119.400', approach: '119.400', atis: '128.175' } }, geometry: { type: 'Point', coordinates: [-2.2749, 53.3650] } },
+        { type: 'Feature', properties: { icao: 'EGNT', iata: 'NCL', name: 'Newcastle',    bounds: [-1.7280, 54.9970, -1.6540, 55.0380], freqs: { tower: '119.700', radar: '124.375', approach: '124.375', atis: '119.025' } }, geometry: { type: 'Point', coordinates: [-1.6917, 55.0375] } },
+        { type: 'Feature', properties: { icao: 'EGPF', iata: 'GLA', name: 'Glasgow',      bounds: [-4.4810, 55.8530, -4.3870, 55.8920], freqs: { tower: '118.800', radar: '119.100', approach: '119.100', atis: '113.400' } }, geometry: { type: 'Point', coordinates: [-4.4330, 55.8719] } },
+        { type: 'Feature', properties: { icao: 'EGPH', iata: 'EDI', name: 'Edinburgh',    bounds: [-3.4140, 55.9290, -3.3330, 55.9740], freqs: { tower: '118.700', radar: '121.200', approach: '121.200', atis: '132.075' } }, geometry: { type: 'Point', coordinates: [-3.3725, 55.9508] } },
+        { type: 'Feature', properties: { icao: 'EGGD', iata: 'BRS', name: 'Bristol',      bounds: [-2.7620, 51.3670, -2.6780, 51.3990], freqs: { tower: '133.850', radar: '125.650', approach: '125.650', atis: '127.375' } }, geometry: { type: 'Point', coordinates: [-2.7191, 51.3827] } },
+        { type: 'Feature', properties: { icao: 'EGBB', iata: 'BHX', name: 'Birmingham',   bounds: [-1.7890, 52.4340, -1.7100, 52.4750], freqs: { tower: '118.300', radar: '120.500', approach: '120.500', atis: '126.025' } }, geometry: { type: 'Point', coordinates: [-1.7480, 52.4539] } },
+        { type: 'Feature', properties: { icao: 'EGAC', iata: 'BHD', name: 'Belfast City', bounds: [-5.9050, 54.6020, -5.8450, 54.6350], freqs: { tower: '130.750', radar: '130.750', approach: '130.750', atis: '120.900' } }, geometry: { type: 'Point', coordinates: [-5.8725, 54.6181] } },
+        { type: 'Feature', properties: { icao: 'EGAA', iata: 'BFS', name: 'Aldergrove',   bounds: [-6.2640, 54.6310, -6.1720, 54.6870], freqs: { tower: '118.300', radar: '120.900', approach: '120.900', atis: '109.600' } }, geometry: { type: 'Point', coordinates: [-6.2158, 54.6575] } },
+        { type: 'Feature', properties: { icao: 'EGNV', iata: 'MME', name: 'Teesside',     bounds: [-1.4700, 54.4920, -1.3900, 54.5280], freqs: { tower: '119.800', radar: '118.850', approach: '118.850', atis: '124.150' } }, geometry: { type: 'Point', coordinates: [-1.4294, 54.5092] } },
+        { type: 'Feature', properties: { icao: 'EGGP', iata: 'LPL', name: 'Liverpool',    bounds: [-2.8940, 53.3100, -2.8080, 53.3590], freqs: { tower: '118.100', radar: '119.850', approach: '119.850', atis: '128.575' } }, geometry: { type: 'Point', coordinates: [-2.8497, 53.3336] } },
+        { type: 'Feature', properties: { icao: 'EGNH', iata: 'BLK', name: 'Blackpool',    bounds: [-3.0620, 53.7550, -3.0000, 53.7900], freqs: { tower: '118.400', radar: '135.950', approach: '135.950', atis: '121.750' } }, geometry: { type: 'Point', coordinates: [-3.0286, 53.7717] } },
+        { type: 'Feature', properties: { icao: 'EGNS', iata: 'IOM', name: 'Isle of Man',  bounds: [-4.6680, 54.0620, -4.5850, 54.1060], freqs: { tower: '118.900', radar: '120.850', approach: '120.850', atis: '118.525' } }, geometry: { type: 'Point', coordinates: [-4.6239, 54.0833] } },
+        { type: 'Feature', properties: { icao: 'EGPK', iata: 'PIK', name: 'Prestwick',    bounds: [-4.6320, 55.4870, -4.5470, 55.5340], freqs: { tower: '118.150', radar: '120.550', approach: '120.550', atis: '127.125' } }, geometry: { type: 'Point', coordinates: [-4.5869, 55.5094] } },
+        { type: 'Feature', properties: { icao: 'EGNM', iata: 'LBA', name: 'Leeds Bradford', bounds: [-1.6990, 53.8450, -1.6260, 53.8890], freqs: { tower: '120.300', radar: '134.575', approach: '134.575', atis: '118.025' } }, geometry: { type: 'Point', coordinates: [-1.6606, 53.8659] } },
+        { type: 'Feature', properties: { icao: 'EIDW', iata: 'DUB', name: 'Dublin',        bounds: [-6.3200, 53.3890, -6.2210, 53.4560], freqs: { tower: '118.600', radar: '121.100', approach: '119.550', atis: '124.525' } }, geometry: { type: 'Point', coordinates: [-6.2700, 53.4213] } },
+        { type: 'Feature', properties: { icao: 'EGPD', iata: 'ABZ', name: 'Aberdeen',      bounds: [-2.2220, 57.1900, -2.1710, 57.2170], freqs: { tower: '118.100', radar: '120.400', approach: '120.400', atis: '121.850' } }, geometry: { type: 'Point', coordinates: [-2.1978, 57.2019] } },
+        { type: 'Feature', properties: { icao: 'EGPE', iata: 'INV', name: 'Inverness',     bounds: [-4.0650, 57.5350, -4.0280, 57.5440], freqs: { tower: '122.600', radar: '122.600', approach: '122.600', atis: '109.200' } }, geometry: { type: 'Point', coordinates: [-4.0475, 57.5425] } },
+        { type: 'Feature', properties: { icao: 'EGHI', iata: 'SOU', name: 'Southampton',   bounds: [-1.3680, 50.9480, -1.3490, 50.9590], freqs: { tower: '118.200', radar: '128.850', approach: '128.850', atis: '113.350' } }, geometry: { type: 'Point', coordinates: [-1.3568, 50.9503] } },
+        { type: 'Feature', properties: { icao: 'EGHH', iata: 'BOH', name: 'Bournemouth',   bounds: [-1.8470, 50.7760, -1.8240, 50.7820], freqs: { tower: '125.600', radar: '118.650', approach: '118.650', atis: '121.750' } }, geometry: { type: 'Point', coordinates: [-1.8425, 50.7800] } },
+        { type: 'Feature', properties: { icao: 'EGMC', iata: 'SEN', name: 'Southend',      bounds: [ 0.6840,  51.5660,  0.7100,  51.5730], freqs: { tower: '127.725', radar: '130.775', approach: '130.775', atis: '121.800' } }, geometry: { type: 'Point', coordinates: [ 0.6956, 51.5714] } },
+        { type: 'Feature', properties: { icao: 'EGSH', iata: 'NWI', name: 'Norwich',       bounds: [ 1.2680,  52.6710,  1.2850,  52.6780], freqs: { tower: '124.250', radar: '119.350', approach: '119.350', atis: '128.625' } }, geometry: { type: 'Point', coordinates: [ 1.2828, 52.6758] } },
+        { type: 'Feature', properties: { icao: 'EGCN', iata: 'DSA', name: 'Doncaster',     bounds: [-1.0200,  53.4750, -0.9810,  53.4900], freqs: { tower: '128.775', radar: '126.225', approach: '126.225', atis: '121.775' } }, geometry: { type: 'Point', coordinates: [-1.0106, 53.4805] } },
+        { type: 'Feature', properties: { icao: 'EGNJ', iata: 'HUY', name: 'Humberside',    bounds: [-0.3620,  53.5720, -0.3320,  53.5870], freqs: { tower: '124.900', radar: '119.125', approach: '119.125', atis: '124.675' } }, geometry: { type: 'Point', coordinates: [-0.3506, 53.5744] } },
     ]
 };
 
@@ -520,6 +530,77 @@ class AirportsToggleControl {
         this.map = undefined;
     }
 
+    _buildFreqPanel(p) {
+        const rows = [
+            ['TWR', p.freqs.tower],
+            ['RAD', p.freqs.radar],
+            ['APP', p.freqs.approach],
+            ['ATIS', p.freqs.atis],
+        ];
+        const rowsHTML = rows.map(([lbl, val]) =>
+            `<div style="display:flex;gap:14px;line-height:1.8">` +
+            `<span style="opacity:0.5;min-width:34px;letter-spacing:.05em">${lbl}</span>` +
+            `<span>${val}</span></div>`
+        ).join('');
+        return `<div style="` +
+            `display:inline-block;` +
+            `background:rgba(0,0,0,0.7);color:#fff;` +
+            `font-family:'Barlow Condensed','Barlow',sans-serif;` +
+            `font-size:14px;font-weight:400;` +
+            `padding:6px 14px 9px;` +
+            `pointer-events:none;white-space:nowrap;user-select:none">` +
+            `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;` +
+            `font-weight:600;font-size:15px;letter-spacing:.12em;` +
+            `margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
+            `<span style="font-size:13px;font-weight:600;letter-spacing:.12em">${p.icao}</span>` +
+            `<span style="font-size:11px;font-weight:400;opacity:0.5;letter-spacing:.08em">${p.name.toUpperCase()}</span>` +
+            `</div>${rowsHTML}</div>`;
+    }
+
+    _buildAirportPanelHTML(p, coords) {
+        const lat = coords[1].toFixed(4);
+        const lng = coords[0].toFixed(4);
+        const fields = [
+            ['IATA',  p.iata  || '—'],
+            ['LAT',   lat],
+            ['LON',   lng],
+            ['TWR',   p.freqs.tower    || '—'],
+            ['RAD',   p.freqs.radar    || '—'],
+            ['APP',   p.freqs.approach || '—'],
+            ['ATIS',  p.freqs.atis     || '—'],
+        ];
+        const fieldsHTML = fields.map(([lbl, val]) =>
+            `<div class="adsb-sb-field">` +
+            `<span class="adsb-sb-label">${lbl}</span>` +
+            `<span class="adsb-sb-value">${val}</span>` +
+            `</div>`
+        ).join('');
+        return `<div class="adsb-sb-header">` +
+            `<span class="adsb-sb-callsign" style="color:#c8ff00">${p.icao}</span>` +
+            `<span class="adsb-sb-hex">${p.name.toUpperCase()}</span>` +
+            `<button class="adsb-sb-untrack-btn" id="apt-panel-close">CLOSE</button>` +
+            `</div>` +
+            `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
+    }
+
+    _showAirportPanel(p, coords) {
+        let bar = document.getElementById('adsb-status-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'adsb-status-bar';
+            document.body.appendChild(bar);
+        }
+        bar.dataset.apt = '1';
+        bar.innerHTML = this._buildAirportPanelHTML(p, coords);
+        bar.classList.add('adsb-sb-visible');
+        bar.querySelector('#apt-panel-close').addEventListener('click', (e) => {
+            e.stopPropagation();
+            bar.classList.remove('adsb-sb-visible');
+            delete bar.dataset.apt;
+            this.map.flyTo({ center: [-4.4815, 54.1453], zoom: 6, duration: 800 });
+        });
+    }
+
     initLayers() {
         const vis = this.visible ? 'visible' : 'none';
 
@@ -547,11 +628,74 @@ class AirportsToggleControl {
 
         // Create HTML label markers once — they survive style changes as DOM nodes
         if (!this._markers) {
+            this._hoverMarker = null;
+
             this._markers = AIRPORTS_DATA.features.map(f => {
+                const p = f.properties;
+                // Outer wrapper — large hit area, anchored top-left to the coordinate
                 const el = document.createElement('div');
-                el.style.cssText = 'color:#ffffff;font-family:monospace;font-size:10px;line-height:1.4;pointer-events:none;white-space:nowrap;';
-                el.innerHTML = `${f.properties.icao}<br>${f.properties.name.toUpperCase()}`;
-                return new maplibregl.Marker({ element: el, anchor: 'left', offset: [8, 7] })
+                el.style.cssText = [
+                    'padding:6px 16px 6px 0',
+                    'cursor:pointer',
+                    'pointer-events:auto',
+                    'user-select:none',
+                ].join(';');
+
+                const label = document.createElement('div');
+                label.style.cssText = [
+                    'color:#ffffff',
+                    "font-family:'Barlow Condensed','Barlow',monospace",
+                    'font-size:10px',
+                    'font-weight:700',
+                    'letter-spacing:.08em',
+                    'line-height:1.5',
+                    'white-space:nowrap',
+                    'pointer-events:none',
+                ].join(';');
+                label.innerHTML =
+                    `<span class="apt-icao" style="color:#c8ff00">${p.icao}</span>` +
+                    `<br><span class="apt-name" style="opacity:0.7;font-weight:400">${p.name.toUpperCase()}</span>`;
+                el.appendChild(label);
+
+                // Click — zoom to runway bounds with 25% padding
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const b = p.bounds; // [minLng, minLat, maxLng, maxLat]
+                    // Measure the right-side control panel width so we can compensate
+                    // for the asymmetric viewport and keep the airport truly centred.
+                    const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right');
+                    const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
+                    const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
+                    const pad = 80;
+                    // Offset top padding by half the controls panel height so the
+                    // airport sits in the true vertical centre of the remaining space.
+                    const topExtra = Math.max(0, ctrlH / 2 - pad);
+                    this.map.fitBounds(
+                        [[b[0], b[1]], [b[2], b[3]]],
+                        {
+                            padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW },
+                            maxZoom: 13,
+                            duration: 800,
+                        }
+                    );
+                    this._showAirportPanel(p, f.geometry.coordinates);
+                });
+
+                // Hover — show frequency panel inline inside the wrapper
+                let freqPanel = null;
+                el.addEventListener('mouseenter', () => {
+                    if (!freqPanel) {
+                        freqPanel = document.createElement('div');
+                        freqPanel.innerHTML = this._buildFreqPanel(p);
+                        freqPanel.style.cssText = 'pointer-events:none;margin-top:4px;';
+                        el.appendChild(freqPanel);
+                    }
+                });
+                el.addEventListener('mouseleave', () => {
+                    if (freqPanel) { freqPanel.remove(); freqPanel = null; }
+                });
+
+                return new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [8, -6] })
                     .setLngLat(f.geometry.coordinates);
             });
             if (this.visible) this._markers.forEach(m => m.addTo(this.map));
@@ -564,7 +708,10 @@ class AirportsToggleControl {
         try { this.map.setLayoutProperty('airports-circle', 'visibility', v); } catch (e) {}
         if (this._markers) {
             if (this.visible) this._markers.forEach(m => m.addTo(this.map));
-            else              this._markers.forEach(m => m.remove());
+            else {
+                this._markers.forEach(m => m.remove());
+                if (this._hoverMarker) { this._hoverMarker.remove(); this._hoverMarker = null; }
+            }
         }
         this.button.style.opacity = this.visible ? '1' : '0.3';
         this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
@@ -1581,6 +1728,7 @@ class AdsbLiveControl {
             bar.id = 'adsb-status-bar';
             document.body.appendChild(bar);
         }
+        delete bar.dataset.apt;
         bar.innerHTML = this._buildStatusBarHTML(props);
         bar.classList.add('adsb-sb-visible');
         this._wireStatusBarUntrack(bar);
@@ -1629,6 +1777,13 @@ class AdsbLiveControl {
     _wireTagButton(el) {
         const btn = el.querySelector('.tag-follow-btn');
         if (!btn) return;
+
+        // Hover over the whole label: swap TRACKING ↔ UNTRACK
+        if (btn.textContent === 'TRACKING') {
+            el.addEventListener('mouseenter', () => { btn.textContent = 'UNTRACK'; });
+            el.addEventListener('mouseleave', () => { btn.textContent = 'TRACKING'; });
+        }
+
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             this._followEnabled = !this._followEnabled;
