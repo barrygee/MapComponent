@@ -1928,39 +1928,58 @@ class AdsbLiveControl {
         this._tagHex = null;
     }
 
-    _showHoverTag(feature) {
+    _showHoverTag(feature, fromLabel = false) {
         if (!feature || !this.map) return;
         const hex = feature.properties.hex;
         // Don't show hover tag over the already-selected plane
         if (hex === this._selectedHex) return;
+        // Cancel any pending hide
+        if (this._hoverHideTimer) { clearTimeout(this._hoverHideTimer); this._hoverHideTimer = null; }
         // Already showing hover tag for this plane — just update position
         const coords = this._interpolatedCoords(hex) || feature.geometry.coordinates;
         if (this._hoverHex === hex && this._hoverMarker) {
             this._hoverMarker.setLngLat(coords);
             return;
         }
-        this._hideHoverTag();
+        this._hideHoverTagNow();
         const el = document.createElement('div');
         el.innerHTML = this._buildTagHTML(feature.properties);
-        // Hover tag has no interactive TRACK button
-        el.style.pointerEvents = 'none';
+        // When triggered from the label, enable pointer events on the data box so
+        // the cursor moving onto it keeps the box alive (no flicker).
+        el.style.pointerEvents = fromLabel ? 'auto' : 'none';
+        if (fromLabel) {
+            el.addEventListener('mouseenter', () => {
+                if (this._hoverHideTimer) { clearTimeout(this._hoverHideTimer); this._hoverHideTimer = null; }
+            });
+            el.addEventListener('mouseleave', () => this._hideHoverTag());
+        }
         this._hoverMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -13] })
             .setLngLat(coords)
             .addTo(this.map);
         this._hoverHex = hex;
-        // Hide the callsign label for this aircraft while the data box is showing
+        this._hoverFromLabel = fromLabel;
+        // Hide the callsign label in both cases — data box covers its position.
         if (this._callsignMarkers[hex]) {
             this._callsignMarkers[hex].getElement().style.visibility = 'hidden';
         }
     }
 
     _hideHoverTag() {
-        // Restore the callsign label for the previously hovered aircraft
+        if (this._hoverHideTimer) clearTimeout(this._hoverHideTimer);
+        this._hoverHideTimer = setTimeout(() => {
+            this._hoverHideTimer = null;
+            this._hideHoverTagNow();
+        }, 80);
+    }
+
+    _hideHoverTagNow() {
+        // Always restore the callsign label
         if (this._hoverHex && this._callsignMarkers[this._hoverHex]) {
             this._callsignMarkers[this._hoverHex].getElement().style.visibility = '';
         }
         if (this._hoverMarker) { this._hoverMarker.remove(); this._hoverMarker = null; }
         this._hoverHex = null;
+        this._hoverFromLabel = false;
     }
 
     // Build a simple HTML callsign label element styled like the selected popup header.
@@ -1985,6 +2004,13 @@ class AdsbLiveControl {
             'user-select:none',
         ].join(';');
         el.textContent = callsign;
+        el.addEventListener('mouseenter', () => {
+            const f = this._geojson.features.find(f => f.properties.hex === props.hex);
+            if (f) this._showHoverTag(f, true);
+        });
+        el.addEventListener('mouseleave', () => {
+            this._hideHoverTag();
+        });
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             const hex = props.hex;
