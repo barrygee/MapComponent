@@ -2581,7 +2581,7 @@ let _onGoToUserLocation = null;
     }
 
     // ---- Helper: nav button (zoom / location) ----
-    const LOC_SVG = `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="7.5" stroke="#c8ff00" stroke-width="1.8"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>`;
+    const LOC_SVG = `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="7.5" stroke="#c8ff00" stroke-width="1.8"/><circle cx="10" cy="10" r="2" fill="white"/></svg>`;
     // SVG replicates the canvas marker exactly. Canvas coords: bracket x=4..60 y=4..56 arm=10,
     // triangle cx=32 cy=32 apex=(32,22) base=(25,40)+(39,40). ViewBox offset by (4,4) → 0 0 56 52.
     const PLANE_SVG = `<svg width="16" height="15" viewBox="0 0 56 52" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="28,14 40,40 28,33 16,40" fill="#ffffff" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" transform="rotate(-45 28 27)"/><polyline points="10,0 0,0 0,10" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="46,0 56,0 56,10" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="10,52 0,52 0,42" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="46,52 56,52 56,42" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/></svg>`;
@@ -2751,30 +2751,26 @@ function createMarkerElement(longitude, latitude) {
     const lonText = longitude !== undefined ? longitude.toFixed(3) : '';
     el.classList.add('user-location-marker');
     el.innerHTML = `<svg viewBox="0 0 110 60" width="110" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-        <rect class="marker-bg" x="16" y="17" width="28" height="26" fill="#c8ff00" fill-opacity="0"/>
-        <polyline class="marker-corner" points="21,17 16,17 16,22" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square" stroke-dasharray="10" stroke-dashoffset="10"/>
-        <polyline class="marker-corner" points="39,17 44,17 44,22" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square" stroke-dasharray="10" stroke-dashoffset="10"/>
-        <polyline class="marker-corner" points="21,43 16,43 16,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square" stroke-dasharray="10" stroke-dashoffset="10"/>
-        <polyline class="marker-corner" points="39,43 44,43 44,38" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="square" stroke-dasharray="10" stroke-dashoffset="10"/>
-        <rect class="marker-dot" x="28" y="28" width="4" height="4" fill="white" opacity="0"/>
+        <circle class="marker-bg" cx="30" cy="30" r="13" fill="#c8ff00" fill-opacity="0"/>
+        <circle class="marker-corner" cx="30" cy="30" r="13" fill="none" stroke="#c8ff00" stroke-width="1.8"/>
+        <circle class="marker-dot" cx="30" cy="30" r="3.5" fill="white" opacity="0"/>
         <text x="52" y="28" fill="white" font-size="7.5" font-family="monospace" class="marker-lat"></text>
         <text x="52" y="38" fill="white" font-size="7.5" font-family="monospace" class="marker-lon"></text>
     </svg>`;
 
-    const corners = el.querySelectorAll('.marker-corner');
+    const circle  = el.querySelector('.marker-corner');
     const bg      = el.querySelector('.marker-bg');
     const dot     = el.querySelector('.marker-dot');
     const latEl   = el.querySelector('.marker-lat');
     const lonEl   = el.querySelector('.marker-lon');
 
-    // Corners draw in sequentially
-    corners.forEach((c, idx) => {
-        c.style.animation = `logo-draw 0.22s ease-out ${idx * 0.07}s forwards`;
-    });
-    // Background pulses twice after corners finish
-    bg.style.animation = 'logo-bg-pulse 0.4s ease-in-out 0.43s 2 both';
+    // Circle fades in
+    circle.style.opacity = '0';
+    circle.style.animation = 'logo-dot-in 0.22s ease-out 0s forwards';
+    // Background pulses twice after circle appears
+    bg.style.animation = 'logo-bg-pulse 0.4s ease-in-out 0.28s 2 both';
     // Dot fades in
-    dot.style.animation = 'logo-dot-in 0.15s ease-out 0.38s forwards';
+    dot.style.animation = 'logo-dot-in 0.15s ease-out 0.22s forwards';
 
     // Coordinates type in after draw + pulse sequence.
     // animDone gates setUserLocation updates until the animation finishes.
