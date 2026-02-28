@@ -2231,7 +2231,7 @@ class AdsbLiveControl {
                 const wasEnabled = this._notifEnabled.has(hex);
                 const f = this._geojson.features.find(f => f.properties.hex === hex);
                 const callsign = f ? ((f.properties.flight || '').trim() || (f.properties.r || '').trim() || hex) : hex;
-                const detail   = f ? [f.properties.r, f.properties.t].filter(Boolean).join(' · ') : '';
+                const detail   = '';
                 if (!this._trackingNotifIds) this._trackingNotifIds = {};
 
                 if (wasEnabled) {
@@ -2304,7 +2304,7 @@ class AdsbLiveControl {
                 const f = this._geojson.features.find(f => f.properties.hex === hex);
                 if (f) {
                     const _trkCs = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || hex;
-                    const _trkDetail = [f.properties.r, f.properties.t].filter(Boolean).join(' · ') || undefined;
+                    const _trkDetail = undefined;
                     if (!this._trackingNotifIds) this._trackingNotifIds = {};
                     if (this._trackingNotifIds[hex]) _Notifications.dismiss(this._trackingNotifIds[hex]);
                     this._trackingNotifIds[hex] = _Notifications.add({
@@ -2332,7 +2332,7 @@ class AdsbLiveControl {
                 this._notifEnabled.add(this._tagHex);
                 const _trkF = this._geojson.features.find(f => f.properties.hex === this._tagHex);
                 const _trkCs = _trkF ? ((_trkF.properties.flight || '').trim() || (_trkF.properties.r || '').trim() || this._tagHex) : this._tagHex;
-                const _trkDetail = _trkF ? ([_trkF.properties.r, _trkF.properties.t].filter(Boolean).join(' · ') || undefined) : undefined;
+                const _trkDetail = undefined;
                 if (!this._trackingNotifIds) this._trackingNotifIds = {};
                 if (this._trackingNotifIds[this._tagHex]) _Notifications.dismiss(this._trackingNotifIds[this._tagHex]);
                 this._trackingNotifIds[this._tagHex] = _Notifications.add({
@@ -2791,7 +2791,7 @@ class AdsbLiveControl {
                                 const callsign = (a.flight || '').trim() || (a.r || '').trim();
                                 const apt      = _nearestAirport(a.lat, a.lon);
                                 const aptStr   = apt ? `${apt.name} (${apt.icao})` : '';
-                                const parts    = [a.r, a.t].filter(Boolean);
+                                const parts    = [];
                                 if (aptStr) parts.push(aptStr);
                                 _Notifications.add({
                                     type:   'departure',
@@ -2804,7 +2804,7 @@ class AdsbLiveControl {
                                 const callsign = (a.flight || '').trim() || (a.r || '').trim();
                                 const apt      = _nearestAirport(a.lat, a.lon);
                                 const aptStr   = apt ? `${apt.name} (${apt.icao})` : '';
-                                const parts    = [a.r, a.t].filter(Boolean);
+                                const parts    = [];
                                 if (aptStr) parts.push(aptStr);
                                 _Notifications.add({
                                     type:   'flight',
@@ -2961,6 +2961,7 @@ class AdsbLiveControl {
             this._applySelection();
             // Activate follow/tracking mode
             this._followEnabled = true;
+            this._saveTrackingState();
             this._notifEnabled.add(hex);
             // Re-attach action callbacks for any persisted tracking notifications
             // (callbacks are in-memory only and are lost on page refresh)
