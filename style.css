@@ -826,6 +826,9 @@ html {
     height: 38px;
     padding: 0 14px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: #000;
+    position: relative;
+    z-index: 1;
 }
 
 .notif-label {
@@ -895,24 +898,65 @@ html {
 }
 
 .notif-action {
-    align-self: stretch;
+    position: relative;
     background: none;
-    border: 1px solid rgba(200, 255, 0, 0.35);
+    border: none;
     cursor: pointer;
-    padding: 6px 10px;
-    color: rgba(200, 255, 0, 0.75);
-    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    margin-top: 10px;
-    transition: color 0.15s, border-color 0.15s;
+    padding: 6px 10px 6px 4px;
+    color: rgba(255, 255, 255, 0.3);
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s;
 }
 
 .notif-action:hover {
     color: #c8ff00;
-    border-color: rgba(200, 255, 0, 0.7);
+}
+
+.notif-label-default {
+    transition: opacity 0.15s;
+}
+
+.notif-label-disable {
+    display: none;
+    color: #fff;
+}
+
+.notif-header:has(.notif-action:hover) .notif-label-default {
+    display: none;
+}
+
+.notif-header:has(.notif-action:hover) .notif-label-disable {
+    display: inline;
+}
+
+.notif-action[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    right: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #000;
+    color: rgba(255, 255, 255, 0.75);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0 10px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 10001;
+}
+
+.notif-action[data-tooltip]:hover::before {
+    opacity: 1;
 }
 
 /* ---- Bell pulse — fires when a notification arrives while panel is closed ---- */

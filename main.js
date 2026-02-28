@@ -399,16 +399,22 @@ const _Notifications = (() => {
         const detail = item.detail || '';
         const action = _actions[item.id];
 
+        const bellSlashSVG = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor"/><path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/><line x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>`;
+
         el.innerHTML =
             `<div class="notif-header">` +
-            `<span class="notif-label">${_labelForType(item.type)}</span>` +
+            (action
+                ? `<span class="notif-label"><span class="notif-label-default">${_labelForType(item.type)}</span><span class="notif-label-disable">DISABLE NOTIFICATION</span></span>`
+                : `<span class="notif-label">${_labelForType(item.type)}</span>`) +
+            `<div style="display:flex;align-items:center;gap:8px">` +
+            (action ? `<button class="notif-action" aria-label="Disable notification">${bellSlashSVG}</button>` : '') +
             `<button class="notif-dismiss" aria-label="Dismiss">✕</button>` +
+            `</div>` +
             `</div>` +
             `<div class="notif-body">` +
             `<span class="notif-title">${item.title}</span>` +
             (detail ? `<span class="notif-detail">${detail}</span>` : '') +
             `<span class="notif-time">${_formatTime(item.ts)}</span>` +
-            (action ? `<button class="notif-action">${action.label}</button>` : '') +
             `</div>`;
 
         el.querySelector('.notif-dismiss').addEventListener('click', (e) => {
@@ -507,11 +513,13 @@ const _Notifications = (() => {
                 const oldAction = el.querySelector('.notif-action');
                 if (oldAction) oldAction.remove();
                 if (action) {
+                    const bellSlashSVG = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor"/><path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/><line x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>`;
                     const ab = document.createElement('button');
                     ab.className = 'notif-action';
-                    ab.textContent = action.label;
+                    ab.setAttribute('aria-label', 'Disable notification');
+                    ab.innerHTML = bellSlashSVG;
                     ab.addEventListener('click', (e) => { e.stopPropagation(); action.callback(); dismiss(item.id); });
-                    el.querySelector('.notif-time').insertAdjacentElement('afterend', ab);
+                    el.querySelector('.notif-dismiss').insertAdjacentElement('beforebegin', ab);
                 }
             }
         }
