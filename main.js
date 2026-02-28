@@ -2217,12 +2217,11 @@ class AdsbLiveControl {
                         title:  callsign,
                         detail: detail || undefined,
                         action: {
-                            label: 'DISABLE NOTIFICATIONS',
+                            label: 'DISABLE NOTIFICATION',
                             callback: () => {
                                 this._notifEnabled.delete(hex);
                                 if (this._trackingNotifIds) delete this._trackingNotifIds[hex];
                                 this._rebuildTagForHex(hex);
-                                _Notifications.add({ type: 'notif-off', title: callsign, detail: detail || undefined });
                             },
                         },
                     });
@@ -2274,11 +2273,10 @@ class AdsbLiveControl {
                     if (this._trackingNotifIds[hex]) _Notifications.dismiss(this._trackingNotifIds[hex]);
                     this._trackingNotifIds[hex] = _Notifications.add({
                         type: 'track', title: _trkCs, detail: _trkDetail,
-                        action: { label: 'DISABLE NOTIFICATIONS', callback: () => {
+                        action: { label: 'DISABLE NOTIFICATION', callback: () => {
                             this._notifEnabled.delete(hex);
                             if (this._trackingNotifIds) delete this._trackingNotifIds[hex];
                             this._rebuildTagForHex(hex);
-                            _Notifications.add({ type: 'notif-off', title: _trkCs, detail: _trkDetail });
                         }},
                     });
                     this._showStatusBar(f.properties);
@@ -2307,11 +2305,10 @@ class AdsbLiveControl {
                 if (this._trackingNotifIds[this._tagHex]) _Notifications.dismiss(this._trackingNotifIds[this._tagHex]);
                 this._trackingNotifIds[this._tagHex] = _Notifications.add({
                     type: 'track', title: _trkCs, detail: _trkDetail,
-                    action: { label: 'DISABLE NOTIFICATIONS', callback: () => {
+                    action: { label: 'DISABLE NOTIFICATION', callback: () => {
                         this._notifEnabled.delete(this._tagHex);
                         if (this._trackingNotifIds) delete this._trackingNotifIds[this._tagHex];
                         this._rebuildTagForHex(this._tagHex);
-                        _Notifications.add({ type: 'notif-off', title: _trkCs, detail: _trkDetail });
                     }},
                 });
             }
@@ -2446,6 +2443,7 @@ class AdsbLiveControl {
             'font-size:13px',
             'font-weight:400',
             'letter-spacing:.12em',
+            'text-transform:uppercase',
             'box-sizing:border-box',
             'display:flex',
             'align-items:center',
@@ -3264,7 +3262,7 @@ let _onGoToUserLocation = null;
     overlayGroup.appendChild(makeOverlayBtn('◎',   '16px', 'RANGE RINGS',    () => rangeRingsControl ? rangeRingsControl.ringsVisible : false, () => { if (rangeRingsControl) rangeRingsControl.toggleRings(); }));
     overlayGroup.appendChild(makeOverlayBtn('=',   '16px', 'A2A REFUELING',  () => aarControl ? aarControl.visible : false,                   () => { if (aarControl) aarControl.toggle(); }));
     overlayGroup.appendChild(makeOverlayBtn('○',   '16px', 'AWACS',          () => awacsControl ? awacsControl.visible : false,               () => { if (awacsControl) awacsControl.toggle(); }));
-    const labelsBtn = makeOverlayBtn('LBL', '8px', 'PLANE LABELS', () => adsbLabelsControl ? adsbLabelsControl.labelsVisible : false, () => { if (adsbLabelsControl) adsbLabelsControl.toggle(); });
+    const labelsBtn = makeOverlayBtn('LBL', '8px', 'CALLSIGNS', () => adsbLabelsControl ? adsbLabelsControl.labelsVisible : false, () => { if (adsbLabelsControl) adsbLabelsControl.toggle(); });
     function syncLabelsBtn() {
         const planesOn = adsbControl ? adsbControl.visible : false;
         labelsBtn.classList.toggle('sm-planes-off', !planesOn);
