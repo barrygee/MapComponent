@@ -506,7 +506,12 @@ const _Notifications = (() => {
             if (el) {
                 el.dataset.type = item.type;
                 const action = _actions[item.id];
-                el.querySelector('.notif-label').textContent = _labelForType(item.type);
+                const labelEl = el.querySelector('.notif-label');
+                if (action) {
+                    labelEl.innerHTML = `<span class="notif-label-default">${_labelForType(item.type)}</span><span class="notif-label-disable">DISABLE NOTIFICATION</span>`;
+                } else {
+                    labelEl.textContent = _labelForType(item.type);
+                }
                 el.querySelector('.notif-title').textContent = item.title;
                 const detailEl = el.querySelector('.notif-detail');
                 if (detailEl) detailEl.textContent = item.detail;
@@ -2936,6 +2941,29 @@ class AdsbLiveControl {
             // Activate follow/tracking mode
             this._followEnabled = true;
             this._notifEnabled.add(hex);
+            // Re-attach action callbacks for any persisted tracking notifications
+            // (callbacks are in-memory only and are lost on page refresh)
+            try {
+                const persisted = JSON.parse(localStorage.getItem('notifications') || '[]');
+                if (!this._trackingNotifIds) this._trackingNotifIds = {};
+                for (const item of persisted) {
+                    if (item.type === 'tracking') {
+                        const notifHex = hex; // capture for callback closure
+                        this._trackingNotifIds[notifHex] = item.id;
+                        _Notifications.update({
+                            id: item.id,
+                            action: {
+                                label: 'DISABLE NOTIFICATION',
+                                callback: () => {
+                                    this._notifEnabled.delete(notifHex);
+                                    if (this._trackingNotifIds) delete this._trackingNotifIds[notifHex];
+                                    this._rebuildTagForHex(notifHex);
+                                },
+                            },
+                        });
+                    }
+                }
+            } catch(e) {}
             const coords = this._interpolatedCoords(hex) || f.geometry.coordinates;
             const newEl = document.createElement('div');
             newEl.innerHTML = this._buildTagHTML(f.properties);
