@@ -2191,6 +2191,12 @@ class AdsbLiveControl {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             this._followEnabled = false;
+            // Dismiss tracking notification for the previously tracked plane
+            if (this._tagHex && this._trackingNotifIds && this._trackingNotifIds[this._tagHex]) {
+                _Notifications.dismiss(this._trackingNotifIds[this._tagHex]);
+                delete this._trackingNotifIds[this._tagHex];
+            }
+            if (this._tagHex) this._notifEnabled.delete(this._tagHex);
             // Rebuild the tag marker without tracking state
             if (this._tagHex) {
                 const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
@@ -2289,6 +2295,12 @@ class AdsbLiveControl {
 
             // If clicking from the hover tag, select the plane first.
             if (overrideHex && overrideHex !== this._selectedHex) {
+                // Dismiss notification for the previously tracked plane before switching
+                if (this._tagHex && this._trackingNotifIds && this._trackingNotifIds[this._tagHex]) {
+                    _Notifications.dismiss(this._trackingNotifIds[this._tagHex]);
+                    delete this._trackingNotifIds[this._tagHex];
+                }
+                if (this._tagHex) this._notifEnabled.delete(this._tagHex);
                 this._selectedHex = overrideHex;
                 this._hideHoverTagNow();
                 this._applySelection();
