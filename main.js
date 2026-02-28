@@ -3632,17 +3632,7 @@ function setUserLocation(position) {
         // Always keep live coords up to date for click replay
         el.dataset.lat = latitude.toFixed(3);
         el.dataset.lon = longitude.toFixed(3);
-        // Update displayed text only after intro animation finishes
-        if (el.dataset.animDone === '1') {
-            const latEl = el.querySelector('.marker-lat');
-            const lonEl = el.querySelector('.marker-lon');
-            if (latEl) latEl.textContent = latitude.toFixed(3);
-            if (lonEl) lonEl.textContent = longitude.toFixed(3);
-            const latLabelEl = el.querySelector('.marker-lat-label');
-            const lonLabelEl = el.querySelector('.marker-lon-label');
-            if (latLabelEl && latLabelEl.textContent === '') latLabelEl.textContent = 'LAT ';
-            if (lonLabelEl && lonLabelEl.textContent === '') lonLabelEl.textContent = 'LON ';
-        }
+        // dataset.lat/lon already updated above for click replay — nothing else to do
     } else {
         userMarker = new maplibregl.Marker({ element: createMarkerElement(longitude, latitude), anchor: 'center' })
             .setLngLat([longitude, latitude])
