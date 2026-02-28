@@ -3629,6 +3629,10 @@ function setUserLocation(position) {
             const lonEl = el.querySelector('.marker-lon');
             if (latEl) latEl.textContent = latitude.toFixed(3);
             if (lonEl) lonEl.textContent = longitude.toFixed(3);
+            const latLabelEl = el.querySelector('.marker-lat-label');
+            const lonLabelEl = el.querySelector('.marker-lon-label');
+            if (latLabelEl && latLabelEl.textContent === '') latLabelEl.textContent = 'LAT ';
+            if (lonLabelEl && lonLabelEl.textContent === '') lonLabelEl.textContent = 'LON ';
         }
     } else {
         userMarker = new maplibregl.Marker({ element: createMarkerElement(longitude, latitude), anchor: 'center' })
