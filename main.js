@@ -447,7 +447,7 @@ const _Notifications = (() => {
     }
 
     // ---- render ----
-    function render() {
+    function render(forceIds) {
         const panel = _getPanel();
         if (!panel) return;
         const items = _load();
@@ -455,6 +455,13 @@ const _Notifications = (() => {
         panel.querySelectorAll('.notif-item').forEach(el => {
             if (!existingIds.has(el.dataset.id)) el.remove();
         });
+        // If forceIds is provided, remove those elements so they get re-rendered fresh
+        if (forceIds) {
+            forceIds.forEach(id => {
+                const el = panel.querySelector(`.notif-item[data-id="${id}"]`);
+                if (el) el.remove();
+            });
+        }
         const renderedIds = new Set([...panel.querySelectorAll('.notif-item')].map(el => el.dataset.id));
         for (let i = items.length - 1; i >= 0; i--) {
             const item = items[i];
@@ -2067,7 +2074,7 @@ class AdsbLiveControl {
                 `white-space:nowrap;user-select:none">` +
                 `<div style="display:flex;align-items:center;gap:4px">` +
                 `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:#fff;pointer-events:none">${callsign}</span>` +
-                `${trkBtn}</div></div>`;
+                `${bellBtn}${trkBtn}</div></div>`;
         }
 
         const alt      = props.alt_baro ?? 0;
@@ -2960,6 +2967,7 @@ class AdsbLiveControl {
             try {
                 const persisted = JSON.parse(localStorage.getItem('notifications') || '[]');
                 if (!this._trackingNotifIds) this._trackingNotifIds = {};
+                const restoredIds = [];
                 for (const item of persisted) {
                     if (item.type === 'tracking') {
                         const notifHex = hex; // capture for callback closure
@@ -2975,8 +2983,10 @@ class AdsbLiveControl {
                                 },
                             },
                         });
+                        restoredIds.push(item.id);
                     }
                 }
+                if (restoredIds.length) _Notifications.render(restoredIds);
             } catch(e) {}
             const coords = this._interpolatedCoords(hex) || f.geometry.coordinates;
             const newEl = document.createElement('div');
