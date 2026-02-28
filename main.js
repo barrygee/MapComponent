@@ -1737,6 +1737,7 @@ class AdsbLiveControl {
         this._parkedTimers = {};      // hex -> setTimeout id (remove from map after 1 min)
         this._notifEnabled = new Set(); // hex -> notifications enabled (independent of tracking)
         this._trackingRestored = false;
+        this._lastFetchTime = 0;
     }
 
     onAdd(map) {
@@ -2033,6 +2034,11 @@ class AdsbLiveControl {
         }
 
         this._raiseLayers();
+
+        // If a pre-fetch already completed while waiting for the style/layers to
+        // initialise, push that data to the map immediately so planes appear
+        // without waiting for another full API round-trip.
+        if (this._geojson.features.length) this._interpolate();
 
         // Start polling only once the map source exists so the first fetch
         // can immediately display planes rather than silently dropping data.
@@ -2916,6 +2922,7 @@ class AdsbLiveControl {
 
             // Don't push raw API coords to the map — let _interpolate() be the sole
             // writer so there's no backward snap when new data arrives.
+            this._lastFetchTime = Date.now();
             this._interpolate();
 
             // On first load, re-select any previously tracked plane.
@@ -3018,7 +3025,9 @@ class AdsbLiveControl {
     }
 
     _startPolling() {
-        this._fetch();
+        // Skip the immediate fetch if a pre-fetch already completed recently
+        // (within the last 4 seconds) to avoid a redundant API call.
+        if (Date.now() - this._lastFetchTime > 4000) this._fetch();
         this._pollInterval = setInterval(() => this._fetch(), 5000);
         this._interpolateInterval = setInterval(() => this._interpolate(), 1000);
     }
