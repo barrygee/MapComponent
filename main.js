@@ -1721,6 +1721,7 @@ class AdsbLiveControl {
         this._seenOnGround = {};      // hex -> bool (true once observed at alt===0 while tracked)
         this._parkedTimers = {};      // hex -> setTimeout id (remove from map after 1 min)
         this._notifEnabled = new Set(); // hex -> notifications enabled (independent of tracking)
+        this._trackingRestored = false;
     }
 
     onAdd(map) {
@@ -2184,6 +2185,7 @@ class AdsbLiveControl {
                 }
             }
             this._hideStatusBar();
+            this._saveTrackingState();
         });
     }
 
@@ -2294,6 +2296,7 @@ class AdsbLiveControl {
                         .setLngLat(coords)
                         .addTo(this.map);
                 }
+                this._saveTrackingState();
                 return;
             }
 
@@ -2333,6 +2336,7 @@ class AdsbLiveControl {
                     }
                 }
             }
+            this._saveTrackingState();
         });
     }
 
@@ -2373,6 +2377,7 @@ class AdsbLiveControl {
     _hideSelectedTag() {
         if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
         this._tagHex = null;
+        this._saveTrackingState();
     }
 
     _showHoverTag(feature, fromLabel = false) {
@@ -2872,6 +2877,9 @@ class AdsbLiveControl {
             // writer so there's no backward snap when new data arrives.
             this._interpolate();
 
+            // On first load, re-select any previously tracked plane.
+            this._restoreTrackingState();
+
             // Rebuild trail and refresh data tag for selected aircraft
             this._rebuildTrails();
             if (this._tagHex && this._tagMarker) {
@@ -2901,6 +2909,44 @@ class AdsbLiveControl {
         ['adsb-trails', 'adsb-bracket', 'adsb-icons'].forEach(id => {
             try { this.map.moveLayer(id); } catch(e) {}
         });
+    }
+
+    _saveTrackingState() {
+        try {
+            if (this._tagHex && this._followEnabled) {
+                localStorage.setItem('adsbTracking', JSON.stringify({ hex: this._tagHex }));
+            } else {
+                localStorage.removeItem('adsbTracking');
+            }
+        } catch(e) {}
+    }
+
+    _restoreTrackingState() {
+        if (this._trackingRestored) return;
+        this._trackingRestored = true;
+        try {
+            const saved = localStorage.getItem('adsbTracking');
+            if (!saved) return;
+            const { hex } = JSON.parse(saved);
+            if (!hex) return;
+            const f = this._geojson.features.find(f => f.properties.hex === hex);
+            if (!f) return;
+            this._selectedHex = hex;
+            this._applySelection();
+            // Activate follow/tracking mode
+            this._followEnabled = true;
+            this._notifEnabled.add(hex);
+            const coords = this._interpolatedCoords(hex) || f.geometry.coordinates;
+            const newEl = document.createElement('div');
+            newEl.innerHTML = this._buildTagHTML(f.properties);
+            this._wireTagButton(newEl);
+            if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
+            this._tagMarker = new maplibregl.Marker({ element: newEl, anchor: 'left', offset: [14, 0] })
+                .setLngLat(coords)
+                .addTo(this.map);
+            this._showStatusBar(f.properties);
+            this.map.easeTo({ center: f.geometry.coordinates, duration: 600 });
+        } catch(e) {}
     }
 
     _startPolling() {
@@ -3254,7 +3300,7 @@ let _onGoToUserLocation = null;
     const roadsBtn = makeOverlayBtn('R', '14px', 'ROADS',  () => roadsControl ? roadsControl.roadsVisible : false, () => { if (roadsControl) roadsControl.toggleRoads(); });
     roadsBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(roadsBtn);
-    const citiesBtn = makeOverlayBtn('N', '14px', 'CITIES', () => namesControl ? namesControl.namesVisible : false, () => { if (namesControl) namesControl.toggleNames(); });
+    const citiesBtn = makeOverlayBtn('N', '14px', 'LOCATIONS', () => namesControl ? namesControl.namesVisible : false, () => { if (namesControl) namesControl.toggleNames(); });
     citiesBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(citiesBtn);
     overlayGroup.appendChild(makeOverlayBtn('◎',   '16px', 'RANGE RINGS',    () => rangeRingsControl ? rangeRingsControl.ringsVisible : false, () => { if (rangeRingsControl) rangeRingsControl.toggleRings(); }));
