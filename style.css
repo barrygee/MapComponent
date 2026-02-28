@@ -700,3 +700,187 @@ html {
     opacity: 1;
 }
 
+
+/* ============================================================
+   NOTIFICATIONS PANEL
+   ============================================================ */
+
+#notifications-panel {
+    position: fixed;
+    bottom: calc(44px + 14px); /* footer height + gap */
+    left: 14px;
+    z-index: 990;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+    pointer-events: none;
+    /* Cap at 6 items before scrolling: 6 × 91px + 5 × 4px gap = 566px */
+    max-height: 566px;
+    overflow-y: auto;
+    /* Thin scrollbar when needed */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    /* Hidden by default — shown via .notif-panel-open */
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+#notifications-panel::-webkit-scrollbar {
+    width: 3px;
+}
+
+#notifications-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#notifications-panel::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+#notifications-panel.notif-panel-open {
+    visibility: visible;
+    opacity: 1;
+}
+
+.notif-item {
+    width: 148px; /* matches expanded side menu width */
+    background: #000;
+    color: #fff;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.notif-item.notif-visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Category accent colours on the left edge */
+.notif-item[data-type="flight"]  { border-left: 2px solid #c8ff00; }
+.notif-item[data-type="system"]  { border-left: 2px solid rgba(255, 255, 255, 0.2); }
+.notif-item[data-type="message"] { border-left: 2px solid rgba(100, 160, 255, 0.8); }
+
+.notif-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 36px;
+    padding: 0 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.notif-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.notif-item[data-type="flight"]  .notif-label { color: #c8ff00; opacity: 0.75; }
+.notif-item[data-type="system"]  .notif-label { color: rgba(255, 255, 255, 0.45); }
+.notif-item[data-type="message"] .notif-label { color: rgba(100, 160, 255, 0.8); }
+
+.notif-dismiss {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.3);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+    line-height: 1;
+}
+
+.notif-dismiss:hover {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.notif-body {
+    padding: 10px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.notif-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: #fff;
+    line-height: 1.2;
+}
+
+.notif-detail {
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    line-height: 1.6;
+}
+
+.notif-time {
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.25);
+    margin-top: 4px;
+}
+
+/* ---- Footer notifications toggle button — matches minimised .sm-btn ---- */
+#notif-toggle-btn {
+    height: 36px;
+    background: #1a1a1a;
+    border: none;
+    cursor: pointer;
+    padding: 0 10px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #fff;
+    opacity: 0.6;
+    transition: background 0.2s, opacity 0.2s, color 0.2s;
+    flex-shrink: 0;
+}
+
+#notif-toggle-btn:hover {
+    background: #222;
+    opacity: 1;
+}
+
+#notif-toggle-btn.notif-btn-active {
+    opacity: 1;
+    color: #c8ff00;
+}
+
+#notif-icon {
+    display: block;
+    flex-shrink: 0;
+    width: auto;
+    height: 13px;
+}
+
+#notif-count {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: inherit;
+    line-height: 1;
+}
+

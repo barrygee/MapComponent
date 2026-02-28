@@ -18,7 +18,7 @@
     <meta name="theme-color" content="#000000">
     <link href='./assets/maplibre-gl.css' rel='stylesheet' />
     <link href='https://fonts.googleapis.com/css2?family=Barlow:wght@100;300;400;500;600;700;900&family=Barlow+Condensed:wght@400;500;600;700;900&display=swap' rel='stylesheet' />
-    <link rel="stylesheet" href="style.css?v=16">
+    <link rel="stylesheet" href="style.css?v=20">
 </head>
 
 <body>
@@ -46,9 +46,18 @@
 
     <div id="map"></div>
 
+    <div id="notifications-panel"></div>
+
     <footer id="footer">
         <div id="footer-left">
-            <span class="footer-label">[AIR]</span>
+            <button id="notif-toggle-btn" aria-label="Toggle notifications">
+                <svg id="notif-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor" fill-opacity="1"/>
+                    <path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/>
+                    <line id="notif-icon-slash" x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" stroke-linecap="square" display="none"/>
+                </svg>
+                <span id="notif-count"></span>
+            </button>
         </div>
         <div id="footer-right">
             <span id="conn-status" class="conn-checking">—</span>
@@ -58,7 +67,7 @@
 
     <script src="./assets/pmtiles.js"></script>
     <script src='./assets/maplibre-gl.js'></script>
-    <script src="main.js?v=39"></script>
+    <script src="main.js?v=42"></script>
 </body>
 
 </html>

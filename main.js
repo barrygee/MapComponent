@@ -25,10 +25,24 @@ let _connState = _isOnline;
 function _checkConn() {
     fetch('https://tile.openstreetmap.org/favicon.ico', { method: 'HEAD', cache: 'no-store', mode: 'no-cors' })
         .then(() => {
-            if (!_connState) { _connState = true;  _setConnStatus(true);  _switchStyle(true);  }
+            if (!_connState) {
+                _connState = true;
+                _setConnStatus(true);
+                _switchStyle(true);
+                if (typeof _Notifications !== 'undefined') {
+                    _Notifications.add({ type: 'system', title: 'ONLINE', detail: 'Connection restored' });
+                }
+            }
         })
         .catch(() => {
-            if (_connState)  { _connState = false; _setConnStatus(false); _switchStyle(false); }
+            if (_connState) {
+                _connState = false;
+                _setConnStatus(false);
+                _switchStyle(false);
+                if (typeof _Notifications !== 'undefined') {
+                    _Notifications.add({ type: 'system', title: 'OFFLINE', detail: 'Connection lost' });
+                }
+            }
         });
 }
 _checkConn(); // immediate check on page load
@@ -301,6 +315,166 @@ function _saveOverlayStates() {
     } catch (e) {}
 }
 // --- End overlay state persistence ---
+
+
+// --- Notifications ---
+// Generalised notification system supporting types: 'flight', 'system', 'message'.
+// Persists across sessions via localStorage ('notifications').
+// Panel is toggled by the footer NOTIFY button; unread count shown as a badge.
+// Flight notifications only fire for actively tracked aircraft.
+
+const _Notifications = (() => {
+    const STORAGE_KEY  = 'notifications';
+    const OPEN_KEY     = 'notificationsOpen';
+
+    // ---- storage ----
+    function _load() {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) { return []; }
+    }
+
+    function _save(items) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch (e) {}
+    }
+
+    // ---- helpers ----
+    function _formatTime(ts) {
+        const d = new Date(ts);
+        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ' LOCAL';
+    }
+
+    function _labelForType(type) {
+        if (type === 'flight')     return 'LANDED';
+        if (type === 'departure')  return 'DEPARTED';
+        if (type === 'system')     return 'SYSTEM';
+        if (type === 'message')    return 'MESSAGE';
+        return 'NOTICE';
+    }
+
+    // ---- DOM ----
+    function _getPanel() { return document.getElementById('notifications-panel'); }
+    function _getBtn()   { return document.getElementById('notif-toggle-btn'); }
+    function _getCount() { return document.getElementById('notif-count'); }
+
+    function _renderItem(item) {
+        const el = document.createElement('div');
+        el.className = 'notif-item';
+        el.dataset.id   = item.id;
+        el.dataset.type = item.type || 'system';
+
+        const detail = item.detail || '';
+
+        el.innerHTML =
+            `<div class="notif-header">` +
+            `<span class="notif-label">${_labelForType(item.type)}</span>` +
+            `<button class="notif-dismiss" aria-label="Dismiss">✕</button>` +
+            `</div>` +
+            `<div class="notif-body">` +
+            `<span class="notif-title">${item.title}</span>` +
+            (detail ? `<span class="notif-detail">${detail}</span>` : '') +
+            `<span class="notif-time">${_formatTime(item.ts)}</span>` +
+            `</div>`;
+
+        el.querySelector('.notif-dismiss').addEventListener('click', (e) => {
+            e.stopPropagation();
+            dismiss(item.id);
+        });
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => { el.classList.add('notif-visible'); });
+        });
+
+        return el;
+    }
+
+    // ---- count label ----
+    function _updateCount() {
+        const el = _getCount();
+        if (!el) return;
+        const count = _load().length;
+        el.textContent = count > 99 ? '99+' : String(count);
+    }
+
+    // ---- render ----
+    function render() {
+        const panel = _getPanel();
+        if (!panel) return;
+        const items = _load();
+        const existingIds = new Set(items.map(i => i.id));
+        panel.querySelectorAll('.notif-item').forEach(el => {
+            if (!existingIds.has(el.dataset.id)) el.remove();
+        });
+        const renderedIds = new Set([...panel.querySelectorAll('.notif-item')].map(el => el.dataset.id));
+        for (const item of items) {
+            if (!renderedIds.has(item.id)) {
+                panel.appendChild(_renderItem(item));
+            }
+        }
+        _updateCount();
+    }
+
+    // ---- public API ----
+
+    // add({ type, title, detail? }) — type: 'flight' | 'system' | 'message'
+    function add(opts) {
+        const item = {
+            id:     opts.type + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+            type:   opts.type   || 'system',
+            title:  opts.title  || '',
+            detail: opts.detail || '',
+            ts:     Date.now(),
+        };
+        const items = _load();
+        items.push(item);
+        _save(items);
+        render();
+    }
+
+    function dismiss(id) {
+        _save(_load().filter(i => i.id !== id));
+        const panel = _getPanel();
+        if (panel) {
+            const el = panel.querySelector(`.notif-item[data-id="${id}"]`);
+            if (el) {
+                el.classList.remove('notif-visible');
+                setTimeout(() => el.remove(), 220);
+            }
+        }
+        _updateCount();
+    }
+
+    // ---- panel open/close ----
+    function _isOpen() {
+        try { return localStorage.getItem(OPEN_KEY) === '1'; } catch (e) { return false; }
+    }
+
+    function _setOpen(open) {
+        try { localStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch (e) {}
+        const panel = _getPanel();
+        const btn   = _getBtn();
+        if (panel) panel.classList.toggle('notif-panel-open', open);
+        if (btn)   btn.classList.toggle('notif-btn-active', open);
+        const slash = document.getElementById('notif-icon-slash');
+        if (slash) slash.setAttribute('display', open ? 'none' : 'inline');
+    }
+
+    function toggle() {
+        _setOpen(!_isOpen());
+    }
+
+    function init() {
+        _setOpen(_isOpen()); // restore panel state
+        render();
+        const btn = _getBtn();
+        if (btn) btn.addEventListener('click', toggle);
+    }
+
+    return { add, dismiss, render, init, toggle };
+})();
+
+// --- End Landing Notifications ---
 
 
 // Custom control for toggling roads
@@ -1436,6 +1610,9 @@ class AdsbLiveControl {
         this._hoverHex    = null;
         this._callsignMarkers = {};  // hex -> MapLibre Marker (HTML callsign label)
         this.labelsVisible = _overlayStates.adsbLabels ?? true;
+        this._prevAlt = {};           // hex -> last known alt_baro (for landing/departure detection)
+        this._hasDeparted = {};       // hex -> bool (true once departure notification fired)
+        this._parkedTimers = {};      // hex -> setTimeout id (remove from map after 1 min)
     }
 
     onAdd(map) {
@@ -2304,6 +2481,82 @@ class AdsbLiveControl {
                             }
                         }
 
+                        // Landing/departure detection for tracked aircraft.
+                        if (hex) {
+                            const prevAlt = this._prevAlt[hex];
+                            const gs      = a.gs ?? 0;
+                            const justLanded  = (prevAlt !== undefined && prevAlt > 0 && alt === 0);
+                            // Departure: alt > 0 AND ground speed > 0 AND we haven't fired yet
+                            const justDeparted = (
+                                alt > 0 && gs > 0 &&
+                                !this._hasDeparted[hex] &&
+                                this._followEnabled && this._selectedHex === hex
+                            );
+                            this._prevAlt[hex] = alt;
+
+                            // Reset departed flag when aircraft is back on ground
+                            if (alt === 0) this._hasDeparted[hex] = false;
+
+                            if (justDeparted) {
+                                this._hasDeparted[hex] = true;
+                                const callsign = (a.flight || '').trim() || (a.r || '').trim() || hex;
+                                const detail   = [a.r, a.t].filter(Boolean).join(' · ') || hex;
+                                _Notifications.add({
+                                    type:   'departure',
+                                    title:  callsign,
+                                    detail: detail !== callsign ? detail : '',
+                                });
+                            }
+
+                            if (justLanded && this._followEnabled && this._selectedHex === hex) {
+                                const callsign = (a.flight || '').trim() || (a.r || '').trim() || hex;
+                                const detail   = [a.r, a.t].filter(Boolean).join(' · ') || hex;
+                                _Notifications.add({
+                                    type:   'flight',
+                                    title:  callsign,
+                                    detail: detail !== callsign ? detail : '',
+                                });
+                                // Schedule removal from map after 1 minute
+                                if (this._parkedTimers[hex]) clearTimeout(this._parkedTimers[hex]);
+                                this._parkedTimers[hex] = setTimeout(() => {
+                                    delete this._parkedTimers[hex];
+                                    delete this._prevAlt[hex];
+                                    delete this._hasDeparted[hex];
+                                    delete this._trails[hex];
+                                    delete this._lastPositions[hex];
+                                    // Remove from geojson features
+                                    this._geojson = {
+                                        type: 'FeatureCollection',
+                                        features: this._geojson.features.filter(f => f.properties.hex !== hex)
+                                    };
+                                    // Also rebuild interpolated features
+                                    if (this._interpolatedFeatures) {
+                                        this._interpolatedFeatures = this._interpolatedFeatures.filter(f => f.properties.hex !== hex);
+                                    }
+                                    // Remove callsign marker
+                                    if (this._callsignMarkers[hex]) {
+                                        this._callsignMarkers[hex].remove();
+                                        delete this._callsignMarkers[hex];
+                                    }
+                                    // If this was the selected/tracked plane, deselect
+                                    if (this._selectedHex === hex) {
+                                        this._selectedHex = null;
+                                        this._followEnabled = false;
+                                        this._hideSelectedTag();
+                                        this._hideStatusBar();
+                                    }
+                                    this._rebuildTrails();
+                                    this._interpolate();
+                                }, 60 * 1000);
+                            }
+
+                            // Cancel any pending removal timer if the plane goes airborne again
+                            if (alt > 0 && this._parkedTimers[hex]) {
+                                clearTimeout(this._parkedTimers[hex]);
+                                delete this._parkedTimers[hex];
+                            }
+                        }
+
                         const gs = a.gs ?? 0;
                         const hexInt = parseInt(hex, 16);
                         const military = a.military === true
@@ -2343,6 +2596,12 @@ class AdsbLiveControl {
             }
             for (const hex of Object.keys(this._lastPositions)) {
                 if (!seen.has(hex)) delete this._lastPositions[hex];
+            }
+            for (const hex of Object.keys(this._prevAlt)) {
+                if (!seen.has(hex) && !this._parkedTimers[hex]) delete this._prevAlt[hex];
+            }
+            for (const hex of Object.keys(this._hasDeparted)) {
+                if (!seen.has(hex)) delete this._hasDeparted[hex];
             }
 
             // Don't push raw API coords to the map — let _interpolate() be the sole
@@ -2904,7 +3163,10 @@ function createMarkerElement(longitude, latitude) {
                         dot.style.animation = 'none';
                         dot.offsetWidth;
                         dot.style.animation = 'marker-dot-end-pulse 0.18s ease-in-out 3 forwards';
-                        after(540, () => { el.dataset.animDone = '1'; });
+                        after(540, () => {
+                            el.dataset.animDone = '1';
+                            el.style.zIndex = '0';
+                        });
                     });
                 }
             }
@@ -2915,6 +3177,7 @@ function createMarkerElement(longitude, latitude) {
     function runIntroAnimation() {
         cancelAll();
         el.dataset.animDone = '0';
+        el.style.zIndex = '9999';
 
         const latText = longitude !== undefined ? latitude.toFixed(3) : '';
         const lonText = longitude !== undefined ? longitude.toFixed(3) : '';
@@ -3046,6 +3309,9 @@ if ('geolocation' in navigator) {
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
     );
 }
+
+// Restore persisted landing notifications on page load
+_Notifications.init();
 
 // --- Logo animation (bracket draw-in + typewriter) ---
 (function () {
