@@ -363,44 +363,27 @@ const _Notifications = (() => {
     function _getBtn()     { return document.getElementById('notif-toggle-btn'); }
     function _getCount()   { return document.getElementById('notif-count'); }
 
-    // ---- scroll buttons ----
-    function _updateScrollBtns() {
-        const list = _getPanel();
-        const btnBar = document.getElementById('notif-scroll-btns');
-        const upBtn  = document.getElementById('notif-scroll-up');
-        const downBtn = document.getElementById('notif-scroll-down');
-        if (!list || !btnBar || !upBtn || !downBtn) return;
-        const canScroll = list.scrollHeight > list.clientHeight;
-        btnBar.classList.toggle('notif-scroll-visible', canScroll);
-        upBtn.disabled   = list.scrollTop <= 0;
-        downBtn.disabled = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+    // ---- scroll indicator ----
+    function _updateScrollIndicator() {
+        const list  = _getPanel();
+        const track = document.getElementById('notif-scrollbar');
+        const thumb = document.getElementById('notif-scrollbar-thumb');
+        if (!list || !track || !thumb) return;
+        const canScroll = list.scrollHeight > list.clientHeight + 1;
+        track.classList.toggle('notif-scrollbar-visible', canScroll);
+        if (!canScroll) return;
+        const ratio      = list.clientHeight / list.scrollHeight;
+        const thumbH     = Math.max(20, ratio * track.clientHeight);
+        const maxTop     = track.clientHeight - thumbH;
+        const scrollRatio = list.scrollTop / (list.scrollHeight - list.clientHeight);
+        thumb.style.height = thumbH + 'px';
+        thumb.style.top    = (scrollRatio * maxTop) + 'px';
     }
 
     function _initScrollBtns() {
-        const list    = _getPanel();
-        const upBtn   = document.getElementById('notif-scroll-up');
-        const downBtn = document.getElementById('notif-scroll-down');
-        if (!list || !upBtn || !downBtn) return;
-
-        upBtn.addEventListener('click', () => {
-            const items = [...list.querySelectorAll('.notif-item')];
-            let target = null;
-            for (let i = items.length - 1; i >= 0; i--) {
-                if (items[i].offsetTop < list.scrollTop) { target = items[i]; break; }
-            }
-            if (target) list.scrollTo({ top: target.offsetTop, behavior: 'smooth' });
-        });
-
-        downBtn.addEventListener('click', () => {
-            const items = [...list.querySelectorAll('.notif-item')];
-            let target = null;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].offsetTop > list.scrollTop) { target = items[i]; break; }
-            }
-            if (target) list.scrollTo({ top: target.offsetTop, behavior: 'smooth' });
-        });
-
-        list.addEventListener('scroll', _updateScrollBtns);
+        const list = _getPanel();
+        if (!list) return;
+        list.addEventListener('scroll', _updateScrollIndicator);
     }
 
     function _renderItem(item) {
@@ -469,7 +452,7 @@ const _Notifications = (() => {
             }
         }
         _updateCount();
-        _updateScrollBtns();
+        _updateScrollIndicator();
     }
 
     // ---- public API ----
@@ -537,7 +520,7 @@ const _Notifications = (() => {
             const el = panel.querySelector(`.notif-item[data-id="${id}"]`);
             if (el) {
                 el.classList.remove('notif-visible');
-                setTimeout(() => { el.remove(); _updateScrollBtns(); }, 220);
+                setTimeout(() => { el.remove(); _updateScrollIndicator(); }, 220);
             }
         }
         _updateCount();
@@ -558,7 +541,7 @@ const _Notifications = (() => {
             // Stop repeating pulse when panel is opened
             _stopBellPulse();
         }
-        if (open) _updateScrollBtns();
+        if (open) _updateScrollIndicator();
     }
 
     let _bellPulseInterval = null;

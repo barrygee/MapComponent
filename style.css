@@ -725,14 +725,22 @@ html {
     opacity: 1;
 }
 
+#notif-list-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+}
+
 #notif-list {
     display: flex;
     flex-direction: column;
     gap: 4px;
     align-items: flex-start;
+    width: 170px;
     /* Cap at ~5 items before scrolling */
     max-height: 580px;
-    overflow-y: scroll;
+    overflow-y: auto;
     scrollbar-width: none; /* Firefox */
     pointer-events: none;
     scroll-snap-type: y mandatory;
@@ -742,45 +750,29 @@ html {
     display: none; /* Chrome/Safari */
 }
 
-#notif-scroll-btns {
-    display: none;
-    gap: 4px;
-    margin-top: 4px;
-    pointer-events: auto;
-    width: 170px;
+/* Custom scrollbar track */
+#notif-scrollbar {
+    width: 2px;
+    margin-left: 6px;
+    align-self: stretch;
+    background: rgba(200, 255, 0, 0.12);
+    position: relative;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
-#notif-scroll-btns.notif-scroll-visible {
-    display: flex;
+#notif-scrollbar.notif-scrollbar-visible {
+    opacity: 1;
 }
 
-#notif-scroll-up,
-#notif-scroll-down {
-    flex: 1;
-    height: 28px;
-    background: #000;
-    border: none;
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 13px;
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.15s, background 0.15s;
-}
-
-#notif-scroll-up:hover,
-#notif-scroll-down:hover {
-    background: #111;
-    color: rgba(255, 255, 255, 0.8);
-}
-
-#notif-scroll-up:disabled,
-#notif-scroll-down:disabled {
-    color: rgba(255, 255, 255, 0.12);
-    cursor: default;
-    background: #000;
+#notif-scrollbar-thumb {
+    position: absolute;
+    left: 0;
+    width: 2px;
+    background: #c8ff00;
+    top: 0;
+    transition: top 0.1s ease, height 0.1s ease;
 }
 
 .notif-item {
