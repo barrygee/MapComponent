@@ -776,29 +776,11 @@ class AirportsToggleControl {
     }
 
     initLayers() {
-        const vis = this.visible ? 'visible' : 'none';
-
         if (this.map.getSource('airports')) {
-            this.map.removeLayer('airports-circle');
             this.map.removeSource('airports');
         }
 
         this.map.addSource('airports', { type: 'geojson', data: AIRPORTS_DATA });
-
-        this.map.addLayer({
-            id: 'airports-circle',
-            type: 'circle',
-            source: 'airports',
-            layout: { visibility: vis },
-            paint: {
-                'circle-radius': 3,
-                'circle-color': '#ffffff',
-                'circle-opacity': 1,
-                'circle-stroke-width': 1,
-                'circle-stroke-color': '#000000',
-                'circle-stroke-opacity': 0.7
-            }
-        });
 
         // Create HTML label markers once — they survive style changes as DOM nodes
         if (!this._markers) {
@@ -878,8 +860,6 @@ class AirportsToggleControl {
 
     toggle() {
         this.visible = !this.visible;
-        const v = this.visible ? 'visible' : 'none';
-        try { this.map.setLayoutProperty('airports-circle', 'visibility', v); } catch (e) {}
         if (this._markers) {
             if (this.visible) this._markers.forEach(m => m.addTo(this.map));
             else {
@@ -978,29 +958,11 @@ class RAFToggleControl {
     }
 
     initLayers() {
-        const vis = this.visible ? 'visible' : 'none';
-
         if (this.map.getSource('raf-bases')) {
-            this.map.removeLayer('raf-circle');
             this.map.removeSource('raf-bases');
         }
 
         this.map.addSource('raf-bases', { type: 'geojson', data: RAF_DATA });
-
-        this.map.addLayer({
-            id: 'raf-circle',
-            type: 'circle',
-            source: 'raf-bases',
-            layout: { visibility: vis },
-            paint: {
-                'circle-radius': 3,
-                'circle-color': '#ffffff',
-                'circle-opacity': 1,
-                'circle-stroke-width': 1,
-                'circle-stroke-color': '#000000',
-                'circle-stroke-opacity': 0.7
-            }
-        });
 
         // Create HTML label markers once — they survive style changes as DOM nodes
         if (!this._markers) {
@@ -1114,8 +1076,6 @@ class RAFToggleControl {
 
     toggle() {
         this.visible = !this.visible;
-        const v = this.visible ? 'visible' : 'none';
-        try { this.map.setLayoutProperty('raf-circle', 'visibility', v); } catch (e) {}
         if (this._markers) {
             if (this.visible) this._markers.forEach(m => m.addTo(this.map));
             else              this._markers.forEach(m => m.remove());
@@ -1612,6 +1572,7 @@ class AdsbLiveControl {
         this.labelsVisible = _overlayStates.adsbLabels ?? true;
         this._prevAlt = {};           // hex -> last known alt_baro (for landing/departure detection)
         this._hasDeparted = {};       // hex -> bool (true once departure notification fired)
+        this._seenOnGround = {};      // hex -> bool (true once observed at alt===0 while tracked)
         this._parkedTimers = {};      // hex -> setTimeout id (remove from map after 1 min)
     }
 
@@ -2486,35 +2447,65 @@ class AdsbLiveControl {
                             const prevAlt = this._prevAlt[hex];
                             const gs      = a.gs ?? 0;
                             const justLanded  = (prevAlt !== undefined && prevAlt > 0 && alt === 0);
+
+                            // Record when this aircraft is observed on the ground while tracked
+                            if (alt === 0 && this._followEnabled && this._selectedHex === hex) {
+                                this._seenOnGround[hex] = true;
+                            }
+
                             // Departure: alt > 0 AND ground speed > 0 AND we haven't fired yet
+                            // AND we previously saw this aircraft at alt===0 while tracking it
                             const justDeparted = (
                                 alt > 0 && gs > 0 &&
                                 !this._hasDeparted[hex] &&
+                                this._seenOnGround[hex] &&
                                 this._followEnabled && this._selectedHex === hex
                             );
                             this._prevAlt[hex] = alt;
 
-                            // Reset departed flag when aircraft is back on ground
-                            if (alt === 0) this._hasDeparted[hex] = false;
+                            // Reset departed flag and ground-seen flag when aircraft is back on ground
+                            if (alt === 0) {
+                                this._hasDeparted[hex] = false;
+                            }
+
+                            // Helper: nearest airport from AIRPORTS_DATA to a given lat/lon
+                            const _nearestAirport = (lat, lon) => {
+                                let best = null, bestDist = Infinity;
+                                for (const f of AIRPORTS_DATA.features) {
+                                    const [aLon, aLat] = f.geometry.coordinates;
+                                    const dLat = (lat - aLat) * Math.PI / 180;
+                                    const dLon = (lon - aLon) * Math.PI / 180;
+                                    const a2 = Math.sin(dLat/2)**2 + Math.cos(aLat * Math.PI/180) * Math.cos(lat * Math.PI/180) * Math.sin(dLon/2)**2;
+                                    const dist = 2 * Math.atan2(Math.sqrt(a2), Math.sqrt(1-a2));
+                                    if (dist < bestDist) { bestDist = dist; best = f.properties; }
+                                }
+                                return best;
+                            };
 
                             if (justDeparted) {
                                 this._hasDeparted[hex] = true;
-                                const callsign = (a.flight || '').trim() || (a.r || '').trim() || hex;
-                                const detail   = [a.r, a.t].filter(Boolean).join(' · ') || hex;
+                                const callsign = (a.flight || '').trim() || (a.r || '').trim();
+                                const apt      = _nearestAirport(a.lat, a.lon);
+                                const aptStr   = apt ? `${apt.name} (${apt.icao})` : '';
+                                const parts    = [a.r, a.t].filter(Boolean);
+                                if (aptStr) parts.push(aptStr);
                                 _Notifications.add({
                                     type:   'departure',
                                     title:  callsign,
-                                    detail: detail !== callsign ? detail : '',
+                                    detail: parts.join(' · '),
                                 });
                             }
 
                             if (justLanded && this._followEnabled && this._selectedHex === hex) {
-                                const callsign = (a.flight || '').trim() || (a.r || '').trim() || hex;
-                                const detail   = [a.r, a.t].filter(Boolean).join(' · ') || hex;
+                                const callsign = (a.flight || '').trim() || (a.r || '').trim();
+                                const apt      = _nearestAirport(a.lat, a.lon);
+                                const aptStr   = apt ? `${apt.name} (${apt.icao})` : '';
+                                const parts    = [a.r, a.t].filter(Boolean);
+                                if (aptStr) parts.push(aptStr);
                                 _Notifications.add({
                                     type:   'flight',
                                     title:  callsign,
-                                    detail: detail !== callsign ? detail : '',
+                                    detail: parts.join(' · '),
                                 });
                                 // Schedule removal from map after 1 minute
                                 if (this._parkedTimers[hex]) clearTimeout(this._parkedTimers[hex]);
@@ -3046,7 +3037,7 @@ function createMarkerElement(longitude, latitude) {
     const CIRC = +(2 * Math.PI * R).toFixed(2); // ~81.68
 
     const CY = 30;
-    const BG_RIGHT = 116;
+    const BG_RIGHT = 97;
     // Background capped exactly to circle height (cy=30, r=13 → y=17 to y=43)
     const BG_Y1 = CY - R; // 17
     const BG_Y2 = CY + R; // 43
@@ -3055,9 +3046,9 @@ function createMarkerElement(longitude, latitude) {
     const arcX2 = CY;
 
     el.innerHTML = `<svg viewBox="0 0 120 60" width="120" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-        <!-- Coord background: left edge is concave arc matching circle, capped at circle top/bottom -->
+        <!-- Coord background: left edge is concave arc matching circle, right edge is convex arc (pill cap) -->
         <path class="marker-coord-bg"
-              d="M ${arcX1},${BG_Y1} A ${R},${R} 0 0,1 ${CY + R},${CY} A ${R},${R} 0 0,1 ${arcX2},${BG_Y2} L ${BG_RIGHT},${BG_Y2} L ${BG_RIGHT},${BG_Y1} Z"
+              d="M ${arcX1},${BG_Y1} A ${R},${R} 0 0,1 ${CY + R},${CY} A ${R},${R} 0 0,1 ${arcX2},${BG_Y2} L ${BG_RIGHT},${BG_Y2} A ${R},${R} 0 0,0 ${BG_RIGHT},${BG_Y1} Z"
               fill="black" opacity="0.75"
               style="clip-path:inset(0 100% 0 0)"/>
         <!-- Outer circle draws on -->
