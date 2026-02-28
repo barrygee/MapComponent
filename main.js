@@ -16,8 +16,8 @@ function _setConnStatus(online) {
 }
 _setConnStatus(_isOnline);
 
-window.addEventListener('online',  () => { _connState = true;  _setConnStatus(true);  _switchStyle(true);  });
-window.addEventListener('offline', () => { _connState = false; _setConnStatus(false); _switchStyle(false); });
+window.addEventListener('online',  () => { _connState = true;  _setConnStatus(true);  _switchStyle(true);  if (typeof _Notifications !== 'undefined') _Notifications.add({ type: 'system', title: 'ONLINE', detail: 'Connection restored' }); });
+window.addEventListener('offline', () => { _connState = false; _setConnStatus(false); _switchStyle(false); if (typeof _Notifications !== 'undefined') _Notifications.add({ type: 'system', title: 'OFFLINE', detail: 'Connection lost' }); });
 
 // Poll real internet connectivity every 2 s and also check immediately on load.
 // mode:'no-cors' resolves for any reachable server; rejects only on network failure.
@@ -384,6 +384,7 @@ const _Notifications = (() => {
         const list = _getPanel();
         if (!list) return;
         list.addEventListener('scroll', _updateScrollIndicator);
+        list.addEventListener('wheel', (e) => { e.stopPropagation(); }, { passive: true });
     }
 
     function _renderItem(item) {
@@ -429,10 +430,11 @@ const _Notifications = (() => {
 
     // ---- count label ----
     function _updateCount() {
-        const el = _getCount();
-        if (!el) return;
         const count = _load().length;
-        el.textContent = count > 99 ? '99+' : String(count);
+        const el = _getCount();
+        if (el) el.textContent = count > 99 ? '99+' : String(count);
+        const btn = document.getElementById('notif-clear-all-btn');
+        if (btn) btn.style.display = (count > 0 && _isOpen()) ? 'block' : 'none';
     }
 
     // ---- render ----
@@ -526,6 +528,22 @@ const _Notifications = (() => {
         _updateCount();
     }
 
+    function clearAll() {
+        const items = _load();
+        if (!items.length) return;
+        items.forEach(i => { delete _actions[i.id]; });
+        _save([]);
+        const panel = _getPanel();
+        if (panel) {
+            panel.querySelectorAll('.notif-item').forEach(el => {
+                el.classList.remove('notif-visible');
+                setTimeout(() => { el.remove(); _updateScrollIndicator(); }, 220);
+            });
+        }
+        _updateCount();
+        _stopBellPulse();
+    }
+
     // ---- panel open/close ----
     function _isOpen() {
         try { return localStorage.getItem(OPEN_KEY) === '1'; } catch (e) { return false; }
@@ -542,6 +560,7 @@ const _Notifications = (() => {
             _stopBellPulse();
         }
         if (open) _updateScrollIndicator();
+        _updateCount();
     }
 
     let _bellPulseInterval = null;
@@ -583,9 +602,11 @@ const _Notifications = (() => {
         render();
         const btn = _getBtn();
         if (btn) btn.addEventListener('click', toggle);
+        const clearBtn = document.getElementById('notif-clear-all-btn');
+        if (clearBtn) clearBtn.addEventListener('click', clearAll);
     }
 
-    return { add, update, dismiss, render, init, toggle };
+    return { add, update, dismiss, clearAll, render, init, toggle };
 })();
 
 // --- End Landing Notifications ---
@@ -1766,9 +1787,9 @@ class AdsbLiveControl {
         const ctx = canvas.getContext('2d');
 
         ctx.beginPath();
-        ctx.moveTo(cx,      cy - 10);  // apex — points north
-        ctx.lineTo(cx + 7,  cy + 8);   // bottom-right
-        ctx.lineTo(cx - 7,  cy + 8);   // bottom-left
+        ctx.moveTo(cx,      cy - 13);  // apex — points north
+        ctx.lineTo(cx + 9,  cy + 10);  // bottom-right
+        ctx.lineTo(cx - 9,  cy + 10);  // bottom-left
         ctx.closePath();
 
         ctx.fillStyle = color;
@@ -1789,6 +1810,10 @@ class AdsbLiveControl {
         // SVG bracket: x=[16,44], y=[17,43]; arms 5 SVG units → 10 canvas px
         const x1 = 4, y1 = 4, x2 = 60, y2 = 56, arm = 10;
 
+        // Semitransparent black background fill
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
+        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+
         ctx.strokeStyle = '#c8ff00';
         ctx.lineWidth   = 3;       // 1.5 logical, matching location marker
         ctx.lineCap     = 'square';
@@ -1805,15 +1830,32 @@ class AdsbLiveControl {
         return ctx.getImageData(0, 0, S, S);
     }
 
-    // Solid filled lime-green rectangle for military aircraft markers.
+    // Bracket corners for military aircraft — same style as civil but black.
     _createMilBracket() {
-        const S = 64;
+        const S   = 64;
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = S;
         const ctx = canvas.getContext('2d');
-        const x1 = 4, y1 = 4, x2 = 60, y2 = 56;
-        ctx.fillStyle = '#c8ff00';
+
+        const x1 = 4, y1 = 4, x2 = 60, y2 = 56, arm = 10;
+
+        // Semitransparent black background fill
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
         ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth   = 3;
+        ctx.lineCap     = 'square';
+
+        // Top-left
+        ctx.beginPath(); ctx.moveTo(x1 + arm, y1); ctx.lineTo(x1, y1); ctx.lineTo(x1, y1 + arm); ctx.stroke();
+        // Top-right
+        ctx.beginPath(); ctx.moveTo(x2 - arm, y1); ctx.lineTo(x2, y1); ctx.lineTo(x2, y1 + arm); ctx.stroke();
+        // Bottom-left
+        ctx.beginPath(); ctx.moveTo(x1 + arm, y2); ctx.lineTo(x1, y2); ctx.lineTo(x1, y2 - arm); ctx.stroke();
+        // Bottom-right
+        ctx.beginPath(); ctx.moveTo(x2 - arm, y2); ctx.lineTo(x2, y2); ctx.lineTo(x2, y2 - arm); ctx.stroke();
+
         return ctx.getImageData(0, 0, S, S);
     }
 
@@ -1825,7 +1867,7 @@ class AdsbLiveControl {
         this.map.addImage('adsb-bracket',     this._createBracket(),            { pixelRatio: 2, sdf: false });
         this.map.addImage('adsb-bracket-mil', this._createMilBracket(),         { pixelRatio: 2, sdf: false });
         this.map.addImage('adsb-blip',        this._createRadarBlip('#ffffff'), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-mil',    this._createRadarBlip('#000000'), { pixelRatio: 2, sdf: false });
+        this.map.addImage('adsb-blip-mil',    this._createRadarBlip('#ffffff'), { pixelRatio: 2, sdf: false });
     }
 
     initLayers() {
