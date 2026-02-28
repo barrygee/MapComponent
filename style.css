@@ -990,13 +990,14 @@ html {
 }
 
 #notif-toggle-btn:hover {
-    background: none;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
     opacity: 1;
 }
 
 #notif-toggle-btn.notif-btn-active {
     opacity: 1;
-    color: #c8ff00;
+    color: #fff;
 }
 
 /* Diagonal line through bell when panel is closed */
