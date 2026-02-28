@@ -3483,9 +3483,18 @@ function createMarkerElement(longitude, latitude) {
 
     function playCoordSequence(latText, lonText) {
         // 1. Slide coord background in
+        coordBg.style.clipPath = 'inset(0 100% 0 0)';
         coordBg.style.animation = 'none';
         coordBg.offsetWidth; // reflow
         coordBg.style.animation = 'marker-coord-bg-in 0.3s ease-out forwards';
+        // Lock in the open state via inline style once animation completes so
+        // MapLibre repaints can't reset the animation-forwards fill.
+        coordBg.addEventListener('animationend', function onBgIn(e) {
+            if (e.animationName !== 'marker-coord-bg-in') return;
+            coordBg.removeEventListener('animationend', onBgIn);
+            coordBg.style.animation = 'none';
+            coordBg.style.clipPath = 'inset(0 0% 0 0)';
+        });
 
         // 2. Type label then value on each line in parallel
         // Each line: type LAT_LABEL chars, then latText chars sequentially
@@ -3542,9 +3551,17 @@ function createMarkerElement(longitude, latitude) {
                     after(45, eraseStep);
                 } else {
                     // All text erased — slide background out right→left
+                    coordBg.style.clipPath = 'inset(0 0% 0 0)';
                     coordBg.style.animation = 'none';
                     coordBg.offsetWidth;
                     coordBg.style.animation = 'marker-coord-bg-out 0.3s ease-in forwards';
+                    // Lock in the hidden state via inline style once animation completes.
+                    coordBg.addEventListener('animationend', function onBgOut(e) {
+                        if (e.animationName !== 'marker-coord-bg-out') return;
+                        coordBg.removeEventListener('animationend', onBgOut);
+                        coordBg.style.animation = 'none';
+                        coordBg.style.clipPath = 'inset(0 100% 0 0)';
+                    });
                     // After bg gone, pulse dot 3× fast (dips transparent, ends opaque)
                     after(300, () => {
                         dot.style.animation = 'none';
