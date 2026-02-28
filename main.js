@@ -2074,7 +2074,7 @@ class AdsbLiveControl {
                 `white-space:nowrap;user-select:none">` +
                 `<div style="display:flex;align-items:center;gap:4px">` +
                 `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:#fff;pointer-events:none">${callsign}</span>` +
-                `${bellBtn}${trkBtn}</div></div>`;
+                `${trkBtn}</div></div>`;
         }
 
         const alt      = props.alt_baro ?? 0;
@@ -2327,6 +2327,14 @@ class AdsbLiveControl {
             }
 
             this._followEnabled = !this._followEnabled;
+            // Disable notifications when tracking is turned off
+            if (!this._followEnabled && this._tagHex) {
+                this._notifEnabled.delete(this._tagHex);
+                if (this._trackingNotifIds && this._trackingNotifIds[this._tagHex]) {
+                    _Notifications.dismiss(this._trackingNotifIds[this._tagHex]);
+                    delete this._trackingNotifIds[this._tagHex];
+                }
+            }
             // Auto-enable notifications when tracking is turned on
             if (this._followEnabled && this._tagHex) {
                 this._notifEnabled.add(this._tagHex);
