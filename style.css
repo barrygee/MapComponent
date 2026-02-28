@@ -723,6 +723,7 @@ html {
     gap: 0;
     visibility: hidden;
     opacity: 0;
+    pointer-events: all;
     transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
@@ -777,7 +778,7 @@ html {
     width: 2px;
     margin-left: 6px;
     align-self: stretch;
-    background: rgba(200, 255, 0, 0.12);
+    background: rgba(0, 0, 0, 0.12);
     position: relative;
     flex-shrink: 0;
     opacity: 0;
@@ -792,7 +793,7 @@ html {
     position: absolute;
     left: 0;
     width: 2px;
-    background: #c8ff00;
+    background: rgba(0, 0, 0, 0.35);
     top: 0;
     transition: top 0.1s ease, height 0.1s ease;
 }
@@ -973,9 +974,10 @@ html {
 #notif-count {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: inherit;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.4);
     line-height: 1;
+    margin-bottom: 4px
 }
 

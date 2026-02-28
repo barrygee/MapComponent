@@ -384,7 +384,10 @@ const _Notifications = (() => {
         const list = _getPanel();
         if (!list) return;
         list.addEventListener('scroll', _updateScrollIndicator);
-        list.addEventListener('wheel', (e) => { e.stopPropagation(); }, { passive: true });
+        const wrap = document.getElementById('notif-list-wrap');
+        if (wrap) {
+            wrap.addEventListener('wheel', (e) => { e.stopPropagation(); e.preventDefault(); list.scrollTop += e.deltaY; }, { passive: false });
+        }
     }
 
     function _renderItem(item) {
