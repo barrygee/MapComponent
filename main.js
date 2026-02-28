@@ -2133,18 +2133,10 @@ class AdsbLiveControl {
         if (props.r)            fields.push(['REG',     props.r]);
         if (props.t)            fields.push(['TYPE',    props.t]);
         fields.push(['ALT',     altStr + vrtArrow]);
-        if (props.alt_geom != null) fields.push(['ALT GEO', props.alt_geom.toLocaleString() + ' ft']);
-        fields.push(['V/S',     vrtStr]);
         fields.push(['GS',      Math.round(props.gs ?? 0) + ' kt']);
-        if (props.ias != null)  fields.push(['IAS',     Math.round(props.ias) + ' kt']);
-        if (props.mach != null) fields.push(['MACH',    'M' + props.mach.toFixed(2)]);
         fields.push(['HDG',     Math.round(props.track ?? 0) + '°']);
-        if (props.nav_altitude != null) fields.push(['NAV ALT', props.nav_altitude.toLocaleString() + ' ft']);
-        if (props.nav_heading  != null) fields.push(['NAV HDG', Math.round(props.nav_heading) + '°']);
         if (props.squawk)       fields.push(['SQUAWK',  props.squawk]);
-        if (props.category)     fields.push(['CAT',     props.category]);
         if (props.emergency && props.emergency !== 'none') fields.push(['EMRG', props.emergency.toUpperCase()]);
-        if (props.rssi != null) fields.push(['RSSI',    props.rssi.toFixed(1) + ' dBFS']);
         if (props.military)     fields.push(['CLASS',   'MILITARY']);
 
         const isEmergency = props.emergency && props.emergency !== 'none';
