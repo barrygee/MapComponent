@@ -327,6 +327,7 @@ const _Notifications = (() => {
     const STORAGE_KEY  = 'notifications';
     const OPEN_KEY     = 'notificationsOpen';
     const _actions     = {};  // id -> { label, callback } — not persisted
+    let _unreadCount   = 0;
 
     // ---- storage ----
     function _load() {
@@ -439,11 +440,11 @@ const _Notifications = (() => {
 
     // ---- count label ----
     function _updateCount() {
-        const count = _load().length;
+        const total = _load().length;
         const el = _getCount();
-        if (el) el.textContent = count > 99 ? '99+' : String(count);
+        if (el) el.textContent = _unreadCount > 99 ? '99+' : String(_unreadCount);
         const btn = document.getElementById('notif-clear-all-btn');
-        if (btn) btn.style.display = (count > 0 && _isOpen()) ? 'block' : 'none';
+        if (btn) btn.style.display = (total > 0 && _isOpen()) ? 'block' : 'none';
     }
 
     // ---- render ----
@@ -488,6 +489,7 @@ const _Notifications = (() => {
         const items = _load();
         items.push(item);
         _save(items);
+        if (!_isOpen()) _unreadCount++;
         render();
         _pulseBell();
         return item.id;
@@ -579,8 +581,9 @@ const _Notifications = (() => {
         if (wrapper) wrapper.classList.toggle('notif-panel-open', open);
         if (btn)     btn.classList.toggle('notif-btn-active', open);
         if (open) {
-            // Stop repeating pulse when panel is opened
+            // Stop repeating pulse when panel is opened and clear unread count
             _stopBellPulse();
+            _unreadCount = 0;
         }
         if (open) _updateScrollIndicator();
         _updateCount();
