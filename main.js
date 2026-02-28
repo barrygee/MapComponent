@@ -2273,11 +2273,6 @@ class AdsbLiveControl {
                     if (this._trackingNotifIds[hex]) _Notifications.dismiss(this._trackingNotifIds[hex]);
                     this._trackingNotifIds[hex] = _Notifications.add({
                         type: 'track', title: _trkCs, detail: _trkDetail,
-                        action: { label: 'DISABLE NOTIFICATION', callback: () => {
-                            this._notifEnabled.delete(hex);
-                            if (this._trackingNotifIds) delete this._trackingNotifIds[hex];
-                            this._rebuildTagForHex(hex);
-                        }},
                     });
                     this._showStatusBar(f.properties);
                     this.map.easeTo({ center: f.geometry.coordinates, duration: 400 });
@@ -2305,11 +2300,6 @@ class AdsbLiveControl {
                 if (this._trackingNotifIds[this._tagHex]) _Notifications.dismiss(this._trackingNotifIds[this._tagHex]);
                 this._trackingNotifIds[this._tagHex] = _Notifications.add({
                     type: 'track', title: _trkCs, detail: _trkDetail,
-                    action: { label: 'DISABLE NOTIFICATION', callback: () => {
-                        this._notifEnabled.delete(this._tagHex);
-                        if (this._trackingNotifIds) delete this._trackingNotifIds[this._tagHex];
-                        this._rebuildTagForHex(this._tagHex);
-                    }},
                 });
             }
 
