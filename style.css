@@ -801,8 +801,8 @@ html {
 .notif-item[data-type="departure"] { border-left: 2px solid #c8ff00; }
 .notif-item[data-type="track"]     { border-left: 2px solid #c8ff00; }
 .notif-item[data-type="tracking"]  { border-left: 2px solid #c8ff00; }
-.notif-item[data-type="notif-off"] { border-left: 2px solid rgba(255, 255, 255, 0.2); }
-.notif-item[data-type="system"]    { border-left: 2px solid rgba(255, 255, 255, 0.2); }
+.notif-item[data-type="notif-off"] { border-left: 2px solid rgba(255, 255, 255, 0.45); }
+.notif-item[data-type="system"]    { border-left: 2px solid rgba(255, 255, 255, 0.45); }
 .notif-item[data-type="message"]   { border-left: 2px solid rgba(100, 160, 255, 0.8); }
 
 .notif-header {
