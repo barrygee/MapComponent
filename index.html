@@ -18,7 +18,7 @@
     <meta name="theme-color" content="#000000">
     <link href='./assets/maplibre-gl.css' rel='stylesheet' />
     <link href='https://fonts.googleapis.com/css2?family=Barlow:wght@100;300;400;500;600;700;900&family=Barlow+Condensed:wght@400;500;600;700;900&display=swap' rel='stylesheet' />
-    <link rel="stylesheet" href="style.css?v=20">
+    <link rel="stylesheet" href="style.css?v=21">
 </head>
 
 <body>
@@ -46,7 +46,13 @@
 
     <div id="map"></div>
 
-    <div id="notifications-panel"></div>
+    <div id="notifications-panel">
+        <div id="notif-list"></div>
+        <div id="notif-scroll-btns">
+            <button id="notif-scroll-up" aria-label="Scroll up">&#8593;</button>
+            <button id="notif-scroll-down" aria-label="Scroll down">&#8595;</button>
+        </div>
+    </div>
 
     <footer id="footer">
         <div id="footer-left">
@@ -54,7 +60,6 @@
                 <svg id="notif-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor" fill-opacity="1"/>
                     <path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/>
-                    <line id="notif-icon-slash" x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="black" stroke-width="1.5" stroke-linecap="square" display="none"/>
                 </svg>
                 <span id="notif-count"></span>
             </button>
@@ -67,7 +72,7 @@
 
     <script src="./assets/pmtiles.js"></script>
     <script src='./assets/maplibre-gl.js'></script>
-    <script src="main.js?v=42"></script>
+    <script src="main.js?v=44"></script>
 </body>
 
 </html>

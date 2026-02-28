@@ -326,6 +326,7 @@ function _saveOverlayStates() {
 const _Notifications = (() => {
     const STORAGE_KEY  = 'notifications';
     const OPEN_KEY     = 'notificationsOpen';
+    const _actions     = {};  // id -> { label, callback } — not persisted
 
     // ---- storage ----
     function _load() {
@@ -348,15 +349,59 @@ const _Notifications = (() => {
     function _labelForType(type) {
         if (type === 'flight')     return 'LANDED';
         if (type === 'departure')  return 'DEPARTED';
+        if (type === 'track')      return 'TRACKING';
+        if (type === 'tracking')   return 'NOTIFICATIONS ON';
+        if (type === 'notif-off')  return 'NOTIFICATIONS OFF';
         if (type === 'system')     return 'SYSTEM';
         if (type === 'message')    return 'MESSAGE';
         return 'NOTICE';
     }
 
     // ---- DOM ----
-    function _getPanel() { return document.getElementById('notifications-panel'); }
-    function _getBtn()   { return document.getElementById('notif-toggle-btn'); }
-    function _getCount() { return document.getElementById('notif-count'); }
+    function _getWrapper() { return document.getElementById('notifications-panel'); }
+    function _getPanel()   { return document.getElementById('notif-list'); }
+    function _getBtn()     { return document.getElementById('notif-toggle-btn'); }
+    function _getCount()   { return document.getElementById('notif-count'); }
+
+    // ---- scroll buttons ----
+    function _updateScrollBtns() {
+        const list = _getPanel();
+        const btnBar = document.getElementById('notif-scroll-btns');
+        const upBtn  = document.getElementById('notif-scroll-up');
+        const downBtn = document.getElementById('notif-scroll-down');
+        if (!list || !btnBar || !upBtn || !downBtn) return;
+        const canScroll = list.scrollHeight > list.clientHeight;
+        btnBar.classList.toggle('notif-scroll-visible', canScroll);
+        upBtn.disabled   = list.scrollTop <= 0;
+        downBtn.disabled = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+    }
+
+    function _initScrollBtns() {
+        const list    = _getPanel();
+        const upBtn   = document.getElementById('notif-scroll-up');
+        const downBtn = document.getElementById('notif-scroll-down');
+        if (!list || !upBtn || !downBtn) return;
+
+        upBtn.addEventListener('click', () => {
+            const items = [...list.querySelectorAll('.notif-item')];
+            let target = null;
+            for (let i = items.length - 1; i >= 0; i--) {
+                if (items[i].offsetTop < list.scrollTop) { target = items[i]; break; }
+            }
+            if (target) list.scrollTo({ top: target.offsetTop, behavior: 'smooth' });
+        });
+
+        downBtn.addEventListener('click', () => {
+            const items = [...list.querySelectorAll('.notif-item')];
+            let target = null;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].offsetTop > list.scrollTop) { target = items[i]; break; }
+            }
+            if (target) list.scrollTo({ top: target.offsetTop, behavior: 'smooth' });
+        });
+
+        list.addEventListener('scroll', _updateScrollBtns);
+    }
 
     function _renderItem(item) {
         const el = document.createElement('div');
@@ -365,6 +410,7 @@ const _Notifications = (() => {
         el.dataset.type = item.type || 'system';
 
         const detail = item.detail || '';
+        const action = _actions[item.id];
 
         el.innerHTML =
             `<div class="notif-header">` +
@@ -375,12 +421,21 @@ const _Notifications = (() => {
             `<span class="notif-title">${item.title}</span>` +
             (detail ? `<span class="notif-detail">${detail}</span>` : '') +
             `<span class="notif-time">${_formatTime(item.ts)}</span>` +
+            (action ? `<button class="notif-action">${action.label}</button>` : '') +
             `</div>`;
 
         el.querySelector('.notif-dismiss').addEventListener('click', (e) => {
             e.stopPropagation();
             dismiss(item.id);
         });
+
+        if (action) {
+            el.querySelector('.notif-action').addEventListener('click', (e) => {
+                e.stopPropagation();
+                action.callback();
+                dismiss(item.id);
+            });
+        }
 
         requestAnimationFrame(() => {
             requestAnimationFrame(() => { el.classList.add('notif-visible'); });
@@ -407,17 +462,19 @@ const _Notifications = (() => {
             if (!existingIds.has(el.dataset.id)) el.remove();
         });
         const renderedIds = new Set([...panel.querySelectorAll('.notif-item')].map(el => el.dataset.id));
-        for (const item of items) {
+        for (let i = items.length - 1; i >= 0; i--) {
+            const item = items[i];
             if (!renderedIds.has(item.id)) {
-                panel.appendChild(_renderItem(item));
+                panel.prepend(_renderItem(item));
             }
         }
         _updateCount();
+        _updateScrollBtns();
     }
 
     // ---- public API ----
 
-    // add({ type, title, detail? }) — type: 'flight' | 'system' | 'message'
+    // add({ type, title, detail?, action?: { label, callback } }) — type: 'flight' | 'system' | 'message' | 'tracking'
     function add(opts) {
         const item = {
             id:     opts.type + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
@@ -426,20 +483,61 @@ const _Notifications = (() => {
             detail: opts.detail || '',
             ts:     Date.now(),
         };
+        if (opts.action) _actions[item.id] = opts.action;
         const items = _load();
         items.push(item);
         _save(items);
         render();
+        _pulseBell();
+        return item.id;
+    }
+
+    // update({ id, type?, title?, detail?, action? }) — mutate an existing item in-place
+    function update(opts) {
+        const items = _load();
+        const item = items.find(i => i.id === opts.id);
+        if (!item) return;
+        if (opts.type   !== undefined) item.type   = opts.type;
+        if (opts.title  !== undefined) item.title  = opts.title;
+        if (opts.detail !== undefined) item.detail = opts.detail;
+        if (opts.action !== undefined) {
+            if (opts.action) _actions[item.id] = opts.action;
+            else             delete _actions[item.id];
+        }
+        _save(items);
+        // Re-render the DOM element in-place
+        const panel = _getPanel();
+        if (panel) {
+            const el = panel.querySelector(`.notif-item[data-id="${item.id}"]`);
+            if (el) {
+                el.dataset.type = item.type;
+                const action = _actions[item.id];
+                el.querySelector('.notif-label').textContent = _labelForType(item.type);
+                el.querySelector('.notif-title').textContent = item.title;
+                const detailEl = el.querySelector('.notif-detail');
+                if (detailEl) detailEl.textContent = item.detail;
+                const oldAction = el.querySelector('.notif-action');
+                if (oldAction) oldAction.remove();
+                if (action) {
+                    const ab = document.createElement('button');
+                    ab.className = 'notif-action';
+                    ab.textContent = action.label;
+                    ab.addEventListener('click', (e) => { e.stopPropagation(); action.callback(); dismiss(item.id); });
+                    el.querySelector('.notif-time').insertAdjacentElement('afterend', ab);
+                }
+            }
+        }
     }
 
     function dismiss(id) {
+        delete _actions[id];
         _save(_load().filter(i => i.id !== id));
         const panel = _getPanel();
         if (panel) {
             const el = panel.querySelector(`.notif-item[data-id="${id}"]`);
             if (el) {
                 el.classList.remove('notif-visible');
-                setTimeout(() => el.remove(), 220);
+                setTimeout(() => { el.remove(); _updateScrollBtns(); }, 220);
             }
         }
         _updateCount();
@@ -452,12 +550,44 @@ const _Notifications = (() => {
 
     function _setOpen(open) {
         try { localStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch (e) {}
-        const panel = _getPanel();
-        const btn   = _getBtn();
-        if (panel) panel.classList.toggle('notif-panel-open', open);
-        if (btn)   btn.classList.toggle('notif-btn-active', open);
-        const slash = document.getElementById('notif-icon-slash');
-        if (slash) slash.setAttribute('display', open ? 'none' : 'inline');
+        const wrapper = _getWrapper();
+        const btn     = _getBtn();
+        if (wrapper) wrapper.classList.toggle('notif-panel-open', open);
+        if (btn)     btn.classList.toggle('notif-btn-active', open);
+        if (open) {
+            // Stop repeating pulse when panel is opened
+            _stopBellPulse();
+        }
+        if (open) _updateScrollBtns();
+    }
+
+    let _bellPulseInterval = null;
+
+    function _pulseBell() {
+        if (_isOpen()) return;
+        const btn = _getBtn();
+        if (!btn) return;
+        // Trigger one 3-pulse burst immediately
+        btn.classList.remove('notif-btn-unread');
+        void btn.offsetWidth; // reflow to restart animation
+        btn.classList.add('notif-btn-unread');
+        // Repeat every 15 seconds until panel is opened
+        if (!_bellPulseInterval) {
+            _bellPulseInterval = setInterval(() => {
+                if (_isOpen()) { _stopBellPulse(); return; }
+                const b = _getBtn();
+                if (!b) return;
+                b.classList.remove('notif-btn-unread');
+                void b.offsetWidth;
+                b.classList.add('notif-btn-unread');
+            }, 15000);
+        }
+    }
+
+    function _stopBellPulse() {
+        if (_bellPulseInterval) { clearInterval(_bellPulseInterval); _bellPulseInterval = null; }
+        const btn = _getBtn();
+        if (btn) { btn.classList.remove('notif-btn-unread'); void btn.offsetWidth; }
     }
 
     function toggle() {
@@ -465,13 +595,14 @@ const _Notifications = (() => {
     }
 
     function init() {
+        _initScrollBtns();
         _setOpen(_isOpen()); // restore panel state
         render();
         const btn = _getBtn();
         if (btn) btn.addEventListener('click', toggle);
     }
 
-    return { add, dismiss, render, init, toggle };
+    return { add, update, dismiss, render, init, toggle };
 })();
 
 // --- End Landing Notifications ---
@@ -1574,6 +1705,7 @@ class AdsbLiveControl {
         this._hasDeparted = {};       // hex -> bool (true once departure notification fired)
         this._seenOnGround = {};      // hex -> bool (true once observed at alt===0 while tracked)
         this._parkedTimers = {};      // hex -> setTimeout id (remove from map after 1 min)
+        this._notifEnabled = new Set(); // hex -> notifications enabled (independent of tracking)
     }
 
     onAdd(map) {
@@ -1847,6 +1979,7 @@ class AdsbLiveControl {
 
         // Tracking mode only applies to the specific plane being tracked.
         const isTracked  = this._followEnabled && props.hex === this._tagHex;
+        const notifOn    = this._notifEnabled.has(props.hex);
         const trkColor   = isTracked ? '#c8ff00' : 'rgba(255,255,255,0.3)';
         const trkBtnText = isTracked ? 'TRACKING' : 'TRACK';
         const trkBtn = `<button class="tag-follow-btn" style="` +
@@ -1855,7 +1988,18 @@ class AdsbLiveControl {
             `font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1;` +
             `touch-action:manipulation;-webkit-tap-highlight-color:transparent">${trkBtnText}</button>`;
 
-        // When tracking, show only callsign + button — data is in the status bar below.
+        const bellColor = notifOn ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+        const bellBtn = `<button class="tag-notif-btn" data-hex="${props.hex}" style="` +
+            `background:none;border:none;cursor:pointer;padding:8px 6px;` +
+            `color:${bellColor};line-height:1;` +
+            `touch-action:manipulation;-webkit-tap-highlight-color:transparent" aria-label="Toggle notifications">` +
+            `<svg width="11" height="11" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">` +
+            `<path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor"/>` +
+            `<path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/>` +
+            (notifOn ? '' : `<line x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>`) +
+            `</svg></button>`;
+
+        // When tracking, show only callsign + buttons — data is in the status bar below.
         if (isTracked) {
             return `<div style="` +
                 `background:rgba(0,0,0,0.7);` +
@@ -1865,7 +2009,7 @@ class AdsbLiveControl {
                 `font-size:13px;font-weight:400;` +
                 `padding:1px 8px;` +
                 `white-space:nowrap;user-select:none">` +
-                `<div style="display:flex;align-items:center;gap:12px">` +
+                `<div style="display:flex;align-items:center;gap:4px">` +
                 `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:#fff;pointer-events:none">${callsign}</span>` +
                 `${trkBtn}</div></div>`;
         }
@@ -1900,10 +2044,11 @@ class AdsbLiveControl {
             `font-size:14px;font-weight:400;` +
             `padding:6px 14px 9px;` +
             `white-space:nowrap;user-select:none">` +
-            `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;` +
+            `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;` +
             `font-weight:600;font-size:15px;letter-spacing:.12em;` +
             `margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
-            `<span style="font-size:13px;font-weight:400;pointer-events:none">${callsign}</span>${trkBtn}</div>` +
+            `<span style="font-size:13px;font-weight:400;pointer-events:none">${callsign}</span>` +
+            `<div style="display:flex;align-items:center;gap:0">${bellBtn}${trkBtn}</div></div>` +
             `<div style="pointer-events:none">` + rowsHTML + `</div></div>`;
     }
 
@@ -2010,6 +2155,61 @@ class AdsbLiveControl {
         const btn = el.querySelector('.tag-follow-btn');
         if (!btn) return;
 
+        // Wire the notification bell button
+        const bellBtn = el.querySelector('.tag-notif-btn');
+        if (bellBtn) {
+            bellBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+            bellBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const hex = bellBtn.dataset.hex || overrideHex || this._tagHex;
+                if (!hex) return;
+
+                const wasEnabled = this._notifEnabled.has(hex);
+                const f = this._geojson.features.find(f => f.properties.hex === hex);
+                const callsign = f ? ((f.properties.flight || '').trim() || (f.properties.r || '').trim() || hex) : hex;
+                const detail   = f ? [f.properties.r, f.properties.t].filter(Boolean).join(' · ') : '';
+                if (!this._trackingNotifIds) this._trackingNotifIds = {};
+
+                if (wasEnabled) {
+                    this._notifEnabled.delete(hex);
+                    // Dismiss any existing notif and add a fresh notifications-off one
+                    if (this._trackingNotifIds[hex]) {
+                        _Notifications.dismiss(this._trackingNotifIds[hex]);
+                        delete this._trackingNotifIds[hex];
+                    }
+                    _Notifications.add({ type: 'notif-off', title: callsign, detail: detail || undefined });
+                } else {
+                    this._notifEnabled.add(hex);
+                    // Dismiss any previous notif for this plane before creating a new one
+                    if (this._trackingNotifIds[hex]) {
+                        _Notifications.dismiss(this._trackingNotifIds[hex]);
+                    }
+                    this._trackingNotifIds[hex] = _Notifications.add({
+                        type:   'tracking',
+                        title:  callsign,
+                        detail: detail || undefined,
+                        action: {
+                            label: 'DISABLE NOTIFICATIONS',
+                            callback: () => {
+                                this._notifEnabled.delete(hex);
+                                if (this._trackingNotifIds) delete this._trackingNotifIds[hex];
+                                this._rebuildTagForHex(hex);
+                                _Notifications.add({ type: 'notif-off', title: callsign, detail: detail || undefined });
+                            },
+                        },
+                    });
+                }
+
+                // Update bell colour in-place immediately, then sync the stored marker
+                const nowEnabled = this._notifEnabled.has(hex);
+                bellBtn.style.color = nowEnabled ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+                const slash = bellBtn.querySelector('line');
+                if (slash) slash.setAttribute('display', nowEnabled ? 'none' : 'inline');
+                // Rebuild stored tag marker so it stays in sync if re-opened
+                this._rebuildTagForHex(hex);
+            });
+        }
+
         // MapLibre calls e.preventDefault() on every mousedown on the marker element,
         // which suppresses the subsequent click event. Stop propagation from the button
         // so MapLibre's mousedown handler never sees presses originating here.
@@ -2035,10 +2235,24 @@ class AdsbLiveControl {
                 this._hideHoverTagNow();
                 this._applySelection();
                 // _applySelection will create the tag marker and show the selected tag.
-                // Enable tracking after the marker is created.
+                // Enable tracking and notifications after the marker is created.
                 this._followEnabled = true;
+                this._notifEnabled.add(hex);
                 const f = this._geojson.features.find(f => f.properties.hex === hex);
                 if (f) {
+                    const _trkCs = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || hex;
+                    const _trkDetail = [f.properties.r, f.properties.t].filter(Boolean).join(' · ') || undefined;
+                    if (!this._trackingNotifIds) this._trackingNotifIds = {};
+                    if (this._trackingNotifIds[hex]) _Notifications.dismiss(this._trackingNotifIds[hex]);
+                    this._trackingNotifIds[hex] = _Notifications.add({
+                        type: 'track', title: _trkCs, detail: _trkDetail,
+                        action: { label: 'DISABLE NOTIFICATIONS', callback: () => {
+                            this._notifEnabled.delete(hex);
+                            if (this._trackingNotifIds) delete this._trackingNotifIds[hex];
+                            this._rebuildTagForHex(hex);
+                            _Notifications.add({ type: 'notif-off', title: _trkCs, detail: _trkDetail });
+                        }},
+                    });
                     this._showStatusBar(f.properties);
                     this.map.easeTo({ center: f.geometry.coordinates, duration: 400 });
                     // Rebuild the tag marker in tracking layout.
@@ -2055,6 +2269,24 @@ class AdsbLiveControl {
             }
 
             this._followEnabled = !this._followEnabled;
+            // Auto-enable notifications when tracking is turned on
+            if (this._followEnabled && this._tagHex) {
+                this._notifEnabled.add(this._tagHex);
+                const _trkF = this._geojson.features.find(f => f.properties.hex === this._tagHex);
+                const _trkCs = _trkF ? ((_trkF.properties.flight || '').trim() || (_trkF.properties.r || '').trim() || this._tagHex) : this._tagHex;
+                const _trkDetail = _trkF ? ([_trkF.properties.r, _trkF.properties.t].filter(Boolean).join(' · ') || undefined) : undefined;
+                if (!this._trackingNotifIds) this._trackingNotifIds = {};
+                if (this._trackingNotifIds[this._tagHex]) _Notifications.dismiss(this._trackingNotifIds[this._tagHex]);
+                this._trackingNotifIds[this._tagHex] = _Notifications.add({
+                    type: 'track', title: _trkCs, detail: _trkDetail,
+                    action: { label: 'DISABLE NOTIFICATIONS', callback: () => {
+                        this._notifEnabled.delete(this._tagHex);
+                        if (this._trackingNotifIds) delete this._trackingNotifIds[this._tagHex];
+                        this._rebuildTagForHex(this._tagHex);
+                        _Notifications.add({ type: 'notif-off', title: _trkCs, detail: _trkDetail });
+                    }},
+                });
+            }
 
             // Re-create the marker so the anchor updates (top-left for data box, left for tracking).
             if (this._tagHex) {
@@ -2079,6 +2311,23 @@ class AdsbLiveControl {
                 }
             }
         });
+    }
+
+    _rebuildTagForHex(hex) {
+        if (!hex || hex !== this._tagHex) return;
+        const f = this._geojson.features.find(f => f.properties.hex === hex);
+        if (!f) return;
+        const coords = this._interpolatedCoords(hex) || f.geometry.coordinates;
+        const newEl = document.createElement('div');
+        newEl.innerHTML = this._buildTagHTML(f.properties);
+        this._wireTagButton(newEl);
+        if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
+        const isTracked = this._followEnabled && hex === this._tagHex;
+        const anchor = isTracked ? 'left' : 'top-left';
+        const offset = isTracked ? [14, 0] : [14, -13];
+        this._tagMarker = new maplibregl.Marker({ element: newEl, anchor, offset })
+            .setLngLat(coords)
+            .addTo(this.map);
     }
 
     _showSelectedTag(feature) {
@@ -2448,18 +2697,18 @@ class AdsbLiveControl {
                             const gs      = a.gs ?? 0;
                             const justLanded  = (prevAlt !== undefined && prevAlt > 0 && alt === 0);
 
-                            // Record when this aircraft is observed on the ground while tracked
-                            if (alt === 0 && this._followEnabled && this._selectedHex === hex) {
+                            // Record when this aircraft is observed on the ground while notifications enabled
+                            if (alt === 0 && this._notifEnabled.has(hex)) {
                                 this._seenOnGround[hex] = true;
                             }
 
                             // Departure: alt > 0 AND ground speed > 0 AND we haven't fired yet
-                            // AND we previously saw this aircraft at alt===0 while tracking it
+                            // AND we previously saw this aircraft at alt===0 while notifications enabled
                             const justDeparted = (
                                 alt > 0 && gs > 0 &&
                                 !this._hasDeparted[hex] &&
                                 this._seenOnGround[hex] &&
-                                this._followEnabled && this._selectedHex === hex
+                                this._notifEnabled.has(hex)
                             );
                             this._prevAlt[hex] = alt;
 
@@ -2496,7 +2745,7 @@ class AdsbLiveControl {
                                 });
                             }
 
-                            if (justLanded && this._followEnabled && this._selectedHex === hex) {
+                            if (justLanded && this._notifEnabled.has(hex)) {
                                 const callsign = (a.flight || '').trim() || (a.r || '').trim();
                                 const apt      = _nearestAirport(a.lat, a.lon);
                                 const aptStr   = apt ? `${apt.name} (${apt.icao})` : '';
