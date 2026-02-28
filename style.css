@@ -603,14 +603,15 @@ html {
     display: flex;
 }
 
-/* ---- Tooltips (minimised state only) ---- */
-/* Applied to .sm-btn and .sm-nav-btn when menu is not expanded */
+/* ---- Tooltips ---- */
 #side-menu:not(.expanded) .sm-btn[data-tooltip],
 #side-menu:not(.expanded) .sm-nav-btn[data-tooltip],
-#side-menu:not(.expanded) #side-menu-toggle[data-tooltip] {
+#side-menu:not(.expanded) #side-menu-toggle[data-tooltip],
+#side-menu.expanded .sm-nav-btn[data-tooltip] {
     position: relative;
 }
 
+/* Minimised: tooltip appears to the left */
 #side-menu:not(.expanded) .sm-btn[data-tooltip]::before,
 #side-menu:not(.expanded) .sm-nav-btn[data-tooltip]::before,
 #side-menu:not(.expanded) #side-menu-toggle[data-tooltip]::before {
@@ -640,6 +641,62 @@ html {
 #side-menu:not(.expanded) .sm-btn[data-tooltip]:hover::before,
 #side-menu:not(.expanded) .sm-nav-btn[data-tooltip]:hover::before,
 #side-menu:not(.expanded) #side-menu-toggle[data-tooltip]:hover::before {
+    opacity: 1;
+}
+
+/* Expanded: nav button tooltips — all anchored to the left of the + button.
+   Each button is (148-8)/3 = 46.67px wide with 4px gaps, so step = 50.67px. */
+#side-menu.expanded #sm-group-nav .sm-nav-btn[data-tooltip],
+#side-menu.expanded #side-menu-toggle[data-tooltip] {
+    position: relative;
+}
+
+#side-menu.expanded #sm-group-nav .sm-nav-btn[data-tooltip]::before,
+#side-menu.expanded #side-menu-toggle[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #000;
+    color: rgba(255,255,255,0.75);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0 10px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 901;
+}
+
+/* + button (1st): tooltip sits directly to its left */
+#side-menu.expanded #sm-group-nav .sm-nav-btn:nth-child(1)[data-tooltip]::before {
+    right: calc(100% + 8px);
+}
+
+/* − button (2nd): offset left by one button+gap width extra */
+#side-menu.expanded #sm-group-nav .sm-nav-btn:nth-child(2)[data-tooltip]::before {
+    right: calc(100% + 8px + 50.67px);
+}
+
+/* location button (3rd): offset left by two button+gap widths extra */
+#side-menu.expanded #sm-group-nav .sm-nav-btn:nth-child(3)[data-tooltip]::before {
+    right: calc(100% + 8px + 101.33px);
+}
+
+/* Toggle (minimise) button tooltip: to the left */
+#side-menu.expanded #side-menu-toggle[data-tooltip]::before {
+    right: calc(100% + 8px);
+}
+
+#side-menu.expanded #sm-group-nav .sm-nav-btn[data-tooltip]:hover::before,
+#side-menu.expanded #side-menu-toggle[data-tooltip]:hover::before {
     opacity: 1;
 }
 

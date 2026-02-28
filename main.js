@@ -2614,7 +2614,7 @@ let _onGoToUserLocation = null;
     const LOC_SVG = `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="7.5" stroke="#c8ff00" stroke-width="1.8"/><circle cx="10" cy="10" r="2" fill="white"/></svg>`;
     // SVG replicates the canvas marker exactly. Canvas coords: bracket x=4..60 y=4..56 arm=10,
     // triangle cx=32 cy=32 apex=(32,22) base=(25,40)+(39,40). ViewBox offset by (4,4) → 0 0 56 52.
-    const PLANE_SVG = `<svg width="16" height="15" viewBox="0 0 56 52" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="28,14 40,40 28,33 16,40" fill="#ffffff" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" transform="rotate(-45 28 27)"/><polyline points="10,0 0,0 0,10" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="46,0 56,0 56,10" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="10,52 0,52 0,42" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="46,52 56,52 56,42" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/></svg>`;
+    const PLANE_SVG = `<svg width="16" height="15" viewBox="0 0 56 52" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="28,18 35,36 28,33 21,36" fill="#ffffff"/><polyline points="10,0 0,0 0,10" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="46,0 56,0 56,10" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="10,52 0,52 0,42" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/><polyline points="46,52 56,52 56,42" stroke="rgba(200,255,0,0.75)" stroke-width="3" stroke-linecap="square"/></svg>`;
 
     function makeNavBtn(content, title, onClick, isHTML) {
         const btn = document.createElement('button');
@@ -2667,6 +2667,7 @@ let _onGoToUserLocation = null;
         expanded = !expanded;
         panel.classList.toggle('expanded', expanded);
         toggleBtn.textContent = expanded ? '›' : '‹';
+        toggleBtn.dataset.tooltip = expanded ? 'COLLAPSE MENU' : 'EXPAND MENU';
     });
     toggleGroup.appendChild(toggleBtn);
     panel.appendChild(toggleGroup);
