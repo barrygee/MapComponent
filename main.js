@@ -1796,17 +1796,31 @@ class AdsbLiveControl {
 
     // Small solid directional triangle pointing north — rotated by icon-rotate
     // to match aircraft track. S=64 canvas, pixelRatio 2 → 32px logical.
-    _createRadarBlip(color = '#ffffff') {
+    _createRadarBlip(color = '#ffffff', scale = 1) {
         const S  = 64;
         const cx = S / 2, cy = S / 2;
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = S;
         const ctx = canvas.getContext('2d');
 
+        // Base vertices centred on canvas
+        const apex  = { x: cx,      y: cy - 13 };
+        const bR    = { x: cx +  9, y: cy + 10 };
+        const bL    = { x: cx -  9, y: cy + 10 };
+
+        // Centroid of the triangle
+        const gcx = (apex.x + bR.x + bL.x) / 3;
+        const gcy = (apex.y + bR.y + bL.y) / 3;
+
+        // Scale each vertex around the centroid
+        const s = (v) => ({ x: gcx + (v.x - gcx) * scale, y: gcy + (v.y - gcy) * scale });
+
+        const A = s(apex), B = s(bR), C = s(bL);
+
         ctx.beginPath();
-        ctx.moveTo(cx,      cy - 13);  // apex — points north
-        ctx.lineTo(cx + 9,  cy + 10);  // bottom-right
-        ctx.lineTo(cx - 9,  cy + 10);  // bottom-left
+        ctx.moveTo(A.x, A.y);
+        ctx.lineTo(B.x, B.y);
+        ctx.lineTo(C.x, C.y);
         ctx.closePath();
 
         ctx.fillStyle = color;
@@ -1856,8 +1870,8 @@ class AdsbLiveControl {
 
         const x1 = 4, y1 = 4, x2 = 60, y2 = 56, arm = 10;
 
-        // Semitransparent black background fill
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
+        // Semitransparent green background fill
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
         ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
 
         ctx.strokeStyle = '#000000';
@@ -1883,8 +1897,8 @@ class AdsbLiveControl {
         if (this.map.hasImage('adsb-blip-mil'))    this.map.removeImage('adsb-blip-mil');
         this.map.addImage('adsb-bracket',     this._createBracket(),            { pixelRatio: 2, sdf: false });
         this.map.addImage('adsb-bracket-mil', this._createMilBracket(),         { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip',        this._createRadarBlip('#ffffff'), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-mil',    this._createRadarBlip('#ffffff'), { pixelRatio: 2, sdf: false });
+        this.map.addImage('adsb-blip',        this._createRadarBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false });
+        this.map.addImage('adsb-blip-mil',    this._createRadarBlip('#c8ff00', 1.1), { pixelRatio: 2, sdf: false });
     }
 
     initLayers() {
