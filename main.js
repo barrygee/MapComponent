@@ -3252,7 +3252,7 @@ let _onGoToUserLocation = null;
     overlayGroup.appendChild(makeOverlayBtn('◎',   '16px', 'RANGE RINGS',    () => rangeRingsControl ? rangeRingsControl.ringsVisible : false, () => { if (rangeRingsControl) rangeRingsControl.toggleRings(); }));
     overlayGroup.appendChild(makeOverlayBtn('=',   '16px', 'A2A REFUELING',  () => aarControl ? aarControl.visible : false,                   () => { if (aarControl) aarControl.toggle(); }));
     overlayGroup.appendChild(makeOverlayBtn('○',   '16px', 'AWACS',          () => awacsControl ? awacsControl.visible : false,               () => { if (awacsControl) awacsControl.toggle(); }));
-    const labelsBtn = makeOverlayBtn('LBL', '8px', 'CALLSIGNS', () => adsbLabelsControl ? adsbLabelsControl.labelsVisible : false, () => { if (adsbLabelsControl) adsbLabelsControl.toggle(); });
+    const labelsBtn = makeOverlayBtn('CALL', '8px', 'CALLSIGNS', () => adsbLabelsControl ? adsbLabelsControl.labelsVisible : false, () => { if (adsbLabelsControl) adsbLabelsControl.toggle(); });
     function syncLabelsBtn() {
         const planesOn = adsbControl ? adsbControl.visible : false;
         labelsBtn.classList.toggle('sm-planes-off', !planesOn);
