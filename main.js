@@ -4343,6 +4343,8 @@ function createMarkerElement(longitude, latitude) {
 
 function setUserLocation(position) {
     const { longitude, latitude } = position.coords;
+    const isFirstFix = !userMarker;
+    console.log('[location] setUserLocation called', { longitude, latitude, isFirstFix, fromCache: !!position._fromCache });
 
     // Add or update marker for user's location
     if (userMarker) {
@@ -4356,6 +4358,11 @@ function setUserLocation(position) {
         userMarker = new maplibregl.Marker({ element: createMarkerElement(longitude, latitude), anchor: 'center' })
             .setLngLat([longitude, latitude])
             .addTo(map);
+    }
+
+    // On the first live GPS fix, fly to the user's location so the marker is visible
+    if (isFirstFix && !position._fromCache) {
+        map.flyTo({ center: [longitude, latitude], zoom: Math.max(map.getZoom(), 10) });
     }
 
     // Update range rings centre to user's location
@@ -4392,7 +4399,7 @@ if (cachedLocation) {
     try {
         const { longitude, latitude, ts } = JSON.parse(cachedLocation);
         if (Date.now() - (ts || 0) < 5 * 60 * 1000) {
-            setUserLocation({ coords: { longitude, latitude } });
+            setUserLocation({ coords: { longitude, latitude }, _fromCache: true });
         } else {
             localStorage.removeItem('userLocation');
         }
@@ -4403,11 +4410,14 @@ if (cachedLocation) {
 
 // Continuously watch for location changes
 if ('geolocation' in navigator) {
+    console.log('[location] registering watchPosition');
     navigator.geolocation.watchPosition(
         setUserLocation,
-        (error) => { console.error('Error getting geolocation:', error); },
+        (error) => { console.error('[location] watchPosition error:', error.code, error.message); },
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
     );
+} else {
+    console.warn('[location] geolocation not available in navigator');
 }
 
 // Restore persisted landing notifications on page load
