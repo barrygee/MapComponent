@@ -4026,21 +4026,7 @@ const _FilterPanel = (() => {
 
     function _repositionPanel() {
         const panel = _getPanel();
-        const bar = document.getElementById('adsb-status-bar');
-        const barVisible = bar && bar.classList.contains('adsb-sb-visible');
-        const base = 44 + 8; // footer height + gap
-
-        // Position filter panel at base (its CSS default)
         if (panel) panel.style.bottom = '';
-
-        // If tracking bar is visible and filter panel is open, stack bar above filter panel
-        if (bar) {
-            if (barVisible && panel && _open) {
-                bar.style.bottom = (base + panel.offsetHeight + 8) + 'px';
-            } else {
-                bar.style.bottom = '';
-            }
-        }
     }
 
     function _getFilterBtn() { return document.getElementById('sm-filter-btn'); }
