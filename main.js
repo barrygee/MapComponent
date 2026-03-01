@@ -3575,8 +3575,12 @@ let _syncSideMenuForPlanes = null;
     }
 
     const overlayGroup = makeGroup();
-    overlayGroup.appendChild(makeOverlayBtn('CVL', '8px',  'AIRPORTS',       () => airportsControl ? airportsControl.visible : false,         () => { if (airportsControl) airportsControl.toggle(); }));
-    overlayGroup.appendChild(makeOverlayBtn('MIL', '8px',  'MILITARY BASES', () => rafControl ? rafControl.visible : false,                   () => { if (rafControl) rafControl.toggle(); }));
+    const cvlBtn = makeOverlayBtn('CVL', '8px',  'AIRPORTS',       () => airportsControl ? airportsControl.visible : false,         () => { if (airportsControl) airportsControl.toggle(); });
+    cvlBtn.classList.add('sm-expanded-only');
+    overlayGroup.appendChild(cvlBtn);
+    const milBtn = makeOverlayBtn('MIL', '8px',  'MILITARY BASES', () => rafControl ? rafControl.visible : false,                   () => { if (rafControl) rafControl.toggle(); });
+    milBtn.classList.add('sm-expanded-only');
+    overlayGroup.appendChild(milBtn);
     const roadsBtn = makeOverlayBtn('R', '14px', 'ROADS',  () => roadsControl ? roadsControl.roadsVisible : false, () => { if (roadsControl) roadsControl.toggleRoads(); });
     roadsBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(roadsBtn);
@@ -3584,13 +3588,10 @@ let _syncSideMenuForPlanes = null;
     citiesBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(citiesBtn);
     const ringsBtn = makeOverlayBtn('◎',   '16px', 'RANGE RINGS',    () => rangeRingsControl ? rangeRingsControl.ringsVisible : false, () => { if (rangeRingsControl) rangeRingsControl.toggleRings(); });
-    ringsBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(ringsBtn);
     const aarBtn = makeOverlayBtn('=',   '16px', 'A2A REFUELING',  () => aarControl ? aarControl.visible : false,                   () => { if (aarControl) aarControl.toggle(); });
-    aarBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(aarBtn);
     const awacsBtn = makeOverlayBtn('○',   '16px', 'AWACS',          () => awacsControl ? awacsControl.visible : false,               () => { if (awacsControl) awacsControl.toggle(); });
-    awacsBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(awacsBtn);
     const labelsBtn = makeOverlayBtn('CALL', '8px', 'CALLSIGNS', () => adsbLabelsControl ? adsbLabelsControl.labelsVisible : false, () => { if (adsbLabelsControl) adsbLabelsControl.toggle(); });
     labelsBtn.classList.add('sm-expanded-only');
