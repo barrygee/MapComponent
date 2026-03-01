@@ -3391,6 +3391,7 @@ class ClearOverlaysControl {
                 airports: airportsControl ? airportsControl.visible : false,
                 raf: rafControl ? rafControl.visible : false,
                 adsb: adsbControl ? adsbControl.visible : false,
+                adsbLabels: adsbLabelsControl ? adsbLabelsControl.labelsVisible : false,
             };
             if (roadsControl && roadsControl.roadsVisible) roadsControl.toggleRoads();
             if (namesControl && namesControl.namesVisible) namesControl.toggleNames();
@@ -3413,10 +3414,20 @@ class ClearOverlaysControl {
                 if (airportsControl && this.savedStates.airports && !airportsControl.visible) airportsControl.toggle();
                 if (rafControl && this.savedStates.raf && !rafControl.visible) rafControl.toggle();
                 if (adsbControl && this.savedStates.adsb && !adsbControl.visible) adsbControl.toggle();
+                // adsbControl.toggle() calls syncToAdsb(true) which resets labelsVisible=false;
+                // restore the saved labels state explicitly.
+                if (adsbLabelsControl && this.savedStates.adsb) {
+                    adsbLabelsControl.labelsVisible = this.savedStates.adsbLabels;
+                    adsbLabelsControl.button.style.opacity = this.savedStates.adsbLabels ? '1' : '0.3';
+                    adsbLabelsControl.button.style.color = this.savedStates.adsbLabels ? '#c8ff00' : '#ffffff';
+                    if (adsbControl) adsbControl.setLabelsVisible(this.savedStates.adsbLabels);
+                    _saveOverlayStates();
+                }
             }
             this.cleared = false;
             this.button.style.opacity = '0.3';
             this.button.style.color = '#ffffff';
+            if (typeof _syncSideMenuForPlanes === 'function') _syncSideMenuForPlanes();
         }
     }
 }
@@ -3594,6 +3605,7 @@ let _syncSideMenuForPlanes = null;
     const awacsBtn = makeOverlayBtn('○',   '16px', 'AWACS',          () => awacsControl ? awacsControl.visible : false,               () => { if (awacsControl) awacsControl.toggle(); });
     overlayGroup.appendChild(awacsBtn);
     const planesBtn = makeOverlayBtn(PLANE_SVG, '8px', 'PLANES', () => adsbControl ? adsbControl.visible : false, () => { adsbToggle(); syncLabelsBtn(); syncFilterBtn(); }, true);
+    planesBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(planesBtn);
     const labelsBtn = makeOverlayBtn('CALL', '8px', 'CALLSIGNS', () => adsbLabelsControl ? adsbLabelsControl.labelsVisible : false, () => { if (adsbLabelsControl) adsbLabelsControl.toggle(); });
     labelsBtn.classList.add('sm-expanded-only');
