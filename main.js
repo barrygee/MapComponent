@@ -405,10 +405,10 @@ const _Notifications = (() => {
         el.innerHTML =
             `<div class="notif-header">` +
             (action
-                ? `<span class="notif-label"><span class="notif-label-default">${_labelForType(item.type)}</span><span class="notif-label-disable">DISABLE NOTIFICATION</span></span>`
+                ? `<span class="notif-label"><span class="notif-label-default">${_labelForType(item.type)}</span><span class="notif-label-disable">DISABLE NOTIFICATIONS</span></span>`
                 : `<span class="notif-label">${_labelForType(item.type)}</span>`) +
             `<div style="display:flex;align-items:center;gap:8px">` +
-            (action ? `<button class="notif-action" aria-label="Disable notification">${bellSlashSVG}</button>` : '') +
+            (action ? `<button class="notif-action" aria-label="Disable notifications">${bellSlashSVG}</button>` : '') +
             `<button class="notif-dismiss" aria-label="Dismiss">✕</button>` +
             `</div>` +
             `</div>` +
@@ -442,7 +442,16 @@ const _Notifications = (() => {
     function _updateCount() {
         const total = _load().length;
         const el = _getCount();
-        if (el) el.textContent = _unreadCount > 99 ? '99+' : String(_unreadCount);
+        if (el) {
+            el.textContent = total > 99 ? '99+' : String(total);
+            // Green when there are unread notifications while panel is closed,
+            // grey when panel is open or all notifications have been seen.
+            if (_unreadCount > 0 && !_isOpen()) {
+                el.classList.add('notif-count-unread');
+            } else {
+                el.classList.remove('notif-count-unread');
+            }
+        }
         const btn = document.getElementById('notif-clear-all-btn');
         if (btn) btn.style.display = (total > 0 && _isOpen()) ? 'block' : 'none';
     }
@@ -517,7 +526,7 @@ const _Notifications = (() => {
                 const action = _actions[item.id];
                 const labelEl = el.querySelector('.notif-label');
                 if (action) {
-                    labelEl.innerHTML = `<span class="notif-label-default">${_labelForType(item.type)}</span><span class="notif-label-disable">DISABLE NOTIFICATION</span>`;
+                    labelEl.innerHTML = `<span class="notif-label-default">${_labelForType(item.type)}</span><span class="notif-label-disable">DISABLE NOTIFICATIONS</span>`;
                 } else {
                     labelEl.textContent = _labelForType(item.type);
                 }
@@ -530,7 +539,7 @@ const _Notifications = (() => {
                     const bellSlashSVG = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor"/><path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/><line x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>`;
                     const ab = document.createElement('button');
                     ab.className = 'notif-action';
-                    ab.setAttribute('aria-label', 'Disable notification');
+                    ab.setAttribute('aria-label', 'Disable notifications');
                     ab.innerHTML = bellSlashSVG;
                     ab.addEventListener('click', (e) => { e.stopPropagation(); action.callback(); dismiss(item.id); });
                     el.querySelector('.notif-dismiss').insertAdjacentElement('beforebegin', ab);
@@ -558,6 +567,7 @@ const _Notifications = (() => {
         if (!items.length) return;
         items.forEach(i => { delete _actions[i.id]; });
         _save([]);
+        _unreadCount = 0;
         const panel = _getPanel();
         if (panel) {
             panel.querySelectorAll('.notif-item').forEach(el => {
@@ -2260,7 +2270,7 @@ class AdsbLiveControl {
                         title:  callsign,
                         detail: detail || undefined,
                         action: {
-                            label: 'DISABLE NOTIFICATION',
+                            label: 'DISABLE NOTIFICATIONS',
                             callback: () => {
                                 this._notifEnabled.delete(hex);
                                 if (this._trackingNotifIds) delete this._trackingNotifIds[hex];
@@ -2998,7 +3008,7 @@ class AdsbLiveControl {
                         _Notifications.update({
                             id: item.id,
                             action: {
-                                label: 'DISABLE NOTIFICATION',
+                                label: 'DISABLE NOTIFICATIONS',
                                 callback: () => {
                                     this._notifEnabled.delete(notifHex);
                                     if (this._trackingNotifIds) delete this._trackingNotifIds[notifHex];
