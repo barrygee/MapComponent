@@ -553,6 +553,10 @@ html {
     color: rgba(200, 255, 0, 0.75);
 }
 
+.sm-btn.enabled {
+    opacity: 1;
+}
+
 .sm-btn.sm-planes-off {
     opacity: 0.1;
     pointer-events: none;

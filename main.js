@@ -3434,6 +3434,8 @@ map.addControl(clearControl, 'top-right');
 
 // Callback set by the side-menu IIFE to activate the location button.
 let _onGoToUserLocation = null;
+// Syncs callsign/filter buttons based on planes visibility — set by side-menu IIFE.
+let _syncSideMenuForPlanes = null;
 
 (function buildSideMenu() {
     // Hide the maplibre ctrl-top-right container (controls still manage their layers).
@@ -3586,11 +3588,10 @@ let _onGoToUserLocation = null;
     overlayGroup.appendChild(makeOverlayBtn('○',   '16px', 'AWACS',          () => awacsControl ? awacsControl.visible : false,               () => { if (awacsControl) awacsControl.toggle(); }));
     const labelsBtn = makeOverlayBtn('CALL', '8px', 'CALLSIGNS', () => adsbLabelsControl ? adsbLabelsControl.labelsVisible : false, () => { if (adsbLabelsControl) adsbLabelsControl.toggle(); });
     function syncLabelsBtn() {
-        const planesOn = adsbControl ? adsbControl.visible : false;
+        const planesOn = adsbControl ? (adsbControl.visible && !adsbControl._allHidden) : false;
         labelsBtn.classList.toggle('sm-planes-off', !planesOn);
         labelsBtn.classList.toggle('active', planesOn && adsbLabelsControl ? adsbLabelsControl.labelsVisible : false);
     }
-    overlayGroup.appendChild(makeOverlayBtn(PLANE_SVG, '8px', 'PLANES', () => adsbControl ? adsbControl.visible : false, () => { adsbToggle(); syncLabelsBtn(); syncFilterBtn(); }, true));
     overlayGroup.appendChild(labelsBtn);
     labelsBtn.addEventListener('click', syncLabelsBtn);
     syncLabelsBtn();
@@ -3604,7 +3605,7 @@ let _onGoToUserLocation = null;
     const FILTER_SVG = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.6"/><line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"/></svg>`;
     const filterGroup = makeGroup();
     const filterBtn = document.createElement('button');
-    filterBtn.className = 'sm-btn';
+    filterBtn.className = 'sm-btn enabled';
     filterBtn.dataset.tooltip = 'FILTER';
     filterBtn.id = 'sm-filter-btn';
 
@@ -3624,12 +3625,10 @@ let _onGoToUserLocation = null;
     filterGroup.appendChild(filterBtn);
     panel.appendChild(filterGroup);
 
-    function syncFilterBtn() {
-        const planesOn = adsbControl ? adsbControl.visible : false;
-        filterBtn.classList.toggle('sm-planes-off', !planesOn);
-        if (!planesOn && typeof _FilterPanel !== 'undefined') _FilterPanel.close();
-    }
+    function syncFilterBtn() {}
     syncFilterBtn();
+
+    _syncSideMenuForPlanes = function() { syncLabelsBtn(); syncFilterBtn(); };
 
     document.body.appendChild(panel);
 })();
@@ -3642,7 +3641,6 @@ const _FilterPanel = (() => {
     function _getInput()   { return document.getElementById('filter-input'); }
     function _getResults() { return document.getElementById('filter-results'); }
     function _getClearBtn(){ return document.getElementById('filter-clear-btn'); }
-    function _getFilterBtn(){ return document.getElementById('sm-filter-btn'); }
 
     // Build the plane SVG icon (same triangle as the radar blip but small)
     const _PLANE_ICON = `<svg width="11" height="11" viewBox="0 0 56 52" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="28,18 35,36 28,33 21,36" fill="currentColor"/></svg>`;
@@ -3987,13 +3985,15 @@ const _FilterPanel = (() => {
         }
     }
 
+    function _getFilterBtn() { return document.getElementById('sm-filter-btn'); }
+
     function open() {
         _open = true;
         const panel = _getPanel();
         if (panel) panel.classList.add('filter-panel-visible');
         _repositionPanel();
         const btn = _getFilterBtn();
-        if (btn) btn.classList.add('active');
+        if (btn) { btn.classList.add('active'); btn.classList.remove('enabled'); }
         const input = _getInput();
         if (input) { input.focus(); input.select(); }
     }
@@ -4003,7 +4003,7 @@ const _FilterPanel = (() => {
         const panel = _getPanel();
         if (panel) panel.classList.remove('filter-panel-visible');
         const btn = _getFilterBtn();
-        if (btn) btn.classList.remove('active');
+        if (btn) { btn.classList.remove('active'); btn.classList.add('enabled'); }
     }
 
     function toggle() {
@@ -4051,6 +4051,7 @@ const _FilterPanel = (() => {
                         btn.textContent = hiding ? 'SHOW ALL' : 'HIDE ALL';
                         btn.classList.toggle('active', hiding);
                         adsbControl.setAllHidden(hiding);
+                        if (_syncSideMenuForPlanes) _syncSideMenuForPlanes();
                     });
                 } else {
                     btn.addEventListener('click', () => {
@@ -4061,6 +4062,7 @@ const _FilterPanel = (() => {
                             adsbControl.setAllHidden(false);
                             const hideBtn = modeBar.querySelector('[data-mode="none"]');
                             if (hideBtn) { hideBtn.textContent = 'HIDE ALL'; hideBtn.classList.remove('active'); }
+                            if (_syncSideMenuForPlanes) _syncSideMenuForPlanes();
                         }
                         adsbControl.setTypeFilter(mode);
                         modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => b.classList.toggle('active', b === btn));
