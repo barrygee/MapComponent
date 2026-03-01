@@ -3984,7 +3984,7 @@ const _FilterPanel = (() => {
         const panel = _getPanel();
         const bar = document.getElementById('adsb-status-bar');
         const barVisible = bar && bar.classList.contains('adsb-sb-visible');
-        const base = 44 + 14; // footer height + gap
+        const base = 44 + 8; // footer height + gap
 
         // Position filter panel at base (its CSS default)
         if (panel) panel.style.bottom = '';

@@ -711,7 +711,7 @@ html {
 
 #filter-panel {
     position: fixed;
-    bottom: calc(44px + 14px);
+    bottom: calc(44px + 8px);
     left: 50%;
     transform: translateX(-50%);
     width: 420px;
