@@ -3656,7 +3656,7 @@ let _syncSideMenuForPlanes = null;
     panel.appendChild(overlayGroup);
 
     const clearGroup = makeGroup();
-    clearGroup.appendChild(makeOverlayBtn('✕', '14px', 'CLEAR ALL', () => clearControl ? clearControl.cleared : false, () => { if (clearControl) clearControl.toggle(); }));
+    clearGroup.appendChild(makeOverlayBtn('✕', '14px', 'HIDE LAYERS', () => clearControl ? clearControl.cleared : false, () => { if (clearControl) clearControl.toggle(); }));
     panel.appendChild(clearGroup);
 
     // ---- Filter button ----
