@@ -345,6 +345,7 @@ html {
 .adsb-sb-fields {
     display: flex;
     flex-wrap: nowrap;
+    justify-content: space-between;
     gap: 0 24px;
 }
 
