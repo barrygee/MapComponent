@@ -1020,8 +1020,22 @@ body:has(#side-menu.expanded) #filter-panel {
     opacity: 1;
 }
 
-#notif-clear-all-btn {
+#notif-header {
     display: none;
+    width: 220px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    pointer-events: none;
+}
+
+#notifications-panel.notif-panel-open #notif-header {
+    display: flex;
+}
+
+#notif-clear-all-btn {
+    display: block;
     pointer-events: all;
     background: rgba(0, 0, 0, 0.55);
     border: none;
@@ -1032,7 +1046,7 @@ body:has(#side-menu.expanded) #filter-panel {
     letter-spacing: 0.08em;
     cursor: pointer;
     padding: 4px 10px;
-    margin-bottom: 6px;
+    margin-bottom: 0;
     line-height: 1;
     transition: color 0.15s ease, background 0.15s ease;
 }
@@ -1061,29 +1075,39 @@ body:has(#side-menu.expanded) #filter-panel {
     display: none; /* Chrome/Safari */
 }
 
-/* Custom scrollbar track */
-#notif-scrollbar {
-    width: 2px;
-    margin-left: 6px;
-    align-self: stretch;
-    background: rgba(0, 0, 0, 0.12);
-    position: relative;
-    flex-shrink: 0;
+/* Scroll hint */
+#notif-scroll-hint {
+    background: rgba(0, 0, 0, 0.55);
+    color: rgba(255, 255, 255, 0.5);
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    pointer-events: none;
+    visibility: hidden;
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
-#notif-scrollbar.notif-scrollbar-visible {
+#notif-scroll-hint.notif-scroll-hint-visible {
+    visibility: visible;
     opacity: 1;
 }
 
-#notif-scrollbar-thumb {
-    position: absolute;
-    left: 0;
-    width: 2px;
-    background: rgba(0, 0, 0, 0.35);
-    top: 0;
-    transition: top 0.1s ease, height 0.1s ease;
+#notif-scroll-arrow {
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+#notif-scroll-arrow.notif-arrow-up {
+    transform: rotate(180deg);
 }
 
 .notif-item {

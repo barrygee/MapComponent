@@ -370,18 +370,18 @@ const _Notifications = (() => {
     // ---- scroll indicator ----
     function _updateScrollIndicator() {
         const list  = _getPanel();
-        const track = document.getElementById('notif-scrollbar');
-        const thumb = document.getElementById('notif-scrollbar-thumb');
-        if (!list || !track || !thumb) return;
-        const canScroll = list.scrollHeight > list.clientHeight + 1;
-        track.classList.toggle('notif-scrollbar-visible', canScroll);
-        if (!canScroll) return;
-        const ratio      = list.clientHeight / list.scrollHeight;
-        const thumbH     = Math.max(20, ratio * track.clientHeight);
-        const maxTop     = track.clientHeight - thumbH;
-        const scrollRatio = list.scrollTop / (list.scrollHeight - list.clientHeight);
-        thumb.style.height = thumbH + 'px';
-        thumb.style.top    = (scrollRatio * maxTop) + 'px';
+        const hint  = document.getElementById('notif-scroll-hint');
+        const arrow = document.getElementById('notif-scroll-arrow');
+        if (!list || !hint || !arrow) return;
+        const hiddenBelow = list.scrollHeight - list.clientHeight - list.scrollTop;
+        const atBottom    = hiddenBelow <= 8;
+        const canScroll   = list.scrollHeight > list.clientHeight + 1;
+        if (!canScroll) {
+            hint.classList.remove('notif-scroll-hint-visible');
+        } else {
+            arrow.classList.toggle('notif-arrow-up', atBottom);
+            hint.classList.add('notif-scroll-hint-visible');
+        }
     }
 
     function _initScrollBtns() {

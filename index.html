@@ -65,12 +65,12 @@
     </div>
 
     <div id="notifications-panel">
-        <button id="notif-clear-all-btn" aria-label="Clear all notifications">CLEAR ALL</button>
+        <div id="notif-header">
+            <button id="notif-clear-all-btn" aria-label="Clear all notifications">CLEAR ALL</button>
+            <div id="notif-scroll-hint">MORE <svg id="notif-scroll-arrow" width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="1,2.5 4,5.5 7,2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
         <div id="notif-list-wrap">
             <div id="notif-list"></div>
-            <div id="notif-scrollbar">
-                <div id="notif-scrollbar-thumb"></div>
-            </div>
         </div>
     </div>
 
