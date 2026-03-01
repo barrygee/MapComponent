@@ -584,10 +584,11 @@ const _Notifications = (() => {
             const el = panel.querySelector(`.notif-item[data-id="${id}"]`);
             if (el) {
                 el.classList.remove('notif-visible');
-                setTimeout(() => { el.remove(); _updateScrollIndicator(); }, 220);
+                setTimeout(() => { el.remove(); _updateScrollIndicator(); _repositionBar(); }, 220);
             }
         }
         _updateCount();
+        _repositionBar();
     }
 
     function clearAll() {
@@ -605,11 +606,40 @@ const _Notifications = (() => {
         }
         _updateCount();
         _stopBellPulse();
+        setTimeout(_repositionBar, 230);
     }
 
     // ---- panel open/close ----
     function _isOpen() {
         try { return localStorage.getItem(OPEN_KEY) === '1'; } catch (e) { return false; }
+    }
+
+    function _repositionBar() {
+        const bar = document.getElementById('adsb-status-bar');
+        if (!bar) return;
+        const wrapper = _getWrapper();
+        const notifOpen = wrapper && wrapper.classList.contains('notif-panel-open');
+        const listWrap = document.getElementById('notif-list-wrap');
+        const hasItems = _load().length > 0;
+        if (notifOpen && hasItems && listWrap && listWrap.offsetWidth > 0) {
+            // Center the bar in the space between the right edge of the
+            // notification list and the right edge of the viewport.
+            const notifRight = listWrap.getBoundingClientRect().right;
+            const gap = 12;
+            const available = window.innerWidth - notifRight - gap;
+            const midX = notifRight + gap + available / 2;
+            bar.style.left = midX + 'px';
+            bar.style.transform = 'translateX(-50%)';
+            bar.style.maxWidth = (available - 14) + 'px';
+            bar.style.right = '';
+            bar.style.width = '';
+        } else {
+            bar.style.left = '';
+            bar.style.transform = '';
+            bar.style.maxWidth = '';
+            bar.style.right = '';
+            bar.style.width = '';
+        }
     }
 
     function _setOpen(open) {
@@ -625,6 +655,7 @@ const _Notifications = (() => {
         }
         if (open) _updateScrollIndicator();
         _updateCount();
+        requestAnimationFrame(_repositionBar);
     }
 
     let _bellPulseInterval = null;
@@ -668,9 +699,10 @@ const _Notifications = (() => {
         if (btn) btn.addEventListener('click', toggle);
         const clearBtn = document.getElementById('notif-clear-all-btn');
         if (clearBtn) clearBtn.addEventListener('click', clearAll);
+        window.addEventListener('resize', _repositionBar);
     }
 
-    return { add, update, dismiss, clearAll, render, init, toggle };
+    return { add, update, dismiss, clearAll, render, init, toggle, repositionBar: _repositionBar };
 })();
 
 // --- End Landing Notifications ---
@@ -2278,12 +2310,14 @@ class AdsbLiveControl {
         bar.classList.add('adsb-sb-visible');
         this._wireStatusBarUntrack(bar);
         if (typeof _FilterPanel !== 'undefined') _FilterPanel.reposition();
+        if (typeof _Notifications !== 'undefined') requestAnimationFrame(() => _Notifications.repositionBar());
     }
 
     _hideStatusBar() {
         const bar = document.getElementById('adsb-status-bar');
         if (bar) bar.classList.remove('adsb-sb-visible');
         if (typeof _FilterPanel !== 'undefined') _FilterPanel.reposition();
+        if (typeof _Notifications !== 'undefined') _Notifications.repositionBar();
     }
 
     _updateStatusBar() {
