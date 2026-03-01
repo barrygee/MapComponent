@@ -1778,7 +1778,8 @@ class AdsbLiveControl {
         this._lastFetchTime = 0;
         this._emergencySquawks = new Set(['7700', '7600', '7500']); // squawk codes treated as emergencies
         this._prevSquawk = {};  // hex -> last known squawk code (for change detection)
-        this._typeFilter = 'all'; // 'all' | 'civil' | 'mil' | 'none'
+        this._typeFilter = 'all'; // 'all' | 'civil' | 'mil'
+        this._allHidden = false; // true = hide all planes regardless of type filter
     }
 
     setTypeFilter(mode) {
@@ -1787,13 +1788,33 @@ class AdsbLiveControl {
         this._updateCallsignMarkers();
     }
 
+    setAllHidden(hidden) {
+        this._allHidden = hidden;
+        this._applyTypeFilter();
+        this._updateCallsignMarkers();
+        // Also hide/show the selected-aircraft tag and hover tag (HTML markers outside map filter)
+        const tagEl = this._tagMarker ? this._tagMarker.getElement() : null;
+        if (tagEl) tagEl.style.visibility = hidden ? 'hidden' : '';
+        const hoverEl = this._hoverMarker ? this._hoverMarker.getElement() : null;
+        if (hoverEl) hoverEl.style.visibility = hidden ? 'hidden' : '';
+    }
+
     _applyTypeFilter() {
         if (!this.map) return;
         const baseFilter = ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]];
         let filter;
-        if (this._typeFilter === 'none') {
-            filter = ['==', 1, 0]; // hide all
-        } else if (this._typeFilter === 'civil') {
+        if (this._allHidden) {
+            // Hide layers entirely via visibility so icons + brackets both disappear
+            ['adsb-bracket', 'adsb-icons'].forEach(id => {
+                try { this.map.setLayoutProperty(id, 'visibility', 'none'); } catch(e) {}
+            });
+            return;
+        }
+        // Restore layer visibility (may have been hidden by hide-all)
+        ['adsb-bracket', 'adsb-icons'].forEach(id => {
+            try { this.map.setLayoutProperty(id, 'visibility', this.visible ? 'visible' : 'none'); } catch(e) {}
+        });
+        if (this._typeFilter === 'civil') {
             filter = ['all', baseFilter, ['!', ['boolean', ['get', 'military'], false]]];
         } else if (this._typeFilter === 'mil') {
             filter = ['all', baseFilter, ['boolean', ['get', 'military'], false]];
@@ -2116,6 +2137,7 @@ class AdsbLiveControl {
         }
 
         this._raiseLayers();
+        this._applyTypeFilter();
 
         // If a pre-fetch already completed while waiting for the style/layers to
         // initialise, push that data to the map immediately so planes appear
@@ -2255,11 +2277,13 @@ class AdsbLiveControl {
         bar.innerHTML = this._buildStatusBarHTML(props);
         bar.classList.add('adsb-sb-visible');
         this._wireStatusBarUntrack(bar);
+        if (typeof _FilterPanel !== 'undefined') _FilterPanel.reposition();
     }
 
     _hideStatusBar() {
         const bar = document.getElementById('adsb-status-bar');
         if (bar) bar.classList.remove('adsb-sb-visible');
+        if (typeof _FilterPanel !== 'undefined') _FilterPanel.reposition();
     }
 
     _updateStatusBar() {
@@ -2500,6 +2524,7 @@ class AdsbLiveControl {
         this._tagMarker = new maplibregl.Marker({ element: el, anchor, offset: [14, -13] })
             .setLngLat(coords)
             .addTo(this.map);
+        if (this._allHidden) el.style.visibility = 'hidden';
         this._tagHex = feature.properties.hex;
     }
 
@@ -2639,9 +2664,9 @@ class AdsbLiveControl {
             const zoom = this.map.getZoom();
             const iconVisible = (f.properties.alt_baro > 0) || (zoom >= 10);
             const isMil = !!f.properties.military;
-            const typeVisible = this._typeFilter === 'all'
+            const typeVisible = !this._allHidden && (this._typeFilter === 'all'
                 || (this._typeFilter === 'civil' && !isMil)
-                || (this._typeFilter === 'mil'   && isMil);
+                || (this._typeFilter === 'mil'   && isMil));
             if (!iconVisible || !typeVisible) {
                 if (this._callsignMarkers[hex]) {
                     this._callsignMarkers[hex].remove();
@@ -2780,6 +2805,8 @@ class AdsbLiveControl {
         if (this.map.getSource('adsb-live')) {
             this.map.getSource('adsb-live').setData(interpolated);
             console.log('[ADSB] _interpolate: setData called with', interpolated.features.length, 'features');
+            // setData resets layer filters — reapply immediately
+            this._applyTypeFilter();
         } else {
             console.log('[ADSB] _interpolate: source not ready yet');
         }
@@ -3947,10 +3974,24 @@ const _FilterPanel = (() => {
         });
     }
 
+    function _repositionPanel() {
+        const panel = _getPanel();
+        if (!panel) return;
+        const bar = document.getElementById('adsb-status-bar');
+        const barVisible = bar && bar.classList.contains('adsb-sb-visible');
+        const base = 44 + 14; // footer height + gap
+        if (barVisible) {
+            panel.style.bottom = (base + bar.offsetHeight + 8) + 'px';
+        } else {
+            panel.style.bottom = '';
+        }
+    }
+
     function open() {
         _open = true;
         const panel = _getPanel();
         if (panel) panel.classList.add('filter-panel-visible');
+        _repositionPanel();
         const btn = _getFilterBtn();
         if (btn) btn.classList.add('active');
         const input = _getInput();
@@ -3998,23 +4039,40 @@ const _FilterPanel = (() => {
         // Close on map click
         map.on('click', () => { if (_open) close(); });
 
-        // Type filter mode buttons (ALL / CVL / MIL / NONE)
+        // Type filter mode buttons (ALL / CIVIL / MILITARY / HIDE ALL)
         const modeBar = document.getElementById('filter-mode-bar');
         if (modeBar) {
             modeBar.querySelectorAll('[data-mode]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const mode = btn.dataset.mode;
-                    if (!adsbControl) return;
-                    adsbControl.setTypeFilter(mode);
-                    modeBar.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
-                });
+                if (btn.dataset.mode === 'none') {
+                    // HIDE ALL / SHOW ALL toggle
+                    btn.addEventListener('click', () => {
+                        if (!adsbControl) return;
+                        const hiding = !adsbControl._allHidden;
+                        btn.textContent = hiding ? 'SHOW ALL' : 'HIDE ALL';
+                        btn.classList.toggle('active', hiding);
+                        adsbControl.setAllHidden(hiding);
+                    });
+                } else {
+                    btn.addEventListener('click', () => {
+                        const mode = btn.dataset.mode;
+                        if (!adsbControl) return;
+                        // If planes were hidden, un-hide them when switching type filter
+                        if (adsbControl._allHidden) {
+                            adsbControl.setAllHidden(false);
+                            const hideBtn = modeBar.querySelector('[data-mode="none"]');
+                            if (hideBtn) { hideBtn.textContent = 'HIDE ALL'; hideBtn.classList.remove('active'); }
+                        }
+                        adsbControl.setTypeFilter(mode);
+                        modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => b.classList.toggle('active', b === btn));
+                    });
+                }
             });
         }
     }
 
-    return { open, close, toggle, init };
+    return { open, close, toggle, init, reposition: _repositionPanel };
 })();
-// --- End Search Panel ---
+// --- End Filter Panel ---
 
 
 // Helper: fly to user's geolocation (uses rangeRingCenter which is kept live)
