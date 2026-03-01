@@ -2045,25 +2045,29 @@ class AdsbLiveControl {
         if (!this._eventsAdded) {
             this._eventsAdded = true;
 
+            let _clickHandled = false;
             const handleAircraftClick = (e) => {
-                if (e.originalEvent._adsbHandled) return; // dedupe: bracket + icons both fire for same click
+                if (_clickHandled) return;
                 if (!e.features || !e.features.length) return;
+                _clickHandled = true;
                 const hex = e.features[0].properties.hex;
                 this._selectedHex = (hex === this._selectedHex) ? null : hex;
-                this._hideHoverTag(); // hover tag replaced by selected tag
+                this._hideHoverTag();
                 this._applySelection();
-                e.originalEvent._adsbHandled = true;
             };
 
             this.map.on('click', 'adsb-bracket', handleAircraftClick);
             this.map.on('click', 'adsb-icons',  handleAircraftClick);
 
             this.map.on('click', (e) => {
-                if (e.originalEvent._adsbHandled) return;
-                if (this._followEnabled) return; // don't deselect while tracking
+                if (_clickHandled) { _clickHandled = false; return; }
+                if (this._followEnabled) return;
                 if (this._selectedHex) {
-                    this._selectedHex = null;
-                    this._applySelection();
+                    const hits = this.map.queryRenderedFeatures(e.point, { layers: ['adsb-bracket', 'adsb-icons'] });
+                    if (!hits.length) {
+                        this._selectedHex = null;
+                        this._applySelection();
+                    }
                 }
             });
 
