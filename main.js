@@ -2964,9 +2964,10 @@ class AdsbLiveControl {
 
                         const gs = a.gs ?? 0;
                         const hexInt = parseInt(hex, 16);
-                        const military = a.military === true
+                        const military = a.t !== 'LAAD'
+                            && (a.military === true
                             || (hexInt >= 0x43C000 && hexInt <= 0x43FFFF)  // UK military
-                            || (hexInt >= 0xAE0000 && hexInt <= 0xAFFFFF); // US military
+                            || (hexInt >= 0xAE0000 && hexInt <= 0xAFFFFF)); // US military
 
                         return {
                             type: 'Feature',
