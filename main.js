@@ -622,22 +622,24 @@ const _Notifications = (() => {
         const listWrap = document.getElementById('notif-list-wrap');
         const hasItems = _load().length > 0;
         if (notifOpen && hasItems && listWrap && listWrap.offsetWidth > 0) {
-            // Center the bar in the space between the right edge of the
-            // notification list and the right edge of the viewport.
+            // Center the bar in the space between the notification list's right
+            // edge and the viewport right edge, with a minimum 14px right margin.
             const notifRight = listWrap.getBoundingClientRect().right;
-            const gap = 12;
-            const available = window.innerWidth - notifRight - gap;
-            const midX = notifRight + gap + available / 2;
+            const gap = 12; // gap between notif list and bar
+            const rightMargin = 14;
+            const zone = window.innerWidth - notifRight - gap - rightMargin;
+            // midpoint of the zone, anchored from notifRight + gap
+            const midX = notifRight + gap + zone / 2;
             bar.style.left = midX + 'px';
+            bar.style.right = 'auto';
             bar.style.transform = 'translateX(-50%)';
-            bar.style.maxWidth = (available - 14) + 'px';
-            bar.style.right = '';
+            bar.style.maxWidth = (zone) + 'px';
             bar.style.width = '';
         } else {
             bar.style.left = '';
+            bar.style.right = '';
             bar.style.transform = '';
             bar.style.maxWidth = '';
-            bar.style.right = '';
             bar.style.width = '';
         }
     }
