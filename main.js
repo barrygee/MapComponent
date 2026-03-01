@@ -2828,7 +2828,7 @@ class AdsbLiveControl {
             const pos = this._lastPositions[f.properties.hex];
             if (!pos || pos.gs < 10) return f; // don't move slow/parked aircraft
             const dt = (now - pos.ts) / 1000; // seconds since last real fix
-            if (dt <= 0 || dt > 30) return f;  // don't extrapolate beyond 30 s
+            if (dt <= 0 || dt > 10) return f;  // don't extrapolate beyond 2× poll interval
             const trackRad = pos.track * Math.PI / 180;
             const nmPerSec = pos.gs / HR_SEC;
             const dLat = nmPerSec * Math.cos(trackRad) * NM_DEG * dt;

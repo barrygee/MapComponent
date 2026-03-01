@@ -299,6 +299,12 @@ html {
     box-sizing: border-box;
 }
 
+#adsb-status-bar[data-apt] {
+    width: auto;
+    max-width: calc(100vw - 28px);
+    white-space: nowrap;
+}
+
 #adsb-status-bar.adsb-sb-visible {
     display: block;
 }
