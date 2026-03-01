@@ -3546,8 +3546,430 @@ let _onGoToUserLocation = null;
     clearGroup.appendChild(makeOverlayBtn('✕', '14px', 'CLEAR ALL', () => clearControl ? clearControl.cleared : false, () => { if (clearControl) clearControl.toggle(); }));
     panel.appendChild(clearGroup);
 
+    // ---- Filter button ----
+    const FILTER_SVG = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.6"/><line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"/></svg>`;
+    const filterGroup = makeGroup();
+    const filterBtn = document.createElement('button');
+    filterBtn.className = 'sm-btn';
+    filterBtn.dataset.tooltip = 'FILTER';
+    filterBtn.id = 'sm-filter-btn';
+
+    const filterIconSpan = document.createElement('span');
+    filterIconSpan.className = 'sm-icon';
+    filterIconSpan.innerHTML = FILTER_SVG;
+
+    const filterLabelSpan = document.createElement('span');
+    filterLabelSpan.className = 'sm-label';
+    filterLabelSpan.textContent = 'FILTER';
+
+    filterBtn.appendChild(filterIconSpan);
+    filterBtn.appendChild(filterLabelSpan);
+    filterBtn.style.opacity = '1';
+    filterBtn.addEventListener('click', () => {
+        if (typeof _FilterPanel !== 'undefined') _FilterPanel.toggle();
+    });
+    filterGroup.appendChild(filterBtn);
+    panel.appendChild(filterGroup);
+
     document.body.appendChild(panel);
 })();
+
+// --- Filter Panel ---
+const _FilterPanel = (() => {
+    let _open = false;
+
+    function _getPanel()   { return document.getElementById('filter-panel'); }
+    function _getInput()   { return document.getElementById('filter-input'); }
+    function _getResults() { return document.getElementById('filter-results'); }
+    function _getClearBtn(){ return document.getElementById('filter-clear-btn'); }
+    function _getFilterBtn(){ return document.getElementById('sm-filter-btn'); }
+
+    // Build the plane SVG icon (same triangle as the radar blip but small)
+    const _PLANE_ICON = `<svg width="11" height="11" viewBox="0 0 56 52" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="28,18 35,36 28,33 21,36" fill="currentColor"/></svg>`;
+    const _AIRPORT_ICON = `<svg width="11" height="11" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.4"/><line x1="6.5" y1="2" x2="6.5" y2="11" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="6.5" x2="11" y2="6.5" stroke="currentColor" stroke-width="1.2"/></svg>`;
+    const _MIL_ICON    = `<svg width="11" height="11" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="6.5,1.5 12,11.5 1,11.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>`;
+
+    function _getAircraftData() {
+        if (typeof adsbControl !== 'undefined' && adsbControl && adsbControl._geojson) {
+            return adsbControl._geojson.features;
+        }
+        return [];
+    }
+
+    function _matchesQuery(q, ...fields) {
+        const lq = q.toLowerCase();
+        return fields.some(f => f && f.toLowerCase().includes(lq));
+    }
+
+    function _search(query) {
+        const q = query.trim();
+        const results = [];
+
+        if (!q) return results;
+
+        // --- Planes ---
+        const planes = _getAircraftData();
+        for (const f of planes) {
+            const p = f.properties;
+            const callsign = (p.flight || '').trim();
+            const hex      = (p.hex || '').trim();
+            const reg      = (p.r || '').trim();
+            const squawk   = (p.squawk || '').trim();
+            if (_matchesQuery(q, callsign, hex, reg, squawk)) {
+                results.push({ kind: 'plane', feature: f, callsign, hex, reg, squawk, emergency: p.emergency && p.emergency !== 'none' });
+            }
+        }
+
+        // --- Airports ---
+        if (typeof AIRPORTS_DATA !== 'undefined') {
+            for (const f of AIRPORTS_DATA.features) {
+                const p = f.properties;
+                if (_matchesQuery(q, p.icao, p.iata, p.name)) {
+                    results.push({ kind: 'airport', feature: f, name: p.name, icao: p.icao, iata: p.iata });
+                }
+            }
+        }
+
+        // --- RAF / Military bases ---
+        if (typeof RAF_DATA !== 'undefined') {
+            for (const f of RAF_DATA.features) {
+                const p = f.properties;
+                if (_matchesQuery(q, p.icao, p.name)) {
+                    results.push({ kind: 'mil', feature: f, name: p.name, icao: p.icao });
+                }
+            }
+        }
+
+        return results;
+    }
+
+    function _selectPlane(feature) {
+        if (!adsbControl) return;
+        const hex = feature.properties.hex;
+        // Select the aircraft
+        adsbControl._selectedHex = hex;
+        adsbControl._applySelection();
+        // Zoom to current position
+        const coords = adsbControl._interpolatedCoords(hex) || feature.geometry.coordinates;
+        map.easeTo({ center: coords, zoom: Math.max(map.getZoom(), 10), duration: 600 });
+        // If there's a tag marker, enable the full data box with track button
+        // (selection already shows the data box — also show status bar if tracking)
+        close();
+    }
+
+    function _selectAirport(feature) {
+        const p = feature.properties;
+        const b = p.bounds;
+        const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right');
+        const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
+        const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
+        const pad = 80;
+        const topExtra = Math.max(0, ctrlH / 2 - pad);
+        map.fitBounds(
+            [[b[0], b[1]], [b[2], b[3]]],
+            { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 }
+        );
+        if (typeof airportsControl !== 'undefined' && airportsControl) {
+            airportsControl._showAirportPanel(p, feature.geometry.coordinates);
+        }
+        close();
+    }
+
+    function _selectMil(feature) {
+        const p = feature.properties;
+        const b = p.bounds;
+        const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right');
+        const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
+        const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
+        const pad = 80;
+        const topExtra = Math.max(0, ctrlH / 2 - pad);
+        map.fitBounds(
+            [[b[0], b[1]], [b[2], b[3]]],
+            { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 }
+        );
+        if (typeof rafControl !== 'undefined' && rafControl) {
+            rafControl._showRAFPanel(p, feature.geometry.coordinates);
+        }
+        close();
+    }
+
+    function _renderResults(results, query) {
+        const container = _getResults();
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (!query.trim()) return;
+
+        if (!results.length) {
+            const el = document.createElement('div');
+            el.className = 'filter-no-results';
+            el.textContent = 'No results';
+            container.appendChild(el);
+            return;
+        }
+
+        const planes   = results.filter(r => r.kind === 'plane');
+        const airports = results.filter(r => r.kind === 'airport');
+        const mil      = results.filter(r => r.kind === 'mil');
+
+        function addSection(label, items, renderFn) {
+            if (!items.length) return;
+            const lbl = document.createElement('div');
+            lbl.className = 'filter-section-label';
+            lbl.textContent = label;
+            container.appendChild(lbl);
+            items.forEach(renderFn);
+        }
+
+        addSection('AIRCRAFT', planes, (r) => {
+            const hex = r.hex;
+            const item = document.createElement('div');
+            item.className = 'filter-result-item';
+
+            const icon = document.createElement('div');
+            icon.className = 'filter-result-icon filter-icon-plane';
+            icon.innerHTML = _PLANE_ICON;
+
+            const info = document.createElement('div');
+            info.className = 'filter-result-info';
+
+            const primary = document.createElement('div');
+            primary.className = 'filter-result-primary';
+            primary.textContent = r.callsign || r.hex;
+
+            const secondary = document.createElement('div');
+            secondary.className = 'filter-result-secondary';
+            const parts = [];
+            if (r.hex)    parts.push(r.hex.toUpperCase());
+            if (r.reg)    parts.push(r.reg);
+            if (r.squawk) parts.push('SQK ' + r.squawk);
+            secondary.textContent = parts.join(' · ');
+
+            info.appendChild(primary);
+            info.appendChild(secondary);
+
+            // ---- Bell button ----
+            const notifOn = adsbControl && adsbControl._notifEnabled && adsbControl._notifEnabled.has(hex);
+            const bellBtn = document.createElement('button');
+            bellBtn.className = 'filter-action-btn filter-bell-btn';
+            bellBtn.setAttribute('aria-label', 'Toggle notifications');
+            bellBtn.dataset.hex = hex;
+            bellBtn.style.color = notifOn ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+            bellBtn.innerHTML =
+                `<svg width="11" height="11" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">` +
+                `<path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor"/>` +
+                `<path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/>` +
+                (notifOn ? '' : `<line x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>`) +
+                `</svg>`;
+
+            bellBtn.addEventListener('mousedown', e => e.stopPropagation());
+            bellBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!adsbControl) return;
+                if (!adsbControl._notifEnabled) adsbControl._notifEnabled = new Set();
+                if (!adsbControl._trackingNotifIds) adsbControl._trackingNotifIds = {};
+                const f = adsbControl._geojson.features.find(f => f.properties.hex === hex);
+                const callsign = f ? ((f.properties.flight || '').trim() || (f.properties.r || '').trim() || hex) : hex;
+                const wasOn = adsbControl._notifEnabled.has(hex);
+                if (wasOn) {
+                    adsbControl._notifEnabled.delete(hex);
+                    if (adsbControl._trackingNotifIds[hex]) {
+                        _Notifications.dismiss(adsbControl._trackingNotifIds[hex]);
+                        delete adsbControl._trackingNotifIds[hex];
+                    }
+                    _Notifications.add({ type: 'notif-off', title: callsign });
+                } else {
+                    adsbControl._notifEnabled.add(hex);
+                    if (adsbControl._trackingNotifIds[hex]) _Notifications.dismiss(adsbControl._trackingNotifIds[hex]);
+                    adsbControl._trackingNotifIds[hex] = _Notifications.add({
+                        type: 'tracking', title: callsign,
+                        action: {
+                            label: 'DISABLE NOTIFICATIONS',
+                            callback: () => {
+                                adsbControl._notifEnabled.delete(hex);
+                                if (adsbControl._trackingNotifIds) delete adsbControl._trackingNotifIds[hex];
+                                adsbControl._rebuildTagForHex(hex);
+                            },
+                        },
+                    });
+                }
+                const nowOn = adsbControl._notifEnabled.has(hex);
+                bellBtn.style.color = nowOn ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+                // Rebuild SVG to show/hide slash
+                bellBtn.innerHTML =
+                    `<svg width="11" height="11" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">` +
+                    `<path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor"/>` +
+                    `<path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/>` +
+                    (nowOn ? '' : `<line x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>`) +
+                    `</svg>`;
+                adsbControl._rebuildTagForHex(hex);
+            });
+
+            // ---- Track button ----
+            const isTracked = adsbControl && adsbControl._followEnabled && adsbControl._tagHex === hex;
+            const trkBtn = document.createElement('button');
+            trkBtn.className = 'filter-action-btn filter-track-btn';
+            trkBtn.textContent = isTracked ? 'TRACKING' : 'TRACK';
+            trkBtn.style.color = isTracked ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+
+            trkBtn.addEventListener('mousedown', e => e.stopPropagation());
+            trkBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!adsbControl) return;
+                const f = adsbControl._geojson.features.find(f => f.properties.hex === hex);
+                if (!f) return;
+
+                // If this plane isn't yet selected, select it first so the tag marker exists.
+                if (adsbControl._selectedHex !== hex) {
+                    adsbControl._selectedHex = hex;
+                    adsbControl._applySelection();
+                }
+
+                // Delegate to the tag marker's own TRACK button — this runs the full
+                // _wireTagButton logic including status bar, notifications, follow, and
+                // tracking state persistence, with no duplication.
+                if (adsbControl._tagMarker) {
+                    const tagTrackBtn = adsbControl._tagMarker.getElement().querySelector('.tag-follow-btn');
+                    if (tagTrackBtn) tagTrackBtn.click();
+                }
+
+                // Zoom to the plane's current position.
+                const coords = adsbControl._interpolatedCoords(hex) || f.geometry.coordinates;
+                map.easeTo({ center: coords, zoom: Math.max(map.getZoom(), 10), duration: 600 });
+                close();
+            });
+
+            item.appendChild(icon);
+            item.appendChild(info);
+            item.appendChild(bellBtn);
+            item.appendChild(trkBtn);
+
+            // Clicking the info area selects/zooms without closing for the buttons
+            info.style.flex = '1';
+            info.style.minWidth = '0';
+            info.style.cursor = 'pointer';
+            info.addEventListener('click', () => _selectPlane(r.feature));
+            icon.style.cursor = 'pointer';
+            icon.addEventListener('click', () => _selectPlane(r.feature));
+
+            container.appendChild(item);
+        });
+
+        addSection('AIRPORTS', airports, (r) => {
+            const item = document.createElement('div');
+            item.className = 'filter-result-item';
+
+            const icon = document.createElement('div');
+            icon.className = 'filter-result-icon filter-icon-airport';
+            icon.innerHTML = _AIRPORT_ICON;
+
+            const primary = document.createElement('div');
+            primary.className = 'filter-result-primary';
+            primary.textContent = r.icao;
+
+            const secondary = document.createElement('div');
+            secondary.className = 'filter-result-secondary';
+            secondary.textContent = r.name.toUpperCase() + (r.iata ? ' · ' + r.iata : '');
+
+            const badge = document.createElement('div');
+            badge.className = 'filter-result-badge';
+            badge.textContent = 'CVL';
+
+            item.appendChild(icon);
+            item.appendChild(primary);
+            item.appendChild(secondary);
+            item.appendChild(badge);
+
+            item.addEventListener('click', () => _selectAirport(r.feature));
+            container.appendChild(item);
+        });
+
+        addSection('MILITARY', mil, (r) => {
+            const item = document.createElement('div');
+            item.className = 'filter-result-item';
+
+            const icon = document.createElement('div');
+            icon.className = 'filter-result-icon filter-icon-mil';
+            icon.innerHTML = _MIL_ICON;
+
+            const primary = document.createElement('div');
+            primary.className = 'filter-result-primary';
+            primary.textContent = r.icao || r.name.toUpperCase().slice(0, 6);
+
+            const secondary = document.createElement('div');
+            secondary.className = 'filter-result-secondary';
+            secondary.textContent = r.name.toUpperCase();
+
+            const badge = document.createElement('div');
+            badge.className = 'filter-result-badge';
+            badge.textContent = 'MIL';
+
+            item.appendChild(icon);
+            item.appendChild(primary);
+            item.appendChild(secondary);
+            item.appendChild(badge);
+
+            item.addEventListener('click', () => _selectMil(r.feature));
+            container.appendChild(item);
+        });
+    }
+
+    function open() {
+        _open = true;
+        const panel = _getPanel();
+        if (panel) panel.classList.add('filter-panel-visible');
+        const btn = _getFilterBtn();
+        if (btn) btn.classList.add('active');
+        const input = _getInput();
+        if (input) { input.focus(); input.select(); }
+    }
+
+    function close() {
+        _open = false;
+        const panel = _getPanel();
+        if (panel) panel.classList.remove('filter-panel-visible');
+        const btn = _getFilterBtn();
+        if (btn) btn.classList.remove('active');
+    }
+
+    function toggle() {
+        if (_open) close();
+        else       open();
+    }
+
+    function init() {
+        const input    = _getInput();
+        const clearBtn = _getClearBtn();
+        if (!input) return;
+
+        input.addEventListener('input', () => {
+            const q = input.value;
+            if (clearBtn) clearBtn.classList.toggle('filter-clear-visible', q.length > 0);
+            _renderResults(_search(q), q);
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') close();
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                input.value = '';
+                clearBtn.classList.remove('filter-clear-visible');
+                const container = _getResults();
+                if (container) container.innerHTML = '';
+                input.focus();
+            });
+        }
+
+        // Close on map click
+        map.on('click', () => { if (_open) close(); });
+    }
+
+    return { open, close, toggle, init };
+})();
+// --- End Search Panel ---
+
 
 // Helper: fly to user's geolocation (uses rangeRingCenter which is kept live)
 function goToUserLocation() {
@@ -3857,6 +4279,9 @@ if ('geolocation' in navigator) {
 
 // Restore persisted landing notifications on page load
 _Notifications.init();
+
+// Initialise filter panel
+_FilterPanel.init();
 
 // --- Logo animation (bracket draw-in + typewriter) ---
 (function () {

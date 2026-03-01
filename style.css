@@ -702,6 +702,231 @@ html {
 
 
 /* ============================================================
+   FILTER PANEL
+   ============================================================ */
+
+#filter-panel {
+    position: fixed;
+    bottom: calc(44px + 14px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 340px;
+    max-width: calc(100vw - 28px);
+    background: rgba(0, 0, 0, 0.92);
+    color: #fff;
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    z-index: 999;
+    display: none;
+    pointer-events: auto;
+    user-select: none;
+    box-sizing: border-box;
+}
+
+#filter-panel.filter-panel-visible {
+    display: block;
+}
+
+#filter-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#filter-icon {
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.35);
+    display: block;
+}
+
+#filter-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    caret-color: #c8ff00;
+    min-width: 0;
+}
+
+#filter-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+}
+
+#filter-clear-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.3);
+    font-family: 'Barlow', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 0;
+    display: none;
+    transition: color 0.15s;
+    flex-shrink: 0;
+}
+
+#filter-clear-btn.filter-clear-visible {
+    display: block;
+}
+
+#filter-clear-btn:hover {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+#filter-results {
+    max-height: 280px;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+#filter-results::-webkit-scrollbar {
+    display: none;
+}
+
+.filter-section-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.3);
+    padding: 8px 14px 4px;
+    text-transform: uppercase;
+}
+
+.filter-result-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px 6px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.12s;
+}
+
+.filter-result-item:last-child {
+    border-bottom: none;
+}
+
+.filter-result-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.filter-result-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.filter-action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 6px;
+    flex-shrink: 0;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+}
+
+.filter-action-btn:hover {
+    color: #fff !important;
+}
+
+.filter-track-btn {
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    padding: 6px 8px;
+}
+
+.filter-result-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.filter-result-icon.filter-icon-plane {
+    color: #ffffff;
+}
+
+.filter-result-icon.filter-icon-airport {
+    color: #c8ff00;
+}
+
+.filter-result-icon.filter-icon-mil {
+    color: rgba(200, 255, 0, 0.5);
+}
+
+.filter-result-primary {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.filter-result-secondary {
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.4);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.filter-result-badge {
+    margin-left: auto;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
+}
+
+.filter-result-badge.filter-badge-emrg {
+    color: #ff4040;
+}
+
+.filter-no-results {
+    padding: 16px 14px;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.25);
+    text-align: center;
+    text-transform: uppercase;
+}
+
+@media (max-width: 600px) {
+    #filter-panel {
+        left: 0;
+        right: 0;
+        transform: none;
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+
+/* ============================================================
    NOTIFICATIONS PANEL
    ============================================================ */
 
