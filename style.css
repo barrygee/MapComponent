@@ -430,7 +430,7 @@ html {
     position: fixed;
     top: 80px;
     right: 14px;
-    z-index: 900;
+    z-index: 1002;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -639,7 +639,7 @@ html {
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.15s ease;
-    z-index: 901;
+    z-index: 1002;
 }
 
 #side-menu:not(.expanded) .sm-btn[data-tooltip]:hover::before,
@@ -676,7 +676,7 @@ html {
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.15s ease;
-    z-index: 901;
+    z-index: 1002;
 }
 
 /* + button (1st): tooltip sits directly to its left */
@@ -711,7 +711,7 @@ html {
 
 #filter-panel {
     position: fixed;
-    bottom: calc(44px + 8px);
+    top: calc(68px + 8px);
     left: 50%;
     transform: translateX(-50%);
     width: 420px;
@@ -728,6 +728,16 @@ html {
 
 #filter-panel.filter-panel-visible {
     display: block;
+}
+
+/* When side menu is expanded on small viewports, centre filter in the space left of the menu */
+@media (max-width: 744px) {
+    body:has(#side-menu.expanded) #filter-panel {
+        --menu-left: calc(100vw - 14px - 148px);
+        left: calc(var(--menu-left) / 2);
+        transform: translateX(-50%);
+        max-width: calc(var(--menu-left) - 28px);
+    }
 }
 
 #filter-mode-bar {
@@ -959,11 +969,18 @@ html {
 
 @media (max-width: 600px) {
     #filter-panel {
-        left: 0;
-        right: 0;
-        transform: none;
-        width: 100%;
-        max-width: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: calc(100vw - 200px);
+        max-width: calc(100vw - 200px);
+    }
+
+    body:has(#side-menu.expanded) #filter-panel {
+        --menu-left: calc(100vw - 14px - 148px);
+        left: calc(var(--menu-left) / 2);
+        transform: translateX(-50%);
+        width: calc(var(--menu-left) - 28px);
+        max-width: calc(var(--menu-left) - 28px);
     }
 }
 

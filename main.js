@@ -3734,7 +3734,6 @@ const _FilterPanel = (() => {
         map.easeTo({ center: coords, zoom: Math.max(map.getZoom(), 10), duration: 600 });
         // If there's a tag marker, enable the full data box with track button
         // (selection already shows the data box — also show status bar if tracking)
-        close();
     }
 
     function _selectAirport(feature) {
@@ -3752,7 +3751,6 @@ const _FilterPanel = (() => {
         if (typeof airportsControl !== 'undefined' && airportsControl) {
             airportsControl._showAirportPanel(p, feature.geometry.coordinates);
         }
-        close();
     }
 
     function _selectMil(feature) {
@@ -3770,7 +3768,6 @@ const _FilterPanel = (() => {
         if (typeof rafControl !== 'undefined' && rafControl) {
             rafControl._showRAFPanel(p, feature.geometry.coordinates);
         }
-        close();
     }
 
     function _renderResults(results, query) {
@@ -3916,7 +3913,6 @@ const _FilterPanel = (() => {
                 // Zoom to the plane's current position.
                 const coords = adsbControl._interpolatedCoords(hex) || f.geometry.coordinates;
                 map.easeTo({ center: coords, zoom: Math.max(map.getZoom(), 10), duration: 600 });
-                close();
             });
 
             item.appendChild(icon);
@@ -4065,8 +4061,7 @@ const _FilterPanel = (() => {
             });
         }
 
-        // Close on map click
-        map.on('click', () => { if (_open) close(); });
+        // Filter panel stays open; only closed by the filter button or Escape
 
         // Type filter mode buttons (ALL / CIVIL / MILITARY / HIDE ALL)
         const modeBar = document.getElementById('filter-mode-bar');
