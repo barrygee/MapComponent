@@ -3593,6 +3593,8 @@ let _syncSideMenuForPlanes = null;
     overlayGroup.appendChild(aarBtn);
     const awacsBtn = makeOverlayBtn('○',   '16px', 'AWACS',          () => awacsControl ? awacsControl.visible : false,               () => { if (awacsControl) awacsControl.toggle(); });
     overlayGroup.appendChild(awacsBtn);
+    const planesBtn = makeOverlayBtn(PLANE_SVG, '8px', 'PLANES', () => adsbControl ? adsbControl.visible : false, () => { adsbToggle(); syncLabelsBtn(); syncFilterBtn(); }, true);
+    overlayGroup.appendChild(planesBtn);
     const labelsBtn = makeOverlayBtn('CALL', '8px', 'CALLSIGNS', () => adsbLabelsControl ? adsbLabelsControl.labelsVisible : false, () => { if (adsbLabelsControl) adsbLabelsControl.toggle(); });
     labelsBtn.classList.add('sm-expanded-only');
     function syncLabelsBtn() {
