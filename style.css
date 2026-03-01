@@ -838,13 +838,15 @@ html {
     text-transform: uppercase;
 }
 
-.notif-item[data-type="flight"]    .notif-label { color: #c8ff00; opacity: 0.75; }
-.notif-item[data-type="departure"] .notif-label { color: #c8ff00; opacity: 0.75; }
-.notif-item[data-type="track"]     .notif-label { color: #c8ff00; opacity: 0.75; }
-.notif-item[data-type="tracking"]  .notif-label { color: #c8ff00; opacity: 0.75; }
-.notif-item[data-type="notif-off"] .notif-label { color: rgba(255, 255, 255, 0.45); }
-.notif-item[data-type="system"]    .notif-label { color: rgba(255, 255, 255, 0.45); }
-.notif-item[data-type="message"]   .notif-label { color: rgba(100, 160, 255, 0.8); }
+.notif-item[data-type="flight"]     .notif-label { color: #c8ff00; opacity: 0.75; }
+.notif-item[data-type="departure"]  .notif-label { color: #c8ff00; opacity: 0.75; }
+.notif-item[data-type="track"]      .notif-label { color: #c8ff00; opacity: 0.75; }
+.notif-item[data-type="tracking"]   .notif-label { color: #c8ff00; opacity: 0.75; }
+.notif-item[data-type="notif-off"]  .notif-label { color: rgba(255, 255, 255, 0.45); }
+.notif-item[data-type="system"]     .notif-label { color: rgba(255, 255, 255, 0.45); }
+.notif-item[data-type="message"]    .notif-label { color: rgba(100, 160, 255, 0.8); }
+.notif-item[data-type="emergency"]  .notif-label { color: #ff2222; }
+.notif-item[data-type="squawk-clr"] .notif-label { color: rgba(255, 255, 255, 0.45); }
 
 .notif-dismiss {
     background: none;
@@ -880,6 +882,10 @@ html {
     line-height: 1.2;
 }
 
+.notif-item[data-type="emergency"] .notif-title {
+    color: #ff2222;
+}
+
 .notif-detail {
     font-size: 10px;
     font-weight: 400;
@@ -887,6 +893,7 @@ html {
     color: rgba(255, 255, 255, 0.4);
     text-transform: uppercase;
     line-height: 1.6;
+    white-space: pre-line;
 }
 
 .notif-time {

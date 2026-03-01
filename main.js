@@ -2546,13 +2546,14 @@ class AdsbLiveControl {
         // Callsign text span
         const nameSpan = document.createElement('span');
         nameSpan.textContent = callsign;
+        nameSpan.style.cssText = 'color:#ffffff !important';
         el.appendChild(nameSpan);
         // Emergency squawk badge
         if (isEmerg) {
             const badge = document.createElement('span');
             badge.className = 'sqk-badge';
             badge.textContent = props.squawk;
-            badge.style.cssText = 'background:#000;color:#ff2222;font-size:11px;font-weight:700;padding:0 4px;border-radius:2px;letter-spacing:.05em;';
+            badge.style.cssText = 'background:#000;color:#ff2222 !important;font-size:11px;font-weight:700;padding:0 4px;border-radius:2px;letter-spacing:.05em;';
             el.appendChild(badge);
         }
         el.addEventListener('mouseenter', () => {
@@ -2625,6 +2626,7 @@ class AdsbLiveControl {
                 // Update callsign text (first child span)
                 const nameSpan = labelEl.querySelector('span:not(.sqk-badge)') || labelEl;
                 nameSpan.textContent = raw || 'UNKNOWN';
+                nameSpan.style.cssText = 'color:#ffffff !important';
                 // Update/add/remove squawk badge
                 let badge = labelEl.querySelector('.sqk-badge');
                 if (isEmerg) {
@@ -3017,8 +3019,7 @@ class AdsbLiveControl {
                             `SQK ${squawk} — ${squawkLabels[squawk] || 'Emergency'}`,
                             props.alt_baro > 0 ? `ALT ${props.alt_baro.toLocaleString()} ft` : 'ON GROUND',
                             props.gs ? `GS ${Math.round(props.gs)} kt` : '',
-                            `${dateStr}  ${timeStr}`,
-                        ].filter(Boolean).join(' · ');
+                        ].filter(Boolean).join(' · ') + `\n${dateStr}  ${timeStr}`;
                         const coords = f.geometry.coordinates;
                         _Notifications.add({
                             type:   'emergency',
@@ -3190,6 +3191,7 @@ class AdsbLiveControl {
 
 let adsbControl = new AdsbLiveControl();
 map.addControl(adsbControl, 'top-right');
+window._adsb = adsbControl; // dev testing hook — see squawk-test.js
 
 // --- ADS-B Label Toggle ---
 class AdsbLabelsToggleControl {
