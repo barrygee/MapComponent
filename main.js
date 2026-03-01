@@ -4050,6 +4050,16 @@ const _FilterPanel = (() => {
                         const hiding = !adsbControl._allHidden;
                         btn.textContent = hiding ? 'SHOW ALL' : 'HIDE ALL';
                         btn.classList.toggle('active', hiding);
+                        if (!hiding) {
+                            adsbControl.setTypeFilter('all');
+                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
+                                b.classList.toggle('active', b.dataset.mode === 'all');
+                            });
+                        } else {
+                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
+                                b.classList.remove('active');
+                            });
+                        }
                         adsbControl.setAllHidden(hiding);
                         if (_syncSideMenuForPlanes) _syncSideMenuForPlanes();
                     });

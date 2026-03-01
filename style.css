@@ -764,6 +764,10 @@ html {
     color: #c8ff00;
 }
 
+.filter-mode-btn[data-mode="none"].active {
+    color: rgba(255, 255, 255, 0.5);
+}
+
 #filter-input-wrap {
     display: flex;
     align-items: center;
