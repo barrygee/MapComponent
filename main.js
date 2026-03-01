@@ -1778,6 +1778,30 @@ class AdsbLiveControl {
         this._lastFetchTime = 0;
         this._emergencySquawks = new Set(['7700', '7600', '7500']); // squawk codes treated as emergencies
         this._prevSquawk = {};  // hex -> last known squawk code (for change detection)
+        this._typeFilter = 'all'; // 'all' | 'civil' | 'mil' | 'none'
+    }
+
+    setTypeFilter(mode) {
+        this._typeFilter = mode;
+        this._applyTypeFilter();
+        this._updateCallsignMarkers();
+    }
+
+    _applyTypeFilter() {
+        if (!this.map) return;
+        const baseFilter = ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]];
+        let filter;
+        if (this._typeFilter === 'none') {
+            filter = ['==', 1, 0]; // hide all
+        } else if (this._typeFilter === 'civil') {
+            filter = ['all', baseFilter, ['!', ['boolean', ['get', 'military'], false]]];
+        } else if (this._typeFilter === 'mil') {
+            filter = ['all', baseFilter, ['boolean', ['get', 'military'], false]];
+        } else {
+            filter = baseFilter; // 'all'
+        }
+        try { this.map.setFilter('adsb-bracket', filter); } catch(e) {}
+        try { this.map.setFilter('adsb-icons',   filter); } catch(e) {}
     }
 
     onAdd(map) {
@@ -2614,7 +2638,11 @@ class AdsbLiveControl {
             // Only show label if the icon is visible (mirrors the layer filter).
             const zoom = this.map.getZoom();
             const iconVisible = (f.properties.alt_baro > 0) || (zoom >= 10);
-            if (!iconVisible) {
+            const isMil = !!f.properties.military;
+            const typeVisible = this._typeFilter === 'all'
+                || (this._typeFilter === 'civil' && !isMil)
+                || (this._typeFilter === 'mil'   && isMil);
+            if (!iconVisible || !typeVisible) {
                 if (this._callsignMarkers[hex]) {
                     this._callsignMarkers[hex].remove();
                     delete this._callsignMarkers[hex];
@@ -2684,10 +2712,8 @@ class AdsbLiveControl {
     _applySelection() {
         if (!this.map) return;
 
-        const baseFilter = ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]];
-        // Bracket and directional arrow always visible for all planes
-        try { this.map.setFilter('adsb-bracket', baseFilter); } catch(e) {}
-        try { this.map.setFilter('adsb-icons',   baseFilter); } catch(e) {}
+        // Apply type filter (civil/mil/all/none) — respects current mode
+        this._applyTypeFilter();
 
         // HTML callsign markers — selected aircraft gets the full popup instead.
         this._updateCallsignMarkers();
@@ -3537,7 +3563,7 @@ let _onGoToUserLocation = null;
         labelsBtn.classList.toggle('sm-planes-off', !planesOn);
         labelsBtn.classList.toggle('active', planesOn && adsbLabelsControl ? adsbLabelsControl.labelsVisible : false);
     }
-    overlayGroup.appendChild(makeOverlayBtn(PLANE_SVG, '8px', 'PLANES', () => adsbControl ? adsbControl.visible : false, () => { adsbToggle(); syncLabelsBtn(); }, true));
+    overlayGroup.appendChild(makeOverlayBtn(PLANE_SVG, '8px', 'PLANES', () => adsbControl ? adsbControl.visible : false, () => { adsbToggle(); syncLabelsBtn(); syncFilterBtn(); }, true));
     overlayGroup.appendChild(labelsBtn);
     labelsBtn.addEventListener('click', syncLabelsBtn);
     syncLabelsBtn();
@@ -3565,12 +3591,18 @@ let _onGoToUserLocation = null;
 
     filterBtn.appendChild(filterIconSpan);
     filterBtn.appendChild(filterLabelSpan);
-    filterBtn.style.opacity = '1';
     filterBtn.addEventListener('click', () => {
         if (typeof _FilterPanel !== 'undefined') _FilterPanel.toggle();
     });
     filterGroup.appendChild(filterBtn);
     panel.appendChild(filterGroup);
+
+    function syncFilterBtn() {
+        const planesOn = adsbControl ? adsbControl.visible : false;
+        filterBtn.classList.toggle('sm-planes-off', !planesOn);
+        if (!planesOn && typeof _FilterPanel !== 'undefined') _FilterPanel.close();
+    }
+    syncFilterBtn();
 
     document.body.appendChild(panel);
 })();
@@ -3965,6 +3997,19 @@ const _FilterPanel = (() => {
 
         // Close on map click
         map.on('click', () => { if (_open) close(); });
+
+        // Type filter mode buttons (ALL / CVL / MIL / NONE)
+        const modeBar = document.getElementById('filter-mode-bar');
+        if (modeBar) {
+            modeBar.querySelectorAll('[data-mode]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const mode = btn.dataset.mode;
+                    if (!adsbControl) return;
+                    adsbControl.setTypeFilter(mode);
+                    modeBar.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
+                });
+            });
+        }
     }
 
     return { open, close, toggle, init };

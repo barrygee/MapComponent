@@ -726,6 +726,40 @@ html {
     display: block;
 }
 
+#filter-mode-bar {
+    display: flex;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.filter-mode-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.3);
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    padding: 7px 0;
+    transition: color 0.15s, background 0.15s;
+    text-transform: uppercase;
+}
+
+.filter-mode-btn:last-child {
+    border-right: none;
+}
+
+.filter-mode-btn:hover {
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.filter-mode-btn.active {
+    color: #c8ff00;
+}
+
 #filter-input-wrap {
     display: flex;
     align-items: center;
