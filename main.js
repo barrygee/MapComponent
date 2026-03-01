@@ -326,7 +326,8 @@ function _saveOverlayStates() {
 const _Notifications = (() => {
     const STORAGE_KEY  = 'notifications';
     const OPEN_KEY     = 'notificationsOpen';
-    const _actions     = {};  // id -> { label, callback } — not persisted
+    const _actions      = {};  // id -> { label, callback } — not persisted
+    const _clickActions = {};  // id -> callback — fires when the notification body is clicked
     let _unreadCount   = 0;
 
     // ---- storage ----
@@ -355,6 +356,8 @@ const _Notifications = (() => {
         if (type === 'notif-off')  return 'NOTIFICATIONS OFF';
         if (type === 'system')     return 'SYSTEM';
         if (type === 'message')    return 'MESSAGE';
+        if (type === 'emergency')  return '⚠ EMERGENCY';
+        if (type === 'squawk-clr') return 'SQUAWK CLEARED';
         return 'NOTICE';
     }
 
@@ -431,6 +434,15 @@ const _Notifications = (() => {
             });
         }
 
+        const clickAction = _clickActions[item.id];
+        if (clickAction) {
+            el.style.cursor = 'pointer';
+            el.querySelector('.notif-body').addEventListener('click', (e) => {
+                e.stopPropagation();
+                clickAction();
+            });
+        }
+
         requestAnimationFrame(() => {
             requestAnimationFrame(() => { el.classList.add('notif-visible'); });
         });
@@ -495,6 +507,7 @@ const _Notifications = (() => {
             ts:     Date.now(),
         };
         if (opts.action) _actions[item.id] = opts.action;
+        if (opts.clickAction) _clickActions[item.id] = opts.clickAction;
         const items = _load();
         items.push(item);
         _save(items);
@@ -550,6 +563,7 @@ const _Notifications = (() => {
 
     function dismiss(id) {
         delete _actions[id];
+        delete _clickActions[id];
         _save(_load().filter(i => i.id !== id));
         const panel = _getPanel();
         if (panel) {
@@ -565,7 +579,7 @@ const _Notifications = (() => {
     function clearAll() {
         const items = _load();
         if (!items.length) return;
-        items.forEach(i => { delete _actions[i.id]; });
+        items.forEach(i => { delete _actions[i.id]; delete _clickActions[i.id]; });
         _save([]);
         _unreadCount = 0;
         const panel = _getPanel();
@@ -1748,6 +1762,8 @@ class AdsbLiveControl {
         this._notifEnabled = new Set(); // hex -> notifications enabled (independent of tracking)
         this._trackingRestored = false;
         this._lastFetchTime = 0;
+        this._emergencySquawks = new Set(['7700', '7600', '7500']); // squawk codes treated as emergencies
+        this._prevSquawk = {};  // hex -> last known squawk code (for change detection)
     }
 
     onAdd(map) {
@@ -1852,7 +1868,7 @@ class AdsbLiveControl {
 
     // Axis-aligned bracket corners matching the location marker style.
     // S=64 canvas, pixelRatio 2 → 32px logical, bracket centred at (32,32).
-    _createBracket() {
+    _createBracket(color = '#c8ff00') {
         const S   = 64;
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = S;
@@ -1866,7 +1882,7 @@ class AdsbLiveControl {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
         ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
 
-        ctx.strokeStyle = '#c8ff00';
+        ctx.strokeStyle = color;
         ctx.lineWidth   = 3;       // 1.5 logical, matching location marker
         ctx.lineCap     = 'square';
 
@@ -1912,14 +1928,18 @@ class AdsbLiveControl {
     }
 
     _registerIcons() {
-        if (this.map.hasImage('adsb-bracket'))     this.map.removeImage('adsb-bracket');
-        if (this.map.hasImage('adsb-bracket-mil')) this.map.removeImage('adsb-bracket-mil');
-        if (this.map.hasImage('adsb-blip'))        this.map.removeImage('adsb-blip');
-        if (this.map.hasImage('adsb-blip-mil'))    this.map.removeImage('adsb-blip-mil');
-        this.map.addImage('adsb-bracket',     this._createBracket(),            { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-bracket-mil', this._createMilBracket(),         { pixelRatio: 2, sdf: false });
+        if (this.map.hasImage('adsb-bracket'))         this.map.removeImage('adsb-bracket');
+        if (this.map.hasImage('adsb-bracket-mil'))     this.map.removeImage('adsb-bracket-mil');
+        if (this.map.hasImage('adsb-bracket-emerg'))   this.map.removeImage('adsb-bracket-emerg');
+        if (this.map.hasImage('adsb-blip'))            this.map.removeImage('adsb-blip');
+        if (this.map.hasImage('adsb-blip-mil'))        this.map.removeImage('adsb-blip-mil');
+        if (this.map.hasImage('adsb-blip-emerg'))      this.map.removeImage('adsb-blip-emerg');
+        this.map.addImage('adsb-bracket',     this._createBracket(),                 { pixelRatio: 2, sdf: false });
+        this.map.addImage('adsb-bracket-mil', this._createMilBracket(),              { pixelRatio: 2, sdf: false });
+        this.map.addImage('adsb-bracket-emerg', this._createBracket('#ff2222'),      { pixelRatio: 2, sdf: false });
         this.map.addImage('adsb-blip',        this._createRadarBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false });
         this.map.addImage('adsb-blip-mil',    this._createRadarBlip('#c8ff00', 1.1), { pixelRatio: 2, sdf: false });
+        this.map.addImage('adsb-blip-emerg',  this._createRadarBlip('#ff2222', 1.1), { pixelRatio: 2, sdf: false });
     }
 
     initLayers() {
@@ -1962,7 +1982,12 @@ class AdsbLiveControl {
             filter: ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
             layout: {
                 visibility: vis,
-                'icon-image': ['case', ['boolean', ['get', 'military'], false], 'adsb-bracket-mil', 'adsb-bracket'],
+                'icon-image': [
+                    'case',
+                    ['==', ['get', 'squawkEmerg'], 1], 'adsb-bracket-emerg',
+                    ['boolean', ['get', 'military'], false], 'adsb-bracket-mil',
+                    'adsb-bracket'
+                ],
                 'icon-size': 0.75,
                 'icon-rotation-alignment': 'viewport',
                 'icon-pitch-alignment': 'viewport',
@@ -1983,7 +2008,12 @@ class AdsbLiveControl {
             filter: ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
             layout: {
                 visibility: vis,
-                'icon-image': ['case', ['boolean', ['get', 'military'], false], 'adsb-blip-mil', 'adsb-blip'],
+                'icon-image': [
+                    'case',
+                    ['==', ['get', 'squawkEmerg'], 1], 'adsb-blip-emerg',
+                    ['boolean', ['get', 'military'], false], 'adsb-blip-mil',
+                    'adsb-blip'
+                ],
                 'icon-size': 0.75,
                 'icon-rotate': ['get', 'track'],
                 'icon-rotation-alignment': 'map',
@@ -2494,11 +2524,11 @@ class AdsbLiveControl {
     _buildCallsignLabelEl(props) {
         const raw = (props.flight || '').trim() || (props.r || '').trim() || (props.hex || '').trim();
         const callsign = raw || 'UNKNOWN';
-        const color = props.military ? '#ffffff' : '#ffffff';
+        const isEmerg = props.squawkEmerg === 1;
         const el = document.createElement('div');
         el.style.cssText = [
-            'background:rgba(0,0,0,0.5)',
-            `color:${color}`,
+            isEmerg ? 'background:rgba(180,0,0,0.85)' : 'background:rgba(0,0,0,0.5)',
+            'color:#ffffff',
             "font-family:'Barlow Condensed','Barlow',sans-serif",
             'font-size:13px',
             'font-weight:400',
@@ -2507,12 +2537,24 @@ class AdsbLiveControl {
             'box-sizing:border-box',
             'display:flex',
             'align-items:center',
+            'gap:5px',
             'padding:1px 8px',
             'cursor:pointer',
             'white-space:nowrap',
             'user-select:none',
         ].join(';');
-        el.textContent = callsign;
+        // Callsign text span
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = callsign;
+        el.appendChild(nameSpan);
+        // Emergency squawk badge
+        if (isEmerg) {
+            const badge = document.createElement('span');
+            badge.className = 'sqk-badge';
+            badge.textContent = props.squawk;
+            badge.style.cssText = 'background:#000;color:#ff2222;font-size:11px;font-weight:700;padding:0 4px;border-radius:2px;letter-spacing:.05em;';
+            el.appendChild(badge);
+        }
         el.addEventListener('mouseenter', () => {
             const f = this._geojson.features.find(f => f.properties.hex === props.hex);
             if (f) this._showHoverTag(f, true);
@@ -2574,11 +2616,28 @@ class AdsbLiveControl {
 
             if (this._callsignMarkers[hex]) {
                 this._callsignMarkers[hex].setLngLat(lngLat);
-                // Refresh text and colour in case callsign/military flag changed.
+                // Refresh label contents in case callsign/squawk state changed.
                 const labelEl = this._callsignMarkers[hex].getElement();
                 const raw = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || f.properties.hex || '';
-                labelEl.textContent = raw || 'UNKNOWN';
-                labelEl.style.color = f.properties.military ? '#ffffff' : '#ffffff';
+                const isEmerg = f.properties.squawkEmerg === 1;
+                // Update background
+                labelEl.style.background = isEmerg ? 'rgba(180,0,0,0.85)' : 'rgba(0,0,0,0.5)';
+                // Update callsign text (first child span)
+                const nameSpan = labelEl.querySelector('span:not(.sqk-badge)') || labelEl;
+                nameSpan.textContent = raw || 'UNKNOWN';
+                // Update/add/remove squawk badge
+                let badge = labelEl.querySelector('.sqk-badge');
+                if (isEmerg) {
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'sqk-badge';
+                        badge.style.cssText = 'background:#000;color:#ff2222;font-size:11px;font-weight:700;padding:0 4px;border-radius:2px;letter-spacing:.05em;';
+                        labelEl.appendChild(badge);
+                    }
+                    badge.textContent = f.properties.squawk;
+                } else if (badge) {
+                    badge.remove();
+                }
             } else {
                 const labelEl = this._buildCallsignLabelEl(f.properties);
                 const marker = new maplibregl.Marker({ element: labelEl, anchor: 'left', offset: [14, 0] })
@@ -2909,6 +2968,7 @@ class AdsbLiveControl {
                                 category:     a.category || '',
                                 emergency:    a.emergency || '',
                                 squawk:       a.squawk || '',
+                                squawkEmerg:  this._emergencySquawks.has(a.squawk || '') ? 1 : 0,
                                 rssi:         a.rssi ?? null,
                                 military,
                             }
@@ -2928,6 +2988,63 @@ class AdsbLiveControl {
             }
             for (const hex of Object.keys(this._hasDeparted)) {
                 if (!seen.has(hex)) delete this._hasDeparted[hex];
+            }
+
+            // Clean up squawk state for aircraft that have left the feed
+            for (const hex of Object.keys(this._prevSquawk)) {
+                if (!seen.has(hex)) delete this._prevSquawk[hex];
+            }
+
+            // Squawk emergency detection — fire notifications on entry/exit of emergency codes
+            for (const f of this._geojson.features) {
+                const props  = f.properties;
+                const hex    = props.hex;
+                if (!hex) continue;
+                const squawk = props.squawk || '';
+                const prev   = this._prevSquawk[hex];
+                const isEmerg = this._emergencySquawks.has(squawk);
+                const wasEmerg = prev !== undefined && this._emergencySquawks.has(prev);
+
+                if (squawk !== prev) {
+                    if (isEmerg) {
+                        // Entered emergency squawk
+                        const callsign = (props.flight || '').trim() || (props.r || '').trim() || hex;
+                        const squawkLabels = { '7700': 'General Emergency', '7600': 'Radio Failure / Lost Comm', '7500': 'Hijacking / Unlawful Interference' };
+                        const now = new Date();
+                        const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                        const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        const detail = [
+                            `SQK ${squawk} — ${squawkLabels[squawk] || 'Emergency'}`,
+                            props.alt_baro > 0 ? `ALT ${props.alt_baro.toLocaleString()} ft` : 'ON GROUND',
+                            props.gs ? `GS ${Math.round(props.gs)} kt` : '',
+                            `${dateStr}  ${timeStr}`,
+                        ].filter(Boolean).join(' · ');
+                        const coords = f.geometry.coordinates;
+                        _Notifications.add({
+                            type:   'emergency',
+                            title:  callsign,
+                            detail,
+                            clickAction: () => {
+                                if (this.map) {
+                                    this.map.flyTo({ center: coords, zoom: Math.max(this.map.getZoom(), 9) });
+                                }
+                            },
+                        });
+                    } else if (wasEmerg) {
+                        // Exited emergency squawk — announce the new code
+                        const callsign = (props.flight || '').trim() || (props.r || '').trim() || hex;
+                        const now = new Date();
+                        const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                        const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        const newCode = squawk || '(none)';
+                        _Notifications.add({
+                            type:   'squawk-clr',
+                            title:  callsign,
+                            detail: `Squawk changed to ${newCode}  ·  ${dateStr}  ${timeStr}`,
+                        });
+                    }
+                    this._prevSquawk[hex] = squawk;
+                }
             }
 
             // Don't push raw API coords to the map — let _interpolate() be the sole
