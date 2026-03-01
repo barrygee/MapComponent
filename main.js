@@ -391,6 +391,20 @@ const _Notifications = (() => {
         const wrap = document.getElementById('notif-list-wrap');
         if (wrap) {
             wrap.addEventListener('wheel', (e) => { e.stopPropagation(); e.preventDefault(); list.scrollTop += e.deltaY; }, { passive: false });
+
+            // Touch scrolling — prevent map zoom/pan while scrolling the list
+            let _touchStartY = 0;
+            wrap.addEventListener('touchstart', (e) => {
+                _touchStartY = e.touches[0].clientY;
+                e.stopPropagation();
+            }, { passive: true });
+            wrap.addEventListener('touchmove', (e) => {
+                const dy = _touchStartY - e.touches[0].clientY;
+                _touchStartY = e.touches[0].clientY;
+                list.scrollTop += dy;
+                e.stopPropagation();
+                e.preventDefault();
+            }, { passive: false });
         }
     }
 
