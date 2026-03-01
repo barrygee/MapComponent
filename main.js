@@ -292,7 +292,7 @@ map.on('error', (e) => {
 
 // --- Overlay state persistence ---
 // Defaults: everything ON on first load; subsequent loads restore last state.
-const _OVERLAY_DEFAULTS = { roads: true, names: true, rings: true, aar: true, awacs: true, airports: true, raf: true, adsb: true, adsbLabels: true };
+const _OVERLAY_DEFAULTS = { roads: true, names: false, rings: false, aar: false, awacs: false, airports: true, raf: false, adsb: true, adsbLabels: true };
 const _overlayStates = (() => {
     try {
         const saved = localStorage.getItem('overlayStates');
@@ -3583,10 +3583,17 @@ let _syncSideMenuForPlanes = null;
     const citiesBtn = makeOverlayBtn('N', '14px', 'LOCATIONS', () => namesControl ? namesControl.namesVisible : false, () => { if (namesControl) namesControl.toggleNames(); });
     citiesBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(citiesBtn);
-    overlayGroup.appendChild(makeOverlayBtn('◎',   '16px', 'RANGE RINGS',    () => rangeRingsControl ? rangeRingsControl.ringsVisible : false, () => { if (rangeRingsControl) rangeRingsControl.toggleRings(); }));
-    overlayGroup.appendChild(makeOverlayBtn('=',   '16px', 'A2A REFUELING',  () => aarControl ? aarControl.visible : false,                   () => { if (aarControl) aarControl.toggle(); }));
-    overlayGroup.appendChild(makeOverlayBtn('○',   '16px', 'AWACS',          () => awacsControl ? awacsControl.visible : false,               () => { if (awacsControl) awacsControl.toggle(); }));
+    const ringsBtn = makeOverlayBtn('◎',   '16px', 'RANGE RINGS',    () => rangeRingsControl ? rangeRingsControl.ringsVisible : false, () => { if (rangeRingsControl) rangeRingsControl.toggleRings(); });
+    ringsBtn.classList.add('sm-expanded-only');
+    overlayGroup.appendChild(ringsBtn);
+    const aarBtn = makeOverlayBtn('=',   '16px', 'A2A REFUELING',  () => aarControl ? aarControl.visible : false,                   () => { if (aarControl) aarControl.toggle(); });
+    aarBtn.classList.add('sm-expanded-only');
+    overlayGroup.appendChild(aarBtn);
+    const awacsBtn = makeOverlayBtn('○',   '16px', 'AWACS',          () => awacsControl ? awacsControl.visible : false,               () => { if (awacsControl) awacsControl.toggle(); });
+    awacsBtn.classList.add('sm-expanded-only');
+    overlayGroup.appendChild(awacsBtn);
     const labelsBtn = makeOverlayBtn('CALL', '8px', 'CALLSIGNS', () => adsbLabelsControl ? adsbLabelsControl.labelsVisible : false, () => { if (adsbLabelsControl) adsbLabelsControl.toggle(); });
+    labelsBtn.classList.add('sm-expanded-only');
     function syncLabelsBtn() {
         const planesOn = adsbControl ? (adsbControl.visible && !adsbControl._allHidden) : false;
         labelsBtn.classList.toggle('sm-planes-off', !planesOn);
@@ -3974,14 +3981,20 @@ const _FilterPanel = (() => {
 
     function _repositionPanel() {
         const panel = _getPanel();
-        if (!panel) return;
         const bar = document.getElementById('adsb-status-bar');
         const barVisible = bar && bar.classList.contains('adsb-sb-visible');
         const base = 44 + 14; // footer height + gap
-        if (barVisible) {
-            panel.style.bottom = (base + bar.offsetHeight + 8) + 'px';
-        } else {
-            panel.style.bottom = '';
+
+        // Position filter panel at base (its CSS default)
+        if (panel) panel.style.bottom = '';
+
+        // If tracking bar is visible and filter panel is open, stack bar above filter panel
+        if (bar) {
+            if (barVisible && panel && _open) {
+                bar.style.bottom = (base + panel.offsetHeight + 8) + 'px';
+            } else {
+                bar.style.bottom = '';
+            }
         }
     }
 
@@ -4004,6 +4017,7 @@ const _FilterPanel = (() => {
         if (panel) panel.classList.remove('filter-panel-visible');
         const btn = _getFilterBtn();
         if (btn) { btn.classList.remove('active'); btn.classList.add('enabled'); }
+        _repositionPanel();
     }
 
     function toggle() {
