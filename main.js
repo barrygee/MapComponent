@@ -621,11 +621,14 @@ const _Notifications = (() => {
         const notifOpen = wrapper && wrapper.classList.contains('notif-panel-open');
         const listWrap = document.getElementById('notif-list-wrap');
         const hasItems = _load().length > 0;
-        if (notifOpen && hasItems && listWrap && listWrap.offsetWidth > 0) {
-            // Center the bar in the space between the notification list's right
+        const refEl = (hasItems && listWrap && listWrap.offsetWidth > 0)
+            ? listWrap
+            : document.getElementById('notif-header');
+        if (notifOpen && refEl && refEl.offsetWidth > 0) {
+            // Center the bar in the space between the notification panel's right
             // edge and the viewport right edge, with a minimum 14px right margin.
-            const notifRight = listWrap.getBoundingClientRect().right;
-            const gap = 12; // gap between notif list and bar
+            const notifRight = refEl.getBoundingClientRect().right;
+            const gap = 12; // gap between notif panel and bar
             const rightMargin = 14;
             const zone = window.innerWidth - notifRight - gap - rightMargin;
             // midpoint of the zone, anchored from notifRight + gap
