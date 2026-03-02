@@ -326,7 +326,6 @@ html {
     justify-content: space-between;
     height: 38px;
     padding: 0 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     background: #000;
     position: relative;
     z-index: 1;
@@ -710,11 +709,11 @@ html {
 
 #filter-panel {
     position: fixed;
-    top: calc(68px + 8px);
+    top: calc(68px + 12px);
     --side-menu-width: calc((148px - 8px) / 3 + 14px); /* minimised menu + right gap */
     left: calc((100vw - var(--side-menu-width)) / 2);
     transform: translateX(-50%);
-    width: 420px;
+    width: 460px;
     max-width: calc(100vw - 28px);
     background: rgba(0, 0, 0, 0.92);
     color: #fff;

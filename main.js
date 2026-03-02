@@ -2344,7 +2344,7 @@ class AdsbLiveControl {
         if (props.military)     fields.push(['CLASS',   'MILITARY']);
 
         const isEmergency = props.emergency && props.emergency !== 'none';
-        const headerColor = isEmergency ? '#ff4040' : '#c8ff00';
+        const headerColor = isEmergency ? '#ff4040' : '#ffffff';
 
         const fieldsHTML = fields.map(([lbl, val]) =>
             `<div class="adsb-sb-field">` +
@@ -2357,7 +2357,7 @@ class AdsbLiveControl {
             `<span class="adsb-sb-label-tag">TRACKING</span>` +
             `<button class="adsb-sb-untrack-btn">UNTRACK</button>` +
             `</div>` +
-            `<div class="adsb-sb-header" style="border-top:none;border-bottom:1px solid rgba(255,255,255,0.08);height:auto;padding:8px 14px 9px">` +
+            `<div class="adsb-sb-header" style="border-top:none;height:auto;padding:8px 14px 9px">` +
             `<span class="adsb-sb-callsign" style="color:${headerColor}">${callsign}</span>` +
             `</div>` +
             `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
@@ -3725,7 +3725,7 @@ let _syncSideMenuForPlanes = null;
     panel.appendChild(clearGroup);
 
     // ---- Filter button ----
-    const FILTER_SVG = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.6"/><line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"/></svg>`;
+    const FILTER_SVG = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="1" y1="3.5" x2="14" y2="3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="3.5" y1="7.5" x2="11.5" y2="7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="6" y1="11.5" x2="9" y2="11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
     const filterGroup = makeGroup();
     const filterBtn = document.createElement('button');
     filterBtn.className = 'sm-btn enabled';
