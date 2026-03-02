@@ -2890,11 +2890,7 @@ class AdsbLiveControl {
             const pos = this._lastPositions[f.properties.hex];
             if (!pos || pos.gs < 10) return f; // don't move slow/parked aircraft
             const dt = (now - pos.ts) / 1000; // seconds since last real fix
-            if (dt <= 0 || dt > 10) {
-                // Data is stale — clear speed so the icon doesn't drift on the next cycle
-                if (dt > 10) pos.gs = 0;
-                return f;
-            }
+            if (dt <= 0 || dt > 5) return f; // no fresh data — keep plane stationary
             const trackRad = pos.track * Math.PI / 180;
             const nmPerSec = pos.gs / HR_SEC;
             const dLat = nmPerSec * Math.cos(trackRad) * NM_DEG * dt;
