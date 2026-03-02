@@ -1409,3 +1409,38 @@ body:has(#side-menu.expanded) #filter-panel {
     color: #c8ff00;
 }
 
+/* ---- Footer button tooltips ---- */
+#notif-toggle-btn[data-tooltip],
+#tracking-toggle-btn[data-tooltip] {
+    position: relative;
+}
+
+#notif-toggle-btn[data-tooltip]::before,
+#tracking-toggle-btn[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    background: #000;
+    color: rgba(255, 255, 255, 0.75);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0 10px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 1002;
+}
+
+#footer-left:not(:has(.notif-btn-active)):not(:has(.tracking-btn-active)) #notif-toggle-btn[data-tooltip]:hover::before,
+#footer-left:not(:has(.notif-btn-active)):not(:has(.tracking-btn-active)) #tracking-toggle-btn[data-tooltip]:hover::before {
+    opacity: 1;
+}
+
