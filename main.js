@@ -2834,6 +2834,15 @@ class AdsbLiveControl {
         nameSpan.textContent = callsign;
         nameSpan.style.cssText = 'color:#ffffff !important';
         el.appendChild(nameSpan);
+        // Military model badge (e.g. C17, C130)
+        if (props.military && props.t) {
+            el.style.paddingRight = '0';
+            const modelBadge = document.createElement('span');
+            modelBadge.className = 'mil-model-badge';
+            modelBadge.textContent = props.t.toUpperCase();
+            modelBadge.style.cssText = 'background:#4d6600;color:#c8ff00 !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 5px;';
+            el.appendChild(modelBadge);
+        }
         // Emergency squawk badge
         if (isEmerg) {
             const badge = document.createElement('span');
@@ -2917,9 +2926,24 @@ class AdsbLiveControl {
                 // Update background
                 labelEl.style.background = isEmerg ? 'rgba(180,0,0,0.85)' : 'rgba(0,0,0,0.5)';
                 // Update callsign text (first child span)
-                const nameSpan = labelEl.querySelector('span:not(.sqk-badge)') || labelEl;
+                const nameSpan = labelEl.querySelector('span:not(.sqk-badge):not(.mil-model-badge)') || labelEl;
                 nameSpan.textContent = raw || 'UNKNOWN';
                 nameSpan.style.cssText = 'color:#ffffff !important';
+                // Update/add/remove military model badge
+                let modelBadge = labelEl.querySelector('.mil-model-badge');
+                if (f.properties.military && f.properties.t) {
+                    if (!modelBadge) {
+                        modelBadge = document.createElement('span');
+                        modelBadge.className = 'mil-model-badge';
+                        modelBadge.style.cssText = 'background:#4d6600;color:#c8ff00 !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 5px;';
+                        labelEl.insertBefore(modelBadge, labelEl.querySelector('.sqk-badge') || null);
+                    }
+                    labelEl.style.paddingRight = '0';
+                    modelBadge.textContent = f.properties.t.toUpperCase();
+                } else if (modelBadge) {
+                    modelBadge.remove();
+                    labelEl.style.paddingRight = '';
+                }
                 // Update/add/remove squawk badge
                 let badge = labelEl.querySelector('.sqk-badge');
                 if (isEmerg) {
