@@ -4716,6 +4716,9 @@ function createMarkerElement(longitude, latitude) {
 
     runIntroAnimation();
 
+    // Expose so callers can re-trigger the intro animation (e.g. after a manual location set)
+    el._replayIntro = runIntroAnimation;
+
     return el;
 }
 
@@ -4724,6 +4727,14 @@ function setUserLocation(position) {
     const isFirstFix = !userMarker;
     console.log('[location] setUserLocation called', { longitude, latitude, isFirstFix, fromCache: !!position._fromCache });
 
+    // Don't let a live GPS fix overwrite a manually-pinned location
+    if (!position._fromCache && !position._manual) {
+        try {
+            const saved = JSON.parse(localStorage.getItem('userLocation') || 'null');
+            if (saved && saved.manual) return;
+        } catch (e) {}
+    }
+
     // Add or update marker for user's location
     if (userMarker) {
         userMarker.setLngLat([longitude, latitude]);
@@ -4731,7 +4742,8 @@ function setUserLocation(position) {
         // Always keep live coords up to date for click replay
         el.dataset.lat = latitude.toFixed(3);
         el.dataset.lon = longitude.toFixed(3);
-        // dataset.lat/lon already updated above for click replay — nothing else to do
+        // Re-run the intro animation when location is manually set
+        if (position._manual && typeof el._replayIntro === 'function') el._replayIntro();
     } else {
         userMarker = new maplibregl.Marker({ element: createMarkerElement(longitude, latitude), anchor: 'center' })
             .setLngLat([longitude, latitude])
@@ -4747,8 +4759,19 @@ function setUserLocation(position) {
     rangeRingCenter = [longitude, latitude];
     if (rangeRingsControl) rangeRingsControl.updateCenter(longitude, latitude);
 
-    // Cache the coordinates with a timestamp
-    localStorage.setItem('userLocation', JSON.stringify({ longitude, latitude, ts: Date.now() }));
+    // Cache the coordinates with a timestamp (manual flag preserved for right-click overrides)
+    if (!position._manual) {
+        try {
+            const existing = JSON.parse(localStorage.getItem('userLocation') || 'null');
+            if (existing && existing.manual) {
+                // Don't overwrite a manual pin with a GPS/cache write
+            } else {
+                localStorage.setItem('userLocation', JSON.stringify({ longitude, latitude, ts: Date.now() }));
+            }
+        } catch (e) {
+            localStorage.setItem('userLocation', JSON.stringify({ longitude, latitude, ts: Date.now() }));
+        }
+    }
     localStorage.setItem('geolocationGranted', 'true');
 
     // Update footer country via reverse geocoding (throttled to once per 2 minutes)
@@ -4771,12 +4794,12 @@ function setUserLocation(position) {
 }
 setUserLocation._lastGeocode = 0;
 
-// Load cached location if less than 5 minutes old
+// Load cached location — manual overrides persist indefinitely, GPS cache expires after 5 minutes
 const cachedLocation = localStorage.getItem('userLocation');
 if (cachedLocation) {
     try {
-        const { longitude, latitude, ts } = JSON.parse(cachedLocation);
-        if (Date.now() - (ts || 0) < 5 * 60 * 1000) {
+        const { longitude, latitude, ts, manual } = JSON.parse(cachedLocation);
+        if (manual || Date.now() - (ts || 0) < 5 * 60 * 1000) {
             setUserLocation({ coords: { longitude, latitude }, _fromCache: true });
         } else {
             localStorage.removeItem('userLocation');
@@ -4785,6 +4808,64 @@ if (cachedLocation) {
         localStorage.removeItem('userLocation');
     }
 }
+
+// Right-click on map → context menu to set location manually
+(function () {
+    let _ctxMenu = null;
+
+    function removeMenu() {
+        if (_ctxMenu) { _ctxMenu.remove(); _ctxMenu = null; }
+    }
+
+    map.on('contextmenu', (e) => {
+        removeMenu();
+
+        const { lng, lat } = e.lngLat;
+
+        const menu = document.createElement('div');
+        menu.style.cssText = [
+            'position:absolute',
+            'background:#1a1a2e',
+            'border:1px solid #444',
+            'border-radius:4px',
+            'padding:4px 0',
+            'font-family:monospace',
+            'font-size:12px',
+            'color:#fff',
+            'z-index:9999',
+            'box-shadow:0 2px 8px rgba(0,0,0,.6)',
+            'min-width:180px',
+            'cursor:default',
+        ].join(';');
+
+        const point = e.point;
+        menu.style.left = point.x + 'px';
+        menu.style.top  = point.y + 'px';
+
+        const item = document.createElement('div');
+        item.textContent = 'Set my location here';
+        item.style.cssText = 'padding:6px 14px;cursor:pointer;white-space:nowrap;';
+        item.addEventListener('mouseenter', () => { item.style.background = '#2a2a4e'; });
+        item.addEventListener('mouseleave', () => { item.style.background = ''; });
+        item.addEventListener('click', () => {
+            removeMenu();
+            // Save as manual override (no expiry)
+            localStorage.setItem('userLocation', JSON.stringify({ longitude: lng, latitude: lat, ts: Date.now(), manual: true }));
+            setUserLocation({ coords: { longitude: lng, latitude: lat }, _fromCache: false, _manual: true });
+        });
+
+        menu.appendChild(item);
+        map.getContainer().appendChild(menu);
+        _ctxMenu = menu;
+
+        // Dismiss on any interaction
+        const dismiss = () => { removeMenu(); };
+        document.addEventListener('click', dismiss, { once: true });
+        document.addEventListener('keydown', dismiss, { once: true });
+        map.on('move', dismiss);
+        map.on('zoom', dismiss);
+    });
+})();
 
 // Continuously watch for location changes
 if ('geolocation' in navigator) {
