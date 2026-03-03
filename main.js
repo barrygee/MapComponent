@@ -2383,19 +2383,23 @@ class AdsbLiveControl {
             (notifOn ? '' : `<line x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>`) +
             `</svg></button>`;
 
-        // When tracking, show only callsign + buttons — data is in the status bar below.
+        // When tracking, show only callsign + type (mil) + buttons — data is in the status bar below.
         if (isTracked) {
+            const milTypeBadge = (props.military && props.t)
+                ? `<span style="background:#4d6600;color:#c8ff00;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 4px;">${props.t.toUpperCase()}</span>`
+                : '';
+            const hasBadge = !!(props.military && props.t);
             return `<div style="` +
                 `background:rgba(0,0,0,0.7);` +
                 `border:1px solid rgba(255,255,255,0.15);` +
                 `color:#fff;` +
                 `font-family:'Barlow Condensed','Barlow',sans-serif;` +
                 `font-size:13px;font-weight:400;` +
-                `padding:1px 8px;` +
+                `padding:1px ${hasBadge ? '0' : '8px'} 1px 8px;` +
                 `white-space:nowrap;user-select:none">` +
-                `<div style="display:flex;align-items:center;gap:4px">` +
-                `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:#fff;pointer-events:none">${callsign}</span>` +
-                `${trkBtn}</div></div>`;
+                `<div style="display:flex;align-items:stretch;gap:4px">` +
+                `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:#fff;pointer-events:none;align-self:center">${callsign}</span>` +
+                `${milTypeBadge}${trkBtn}</div></div>`;
         }
 
         const alt      = props.alt_baro ?? 0;
@@ -2834,14 +2838,32 @@ class AdsbLiveControl {
         nameSpan.textContent = callsign;
         nameSpan.style.cssText = 'color:#ffffff !important';
         el.appendChild(nameSpan);
-        // Military model badge (e.g. C17, C130)
-        if (props.military && props.t) {
-            el.style.paddingRight = '0';
-            const modelBadge = document.createElement('span');
-            modelBadge.className = 'mil-model-badge';
-            modelBadge.textContent = props.t.toUpperCase();
-            modelBadge.style.cssText = 'background:#4d6600;color:#c8ff00 !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 5px;';
-            el.appendChild(modelBadge);
+        // Military model badge (e.g. C17, C130) + optional tracking button
+        if (props.military) {
+            const isTracked = this._notifEnabled.has(props.hex);
+            const hasBadge = !!props.t;
+            if (hasBadge || isTracked) el.style.paddingRight = '0';
+            if (hasBadge) {
+                const modelBadge = document.createElement('span');
+                modelBadge.className = 'mil-model-badge';
+                modelBadge.textContent = props.t.toUpperCase();
+                modelBadge.style.cssText = 'background:#4d6600;color:#c8ff00 !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 5px;';
+                el.appendChild(modelBadge);
+            }
+            if (isTracked) {
+                const trkBtn = document.createElement('button');
+                trkBtn.className = 'mil-trk-btn';
+                trkBtn.textContent = 'TRACKING';
+                trkBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 6px;color:#c8ff00;font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.1em;align-self:stretch;display:flex;align-items:center;white-space:nowrap;';
+                trkBtn.addEventListener('mouseenter', () => { trkBtn.textContent = 'UNTRACK'; });
+                trkBtn.addEventListener('mouseleave', () => { trkBtn.textContent = 'TRACKING'; });
+                trkBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this._notifEnabled.delete(props.hex);
+                    this._updateCallsignMarkers();
+                });
+                el.appendChild(trkBtn);
+            }
         }
         // Emergency squawk badge
         if (isEmerg) {
@@ -2929,19 +2951,46 @@ class AdsbLiveControl {
                 const nameSpan = labelEl.querySelector('span:not(.sqk-badge):not(.mil-model-badge)') || labelEl;
                 nameSpan.textContent = raw || 'UNKNOWN';
                 nameSpan.style.cssText = 'color:#ffffff !important';
-                // Update/add/remove military model badge
-                let modelBadge = labelEl.querySelector('.mil-model-badge');
-                if (f.properties.military && f.properties.t) {
-                    if (!modelBadge) {
-                        modelBadge = document.createElement('span');
-                        modelBadge.className = 'mil-model-badge';
-                        modelBadge.style.cssText = 'background:#4d6600;color:#c8ff00 !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 5px;';
-                        labelEl.insertBefore(modelBadge, labelEl.querySelector('.sqk-badge') || null);
+                // Update/add/remove military model badge + tracking button
+                if (f.properties.military) {
+                    const isTracked = this._notifEnabled.has(hex);
+                    const hasBadge = !!f.properties.t;
+                    if (hasBadge || isTracked) labelEl.style.paddingRight = '0';
+                    else labelEl.style.paddingRight = '';
+                    // Model badge
+                    let modelBadge = labelEl.querySelector('.mil-model-badge');
+                    if (hasBadge) {
+                        if (!modelBadge) {
+                            modelBadge = document.createElement('span');
+                            modelBadge.className = 'mil-model-badge';
+                            modelBadge.style.cssText = 'background:#4d6600;color:#c8ff00 !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 5px;';
+                            labelEl.insertBefore(modelBadge, labelEl.querySelector('.mil-trk-btn') || labelEl.querySelector('.sqk-badge') || null);
+                        }
+                        modelBadge.textContent = f.properties.t.toUpperCase();
+                    } else if (modelBadge) {
+                        modelBadge.remove();
                     }
-                    labelEl.style.paddingRight = '0';
-                    modelBadge.textContent = f.properties.t.toUpperCase();
-                } else if (modelBadge) {
-                    modelBadge.remove();
+                    // Tracking button
+                    let trkBtn = labelEl.querySelector('.mil-trk-btn');
+                    if (isTracked && !trkBtn) {
+                        trkBtn = document.createElement('button');
+                        trkBtn.className = 'mil-trk-btn';
+                        trkBtn.textContent = 'TRACKING';
+                        trkBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 6px;color:#c8ff00;font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.1em;align-self:stretch;display:flex;align-items:center;white-space:nowrap;';
+                        trkBtn.addEventListener('mouseenter', () => { trkBtn.textContent = 'UNTRACK'; });
+                        trkBtn.addEventListener('mouseleave', () => { trkBtn.textContent = 'TRACKING'; });
+                        trkBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            this._notifEnabled.delete(hex);
+                            this._updateCallsignMarkers();
+                        });
+                        labelEl.appendChild(trkBtn);
+                    } else if (!isTracked && trkBtn) {
+                        trkBtn.remove();
+                    }
+                } else {
+                    labelEl.querySelector('.mil-model-badge')?.remove();
+                    labelEl.querySelector('.mil-trk-btn')?.remove();
                     labelEl.style.paddingRight = '';
                 }
                 // Update/add/remove squawk badge
@@ -3109,7 +3158,10 @@ class AdsbLiveControl {
             const hex = f.properties.hex;
             if (hex && this._callsignMarkers[hex]) {
                 this._callsignMarkers[hex].setLngLat(f.geometry.coordinates);
-                this._callsignMarkers[hex].getElement().style.opacity = f.properties.stale ? '0.3' : '1';
+                const labelEl = this._callsignMarkers[hex].getElement();
+                labelEl.style.opacity = f.properties.stale ? '0.3' : '1';
+                const nameSpan = labelEl.querySelector('span:not(.sqk-badge):not(.mil-model-badge)');
+                if (nameSpan) nameSpan.style.color = f.properties.stale ? 'rgba(255,255,255,0.45)' : '#ffffff';
             }
             if (hex && hex === this._hoverHex && this._hoverMarker) {
                 this._hoverMarker.setLngLat(f.geometry.coordinates);
