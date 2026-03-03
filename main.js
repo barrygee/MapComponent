@@ -1875,6 +1875,7 @@ class AdsbLiveControl {
         this._prevSquawk = {};  // hex -> last known squawk code (for change detection)
         this._typeFilter = 'all'; // 'all' | 'civil' | 'mil'
         this._allHidden = false; // true = hide all planes regardless of type filter
+        this._hideNonPlane = false; // true = hide non-aircraft (ground vehicles, towers, UAVs, etc.)
     }
 
     setTypeFilter(mode) {
@@ -1894,6 +1895,12 @@ class AdsbLiveControl {
         if (hoverEl) hoverEl.style.visibility = hidden ? 'hidden' : '';
     }
 
+    setHideNonPlane(hide) {
+        this._hideNonPlane = hide;
+        this._applyTypeFilter();
+        this._updateCallsignMarkers();
+    }
+
     _applyTypeFilter() {
         if (!this.map) return;
         const baseFilter = ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]];
@@ -1909,12 +1916,20 @@ class AdsbLiveControl {
         ['adsb-bracket', 'adsb-icons'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', this.visible ? 'visible' : 'none'); } catch(e) {}
         });
+        // Non-plane filter: exclude surface-category items (C1–C5) when hideNonPlane is on
+        const nonPlaneCategories = ['C1', 'C2', 'C3', 'C4', 'C5'];
+        const nonPlaneFilter = this._hideNonPlane
+            ? ['!', ['in', ['get', 'category'], ['literal', nonPlaneCategories]]]
+            : null;
+
         if (this._typeFilter === 'civil') {
-            filter = ['all', baseFilter, ['!', ['boolean', ['get', 'military'], false]]];
+            const f = ['all', baseFilter, ['!', ['boolean', ['get', 'military'], false]]];
+            filter = nonPlaneFilter ? ['all', f, nonPlaneFilter] : f;
         } else if (this._typeFilter === 'mil') {
-            filter = ['all', baseFilter, ['boolean', ['get', 'military'], false]];
+            const f = ['all', baseFilter, ['boolean', ['get', 'military'], false]];
+            filter = nonPlaneFilter ? ['all', f, nonPlaneFilter] : f;
         } else {
-            filter = baseFilter; // 'all'
+            filter = nonPlaneFilter ? ['all', baseFilter, nonPlaneFilter] : baseFilter;
         }
         try { this.map.setFilter('adsb-bracket', filter); } catch(e) {}
         try { this.map.setFilter('adsb-icons',   filter); } catch(e) {}
@@ -2868,9 +2883,12 @@ class AdsbLiveControl {
             const zoom = this.map.getZoom();
             const iconVisible = (f.properties.alt_baro > 0) || (zoom >= 10);
             const isMil = !!f.properties.military;
+            const cat = (f.properties.category || '').toUpperCase();
+            const isNonPlane = ['C1','C2','C3','C4','C5'].includes(cat);
             const typeVisible = !this._allHidden && (this._typeFilter === 'all'
                 || (this._typeFilter === 'civil' && !isMil)
-                || (this._typeFilter === 'mil'   && isMil));
+                || (this._typeFilter === 'mil'   && isMil))
+                && !(this._hideNonPlane && isNonPlane);
             if (!iconVisible || !typeVisible) {
                 if (this._callsignMarkers[hex]) {
                     this._callsignMarkers[hex].remove();
@@ -3861,6 +3879,9 @@ let _syncSideMenuForPlanes = null;
     overlayGroup.appendChild(labelsBtn);
     labelsBtn.addEventListener('click', syncLabelsBtn);
     syncLabelsBtn();
+    const groundBtn = makeOverlayBtn('GND', '8px', 'GROUND VEHICLES', () => adsbControl ? !adsbControl._hideNonPlane : true, () => { if (adsbControl) adsbControl.setHideNonPlane(!adsbControl._hideNonPlane); });
+    groundBtn.classList.add('sm-expanded-only');
+    overlayGroup.appendChild(groundBtn);
     panel.appendChild(overlayGroup);
 
     const clearGroup = makeGroup();
