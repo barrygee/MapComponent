@@ -213,6 +213,22 @@ function computeTextRotate(coordinates) {
     return Math.round(rot * 10) / 10;
 }
 
+/**
+ * Find the two endpoints of the longest edge of a polygon ring.
+ * Returns [[lng0,lat0],[lng1,lat1]] for the longest edge.
+ */
+function computeLongestEdge(coordinates) {
+    const ring = coordinates[0];
+    let maxLen = -1, p0 = ring[0], p1 = ring[1];
+    for (let i = 0; i < ring.length - 1; i++) {
+        const dLng = ring[i + 1][0] - ring[i][0];
+        const dLat = ring[i + 1][1] - ring[i][1];
+        const len = Math.sqrt(dLng * dLng + dLat * dLat);
+        if (len > maxLen) { maxLen = len; p0 = ring[i]; p1 = ring[i + 1]; }
+    }
+    return [p0, p1];
+}
+
 const origin = window.location.origin;
 
 const _styleURL = _isOnline
@@ -1945,6 +1961,8 @@ class AARToggleControl {
 
         // Create HTML label markers once — DOM nodes survive style changes
         if (!this._labelMarkers) {
+            this._labelEdges = [];
+            this._labelEls = [];
             this._labelMarkers = AARA_ZONES.features.map(f => {
                 const coords = computeCentroid(f.geometry.coordinates);
                 const rotate = computeTextRotate(f.geometry.coordinates);
@@ -1956,11 +1974,26 @@ class AARToggleControl {
                 label.style.cssText = `color:#ffffff;font-family:monospace;font-size:10px;white-space:nowrap;text-align:center;transform:rotate(${rotate}deg);`;
                 label.textContent = f.properties.name;
                 wrapper.appendChild(label);
+                this._labelEdges.push(computeLongestEdge(f.geometry.coordinates));
+                this._labelEls.push(label);
                 return new maplibregl.Marker({ element: wrapper, anchor: 'center' })
                     .setLngLat(coords);
             });
             if (this.visible) this._labelMarkers.forEach(m => m.addTo(this.map));
         }
+    }
+
+    _updateLabelRotations() {
+        if (!this._labelEls) return;
+        this._labelEls.forEach((el, i) => {
+            const [p0, p1] = this._labelEdges[i];
+            const s0 = this.map.project(p0);
+            const s1 = this.map.project(p1);
+            let angle = Math.atan2(s1.y - s0.y, s1.x - s0.x) * 180 / Math.PI;
+            // Keep text reading left-to-right
+            if (angle > 90 || angle <= -90) angle += 180;
+            el.style.transform = `rotate(${angle}deg)`;
+        });
     }
 
     toggle() {
@@ -1981,6 +2014,8 @@ class AARToggleControl {
 
 const aarControl = new AARToggleControl();
 map.addControl(aarControl, 'top-right');
+map.on('rotate', () => aarControl._updateLabelRotations());
+map.on('pitch',  () => aarControl._updateLabelRotations());
 // --- End UK AARA ---
 
 
