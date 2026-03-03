@@ -1982,7 +1982,8 @@ class AdsbLiveControl {
 
     _parseAlt(alt_baro) {
         if (alt_baro === 'ground' || alt_baro === '' || alt_baro == null) return 0;
-        return typeof alt_baro === 'number' ? alt_baro : parseFloat(alt_baro) || 0;
+        const alt = typeof alt_baro === 'number' ? alt_baro : parseFloat(alt_baro) || 0;
+        return alt < 0 ? 0 : alt;
     }
 
     // Small solid directional triangle pointing north — rotated by icon-rotate
@@ -3031,19 +3032,23 @@ class AdsbLiveControl {
                                 trail.push({ lon: a.lon, lat: a.lat, alt });
                                 if (trail.length > this._MAX_TRAIL) trail.shift();
                             }
+                            // Back-date lastSeen by seen_pos so ageSec reflects how long
+                            // ago the position was actually recorded, not when we fetched it.
+                            const seenAgoMs = (a.seen_pos ?? 0) * 1000;
+                            const lastSeen = Date.now() - seenAgoMs;
                             const existing = this._lastPositions[hex];
-                            if (posChanged || !existing) {
-                                // New real position — record it and reset the dead-reckoning clock
+                            if (!existing) {
                                 this._lastPositions[hex] = {
                                     lon: a.lon, lat: a.lat,
                                     gs: a.gs ?? 0, track: a.track ?? null,
-                                    lastSeen: Date.now()
+                                    lastSeen
                                 };
                             } else {
-                                // Same position — only update speed/track, never touch lastSeen
-                                // so dead-reckoning keeps accumulating from the last real fix
+                                existing.lon = a.lon;
+                                existing.lat = a.lat;
                                 existing.gs = a.gs ?? 0;
                                 existing.track = a.track ?? null;
+                                existing.lastSeen = lastSeen;
                             }
                         }
 
