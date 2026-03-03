@@ -2148,7 +2148,7 @@ class AdsbLiveControl {
                 'icon-ignore-placement': true,
             },
             paint: {
-                'icon-opacity': 1,
+                'icon-opacity': ['case', ['==', ['get', 'stale'], 1], 0.3, 1],
                 'icon-opacity-transition': { duration: 0 },
             }
         });
@@ -2175,7 +2175,7 @@ class AdsbLiveControl {
                 'icon-ignore-placement': true,
             },
             paint: {
-                'icon-opacity': 1,
+                'icon-opacity': ['case', ['==', ['get', 'stale'], 1], 0.3, 1],
                 'icon-opacity-transition': { duration: 0 },
             }
         });
@@ -2886,18 +2886,48 @@ class AdsbLiveControl {
         const NM_DEG = 1 / 60;
         const HR_SEC = 3600;
 
-        this._interpolatedFeatures = this._geojson.features.map(f => {
+        const STALE_DIM_SEC = 30;  // dim/disable icon after 30s no data
+        const STALE_REMOVE_SEC = 60; // remove from map after 60s no data
+        this._geojson.features = this._geojson.features.filter(f => {
             const pos = this._lastPositions[f.properties.hex];
-            if (!pos || pos.gs < 10) return f; // don't move slow/parked aircraft
-            const dt = (now - pos.ts) / 1000; // seconds since last real fix
-            if (dt <= 0 || dt > 5) return f; // no fresh data — keep plane stationary
+            if (!pos) return true; // no tracking data yet, keep
+            const ageSec = (now - pos.lastSeen) / 1000;
+            if (ageSec >= STALE_REMOVE_SEC) {
+                // Remove callsign marker immediately
+                const hex = f.properties.hex;
+                if (hex && this._callsignMarkers[hex]) {
+                    this._callsignMarkers[hex].remove();
+                    delete this._callsignMarkers[hex];
+                }
+                return false;
+            }
+            return true;
+        });
+
+        this._interpolatedFeatures = this._geojson.features.map(f => {
+            const hex = f.properties.hex;
+            const pos = this._lastPositions[hex];
+            const ageSec = pos ? (now - pos.lastSeen) / 1000 : 0;
+            const stale = ageSec >= STALE_DIM_SEC ? 1 : 0;
+
+            if (!pos || pos.gs < 10 || stale) {
+                // Parked/slow/stale — freeze at last known API position
+                const coords = pos ? [pos.lon, pos.lat] : f.geometry.coordinates;
+                return { ...f, geometry: { type: 'Point', coordinates: coords }, properties: { ...f.properties, stale } };
+            }
+
+            const dt = (now - pos.ts) / 1000; // seconds since last real position fix
+            if (dt <= 0) return { ...f, geometry: { type: 'Point', coordinates: [pos.lon, pos.lat] }, properties: { ...f.properties, stale } };
+
+            // Extrapolate position using last known speed and heading
             const trackRad = pos.track * Math.PI / 180;
             const nmPerSec = pos.gs / HR_SEC;
             const dLat = nmPerSec * Math.cos(trackRad) * NM_DEG * dt;
             const dLon = nmPerSec * Math.sin(trackRad) * NM_DEG * dt / Math.cos(pos.lat * Math.PI / 180);
             return {
                 ...f,
-                geometry: { type: 'Point', coordinates: [pos.lon + dLon, pos.lat + dLat] }
+                geometry: { type: 'Point', coordinates: [pos.lon + dLon, pos.lat + dLat] },
+                properties: { ...f.properties, stale }
             };
         });
 
@@ -2926,6 +2956,7 @@ class AdsbLiveControl {
             const hex = f.properties.hex;
             if (hex && this._callsignMarkers[hex]) {
                 this._callsignMarkers[hex].setLngLat(f.geometry.coordinates);
+                this._callsignMarkers[hex].getElement().style.opacity = f.properties.stale ? '0.3' : '1';
             }
             if (hex && hex === this._hoverHex && this._hoverMarker) {
                 this._hoverMarker.setLngLat(f.geometry.coordinates);
@@ -2991,23 +3022,14 @@ class AdsbLiveControl {
                                 trail.push({ lon: a.lon, lat: a.lat, alt });
                                 if (trail.length > this._MAX_TRAIL) trail.shift();
                             }
-                            // Only reset the interpolation clock when the API gives us a
-                            // genuinely new position. If the same fix comes back again,
-                            // keep the existing entry so the extrapolation clock keeps
-                            // running forward and the plane doesn't snap backwards.
-                            if (posChanged || !this._lastPositions[hex]) {
-                                const ageSec = a.seen_pos ?? a.seen ?? 0;
-                                this._lastPositions[hex] = {
-                                    lon: a.lon, lat: a.lat,
-                                    gs: a.gs ?? 0, track: a.track ?? 0,
-                                    ts: Date.now() - ageSec * 1000
-                                };
-                            } else {
-                                // Position unchanged — update speed/track in case they
-                                // changed, but leave lon/lat/ts alone.
-                                this._lastPositions[hex].gs = a.gs ?? 0;
-                                this._lastPositions[hex].track = a.track ?? 0;
-                            }
+                            // Always reset ts on every fetch so dt never grows unboundedly
+                            // between polls — prevents drift and snap-back.
+                            this._lastPositions[hex] = {
+                                lon: a.lon, lat: a.lat,
+                                gs: a.gs ?? 0, track: a.track ?? 0,
+                                ts: Date.now(),
+                                lastSeen: Date.now()
+                            };
                         }
 
                         // Landing/departure detection for tracked aircraft.
