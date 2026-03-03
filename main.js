@@ -2779,6 +2779,9 @@ class AdsbLiveControl {
 
     _hideSelectedTag() {
         if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
+        if (this._tagHex && this._followEnabled) {
+            this._notifEnabled.delete(this._tagHex);
+        }
         this._tagHex = null;
         this._saveTrackingState();
     }
