@@ -1847,6 +1847,7 @@ class AdsbLiveControl {
     constructor() {
         this.visible = _overlayStates.adsb;
         this._pollInterval = null;
+        this._interpolateInterval = null;
         this._geojson = { type: 'FeatureCollection', features: [] };
         this._trails = {};
         this._trailsGeojson = { type: 'FeatureCollection', features: [] };
@@ -1854,7 +1855,6 @@ class AdsbLiveControl {
         this._selectedHex = null;
         this._eventsAdded = false;
         this._lastPositions = {};   // hex -> { lon, lat, gs, track, ts }
-        this._interpolateInterval = null;
         this._spriteReady = Promise.resolve();
         this._tagMarker = null;   // MapLibre Marker showing selected-aircraft data tag
         this._tagHex    = null;
@@ -1865,6 +1865,7 @@ class AdsbLiveControl {
         this.labelsVisible = _overlayStates.adsbLabels ?? true;
         this._prevAlt = {};           // hex -> last known alt_baro (for landing/departure detection)
         this._hasDeparted = {};       // hex -> bool (true once departure notification fired)
+        this._landedAt = {};          // hex -> timestamp when plane transitioned to alt===0
         this._seenOnGround = {};      // hex -> bool (true once observed at alt===0 while tracked)
         this._parkedTimers = {};      // hex -> setTimeout id (remove from map after 1 min)
         this._notifEnabled = new Set(); // hex -> notifications enabled (independent of tracking)
@@ -2886,14 +2887,13 @@ class AdsbLiveControl {
         const NM_DEG = 1 / 60;
         const HR_SEC = 3600;
 
-        const STALE_DIM_SEC = 30;  // dim/disable icon after 30s no data
-        const STALE_REMOVE_SEC = 60; // remove from map after 60s no data
+        const STALE_SEC = 30;      // dim/disable after 30s no data
+        const REMOVE_SEC = 60;     // remove from map after 60s no data
         this._geojson.features = this._geojson.features.filter(f => {
             const pos = this._lastPositions[f.properties.hex];
-            if (!pos) return true; // no tracking data yet, keep
+            if (!pos) return true;
             const ageSec = (now - pos.lastSeen) / 1000;
-            if (ageSec >= STALE_REMOVE_SEC) {
-                // Remove callsign marker immediately
+            if (ageSec >= REMOVE_SEC) {
                 const hex = f.properties.hex;
                 if (hex && this._callsignMarkers[hex]) {
                     this._callsignMarkers[hex].remove();
@@ -2908,26 +2908,35 @@ class AdsbLiveControl {
             const hex = f.properties.hex;
             const pos = this._lastPositions[hex];
             const ageSec = pos ? (now - pos.lastSeen) / 1000 : 0;
-            const stale = ageSec >= STALE_DIM_SEC ? 1 : 0;
+            const onGround = f.properties.alt_baro === 0;
 
-            if (!pos || pos.gs < 10 || stale) {
-                // Parked/slow/stale — freeze at last known API position
-                const coords = pos ? [pos.lon, pos.lat] : f.geometry.coordinates;
-                return { ...f, geometry: { type: 'Point', coordinates: coords }, properties: { ...f.properties, stale } };
+            if (onGround) {
+                // Ground planes: dead-reckon only if we have fresh data, gs >= 10, and a real track.
+                const groundStale = ageSec >= STALE_SEC;
+                if (!pos || pos.gs < 10 || groundStale || pos.track === null) {
+                    const coords = pos ? [pos.lon, pos.lat] : f.geometry.coordinates;
+                    return { ...f, geometry: { type: 'Point', coordinates: coords }, properties: { ...f.properties, stale: 0 } };
+                }
+            } else {
+                // Airborne: go stale if no data received within threshold
+                const stale = ageSec >= STALE_SEC ? 1 : 0;
+                if (!pos || pos.gs < 10 || stale) {
+                    const coords = pos ? [pos.lon, pos.lat] : f.geometry.coordinates;
+                    return { ...f, geometry: { type: 'Point', coordinates: coords }, properties: { ...f.properties, stale } };
+                }
             }
 
-            const dt = (now - pos.ts) / 1000; // seconds since last real position fix
-            if (dt <= 0) return { ...f, geometry: { type: 'Point', coordinates: [pos.lon, pos.lat] }, properties: { ...f.properties, stale } };
-
-            // Extrapolate position using last known speed and heading
+            // Dead-reckon from the last real API fix using elapsed time
             const trackRad = pos.track * Math.PI / 180;
             const nmPerSec = pos.gs / HR_SEC;
-            const dLat = nmPerSec * Math.cos(trackRad) * NM_DEG * dt;
-            const dLon = nmPerSec * Math.sin(trackRad) * NM_DEG * dt / Math.cos(pos.lat * Math.PI / 180);
+            const dLat = nmPerSec * ageSec * Math.cos(trackRad) * NM_DEG;
+            const dLon = nmPerSec * ageSec * Math.sin(trackRad) * NM_DEG / Math.cos(pos.lat * Math.PI / 180);
+            const lon = pos.lon + dLon;
+            const lat = pos.lat + dLat;
             return {
                 ...f,
-                geometry: { type: 'Point', coordinates: [pos.lon + dLon, pos.lat + dLat] },
-                properties: { ...f.properties, stale }
+                geometry: { type: 'Point', coordinates: [lon, lat] },
+                properties: { ...f.properties, stale: 0 }
             };
         });
 
@@ -3022,14 +3031,20 @@ class AdsbLiveControl {
                                 trail.push({ lon: a.lon, lat: a.lat, alt });
                                 if (trail.length > this._MAX_TRAIL) trail.shift();
                             }
-                            // Always reset ts on every fetch so dt never grows unboundedly
-                            // between polls — prevents drift and snap-back.
-                            this._lastPositions[hex] = {
-                                lon: a.lon, lat: a.lat,
-                                gs: a.gs ?? 0, track: a.track ?? 0,
-                                ts: Date.now(),
-                                lastSeen: Date.now()
-                            };
+                            const existing = this._lastPositions[hex];
+                            if (posChanged || !existing) {
+                                // New real position — record it and reset the dead-reckoning clock
+                                this._lastPositions[hex] = {
+                                    lon: a.lon, lat: a.lat,
+                                    gs: a.gs ?? 0, track: a.track ?? null,
+                                    lastSeen: Date.now()
+                                };
+                            } else {
+                                // Same position — only update speed/track, never touch lastSeen
+                                // so dead-reckoning keeps accumulating from the last real fix
+                                existing.gs = a.gs ?? 0;
+                                existing.track = a.track ?? null;
+                            }
                         }
 
                         // Landing/departure detection for tracked aircraft.
@@ -3037,6 +3052,7 @@ class AdsbLiveControl {
                             const prevAlt = this._prevAlt[hex];
                             const gs      = a.gs ?? 0;
                             const justLanded  = (prevAlt !== undefined && prevAlt > 0 && alt === 0);
+                            if (justLanded) this._landedAt[hex] = Date.now();
 
                             // Record when this aircraft is observed on the ground while notifications enabled
                             if (alt === 0 && this._notifEnabled.has(hex)) {
@@ -3243,10 +3259,9 @@ class AdsbLiveControl {
                 }
             }
 
-            // Don't push raw API coords to the map — let _interpolate() be the sole
-            // writer so there's no backward snap when new data arrives.
+            // Don't push raw API coords to the map — let the interpolation timer be the
+            // sole writer so there's no backward snap when new data arrives.
             this._lastFetchTime = Date.now();
-            this._interpolate();
 
             // On first load, re-select any previously tracked plane.
             this._restoreTrackingState();
@@ -3351,8 +3366,8 @@ class AdsbLiveControl {
         // Skip the immediate fetch if a pre-fetch already completed recently
         // (within the last 4 seconds) to avoid a redundant API call.
         if (Date.now() - this._lastFetchTime > 4000) this._fetch();
-        this._pollInterval = setInterval(() => this._fetch(), 5000);
-        this._interpolateInterval = setInterval(() => this._interpolate(), 1000);
+        this._pollInterval = setInterval(() => this._fetch(), 1000);
+        this._interpolateInterval = setInterval(() => this._interpolate(), 100);
     }
 
     _stopPolling() {
