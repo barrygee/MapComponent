@@ -1325,7 +1325,7 @@ class AirportsToggleControl {
             `<button class="adsb-sb-untrack-btn" id="apt-panel-close">CLOSE</button>` +
             `</div>` +
             `<div class="adsb-sb-header" style="border-top:none;border-bottom:1px solid rgba(255,255,255,0.08);height:auto;padding:8px 14px 9px">` +
-            `<span class="adsb-sb-callsign" style="color:#c8ff00">${p.icao}</span>` +
+            `<span class="adsb-sb-callsign" style="color:#ffffff">${p.icao}</span>` +
             `<span style="font-size:10px;font-weight:400;letter-spacing:0.08em;color:rgba(255,255,255,0.4)">${p.name.toUpperCase()}</span>` +
             `</div>` +
             `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
@@ -4320,6 +4320,7 @@ let _syncSideMenuForPlanes = null;
     const locBtn = makeNavBtn(LOC_SVG, 'Go to my location', goToUserLocation, true);
     navGroup.appendChild(locBtn);
 
+
     // Deactivate location button when zoom drops 2+ levels from when it was activated,
     // or when the user location marker leaves the viewport.
     let locActiveZoom = null;
@@ -4392,6 +4393,22 @@ let _syncSideMenuForPlanes = null;
     overlayGroup.appendChild(aarBtn);
     const awacsBtn = makeOverlayBtn('○',   '16px', 'AWACS',          () => awacsControl ? awacsControl.visible : false,               () => { if (awacsControl) awacsControl.toggle(); });
     overlayGroup.appendChild(awacsBtn);
+
+    // ---- 3D view toggle ----
+    let _tiltActive = false;
+    const CUBE_SVG = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5" stroke="currentColor" stroke-width="1.2" fill="none"/><polyline points="7,1 7,7" stroke="currentColor" stroke-width="1.2"/><polyline points="1,4.5 7,7 13,4.5" stroke="currentColor" stroke-width="1.2"/></svg>`;
+    const tiltBtn = makeOverlayBtn(CUBE_SVG, '14px', '3D VIEW', () => _tiltActive, () => {
+        _tiltActive = !_tiltActive;
+        const panel3d = document.getElementById('map-3d-controls');
+        if (panel3d) panel3d.style.display = _tiltActive ? 'grid' : 'none';
+        if (_tiltActive) {
+            map.easeTo({ pitch: 45, duration: 400 });
+        } else {
+            map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
+        }
+    }, true);
+    overlayGroup.appendChild(tiltBtn);
+
     const cvlBtn = makeOverlayBtn('CVL', '8px',  'AIRPORTS',       () => airportsControl ? airportsControl.visible : false,         () => { if (airportsControl) airportsControl.toggle(); });
     cvlBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(cvlBtn);
@@ -4440,6 +4457,35 @@ let _syncSideMenuForPlanes = null;
     _syncSideMenuForPlanes = function() { syncLabelsBtn(); syncFilterBtn(); };
 
     document.body.appendChild(panel);
+
+    // ---- Fixed bottom-right 3D controls widget ----
+    const ctrl3d = document.createElement('div');
+    ctrl3d.id = 'map-3d-controls';
+    ctrl3d.style.display = 'none';
+
+    function make3dBtn(icon, title, onClick) {
+        const btn = document.createElement('button');
+        btn.className = 'map-3d-btn';
+        btn.dataset.tooltip = title;
+        btn.textContent = icon;
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    // 3×3 grid: top-left empty, tilt-up, top-right empty,
+    //           rotate-left, reset, rotate-right,
+    //           zoom-out, tilt-down, zoom-in
+    ctrl3d.appendChild(document.createElement('span')); // [0,0] empty
+    ctrl3d.appendChild(make3dBtn('↑', 'TILT UP',      () => map.easeTo({ pitch: Math.min(map.getPitch() + 10, 85), duration: 300 })));
+    ctrl3d.appendChild(document.createElement('span')); // [0,2] empty
+    ctrl3d.appendChild(make3dBtn('↺', 'ROTATE LEFT',  () => map.easeTo({ bearing: map.getBearing() - 15, duration: 300 })));
+    ctrl3d.appendChild(make3dBtn('⌖', 'RESET BEARING', () => map.easeTo({ bearing: 0, duration: 400 })));
+    ctrl3d.appendChild(make3dBtn('↻', 'ROTATE RIGHT', () => map.easeTo({ bearing: map.getBearing() + 15, duration: 300 })));
+    ctrl3d.appendChild(make3dBtn('−', 'ZOOM OUT',     () => map.zoomOut()));
+    ctrl3d.appendChild(make3dBtn('↓', 'TILT DOWN',    () => map.easeTo({ pitch: Math.max(map.getPitch() - 10, 0), duration: 300 })));
+    ctrl3d.appendChild(make3dBtn('+', 'ZOOM IN',      () => map.zoomIn()));
+
+    document.body.appendChild(ctrl3d);
 })();
 
 // ============================================================

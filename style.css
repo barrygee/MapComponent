@@ -1721,3 +1721,77 @@ body:has(#side-menu.expanded) #filter-panel {
 #footer-left:not(:has(.notif-btn-active)):not(:has(.tracking-btn-active)) #tracking-toggle-btn[data-tooltip]:hover::before {
     opacity: 1;
 }
+
+/* ============================================================
+   3D CONTROLS WIDGET
+   Fixed bottom-right floating panel, shown when 3D mode is active.
+   3×3 grid: tilt-up centre-top, rotate left/right middle row with
+   reset-bearing centre, zoom-out/in bottom corners with tilt-down centre.
+   ============================================================ */
+
+#map-3d-controls {
+    position: fixed;
+    bottom: calc(44px + 14px); /* footer height + breathing gap — matches tracking/notifications panels */
+    right: 14px;
+    z-index: 1002;
+    display: grid;
+    grid-template-columns: repeat(3, 36px);
+    grid-template-rows: repeat(3, 36px);
+    gap: 4px;
+}
+
+.map-3d-btn {
+    width: 36px;
+    height: 36px;
+    background: #000;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    position: relative;
+}
+
+.map-3d-btn:hover {
+    background: #111;
+    color: #c8ff00;
+}
+
+.map-3d-btn:active {
+    background: #1a1a1a;
+    color: #c8ff00;
+}
+
+/* Tooltip above each 3D widget button */
+.map-3d-btn[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000;
+    color: rgba(255, 255, 255, 0.75);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0 10px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 10001;
+}
+
+.map-3d-btn[data-tooltip]:hover::before {
+    opacity: 1;
+}
