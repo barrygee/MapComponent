@@ -3081,7 +3081,8 @@ class AdsbLiveControl {
                     });
                     this._showStatusBar(f.properties);
                     const is3D_a = typeof window._is3DActive === 'function' && window._is3DActive();
-                    this.map.easeTo({ center: f.geometry.coordinates, zoom: 16, ...(is3D_a ? { pitch: 45 } : {}), duration: 600 });
+                    const _trackCoords_a = this._interpolatedCoords(hex) || f.geometry.coordinates;
+                    this.map.easeTo({ center: _trackCoords_a, zoom: 16, ...(is3D_a ? { pitch: 45 } : {}), duration: 600 });
                     // Rebuild the tag marker in tracking layout.
                     const coords = this._interpolatedCoords(hex) || f.geometry.coordinates;
                     const newEl = document.createElement('div');
@@ -3135,7 +3136,8 @@ class AdsbLiveControl {
                     if (this._followEnabled) {
                         this._showStatusBar(f.properties);
                         const is3D_b = typeof window._is3DActive === 'function' && window._is3DActive();
-                        this.map.easeTo({ center: f.geometry.coordinates, zoom: 16, ...(is3D_b ? { pitch: 45 } : {}), duration: 600 });
+                        const _trackCoords_b = this._interpolatedCoords(this._tagHex) || f.geometry.coordinates;
+                        this.map.easeTo({ center: _trackCoords_b, zoom: 16, ...(is3D_b ? { pitch: 45 } : {}), duration: 600 });
                     } else {
                         this._hideStatusBar();
                         const is3D_c = typeof window._is3DActive === 'function' && window._is3DActive();
@@ -3601,7 +3603,8 @@ class AdsbLiveControl {
             if (f) {
                 this._tagMarker.setLngLat(f.geometry.coordinates);
                 if (this._followEnabled) {
-                    this.map.setCenter(f.geometry.coordinates);
+                    const followPitch = typeof window._getTargetPitch === 'function' ? window._getTargetPitch() : 0;
+                    this.map.easeTo({ center: f.geometry.coordinates, pitch: followPitch, duration: 150, easing: t => t });
                 }
             }
         }
@@ -4461,15 +4464,17 @@ let _syncSideMenuForPlanes = null;
         if (panel3d) panel3d.style.display = _tiltActive ? 'grid' : 'none';
         const isTracking = typeof adsbControl !== 'undefined' && adsbControl._followEnabled;
         if (_tiltActive) {
+            _targetPitch = 45;
             if (isTracking) {
                 const hex = adsbControl._tagHex;
                 const f = hex && adsbControl._geojson && adsbControl._geojson.features.find(f => f.properties.hex === hex);
                 const center = f ? f.geometry.coordinates : undefined;
-                map.easeTo({ pitch: 45, zoom: 16, ...(center ? { center } : {}), duration: 600 });
+                map.easeTo({ pitch: 45, ...(center ? { center } : {}), duration: 600 });
             } else {
                 map.easeTo({ pitch: 45, duration: 400 });
             }
         } else {
+            _targetPitch = 0;
             if (isTracking) {
                 const hex = adsbControl._tagHex;
                 const f = hex && adsbControl._geojson && adsbControl._geojson.features.find(f => f.properties.hex === hex);
@@ -4483,7 +4488,10 @@ let _syncSideMenuForPlanes = null;
     overlayGroup.appendChild(tiltBtn);
 
     // Expose a helper so other controls can read the 3D state.
-    window._is3DActive  = () => _tiltActive;
+    let _targetPitch = _tiltActive ? 45 : 0;
+    window._is3DActive     = () => _tiltActive;
+    window._getTargetPitch = () => _targetPitch;
+    window._setTargetPitch = (p) => { _targetPitch = p; };
     window._set3DActive = function(active, applyPitch) {
         if (_tiltActive === active && !applyPitch) return;
         _tiltActive = active;
@@ -4567,13 +4575,13 @@ let _syncSideMenuForPlanes = null;
     //           rotate-left, reset, rotate-right,
     //           zoom-out, tilt-down, zoom-in
     ctrl3d.appendChild(document.createElement('span')); // [0,0] empty
-    ctrl3d.appendChild(make3dBtn('↑', 'TILT UP',      () => map.easeTo({ pitch: Math.min(map.getPitch() + 10, 85), duration: 300 })));
+    ctrl3d.appendChild(make3dBtn('↑', 'TILT UP',      () => { const p = Math.min(map.getPitch() + 10, 85); if (typeof window._setTargetPitch === 'function') window._setTargetPitch(p); map.easeTo({ pitch: p, duration: 300 }); }));
     ctrl3d.appendChild(document.createElement('span')); // [0,2] empty
     ctrl3d.appendChild(make3dBtn('↺', 'ROTATE LEFT',  () => map.easeTo({ bearing: map.getBearing() - 15, duration: 300 })));
     ctrl3d.appendChild(make3dBtn('⌖', 'RESET BEARING', () => map.easeTo({ bearing: 0, duration: 400 })));
     ctrl3d.appendChild(make3dBtn('↻', 'ROTATE RIGHT', () => map.easeTo({ bearing: map.getBearing() + 15, duration: 300 })));
     ctrl3d.appendChild(make3dBtn('−', 'ZOOM OUT',     () => map.zoomOut()));
-    ctrl3d.appendChild(make3dBtn('↓', 'TILT DOWN',    () => map.easeTo({ pitch: Math.max(map.getPitch() - 10, 0), duration: 300 })));
+    ctrl3d.appendChild(make3dBtn('↓', 'TILT DOWN',    () => { const p = Math.max(map.getPitch() - 10, 0); if (typeof window._setTargetPitch === 'function') window._setTargetPitch(p); map.easeTo({ pitch: p, duration: 300 }); }));
     ctrl3d.appendChild(make3dBtn('+', 'ZOOM IN',      () => map.zoomIn()));
 
     document.body.appendChild(ctrl3d);
