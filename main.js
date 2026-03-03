@@ -86,7 +86,12 @@ function _switchStyle(online) {
 
 // ============================================================
 // GROUP 2 — GEOMETRY HELPERS
-// Pure math utilities for geodesic range rings and polygon labels.
+// Pure math utilities for geodesic range rings, polygon labels, and edge finding.
+//   generateGeodesicCircle(lng, lat, radiusNm) — 181-point great-circle
+//   buildRingsGeoJSON(lng, lat)                — 5 range-ring FeatureCollections
+//   computeCentroid(coordinates)               — area-weighted centroid (shoelace)
+//   computeTextRotate(coordinates)             — longest-edge bearing for label rotation
+//   computeLongestEdge(coordinates)            — returns the two endpoints of the longest edge
 // No side effects; no external dependencies.
 // Target module: frontend/map/geometry.js
 // ============================================================
@@ -215,7 +220,9 @@ function computeTextRotate(coordinates) {
 
 /**
  * Find the two endpoints of the longest edge of a polygon ring.
- * Returns [[lng0,lat0],[lng1,lat1]] for the longest edge.
+ * Used by AARA / AWACS label placement to anchor label lines along the dominant axis.
+ * @param {number[][][]} coordinates - GeoJSON Polygon coordinates array; uses ring [0]
+ * @returns {[[number,number],[number,number]]} [p0, p1] — the two endpoints of the longest edge
  */
 function computeLongestEdge(coordinates) {
     const ring = coordinates[0];
@@ -5068,6 +5075,37 @@ function goToUserLocation() {
 // --- End Side Menu ---
 
 
+// ============================================================
+// GROUP 13a — USER LOCATION MARKER
+// Animated SVG marker showing the user's position on the map.
+// Handles GPS watchPosition, cached location, manual right-click pin,
+// and reverse-geocode footer label (Nominatim, throttled 2 min).
+//
+// createMarkerElement(longitude, latitude)
+//   Builds the SVG marker DOM element with draw-on ring animation,
+//   dot pulse, coordinate typewriter sequence, and click-to-replay.
+//   Exposes el._replayIntro() for external re-trigger.
+//   Returns: HTMLDivElement
+//
+// setUserLocation(position)
+//   Called by navigator.geolocation.watchPosition and manually.
+//   Guards against GPS overwriting a manual pin.
+//   Updates: userMarker position, rangeRingCenter, localStorage, footer country.
+//   Flags: position._fromCache, position._manual
+//
+// Cached location block
+//   On page load, reads localStorage('userLocation').
+//   Manual pins persist indefinitely; GPS cache expires after 5 minutes.
+//
+// Right-click context menu IIFE
+//   Adds 'Set my location here' context menu on map right-click.
+//   Saves as manual:true in localStorage; calls setUserLocation with _manual flag.
+//
+// Globals written: userMarker, rangeRingCenter
+// Dependencies: maplibregl.Marker, rangeRingsControl, _Notifications (indirect via footer)
+// Target module: frontend/map/user-location.js
+// ============================================================
+
 let userMarker;
 
 function createMarkerElement(longitude, latitude) {
@@ -5444,12 +5482,13 @@ if (cachedLocation) {
 //
 // Execution order:
 //   1. navigator.geolocation.watchPosition(setUserLocation) — continuous position tracking
-//   2. _Notifications.init()  — restore notifications + attach bell handler
-//   3. _Tracking.init()       — attach tracking button handler
-//   4. _FilterPanel.init()    — attach search input + mode-button handlers
-//   5. Logo animation IIFE    — bracket draw-in + typewriter effect
+//   2. map.once('load') — restore saved 3D pitch state after first style load
+//   3. _Notifications.init()  — restore notifications + attach bell handler
+//   4. _Tracking.init()       — attach tracking button handler
+//   5. _FilterPanel.init()    — attach search input + mode-button handlers
+//   6. Logo animation IIFE    — bracket draw-in + typewriter effect
 //
-// setUserLocation(pos) is defined inside buildSideMenu() and referenced here.
+// setUserLocation(pos) is defined in GROUP 13a (user-location) and called here via watchPosition.
 // playLogoAnimation() — inner function of logo IIFE; resets + replays SVG + typewriter on click.
 // Target module: frontend/app/boot.js
 // ============================================================
