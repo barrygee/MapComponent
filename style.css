@@ -640,7 +640,7 @@ html {
 
 /* ---- Overlay toggle buttons ----
    The main control buttons for each map layer/overlay (airports, RAF,
-   ADS-B, range rings, AARA, etc.). Inactive by default (opacity 0.3).
+   ADS-B, range rings, AARA, etc.). Inactive: black bg, white icon/text.
    Activated overlays glow lime (.active); visible-but-not-primary (.enabled)
    are fully opaque white. */
 .sm-btn {
@@ -657,7 +657,7 @@ html {
     align-items: center;
     justify-content: center;
     transition: background 0.2s, opacity 0.2s, color 0.2s;
-    opacity: 0.3;           /* inactive/off: very dim */
+    opacity: 1;             /* inactive/off: full opacity, black bg white icon */
     flex-shrink: 0;
     white-space: nowrap;
     padding: 0;
