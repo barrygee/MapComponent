@@ -2297,10 +2297,14 @@ class AdsbLiveControl {
         this._applyTypeFilter();
         this._updateCallsignMarkers();
         // Also hide/show the selected-aircraft tag and hover tag (HTML markers outside map filter)
+        // Keep the tag visible if a plane is actively being tracked
+        const isTracking = this._followEnabled && this._selectedHex;
         const tagEl = this._tagMarker ? this._tagMarker.getElement() : null;
-        if (tagEl) tagEl.style.visibility = hidden ? 'hidden' : '';
+        if (tagEl) tagEl.style.visibility = (hidden && !isTracking) ? 'hidden' : '';
         const hoverEl = this._hoverMarker ? this._hoverMarker.getElement() : null;
         if (hoverEl) hoverEl.style.visibility = hidden ? 'hidden' : '';
+        // Trails: keep visible while tracking, hide otherwise
+        try { this.map.setLayoutProperty('adsb-trails', 'visibility', (!hidden || isTracking) ? 'visible' : 'none'); } catch(e) {}
     }
 
     setHideGroundVehicles(hide) {
@@ -2329,9 +2333,21 @@ class AdsbLiveControl {
         const isPlaneExpr = ['all', ['!', isGndExpr], ['!', isTowerExpr]];
 
         if (this._allHidden) {
-            ['adsb-bracket', 'adsb-icons'].forEach(id => {
-                try { this.map.setLayoutProperty(id, 'visibility', 'none'); } catch(e) {}
-            });
+            const trackedHex = this._followEnabled && this._selectedHex ? this._selectedHex : null;
+            if (trackedHex) {
+                // Keep only the tracked aircraft visible
+                const trackedFilter = ['==', ['get', 'hex'], trackedHex];
+                ['adsb-bracket', 'adsb-icons'].forEach(id => {
+                    try {
+                        this.map.setLayoutProperty(id, 'visibility', 'visible');
+                        this.map.setFilter(id, trackedFilter);
+                    } catch(e) {}
+                });
+            } else {
+                ['adsb-bracket', 'adsb-icons'].forEach(id => {
+                    try { this.map.setLayoutProperty(id, 'visibility', 'none'); } catch(e) {}
+                });
+            }
             return;
         }
 
@@ -2339,10 +2355,10 @@ class AdsbLiveControl {
             try { this.map.setLayoutProperty(id, 'visibility', 'visible'); } catch(e) {}
         });
 
-        // Non-planes only shown when type filter is 'all'
+        // Non-planes only shown when type filter is 'all' and ADS-B is visible
         const typeFiltering = this._typeFilter !== 'all';
-        const showGnd    = !typeFiltering && !this._hideGroundVehicles;
-        const showTowers = !typeFiltering && !this._hideTowers;
+        const showGnd    = this.visible && !typeFiltering && !this._hideGroundVehicles;
+        const showTowers = this.visible && !typeFiltering && !this._hideTowers;
 
         const conditions = [];
 
@@ -3151,6 +3167,14 @@ class AdsbLiveControl {
                         if (!is3D_c) this.map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
                     }
                 }
+            }
+            // Re-apply layer filter in case _allHidden is active (tracked plane must stay visible)
+            if (this._allHidden) {
+                this._applyTypeFilter();
+                const isTracking = this._followEnabled && this._selectedHex;
+                const tagEl = this._tagMarker ? this._tagMarker.getElement() : null;
+                if (tagEl) tagEl.style.visibility = isTracking ? '' : 'hidden';
+                try { this.map.setLayoutProperty('adsb-trails', 'visibility', isTracking ? 'visible' : 'none'); } catch(e) {}
             }
             this._saveTrackingState();
         });
@@ -4224,7 +4248,15 @@ class ClearOverlaysControl {
             if (awacsControl && awacsControl.visible) awacsControl.toggle();
             if (airportsControl && airportsControl.visible) airportsControl.toggle();
             if (rafControl && rafControl.visible) rafControl.toggle();
-            if (adsbControl && adsbControl.visible) adsbControl.toggle();
+            if (adsbControl && adsbControl.visible) {
+                adsbControl.setAllHidden(true);
+                adsbControl.setLabelsVisible(false);
+                // Trails stay visible if a plane is being tracked (trails source only contains selected plane's dots)
+                const keepTrails = adsbControl._followEnabled && adsbControl._selectedHex;
+                if (!keepTrails) {
+                    try { adsbControl.map.setLayoutProperty('adsb-trails', 'visibility', 'none'); } catch(e) {}
+                }
+            }
             this.cleared = true;
             this.button.style.opacity = '1';
             this.button.style.color = '#c8ff00';
@@ -4237,14 +4269,15 @@ class ClearOverlaysControl {
                 if (awacsControl && this.savedStates.awacs && !awacsControl.visible) awacsControl.toggle();
                 if (airportsControl && this.savedStates.airports && !airportsControl.visible) airportsControl.toggle();
                 if (rafControl && this.savedStates.raf && !rafControl.visible) rafControl.toggle();
-                if (adsbControl && this.savedStates.adsb && !adsbControl.visible) adsbControl.toggle();
-                // adsbControl.toggle() calls syncToAdsb(true) which resets labelsVisible=false;
-                // restore the saved labels state explicitly.
-                if (adsbLabelsControl && this.savedStates.adsb) {
-                    adsbLabelsControl.labelsVisible = this.savedStates.adsbLabels;
-                    adsbLabelsControl.button.style.opacity = this.savedStates.adsbLabels ? '1' : '0.3';
-                    adsbLabelsControl.button.style.color = this.savedStates.adsbLabels ? '#c8ff00' : '#ffffff';
-                    if (adsbControl) adsbControl.setLabelsVisible(this.savedStates.adsbLabels);
+                if (adsbControl && this.savedStates.adsb) {
+                    adsbControl.setAllHidden(false);
+                    try { adsbControl.map.setLayoutProperty('adsb-trails', 'visibility', 'visible'); } catch(e) {}
+                    if (adsbLabelsControl) {
+                        adsbLabelsControl.labelsVisible = this.savedStates.adsbLabels;
+                        adsbLabelsControl.button.style.opacity = this.savedStates.adsbLabels ? '1' : '0.3';
+                        adsbLabelsControl.button.style.color = this.savedStates.adsbLabels ? '#c8ff00' : '#ffffff';
+                        adsbControl.setLabelsVisible(this.savedStates.adsbLabels);
+                    }
                     _saveOverlayStates();
                 }
             }
