@@ -2006,15 +2006,7 @@
         ]
       ],
       "layout": {
-        "icon-image": [
-          "step",
-          [
-            "zoom"
-          ],
-          "circle-11",
-          9,
-          ""
-        ],
+        "icon-image": "",
         "icon-size": 0.4,
         "text-anchor": [
           "step",

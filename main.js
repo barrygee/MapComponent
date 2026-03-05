@@ -73,13 +73,27 @@ const _OFFLINE_BOUNDS = [[-20, 44], [32, 67]];
  * Side effects: calls map.setMinZoom, map.setMaxBounds, map.setStyle
  * Dependencies: global map, _OFFLINE_BOUNDS, window.location.origin
  */
+/**
+ * TransformStyleFunction passed to map.setStyle().
+ * Rewrites root-relative sprite/glyphs paths to absolute URLs.
+ * MapLibre v5+ requires absolute sprite URLs.
+ */
+function _transformStyle(_prev, next) {
+    const o = window.location.origin;
+    if (next.sprite && next.sprite.startsWith('/')) next.sprite = o + next.sprite;
+    if (next.glyphs  && next.glyphs.startsWith('/'))  next.glyphs  = o + next.glyphs;
+    return next;
+}
+
 function _switchStyle(online) {
     if (typeof map === 'undefined') return;
     map.setMinZoom(online ? 2 : 5);
     map.setMaxBounds(online ? null : _OFFLINE_BOUNDS);
-    map.setStyle(online
-        ? `${window.location.origin}/assets/fiord-online.json`
-        : `${window.location.origin}/assets/fiord.json`
+    map.setStyle(
+        online
+            ? `${window.location.origin}/assets/fiord-online.json`
+            : `${window.location.origin}/assets/fiord.json`,
+        { transformStyle: _transformStyle }
     );
 }
 // --- End connectivity detection ---
@@ -244,7 +258,7 @@ const _styleURL = _isOnline
 
 const map = new maplibregl.Map({
     container: 'map',
-    style: _styleURL,
+    style: { version: 8, sources: {}, layers: [] }, // blank stub; real style applied below
     center: _isOnline ? [-4.4815, 54.1453] : [-4.5481, 54.2361],
     zoom: _isOnline ? 6 : 5,
     minZoom: _isOnline ? 2 : 5,
@@ -252,9 +266,11 @@ const map = new maplibregl.Map({
     attributionControl: false,
     fadeDuration: 0,
     cooperativeGestures: false,
-    transformRequest: (url) => ({ url })
+    transformRequest: (url) => ({ url: url.startsWith('/') ? origin + url : url })
 });
 map.scrollZoom.enable();
+// Apply real style with transformStyle to fix root-relative sprite/glyphs URLs (MapLibre v5+)
+map.setStyle(_styleURL, { transformStyle: _transformStyle });
 
 let _styleLoadedOnce = false;
 
@@ -384,8 +400,16 @@ map.on('style.load', () => {
 });
 
 map.on('error', (e) => {
+    const msg = e?.error?.message || '';
+    // Suppress expected errors from guarded layer/source setup calls
+    if (msg.includes('Cannot remove non-existing layer') ||
+        msg.includes('Cannot style non-existing layer') ||
+        msg.includes('does not exist in the map')) return;
     console.error('Map error:', e);
 });
+
+// Suppress warnings for sprite images referenced in the base style but not present in the ofm sprite
+map.on('styleimagemissing', () => {});
 
 
 // ============================================================
@@ -2278,12 +2302,14 @@ class AdsbLiveControl {
         this._notifEnabled = new Set(); // hex -> notifications enabled (independent of tracking)
         this._trackingRestored = false;
         this._lastFetchTime = 0;
+        this._isFetching = false;
         this._emergencySquawks = new Set(['7700', '7600', '7500']); // squawk codes treated as emergencies
         this._prevSquawk = {};  // hex -> last known squawk code (for change detection)
         this._typeFilter = 'all'; // 'all' | 'civil' | 'mil'
         this._allHidden = false; // true = hide all planes regardless of type filter
         this._hideGroundVehicles = false; // true = hide ground vehicles (C1, C2)
         this._hideTowers = false;        // true = hide towers/obstructions (C3, t=TWR)
+        this._fetchFailCount = 0;        // consecutive fetch failures (for backoff)
     }
 
     setTypeFilter(mode) {
@@ -3676,7 +3702,8 @@ class AdsbLiveControl {
     }
 
     async _fetch() {
-        if (!this.map) return;
+        if (!this.map || this._isFetching) return;
+        this._isFetching = true;
         let lat, lon;
         const cached = localStorage.getItem('userLocation');
         if (cached) {
@@ -3694,11 +3721,22 @@ class AdsbLiveControl {
             lon = c.lng;
         }
         try {
-            const url = `https://api.airplanes.live/v2/point/${lat.toFixed(4)}/${lon.toFixed(4)}/250`;
+            const url = `${origin}/api/adsb/point/${lat.toFixed(4)}/${lon.toFixed(4)}/250`;
             console.time('[ADSB] API fetch');
             const resp = await fetch(url);
             console.timeEnd('[ADSB] API fetch');
-            if (!resp.ok) return;
+            if (!resp.ok) {
+                if (resp.status === 429) {
+                    console.warn('[ADSB] Rate limited (429) — backing off 30s');
+                    this._isFetching = false;
+                    this._stopPolling();
+                    setTimeout(() => { if (this.visible) this._startPolling(); }, 30000);
+                    return;
+                }
+                this._isFetching = false;
+                return;
+            }
+            this._fetchFailCount = 0;
             const data = await resp.json();
             console.log('[ADSB] aircraft count:', (data.ac || []).length);
             const aircraft = data.ac || [];
@@ -3980,8 +4018,21 @@ class AdsbLiveControl {
             this._updateCallsignMarkers();
             // Keep ADS-B layers above all other map layers
             this._raiseLayers();
+            this._fetchFailCount = 0;
         } catch(e) {
+            console.timeEnd('[ADSB] API fetch'); // clear timer if fetch threw before timeEnd
+            this._fetchFailCount++;
+            if (this._fetchFailCount >= 3) {
+                console.warn(`[ADSB] ${this._fetchFailCount} consecutive fetch failures — backing off 30s`);
+                this._fetchFailCount = 0;
+                this._isFetching = false;
+                this._stopPolling();
+                setTimeout(() => { if (this.visible) this._startPolling(); }, 30000);
+                return;
+            }
             console.warn('ADS-B fetch error:', e);
+        } finally {
+            this._isFetching = false;
         }
     }
 
