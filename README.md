@@ -166,6 +166,83 @@ The following data is bundled directly in the application (no external API):
 
 ---
 
+## Testing Emergency Visuals
+
+The app includes a dev helper (`squawk-test.js`) that mocks the ADS-B API feed so you can trigger emergency states without waiting for a real emergency squawk.
+
+### Setup
+
+1. Start the app and open it in the browser.
+2. Open DevTools and load the script in the console:
+
+```js
+const s = document.createElement('script'); s.src = '/squawk-test.js'; document.head.appendChild(s);
+```
+
+The helper attaches itself to `window.sqkTest`. Confirm it loaded:
+
+```js
+sqkTest.help()
+```
+
+### Testing emergency colour behaviour (red icon, label, trail dots)
+
+**Step 1 — trigger an emergency aircraft:**
+
+```js
+sqkTest.enterEmergency('7700')
+```
+
+The mock replaces the next ADS-B poll (runs every ~5 s) with a single aircraft (`TEST001`, squawk `7700`) near London. Once the poll fires you should see:
+
+- A red blip + red bracket on the map
+- A red emergency notification in the notifications panel
+
+**Step 2 — select the aircraft:**
+
+Click the red blip on the map. Verify:
+
+- The data tag callsign (`TEST001`) is displayed in **red** (`#ff4040`)
+- The bracket remains red
+
+**Step 3 — enable tracking:**
+
+Click the **TRACK** button in the data tag. Verify:
+
+- The compact tracking tag callsign is **red**
+- The status bar (tracking panel) callsign is **red**
+- Trail dots appearing behind the aircraft are **red** (they appear after the aircraft moves; the mock aircraft is stationary so trails will only accumulate if you also run `sqkTest.fullFlow()` which moves it across poll cycles)
+
+**Quick end-to-end flow:**
+
+```js
+sqkTest.fullFlow('7700', 8000)
+```
+
+This triggers emergency → holds 8 s (select and track during this window) → clears to squawk `1200`. After clearing, the icon, label, and trail dots should revert to white/lime.
+
+**Test all three emergency codes simultaneously:**
+
+```js
+sqkTest.allCodes()
+```
+
+Places three aircraft (hex `test01`/`test02`/`test03`) each squawking `7700`, `7600`, `7500` in sequence over ~12 s.
+
+**Check internal state at any time:**
+
+```js
+sqkTest.status()
+```
+
+**Restore real ADS-B feed when done:**
+
+```js
+sqkTest.restore()
+```
+
+---
+
 ## Tech Stack
 
 | Component | Technology |

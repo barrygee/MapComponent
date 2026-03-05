@@ -2660,7 +2660,7 @@ class AdsbLiveControl {
                 'circle-radius': 2.5,
                 'circle-opacity': ['get', 'opacity'],
                 'circle-stroke-width': 0,
-                'circle-color': '#c8ff00',
+                'circle-color': ['case', ['==', ['get', 'emerg'], 1], '#ff2222', '#c8ff00'],
             }
         });
 
@@ -2809,6 +2809,8 @@ class AdsbLiveControl {
     _buildTagHTML(props) {
         const raw      = (props.flight || '').trim() || (props.r || '').trim() || (props.hex || '').trim();
         const callsign = raw || 'UNKNOWN';
+        const isEmergency = props.squawkEmerg === 1 || (props.emergency && props.emergency !== 'none');
+        const callsignColor = isEmergency ? '#ff4040' : '#ffffff';
 
         // Tracking mode only applies to the specific plane being tracked.
         const isTracked  = this._followEnabled && props.hex === this._tagHex;
@@ -2846,7 +2848,7 @@ class AdsbLiveControl {
                 `padding:1px ${hasBadge ? '0' : '8px'} 1px 8px;` +
                 `white-space:nowrap;user-select:none">` +
                 `<div style="display:flex;align-items:stretch;gap:4px">` +
-                `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:#fff;pointer-events:none;align-self:center">${callsign}</span>` +
+                `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:${callsignColor};pointer-events:none;align-self:center">${callsign}</span>` +
                 `${milTypeBadge}${trkBtn}</div></div>`;
         }
 
@@ -2885,7 +2887,7 @@ class AdsbLiveControl {
             `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;` +
             `font-weight:600;font-size:15px;letter-spacing:.12em;` +
             `margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
-            `<span style="font-size:13px;font-weight:400;pointer-events:none">${callsign}</span>` +
+            `<span style="font-size:13px;font-weight:400;pointer-events:none;color:${callsignColor}">${callsign}</span>` +
             `<div style="display:flex;align-items:center;gap:0">${bellBtn}${trkBtn}</div></div>` +
             `<div style="pointer-events:none">` + rowsHTML + `</div></div>`;
     }
@@ -3303,7 +3305,7 @@ class AdsbLiveControl {
         // Callsign text span
         const nameSpan = document.createElement('span');
         nameSpan.textContent = callsign;
-        nameSpan.style.cssText = 'color:#ffffff !important';
+        nameSpan.style.cssText = isEmerg ? 'color:#ff4040 !important' : 'color:#ffffff !important';
         el.appendChild(nameSpan);
         // Military model badge (e.g. C17, C130) + optional tracking button
         if (props.military) {
@@ -3339,7 +3341,8 @@ class AdsbLiveControl {
             const badge = document.createElement('span');
             badge.className = 'sqk-badge';
             badge.textContent = props.squawk;
-            badge.style.cssText = 'background:#000;color:#ff2222 !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 8px;';
+            const hasTypeBadge = props.military && props.t;
+            badge.style.cssText = `background:#000;color:#ff2222 !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px ${hasTypeBadge ? '0' : '8px'};`;
             el.appendChild(badge);
         }
         el.addEventListener('mouseenter', () => {
@@ -3547,6 +3550,8 @@ class AdsbLiveControl {
         if (this._selectedHex && this._trails[this._selectedHex]) {
             const points = this._trails[this._selectedHex];
             const n = points.length;
+            const selFeature = this._geojson.features.find(f => f.properties.hex === this._selectedHex);
+            const isEmerg = selFeature && (selFeature.properties.squawkEmerg === 1 || (selFeature.properties.emergency && selFeature.properties.emergency !== 'none')) ? 1 : 0;
             for (let i = 0; i < n; i++) {
                 const p = points[i];
                 trailFeatures.push({
@@ -3555,6 +3560,7 @@ class AdsbLiveControl {
                     properties: {
                         alt:     p.alt,
                         opacity: (i + 1) / n,   // oldest = near 0, newest = 1.0
+                        emerg:   isEmerg,
                     }
                 });
             }
