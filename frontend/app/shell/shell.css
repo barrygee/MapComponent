@@ -1,0 +1,219 @@
+/* ============================================================
+   BASE RESET
+   Ensures consistent box-model across all elements.
+   Locks viewport to full screen, prevents scrollbars on the
+   outer page (the map handles its own scroll/zoom).
+   Black background prevents flash on load before map renders.
+   ============================================================ */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;       /* map fills the viewport — no page scroll */
+    background: #000;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+}
+
+
+/* ============================================================
+   NAVIGATION HEADER
+   Fixed 68px bar at the top of the viewport.
+   Contains the animated SVG logo (left) and domain nav links
+   (AIR / SPACE / SEA / LAND) on the right.
+   z-index 1000 keeps it above the MapLibre canvas and controls.
+   ============================================================ */
+#nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 68px;
+    background: #000000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    z-index: 1000;
+}
+
+/* Left side of the nav bar — wraps the SVG logo element */
+#nav-logo {
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+/* The SVG logo image itself; height constrained to 24px */
+#logo-img {
+    height: 24px;
+    width: auto;
+    display: block;
+}
+
+/* ---- Logo load animation ----
+   Four bracket corner paths draw in via stroke-dashoffset,
+   staggered 70ms apart. After the corners finish (~0.43 s),
+   the centre dot fades in and the background rectangle pulses
+   twice. The SENTINEL typewriter text is driven by JS after
+   the CSS animations complete.
+   ------------------------------------------------------------ */
+
+/* Each bracket corner path: strokes from 0 to full length */
+.logo-corner {
+    stroke-dasharray: 10;
+    stroke-dashoffset: 10;
+    animation: logo-draw 0.22s ease-out forwards;
+}
+.logo-corner:nth-child(1) { animation-delay: 0.00s; }
+.logo-corner:nth-child(2) { animation-delay: 0.07s; }
+.logo-corner:nth-child(3) { animation-delay: 0.14s; }
+.logo-corner:nth-child(4) { animation-delay: 0.21s; }
+
+@keyframes logo-draw {
+    to { stroke-dashoffset: 0; }
+}
+
+/* Centre dot fades in after all corners are drawn (0.38 s) */
+.logo-dot {
+    opacity: 0;
+    animation: logo-dot-in 0.15s ease-out 0.38s forwards;
+}
+
+@keyframes logo-dot-in {
+    to { opacity: 1; }
+}
+
+/* Background rectangle pulses lime-ish twice after dot appears */
+.logo-bg {
+    animation: logo-bg-pulse 0.4s ease-in-out 0.43s 2 both;
+}
+
+@keyframes logo-bg-pulse {
+    0%   { fill-opacity: 0; }
+    50%  { fill-opacity: 0.18; }
+    100% { fill-opacity: 0; }
+}
+
+/* Right side of the nav bar — flex row containing nav links */
+#nav-right {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+}
+
+/* Domain navigation link (AIR / SPACE / SEA / LAND).
+   Muted by default; brightens on hover. */
+.nav-link {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.3);
+    transition: color 0.2s;
+}
+
+.nav-link:hover {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+/* Active domain link — always lime, never dims on hover */
+.nav-link--active {
+    color: #c8ff00;
+}
+
+.nav-link--active:hover {
+    color: #c8ff00;
+}
+
+
+/* ============================================================
+   FOOTER
+   Fixed 44px bar at the bottom of the viewport.
+   Left side: notification + tracking toggle buttons.
+   Right side: connection status label + location coordinates.
+   Mirrors the header's visual weight and z-index.
+   ============================================================ */
+#footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 44px;
+    background: #000000;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    z-index: 1000;
+}
+
+/* Left cluster: notification toggle + tracking toggle buttons */
+#footer-left {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+}
+
+/* Right cluster: connection indicator + user location label */
+#footer-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* ---- Connection status indicator ----
+   Toggled between .conn-online / .conn-offline / .conn-checking
+   by the connectivity module whenever OSM poll results change. */
+#conn-status {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+/* Online: lime — matches the primary accent colour */
+.conn-online  { color: #c8ff00; }
+/* Offline: muted red — danger state, readable at small size */
+.conn-offline { color: rgba(255, 80, 80, 0.8); }
+/* Checking: near-invisible white — transitional, low noise */
+.conn-checking { color: rgba(255, 255, 255, 0.2); }
+
+/* Generic dim footer label (e.g. "LOC:" prefix) */
+.footer-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+}
+
+/* Coordinate / data value displayed next to a footer label */
+.footer-code {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 100;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.2);
+    text-transform: uppercase;
+}
+
+/* ---- Footer tooltip shared rule (applies to both notif + tracking buttons) ----
+   Only show tooltip when neither panel is open. */
+#footer-left:not(:has(.notif-btn-active)):not(:has(.tracking-btn-active)) #notif-toggle-btn[data-tooltip]:hover::before,
+#footer-left:not(:has(.notif-btn-active)):not(:has(.tracking-btn-active)) #tracking-toggle-btn[data-tooltip]:hover::before {
+    opacity: 1;
+}

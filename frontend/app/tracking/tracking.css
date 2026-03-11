@@ -1,0 +1,207 @@
+/* ============================================================
+   TRACKING PANEL
+   Fixed overlay anchored to the bottom-left of the map area
+   (above the footer, below the header). Contains:
+     - #adsb-status-bar  — selected aircraft detail card
+   Visibility and opacity are transitioned; pointer-events are
+   disabled by default so the closed panel doesn't block the map.
+   Opened by JS adding .tracking-panel-open.
+   ============================================================ */
+#tracking-panel {
+    position: fixed;
+    bottom: calc(44px + 14px); /* footer height + breathing gap */
+    top: calc(68px + 8px);     /* header height + breathing gap */
+    left: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;  /* card sits at the bottom of the panel */
+    pointer-events: none;       /* closed: map clicks pass through */
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+/* Opened state — JS adds this class to make the panel interactive */
+#tracking-panel.tracking-panel-open {
+    visibility: visible;
+    opacity: 1;
+}
+
+
+/* ============================================================
+   ADS-B SELECTED AIRCRAFT STATUS BAR
+   The detail card shown inside #tracking-panel when an aircraft
+   is actively tracked. 220px wide, pure black background.
+   Fields: callsign, altitude, speed, heading, squawk, type.
+   Rendered by AdsbLiveControl.renderStatusBar() in main.js.
+   Toggled via .adsb-sb-visible class; hidden via display:none
+   to prevent layout shift in the tracking panel column.
+   ============================================================ */
+#adsb-status-bar {
+    width: 220px;
+    background: #000;
+    color: #fff;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    pointer-events: auto;
+    display: none;          /* hidden until an aircraft is selected */
+    flex-direction: column;
+    gap: 0;
+    user-select: none;
+    box-sizing: border-box;
+}
+
+/* Visible state: switched on by JS when tracking begins */
+#adsb-status-bar.adsb-sb-visible {
+    display: flex;
+}
+
+/* Top row of the card: "TRACKING" label (left) + UNTRACK button (right) */
+.adsb-sb-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 38px;
+    padding: 0 14px;
+    background: #000;
+    position: relative;
+    z-index: 1;
+}
+
+/* "TRACKING" section label — lime, small caps */
+.adsb-sb-label-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #c8ff00;
+    opacity: 0.75;
+}
+
+/* "UNTRACK" ghost button in the status bar header */
+.adsb-sb-untrack-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.3);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.adsb-sb-untrack-btn:hover {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+/* Aircraft callsign — primary identifier, displayed prominently */
+.adsb-sb-callsign {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: #fff;
+    line-height: 1.2;
+}
+
+/* Container for all data field rows below the header */
+.adsb-sb-fields {
+    padding: 10px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Single data row: label + value side by side */
+.adsb-sb-field {
+    display: flex;
+    gap: 14px;
+    line-height: 1.8;
+}
+
+/* Left-column field label (e.g. "ALT", "SPD", "HDG") */
+.adsb-sb-label {
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.45);
+    text-transform: uppercase;
+    flex-shrink: 0;
+    min-width: 48px;    /* aligns values into a clean column */
+}
+
+/* Right-column field value (e.g. "35000 ft", "420 kts") */
+.adsb-sb-value {
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.85);
+    flex-shrink: 0;
+}
+
+/* Emergency value override — red text for squawk 7500/7600/7700 */
+.adsb-sb-emrg {
+    color: #ff4040;
+    font-weight: 600;
+}
+
+/* ---- Tracking toggle button ---- */
+#tracking-toggle-btn {
+    height: 36px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 10px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #fff;
+    opacity: 0.6;               /* dim when panel is closed */
+    transition: background 0.2s, opacity 0.2s, color 0.2s;
+    flex-shrink: 0;
+    margin: 4px 0;
+}
+
+#tracking-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    opacity: 1;
+}
+
+/* Active: lime tint confirms tracking is open and an aircraft is followed */
+#tracking-toggle-btn.tracking-btn-active {
+    opacity: 1;
+    color: #c8ff00;
+}
+
+/* Tracking crosshair / target SVG icon */
+#tracking-icon {
+    display: block;
+    flex-shrink: 0;
+    width: auto;
+    height: 15px;
+}
+
+/* Tracked aircraft count badge */
+#tracking-count {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.4);
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+/* Lime badge when at least one aircraft is being tracked */
+#tracking-count.tracking-count-active {
+    color: #c8ff00;
+}
