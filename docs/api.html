@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL – API Reference</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<header>
+  <a href="index.html" class="logo">
+    <svg width="24" height="24" viewBox="0 0 32 32"><rect x="0" y="0" width="6" height="6" fill="#c8ff00"/><rect x="26" y="0" width="6" height="6" fill="#c8ff00"/><rect x="0" y="26" width="6" height="6" fill="#c8ff00"/><rect x="26" y="26" width="6" height="6" fill="#c8ff00"/><circle cx="16" cy="16" r="4" fill="#c8ff00"/><circle cx="16" cy="16" r="8" fill="none" stroke="#c8ff00" stroke-width="1" stroke-dasharray="2 2"/></svg>
+    <h1>SENTINEL</h1>
+  </a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="overview.html">Overview</a>
+    <a href="frontend.html">Frontend</a>
+    <a href="backend.html">Backend</a>
+    <a href="features.html">Features</a>
+    <a href="api.html" class="active">API</a>
+    <a href="dependencies.html">Dependencies</a>
+  </nav>
+</header>
+<div class="layout">
+  <nav class="sidebar">
+    <h4>API Reference</h4>
+    <a href="#base" class="active">Base URL</a>
+    <a href="#health">Health</a>
+    <h4>Air Domain</h4>
+    <a href="#adsb">ADS-B Proxy</a>
+    <a href="#geocode">Geocode Proxy</a>
+    <a href="#messages">Messages</a>
+    <a href="#tracking">Tracking</a>
+    <h4>Stub Domains</h4>
+    <a href="#space">Space</a>
+    <a href="#sea">Sea</a>
+    <a href="#land">Land</a>
+    <h4>Reference</h4>
+    <a href="#cache-headers">Cache Headers</a>
+    <a href="#error-codes">Error Codes</a>
+  </nav>
+  <main class="main">
+
+    <div class="section" id="base">
+      <h2>Base URL</h2>
+      <p>All API endpoints are served under <code>/api</code>. In development, the backend runs on port 8000. In Docker, the nginx reverse proxy forwards <code>/api</code> to the backend container.</p>
+      <table>
+        <thead><tr><th>Environment</th><th>Base URL</th></tr></thead>
+        <tbody>
+          <tr><td>Development</td><td><code>http://localhost:8000</code></td></tr>
+          <tr><td>Docker</td><td><code>http://localhost:8080</code> (nginx → backend:8000)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="health">
+      <h2>Health Check</h2>
+      <div class="card">
+        <div class="card-header">
+          <span class="tag tag-get">GET</span>
+          <h3>/health</h3>
+        </div>
+        <p>Returns application health status and current timestamp.</p>
+        <h4>Response</h4>
+        <pre><code>{
+  "status": "ok",
+  "timestamp": 1710000000
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="section" id="adsb">
+      <h2>ADS-B Proxy</h2>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="tag tag-get">GET</span>
+          <h3>/api/air/adsb/point/{lat}/{lon}/{radius}</h3>
+        </div>
+        <p>Returns live aircraft data within <code>radius</code> nautical miles of <code>(lat, lon)</code>. Proxies airplanes.live with a write-through SQLite cache.</p>
+
+        <h4>Path Parameters</h4>
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>lat</code></td><td>float</td><td>Centre latitude (decimal degrees)</td></tr>
+            <tr><td><code>lon</code></td><td>float</td><td>Centre longitude (decimal degrees)</td></tr>
+            <tr><td><code>radius</code></td><td>int</td><td>Search radius in nautical miles (typical: 250)</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Response Headers</h4>
+        <table>
+          <thead><tr><th>Header</th><th>Value</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>X-Cache</code></td><td><code>HIT</code></td><td>Served from fresh cache</td></tr>
+            <tr><td><code>X-Cache</code></td><td><code>MISS</code></td><td>Fetched from upstream, now cached</td></tr>
+            <tr><td><code>X-Cache</code></td><td><code>STALE</code></td><td>Upstream failed, served stale cache</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Response Body</h4>
+        <p>Raw JSON from airplanes.live. Shape:</p>
+        <pre><code>{
+  "ac": [
+    {
+      "hex": "400f86",
+      "type": "adsb_icao",
+      "flight": "BAW123  ",
+      "r": "G-BNWY",
+      "t": "B744",
+      "alt_baro": 37000,
+      "alt_geom": 37200,
+      "gs": 480.5,
+      "track": 270.3,
+      "lat": 52.4567,
+      "lon": -1.2345,
+      "squawk": "1234",
+      "military": false,
+      ...
+    }
+  ],
+  "total": 42,
+  "now": 1710000000.123,
+  "msg": "No error"
+}</code></pre>
+
+        <h4>Error Responses</h4>
+        <table>
+          <thead><tr><th>Status</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td>503</td><td>Upstream unavailable and no stale cache within 30s window</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section" id="geocode">
+      <h2>Geocode Proxy</h2>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="tag tag-get">GET</span>
+          <h3>/api/air/geocode/reverse</h3>
+        </div>
+        <p>Reverse-geocodes coordinates to a human-readable address. Proxies Nominatim with a 10-minute SQLite cache (keyed at ~1km resolution).</p>
+
+        <h4>Query Parameters</h4>
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>lat</code></td><td>float</td><td>Latitude</td></tr>
+            <tr><td><code>lon</code></td><td>float</td><td>Longitude</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Response Body</h4>
+        <p>Raw Nominatim JSON. The frontend extracts <code>address.country</code> for the footer label.</p>
+        <pre><code>{
+  "place_id": 123456,
+  "display_name": "Isle of Man, ...",
+  "address": {
+    "county": "Isle of Man",
+    "country": "United Kingdom",
+    "country_code": "gb"
+  },
+  "lat": "54.1453",
+  "lon": "-4.4815"
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="section" id="messages">
+      <h2>Messages (Notifications)</h2>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="tag tag-get">GET</span>
+          <h3>/api/air/messages</h3>
+        </div>
+        <p>Returns all non-dismissed messages, newest first.</p>
+        <h4>Response</h4>
+        <pre><code>[
+  {
+    "id": 1,
+    "msg_id": "emg-400f86-1710000000",
+    "type": "emergency",
+    "title": "SQUAWK 7700 — BAW123",
+    "detail": "General emergency. Alt: 37000ft",
+    "ts": 1710000000000,
+    "dismissed": false
+  }
+]</code></pre>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <div class="card-header">
+          <span class="tag tag-post">POST</span>
+          <h3>/api/air/messages</h3>
+          <code style="margin-left: auto; font-size: 0.8rem;">201 Created</code>
+        </div>
+        <p>Create a new message. Idempotent — if <code>msg_id</code> already exists, returns the existing record without creating a duplicate.</p>
+        <h4>Request Body</h4>
+        <pre><code>{
+  "msg_id": "emg-400f86-1710000000",
+  "type": "emergency",
+  "title": "SQUAWK 7700 — BAW123",
+  "detail": "General emergency. Alt: 37000ft",
+  "ts": 1710000000000
+}</code></pre>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <div class="card-header">
+          <span class="tag tag-delete">DELETE</span>
+          <h3>/api/air/messages/{msg_id}</h3>
+        </div>
+        <p>Soft-delete a single message by its client-generated <code>msg_id</code>. Sets <code>dismissed = true</code>.</p>
+        <h4>Error Responses</h4>
+        <table>
+          <thead><tr><th>Status</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td>404</td><td>No message with this msg_id</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <div class="card-header">
+          <span class="tag tag-delete">DELETE</span>
+          <h3>/api/air/messages</h3>
+        </div>
+        <p>Soft-delete all messages (bulk dismiss).</p>
+      </div>
+    </div>
+
+    <div class="section" id="tracking">
+      <h2>Aircraft Tracking</h2>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="tag tag-get">GET</span>
+          <h3>/api/air/tracking</h3>
+        </div>
+        <p>Returns all tracked aircraft, most recently added first.</p>
+        <h4>Response</h4>
+        <pre><code>[
+  {
+    "id": 1,
+    "hex": "400f86",
+    "callsign": "BAW123",
+    "follow": true,
+    "added_at": 1710000000000
+  }
+]</code></pre>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <div class="card-header">
+          <span class="tag tag-post">POST</span>
+          <h3>/api/air/tracking</h3>
+          <code style="margin-left: auto; font-size: 0.8rem;">201 Created</code>
+        </div>
+        <p>Add or update aircraft tracking. If the hex already exists, updates <code>callsign</code> and <code>follow</code>.</p>
+        <h4>Request Body</h4>
+        <pre><code>{
+  "hex": "400f86",
+  "callsign": "BAW123",
+  "follow": true
+}</code></pre>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <div class="card-header">
+          <span class="tag tag-delete">DELETE</span>
+          <h3>/api/air/tracking/{hex}</h3>
+        </div>
+        <p>Remove an aircraft from tracking by its ICAO hex code.</p>
+        <h4>Error Responses</h4>
+        <table>
+          <thead><tr><th>Status</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td>404</td><td>No tracked aircraft with this hex</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section" id="space">
+      <h2>Space Domain (Stub)</h2>
+      <div class="card">
+        <div class="card-header">
+          <span class="tag tag-get">GET</span>
+          <h3>/api/space/status</h3>
+        </div>
+        <pre><code>{"status": "not_implemented", "domain": "space"}</code></pre>
+      </div>
+    </div>
+
+    <div class="section" id="sea">
+      <h2>Sea Domain (Stub)</h2>
+      <div class="card">
+        <div class="card-header">
+          <span class="tag tag-get">GET</span>
+          <h3>/api/sea/status</h3>
+        </div>
+        <pre><code>{"status": "not_implemented", "domain": "sea"}</code></pre>
+      </div>
+    </div>
+
+    <div class="section" id="land">
+      <h2>Land Domain (Stub)</h2>
+      <div class="card">
+        <div class="card-header">
+          <span class="tag tag-get">GET</span>
+          <h3>/api/land/status</h3>
+        </div>
+        <pre><code>{"status": "not_implemented", "domain": "land"}</code></pre>
+      </div>
+    </div>
+
+    <div class="section" id="cache-headers">
+      <h2>Cache Headers</h2>
+      <p>The <code>X-Cache</code> response header indicates how the ADS-B proxy served the response:</p>
+      <table>
+        <thead><tr><th>Value</th><th>Meaning</th><th>Data Age</th></tr></thead>
+        <tbody>
+          <tr><td><code>HIT</code></td><td>Served from fresh SQLite cache</td><td>&lt; 5 seconds</td></tr>
+          <tr><td><code>MISS</code></td><td>Fetched from airplanes.live, result stored</td><td>Fresh</td></tr>
+          <tr><td><code>STALE</code></td><td>Upstream unavailable, stale fallback used</td><td>5–30 seconds old</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="error-codes">
+      <h2>Error Codes</h2>
+      <table>
+        <thead><tr><th>Status</th><th>Endpoint(s)</th><th>Cause</th></tr></thead>
+        <tbody>
+          <tr><td>404</td><td><code>DELETE /messages/{msg_id}</code>, <code>DELETE /tracking/{hex}</code></td><td>Resource not found</td></tr>
+          <tr><td>503</td><td><code>GET /adsb/point/…</code></td><td>Upstream API unavailable and cache expired beyond stale window</td></tr>
+          <tr><td>422</td><td>POST endpoints</td><td>Request body validation failure (Pydantic)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

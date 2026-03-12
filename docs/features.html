@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL – Features & Components</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<header>
+  <a href="index.html" class="logo">
+    <svg width="24" height="24" viewBox="0 0 32 32"><rect x="0" y="0" width="6" height="6" fill="#c8ff00"/><rect x="26" y="0" width="6" height="6" fill="#c8ff00"/><rect x="0" y="26" width="6" height="6" fill="#c8ff00"/><rect x="26" y="26" width="6" height="6" fill="#c8ff00"/><circle cx="16" cy="16" r="4" fill="#c8ff00"/><circle cx="16" cy="16" r="8" fill="none" stroke="#c8ff00" stroke-width="1" stroke-dasharray="2 2"/></svg>
+    <h1>SENTINEL</h1>
+  </a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="overview.html">Overview</a>
+    <a href="frontend.html">Frontend</a>
+    <a href="backend.html">Backend</a>
+    <a href="features.html" class="active">Features</a>
+    <a href="api.html">API</a>
+    <a href="dependencies.html">Dependencies</a>
+  </nav>
+</header>
+<div class="layout">
+  <nav class="sidebar">
+    <h4>Features</h4>
+    <a href="#adsb" class="active">ADS-B Live Tracking</a>
+    <a href="#airports">Civil Airports</a>
+    <a href="#raf">RAF / USAF Bases</a>
+    <a href="#aara">AARA Zones</a>
+    <a href="#awacs">AWACS Orbits</a>
+    <a href="#range-rings">Range Rings</a>
+    <a href="#roads">Roads Toggle</a>
+    <a href="#names">Place Names</a>
+    <a href="#notifications">Notifications</a>
+    <a href="#tracking-panel">Tracking Panel</a>
+    <a href="#filter">Filter Panel</a>
+    <a href="#3d">3D View</a>
+    <a href="#user-location">GPS Location</a>
+    <a href="#connectivity">Online / Offline</a>
+    <a href="#clear">Clear Overlays</a>
+  </nav>
+  <main class="main">
+
+    <div class="section" id="adsb">
+      <h2>ADS-B Live Aircraft Tracking</h2>
+      <p><strong>Files:</strong> <code>controls/adsb.js</code> (AdsbLiveControl), <code>controls/adsb-labels.js</code></p>
+
+      <h3>Polling & Interpolation</h3>
+      <p>Aircraft positions are fetched from the backend proxy every ~5 seconds. Between polls, positions are dead-reckoned (interpolated) every 100ms using each aircraft's heading and ground speed. This produces smooth motion without excessive API calls.</p>
+      <div class="fn-block">
+        <div class="fn-sig">_fetch()</div>
+        <div class="fn-desc">GETs <code>/api/air/adsb/point/{lat}/{lon}/250</code> using the current user location as centre (or map centre if no GPS). Parses response, updates <code>_lastPositions</code>, queues interpolation.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">_interpolate()</div>
+        <div class="fn-desc">Runs every 100ms. Computes dead-reckoned position for each aircraft: <code>newPos = lastPos + (heading_vector × speed × elapsed_ms)</code>. Updates the GeoJSON source.</div>
+      </div>
+
+      <h3>Aircraft Rendering</h3>
+      <p>Icons are drawn on HTML Canvas and registered as MapLibre sprite images at runtime — no external sprite sheet is needed.</p>
+      <table>
+        <thead><tr><th>Icon</th><th>Function</th><th>When used</th></tr></thead>
+        <tbody>
+          <tr><td>Radar blip (triangle)</td><td><code>_createRadarBlip(color, scale)</code></td><td>All aircraft (white = civil, lime = military)</td></tr>
+          <tr><td>Corner bracket</td><td><code>_createBracket(color)</code></td><td>Selected aircraft (lime)</td></tr>
+          <tr><td>Military bracket</td><td><code>_createMilBracket()</code></td><td>Selected military aircraft</td></tr>
+          <tr><td>Tower blip</td><td><code>_createTowerBlip(scale)</code></td><td>ATC towers / fixed stations</td></tr>
+          <tr><td>UAV icon</td><td><code>_createUavIcon()</code></td><td>Unmanned aerial vehicles</td></tr>
+          <tr><td>Ground vehicle</td><td><code>_createGroundVehicleIcon()</code></td><td>Ground vehicles</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Selection & Tags</h3>
+      <div class="fn-block">
+        <div class="fn-sig">_onMapClick(e)</div>
+        <div class="fn-desc">Click on aircraft layer. Finds nearest feature, sets <code>_selectedHex</code>, applies bracket overlay, calls <code>_rebuildTagForHex(hex)</code>, updates tracking panel.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">_onMapHover(e)</div>
+        <div class="fn-desc">Hover over aircraft. Shows lightweight data tag with callsign, altitude, speed, heading, squawk.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">_applySelection()</div>
+        <div class="fn-desc">Updates the bracket layer to highlight <code>_selectedHex</code>. Called after polling to keep bracket on correct aircraft.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">_rebuildTagForHex(hex)</div>
+        <div class="fn-desc">Creates a persistent HTML tag marker showing all data for selected aircraft. Updates with each interpolation tick.</div>
+      </div>
+
+      <h3>Filtering</h3>
+      <div class="fn-block">
+        <div class="fn-sig">setTypeFilter(mode: 'all' | 'civil' | 'mil')</div>
+        <div class="fn-desc">Applies a MapLibre filter expression to the ADS-B layer. Military aircraft have <code>a.military = true</code> from the API.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">setAllHidden(hidden: boolean)</div>
+        <div class="fn-desc">Hides all aircraft except the tracked one. Used by the HIDE ALL mode in the filter panel.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">setHideGroundVehicles(hide: boolean)</div>
+        <div class="fn-desc">Filters ground vehicles from the ADS-B layer.</div>
+      </div>
+
+      <h3>Trail History</h3>
+      <p>Up to 100 position history points are stored per aircraft hex in <code>_trails</code>. A line layer <code>adsb-trails</code> renders these as a fading track behind each aircraft.</p>
+
+      <h3>Emergency Detection</h3>
+      <div class="fn-block">
+        <div class="fn-sig">_checkEmergency(hex)</div>
+        <div class="fn-desc">Checks squawk code. If 7500 (hijack), 7600 (comms failure), or 7700 (general emergency), creates an emergency notification via <code>_Notifications.add()</code> and renders a red bracket. Clears notification when squawk returns to normal.</div>
+      </div>
+
+      <h3>Layers</h3>
+      <table>
+        <thead><tr><th>Layer ID</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>adsb-icons</code></td><td>symbol</td><td>Radar blip triangles, rotated to heading</td></tr>
+          <tr><td><code>adsb-bracket</code></td><td>symbol</td><td>Bracket overlay on selected aircraft</td></tr>
+          <tr><td><code>adsb-trails</code></td><td>line</td><td>Position trail history per aircraft</td></tr>
+          <tr><td><code>adsb-callsigns</code></td><td>HTML markers</td><td>Callsign text labels (via AdsbLabelsToggleControl)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="airports">
+      <h2>Civil Airports</h2>
+      <p><strong>File:</strong> <code>controls/airports.js</code> (AirportsToggleControl)</p>
+      <p>26 UK and Ireland civil airports are included. Each airport is a GeoJSON feature with ICAO/IATA codes, name, coordinate bounds, and radio frequencies (tower, radar, approach, ATIS).</p>
+
+      <h3>Markers</h3>
+      <p>Each airport renders an HTML marker showing the ICAO code (lime) and airport name (white). On hover, a frequency panel appears showing all published radio frequencies. On click, the map zooms to the airport's bounding box and the tracking panel shows an airport detail card.</p>
+
+      <h3>Functions</h3>
+      <div class="fn-block">
+        <div class="fn-sig">initLayers()</div>
+        <div class="fn-desc">Creates all HTML markers. Called on map load and on style switch.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">_buildFreqPanel(p)</div>
+        <div class="fn-desc">Returns HTML string for the hover frequency popup (tower/radar/approach/atis).</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">_showAirportPanel(p, coords)</div>
+        <div class="fn-desc">Injects airport detail HTML into the tracking panel and opens it.</div>
+      </div>
+
+      <h4>Included Airports (sample)</h4>
+      <p style="color: var(--muted); font-size: 0.82rem;">EGLL (Heathrow), EGKK (Gatwick), EGCC (Manchester), EIDW (Dublin), EGSS (Stansted), EGBB (Birmingham), EGPF (Glasgow), EGPH (Edinburgh), EGGD (Bristol), EGGP (Liverpool), EGNT (Newcastle), EGLL, EGAC (Belfast City), EIDW, and 12 more.</p>
+    </div>
+
+    <div class="section" id="raf">
+      <h2>RAF / USAF Bases</h2>
+      <p><strong>File:</strong> <code>controls/raf.js</code> (RAFToggleControl)</p>
+      <p>24 RAF and USAF bases in the UK. Same marker and detail panel pattern as civil airports but with military styling. Bases include ICAO code, name, and bounding box.</p>
+
+      <h4>Included Bases (sample)</h4>
+      <p style="color: var(--muted); font-size: 0.82rem;">RAF Benson, RAF Brize Norton, RAF Coningsby, RAF Cottesmore, RAF Fairford, RAF Lakenheath, RAF Lossiemouth, RAF Marham, RAF Mildenhall, RAF Northolt, RAF Odiham, RAF Shawbury, RAF Waddington, RAF Wittering, and 10 more.</p>
+    </div>
+
+    <div class="section" id="aara">
+      <h2>Air-to-Air Refuelling Areas (AARA)</h2>
+      <p><strong>File:</strong> <code>controls/aara.js</code> (AARToggleControl)</p>
+      <p>14 UK AARA polygon zones rendered as filled polygons with dashed outlines. Labels are placed at zone centroids and rotated to align with the longest polygon edge. Label rotation updates in real-time as the map rotates or pitches.</p>
+
+      <h3>Rendering</h3>
+      <table>
+        <thead><tr><th>Layer</th><th>Style</th></tr></thead>
+        <tbody>
+          <tr><td><code>aara-fill</code></td><td>Lime fill at 4% opacity</td></tr>
+          <tr><td><code>aara-outline</code></td><td>Lime dashed line, 1.5px</td></tr>
+          <tr><td>Labels</td><td>HTML markers, rotated to longest edge bearing</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Key Functions</h3>
+      <div class="fn-block">
+        <div class="fn-sig">_updateLabelRotations()</div>
+        <div class="fn-desc">Recalculates screen-space rotation for each label on <code>map.on('rotate')</code> and <code>map.on('pitch')</code>. Uses <code>computeTextRotate()</code> from MapComponent.</div>
+      </div>
+    </div>
+
+    <div class="section" id="awacs">
+      <h2>AWACS Orbit Zones</h2>
+      <p><strong>File:</strong> <code>controls/awacs.js</code> (AWACSToggleControl)</p>
+      <p>Approximately 50 AWACS patrol orbit lobes across UK and Atlantic airspace. Each lobe is a 37-point circular polygon. Zones are grouped by region (SW Approaches/Cork, etc.) and rendered as outline layers only.</p>
+    </div>
+
+    <div class="section" id="range-rings">
+      <h2>Range Rings</h2>
+      <p><strong>File:</strong> <code>controls/range-rings.js</code> (RangeRingsControl)</p>
+      <p>Five geodesic range rings at 50, 100, 150, 200, and 250 nautical miles from the user's GPS position. Rings update automatically when location changes.</p>
+
+      <div class="fn-block">
+        <div class="fn-sig">updateCenter(lng, lat)</div>
+        <div class="fn-desc">Called by <code>setUserLocation()</code> in user-location.js when GPS position updates. Recentres all 5 rings to the new location.</div>
+        <div class="fn-deps">Calls: <span>MapComponent.buildRingsGeoJSON()</span></div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">initRings()</div>
+        <div class="fn-desc">Creates or recreates the <code>range-rings-lines</code> GeoJSON source and line layer. Called on map load and style switch.</div>
+      </div>
+
+      <p>Rings are white dashed lines with distance labels (e.g. "50nm") at the top of each circle.</p>
+    </div>
+
+    <div class="section" id="roads">
+      <h2>Roads Toggle</h2>
+      <p><strong>File:</strong> <code>controls/roads.js</code> (RoadsToggleControl)</p>
+      <p>Toggles the visibility of 15 MapLibre road-related layer IDs in the active map style.</p>
+      <p><strong>Layers toggled:</strong> highway_path, highway_minor, highway_major_casing, highway_major_inner, highway_major_subtle, highway_motorway_casing, highway_motorway_inner, highway_motorway_subtle, highway_name_motorway, highway_name_other, highway_ref, tunnel_motorway_casing, tunnel_motorway_inner, road_area_pier, road_pier.</p>
+    </div>
+
+    <div class="section" id="names">
+      <h2>Place Names Toggle</h2>
+      <p><strong>File:</strong> <code>controls/names.js</code> (NamesToggleControl)</p>
+      <p>Toggles 8 label layers: place_suburb, place_village, place_town, place_city, place_state, place_country, place_country_other, water_name.</p>
+    </div>
+
+    <div class="section" id="notifications">
+      <h2>Notifications Panel</h2>
+      <p><strong>File:</strong> <code>notifications/notifications.js</code></p>
+      <p>A slide-in panel on the left side of the screen. Notifications are created by the ADS-B system for emergency squawks, landing/departure events, and system status changes.</p>
+
+      <h3>Notification Types</h3>
+      <table>
+        <thead><tr><th>Type</th><th>Label</th><th>Created by</th></tr></thead>
+        <tbody>
+          <tr><td><code>emergency</code></td><td>⚠ EMERGENCY</td><td>AdsbLiveControl._checkEmergency()</td></tr>
+          <tr><td><code>flight</code></td><td>✈ FLIGHT</td><td>AdsbLiveControl._checkLandingDeparture()</td></tr>
+          <tr><td><code>system</code></td><td>◈ SYSTEM</td><td>Connectivity changes</td></tr>
+          <tr><td><code>squawk-clr</code></td><td>✓ SQUAWK CLEAR</td><td>AdsbLiveControl (emergency resolved)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Persistence</h3>
+      <p>Notifications are saved to <code>localStorage['notifications']</code> and also synced to <code>POST /api/air/messages</code>. On page reload, notifications are restored from localStorage.</p>
+
+      <h3>Bell Pulse</h3>
+      <p>When the panel is closed and there are unread notifications, the bell icon in the footer pulses every 15 seconds.</p>
+    </div>
+
+    <div class="section" id="tracking-panel">
+      <h2>Tracking Panel</h2>
+      <p><strong>File:</strong> <code>tracking/tracking.js</code></p>
+      <p>A slide-in panel (same side as notifications, tab behavior) that displays the selected aircraft status bar. Also used to show airport and RAF base detail cards.</p>
+      <p>The ADS-B status bar inside the panel shows: callsign, ICAO hex, registration, aircraft type, altitude, speed, heading, squawk code, and a TRACK/FOLLOW toggle.</p>
+    </div>
+
+    <div class="section" id="filter">
+      <h2>Filter Panel</h2>
+      <p><strong>File:</strong> <code>air/filter.js</code></p>
+      <p>A search panel that opens from the side menu or via Ctrl+F / Cmd+F. Searches in real-time across:</p>
+      <ul style="color: var(--muted); font-size: 0.85rem; padding-left: 20px; margin-bottom: 12px;">
+        <li><strong>Aircraft</strong>: callsign, ICAO hex, registration, squawk</li>
+        <li><strong>Airports</strong>: ICAO, IATA, name</li>
+        <li><strong>Military bases</strong>: ICAO, name</li>
+      </ul>
+      <p>Results are grouped into three sections. Clicking a result zooms to it and opens its detail panel. Notification bell and TRACK button are available per aircraft result.</p>
+
+      <h3>Mode Bar</h3>
+      <table>
+        <thead><tr><th>Mode</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>ALL</td><td><code>adsbControl.setTypeFilter('all')</code></td></tr>
+          <tr><td>CIVIL</td><td><code>adsbControl.setTypeFilter('civil')</code></td></tr>
+          <tr><td>MILITARY</td><td><code>adsbControl.setTypeFilter('mil')</code></td></tr>
+          <tr><td>HIDE ALL</td><td><code>adsbControl.setAllHidden(true)</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="3d">
+      <h2>3D View</h2>
+      <p><strong>File:</strong> <code>air/side-menu.js</code></p>
+      <p>Toggles between flat (pitch 0°) and 3D (pitch 45°) map view. When 3D is active, a 3×3 grid of controls appears:</p>
+      <table>
+        <thead><tr><th>Button</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>↑ (tilt up)</td><td>Increase pitch by 10°</td></tr>
+          <tr><td>↓ (tilt down)</td><td>Decrease pitch by 10°</td></tr>
+          <tr><td>↶ (rotate CW)</td><td>Change bearing by +15°</td></tr>
+          <tr><td>↷ (rotate CCW)</td><td>Change bearing by -15°</td></tr>
+          <tr><td>+ (zoom in)</td><td>Increase zoom by 0.5</td></tr>
+          <tr><td>− (zoom out)</td><td>Decrease zoom by 0.5</td></tr>
+          <tr><td>⌂ (reset)</td><td>Pitch → 0, bearing → 0</td></tr>
+        </tbody>
+      </table>
+      <p>3D state is persisted in <code>localStorage['sentinel_3d']</code> and restored on page reload.</p>
+    </div>
+
+    <div class="section" id="user-location">
+      <h2>GPS User Location</h2>
+      <p><strong>File:</strong> <code>air/user-location.js</code></p>
+      <p>Uses the browser Geolocation API (<code>watchPosition</code>) to track user location. An animated SVG marker shows the GPS position with a pulsing ring, dot, and coordinate typewriter animation.</p>
+
+      <h3>Manual Location Pin</h3>
+      <p>Right-clicking the map shows a context menu with "DROP PIN HERE". Manual pins are persisted in localStorage with a <code>manual: true</code> flag and are never overwritten by GPS updates.</p>
+
+      <h3>Reverse Geocoding</h3>
+      <p>After every location update (max once per 2 minutes), the coordinates are sent to <code>GET /api/air/geocode/reverse</code>. The returned country name updates the footer location label.</p>
+
+      <h3>GPS Cache</h3>
+      <p>Last GPS position is cached in <code>localStorage['userLocation']</code> and expires after 5 minutes. On page load, the cached position is used immediately while a fresh fix is obtained.</p>
+    </div>
+
+    <div class="section" id="connectivity">
+      <h2>Online / Offline Detection</h2>
+      <p><strong>File:</strong> <code>map/map.js</code></p>
+      <p>The OSM favicon is polled every 2 seconds. On state change, the map style is switched and a footer status pill is updated. All overlays are automatically re-initialized after a style switch via <code>overlay-reinit.js</code>.</p>
+      <div class="callout">
+        Browser <code>window.online</code> / <code>window.offline</code> events are also listened to as supplementary signals, but the OSM poll is the authoritative check.
+      </div>
+    </div>
+
+    <div class="section" id="clear">
+      <h2>Clear Overlays</h2>
+      <p><strong>File:</strong> <code>controls/clear-overlays.js</code> (ClearOverlaysControl)</p>
+      <p>A "CLR" button that toggles all overlays off/on. On first press, the current state of every control is snapshotted, then all are turned off. On second press, the snapshot is restored. This allows temporarily clearing all clutter from the map.</p>
+
+      <div class="fn-block">
+        <div class="fn-sig">_hideAllOverlays()</div>
+        <div class="fn-desc">Saves current state of all controls into <code>savedStates</code>. Calls <code>toggle()</code> on any control that is currently visible to turn it off.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">_restoreAllOverlays()</div>
+        <div class="fn-desc">Calls <code>toggle()</code> on controls that were previously visible (according to <code>savedStates</code>) to restore them.</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

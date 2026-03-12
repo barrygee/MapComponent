@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL – Dependency Map</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<header>
+  <a href="index.html" class="logo">
+    <svg width="24" height="24" viewBox="0 0 32 32"><rect x="0" y="0" width="6" height="6" fill="#c8ff00"/><rect x="26" y="0" width="6" height="6" fill="#c8ff00"/><rect x="0" y="26" width="6" height="6" fill="#c8ff00"/><rect x="26" y="26" width="6" height="6" fill="#c8ff00"/><circle cx="16" cy="16" r="4" fill="#c8ff00"/><circle cx="16" cy="16" r="8" fill="none" stroke="#c8ff00" stroke-width="1" stroke-dasharray="2 2"/></svg>
+    <h1>SENTINEL</h1>
+  </a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="overview.html">Overview</a>
+    <a href="frontend.html">Frontend</a>
+    <a href="backend.html">Backend</a>
+    <a href="features.html">Features</a>
+    <a href="api.html">API</a>
+    <a href="dependencies.html" class="active">Dependencies</a>
+  </nav>
+</header>
+<div class="layout">
+  <nav class="sidebar">
+    <h4>Dependency Map</h4>
+    <a href="#frontend-graph" class="active">Frontend Graph</a>
+    <a href="#backend-graph">Backend Graph</a>
+    <a href="#adsb-deps">AdsbLiveControl</a>
+    <a href="#map-deps">MapComponent</a>
+    <a href="#notifications-deps">_Notifications</a>
+    <a href="#filter-deps">_FilterPanel</a>
+    <a href="#control-deps">Controls Matrix</a>
+    <a href="#backend-deps">Backend Matrix</a>
+  </nav>
+  <main class="main">
+
+    <div class="section" id="frontend-graph">
+      <h2>Frontend Module Graph</h2>
+      <p>Arrows indicate "depends on / calls" direction. A module must be loaded <em>after</em> all modules it depends on.</p>
+
+      <div class="diagram">
+        <svg width="760" height="560" viewBox="0 0 760 560" font-family="'Consolas', monospace" font-size="10" fill="#e0e0e0">
+          <defs>
+            <marker id="a" markerWidth="7" markerHeight="7" refX="7" refY="3.5" orient="auto">
+              <path d="M0,0 L7,3.5 L0,7 Z" fill="#444"/>
+            </marker>
+            <marker id="alime" markerWidth="7" markerHeight="7" refX="7" refY="3.5" orient="auto">
+              <path d="M0,0 L7,3.5 L0,7 Z" fill="#c8ff00"/>
+            </marker>
+            <marker id="ablue" markerWidth="7" markerHeight="7" refX="7" refY="3.5" orient="auto">
+              <path d="M0,0 L7,3.5 L0,7 Z" fill="#00aaff"/>
+            </marker>
+          </defs>
+
+          <!-- ROW 1: External libs -->
+          <rect x="40" y="10" width="90" height="28" rx="3" fill="#1a1a1a" stroke="#333"/>
+          <text x="85" y="28" text-anchor="middle" fill="#666">pmtiles.js</text>
+          <rect x="145" y="10" width="100" height="28" rx="3" fill="#1a1a1a" stroke="#333"/>
+          <text x="195" y="28" text-anchor="middle" fill="#666">maplibre-gl.js</text>
+
+          <!-- ROW 2: Shared panels -->
+          <rect x="40" y="66" width="120" height="28" rx="3" fill="#001020" stroke="#00336a"/>
+          <text x="100" y="84" text-anchor="middle" fill="#00aaff">notifications.js</text>
+          <rect x="175" y="66" width="110" height="28" rx="3" fill="#001020" stroke="#00336a"/>
+          <text x="230" y="84" text-anchor="middle" fill="#00aaff">tracking.js</text>
+
+          <!-- ROW 3: MapComponent -->
+          <rect x="40" y="122" width="200" height="28" rx="3" fill="#0f1500" stroke="#c8ff00"/>
+          <text x="140" y="140" text-anchor="middle" fill="#c8ff00">map/map.js → MapComponent</text>
+
+          <!-- ROW 4: Air globals -->
+          <rect x="40" y="178" width="100" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="90" y="196" text-anchor="middle" fill="#ff9900">air-globals.js</text>
+          <rect x="155" y="178" width="110" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="210" y="196" text-anchor="middle" fill="#ff9900">overlay-state.js</text>
+          <rect x="280" y="178" width="100" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="330" y="196" text-anchor="middle" fill="#ff9900">map-alias.js</text>
+
+          <!-- ROW 5: Control base -->
+          <rect x="40" y="234" width="150" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="115" y="252" text-anchor="middle" fill="#cc88ff">sentinel-control-base.js</text>
+
+          <!-- ROW 6: Controls -->
+          <rect x="40" y="290" width="66" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="73" y="308" text-anchor="middle" fill="#cc88ff">roads.js</text>
+          <rect x="116" y="290" width="80" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="156" y="308" text-anchor="middle" fill="#cc88ff">airports.js</text>
+          <rect x="206" y="290" width="60" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="236" y="308" text-anchor="middle" fill="#cc88ff">raf.js</text>
+          <rect x="276" y="290" width="66" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="309" y="308" text-anchor="middle" fill="#cc88ff">names.js</text>
+          <rect x="352" y="290" width="90" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="397" y="308" text-anchor="middle" fill="#cc88ff">range-rings.js</text>
+          <rect x="452" y="290" width="60" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="482" y="308" text-anchor="middle" fill="#cc88ff">aara.js</text>
+          <rect x="522" y="290" width="70" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="557" y="308" text-anchor="middle" fill="#cc88ff">awacs.js</text>
+          <rect x="602" y="290" width="60" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="632" y="308" text-anchor="middle" fill="#cc88ff">adsb.js</text>
+
+          <!-- ROW 6b: More controls -->
+          <rect x="40" y="328" width="100" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="90" y="346" text-anchor="middle" fill="#cc88ff">adsb-labels.js</text>
+          <rect x="150" y="328" width="120" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="210" y="346" text-anchor="middle" fill="#cc88ff">clear-overlays.js</text>
+
+          <!-- ROW 7: Reinit -->
+          <rect x="40" y="384" width="120" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="100" y="402" text-anchor="middle" fill="#ff9900">overlay-reinit.js</text>
+
+          <!-- ROW 8: UI components -->
+          <rect x="40" y="440" width="100" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="90" y="458" text-anchor="middle" fill="#ff9900">side-menu.js</text>
+          <rect x="150" y="440" width="80" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="190" y="458" text-anchor="middle" fill="#ff9900">filter.js</text>
+          <rect x="240" y="440" width="110" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="295" y="458" text-anchor="middle" fill="#ff9900">user-location.js</text>
+          <rect x="360" y="440" width="80" height="28" rx="3" fill="#0f1500" stroke="#c8ff00"/>
+          <text x="400" y="458" text-anchor="middle" fill="#c8ff00">boot.js</text>
+
+          <!-- Arrows: libs → map.js -->
+          <line x1="85" y1="38" x2="110" y2="122" stroke="#333" stroke-width="1" marker-end="url(#a)"/>
+          <line x1="195" y1="38" x2="155" y2="122" stroke="#333" stroke-width="1" marker-end="url(#a)"/>
+
+          <!-- Arrows: map.js → controls (via MapComponent) -->
+          <line x1="140" y1="150" x2="115" y2="234" stroke="#c8ff00" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#alime)"/>
+          <line x1="140" y1="150" x2="397" y2="290" stroke="#c8ff00" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#alime)"/>
+          <line x1="140" y1="150" x2="482" y2="290" stroke="#c8ff00" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#alime)"/>
+
+          <!-- Arrows: control-base → controls -->
+          <line x1="115" y1="262" x2="73" y2="290" stroke="#444" stroke-width="1" marker-end="url(#a)"/>
+          <line x1="115" y1="262" x2="156" y2="290" stroke="#444" stroke-width="1" marker-end="url(#a)"/>
+          <line x1="115" y1="262" x2="632" y2="290" stroke="#444" stroke-width="1" stroke-dasharray="2 2" marker-end="url(#a)"/>
+
+          <!-- Arrows: notifications → adsb.js -->
+          <line x1="100" y1="94" x2="632" y2="290" stroke="#00aaff" stroke-width="1" stroke-dasharray="2 2" marker-end="url(#ablue)"/>
+
+          <!-- Arrows: overlay-reinit → controls -->
+          <line x1="100" y1="412" x2="90" y2="440" stroke="#333" stroke-width="1" marker-end="url(#a)"/>
+
+          <!-- Arrows: boot.js → all -->
+          <line x1="400" y1="468" x2="90" y2="468" stroke="#c8ff00" stroke-width="1" marker-end="url(#alime)"/>
+          <line x1="400" y1="468" x2="190" y2="468" stroke="#c8ff00" stroke-width="1" marker-end="url(#alime)"/>
+          <line x1="400" y1="468" x2="295" y2="468" stroke="#c8ff00" stroke-width="1" marker-end="url(#alime)"/>
+
+          <!-- Legend -->
+          <rect x="560" y="440" width="180" height="100" rx="3" fill="#111" stroke="#222"/>
+          <text x="650" y="458" text-anchor="middle" fill="#555" font-size="9" letter-spacing="1">LEGEND</text>
+          <line x1="575" y1="470" x2="610" y2="470" stroke="#c8ff00" stroke-width="1.5" stroke-dasharray="3 2"/>
+          <text x="620" y="473" fill="#c8ff00">uses MapComponent</text>
+          <line x1="575" y1="488" x2="610" y2="488" stroke="#00aaff" stroke-width="1.5" stroke-dasharray="2 2"/>
+          <text x="620" y="491" fill="#00aaff">uses _Notifications</text>
+          <line x1="575" y1="506" x2="610" y2="506" stroke="#444" stroke-width="1.5"/>
+          <text x="620" y="509" fill="#666">inherits / calls</text>
+          <line x1="575" y1="524" x2="610" y2="524" stroke="#c8ff00" stroke-width="1.5"/>
+          <text x="620" y="527" fill="#c8ff00">boot orchestrates</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="section" id="backend-graph">
+      <h2>Backend Module Graph</h2>
+      <div class="diagram">
+        <svg width="700" height="280" viewBox="0 0 700 280" font-family="'Consolas', monospace" font-size="10" fill="#e0e0e0">
+          <defs>
+            <marker id="ba" markerWidth="7" markerHeight="7" refX="7" refY="3.5" orient="auto">
+              <path d="M0,0 L7,3.5 L0,7 Z" fill="#444"/>
+            </marker>
+          </defs>
+
+          <!-- main.py -->
+          <rect x="280" y="10" width="140" height="28" rx="3" fill="#0f1500" stroke="#c8ff00"/>
+          <text x="350" y="28" text-anchor="middle" fill="#c8ff00">main.py</text>
+
+          <!-- config.py -->
+          <rect x="460" y="10" width="110" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="515" y="28" text-anchor="middle" fill="#ff9900">config.py</text>
+
+          <!-- database.py -->
+          <rect x="590" y="10" width="100" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="640" y="28" text-anchor="middle" fill="#00aaff">database.py</text>
+
+          <!-- Routers -->
+          <rect x="60" y="90" width="100" height="28" rx="3" fill="#001020" stroke="#00336a"/>
+          <text x="110" y="108" text-anchor="middle" fill="#00aaff">air.py</text>
+          <rect x="175" y="90" width="100" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="225" y="108" text-anchor="middle" fill="#555">space.py</text>
+          <rect x="290" y="90" width="90" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="335" y="108" text-anchor="middle" fill="#555">sea.py</text>
+          <rect x="395" y="90" width="90" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="440" y="108" text-anchor="middle" fill="#555">land.py</text>
+
+          <!-- cache.py -->
+          <rect x="520" y="90" width="90" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="565" y="108" text-anchor="middle" fill="#ff9900">cache.py</text>
+
+          <!-- models.py -->
+          <rect x="40" y="170" width="120" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="100" y="188" text-anchor="middle" fill="#cc88ff">models.py</text>
+
+          <!-- services -->
+          <rect x="180" y="170" width="100" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="230" y="188" text-anchor="middle" fill="#00cc66">adsb.py</text>
+          <rect x="295" y="170" width="110" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="350" y="188" text-anchor="middle" fill="#00cc66">geocode.py</text>
+
+          <!-- External -->
+          <rect x="180" y="240" width="100" height="28" rx="3" fill="#1a1a00" stroke="#3a3a00"/>
+          <text x="230" y="258" text-anchor="middle" fill="#888">airplanes.live</text>
+          <rect x="295" y="240" width="100" height="28" rx="3" fill="#1a1a00" stroke="#3a3a00"/>
+          <text x="345" y="258" text-anchor="middle" fill="#888">nominatim</text>
+
+          <!-- SQLite -->
+          <rect x="420" y="170" width="90" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="465" y="188" text-anchor="middle" fill="#555">sentinel.db</text>
+
+          <!-- main → routers -->
+          <line x1="320" y1="38" x2="110" y2="90" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+          <line x1="340" y1="38" x2="225" y2="90" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+          <line x1="360" y1="38" x2="335" y2="90" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+          <line x1="380" y1="38" x2="440" y2="90" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+
+          <!-- main → database -->
+          <line x1="420" y1="24" x2="590" y2="24" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+
+          <!-- config → all (dotted) -->
+          <line x1="515" y1="38" x2="565" y2="90" stroke="#333" stroke-width="1" stroke-dasharray="2 2" marker-end="url(#ba)"/>
+          <line x1="515" y1="38" x2="230" y2="170" stroke="#333" stroke-width="1" stroke-dasharray="2 2" marker-end="url(#ba)"/>
+          <line x1="515" y1="38" x2="350" y2="170" stroke="#333" stroke-width="1" stroke-dasharray="2 2" marker-end="url(#ba)"/>
+
+          <!-- air.py → models, services, cache -->
+          <line x1="110" y1="118" x2="100" y2="170" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+          <line x1="110" y1="118" x2="230" y2="170" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+          <line x1="110" y1="118" x2="350" y2="170" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+          <line x1="110" y1="118" x2="565" y2="108" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+
+          <!-- services → external -->
+          <line x1="230" y1="198" x2="230" y2="240" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+          <line x1="350" y1="198" x2="345" y2="240" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+
+          <!-- database → SQLite -->
+          <line x1="640" y1="38" x2="465" y2="170" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+          <line x1="465" y1="198" x2="465" y2="188" stroke="#444" stroke-width="0"/>
+
+          <!-- models → SQLite -->
+          <line x1="160" y1="184" x2="420" y2="184" stroke="#444" stroke-width="1" marker-end="url(#ba)"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="section" id="adsb-deps">
+      <h2>AdsbLiveControl — Detailed Dependencies</h2>
+      <p>The most complex module. Depends on nearly every other frontend module.</p>
+      <table>
+        <thead><tr><th>Dependency</th><th>Source</th><th>Used For</th></tr></thead>
+        <tbody>
+          <tr><td><code>map</code></td><td>map-alias.js → MapComponent.map</td><td>Add layers, handle click/hover events</td></tr>
+          <tr><td><code>maplibregl</code></td><td>maplibre-gl.js (global)</td><td>Create Marker instances for callsign labels</td></tr>
+          <tr><td><code>window._Notifications</code></td><td>notifications.js</td><td>Emergency squawk notifications, flight events</td></tr>
+          <tr><td><code>window._Tracking</code></td><td>tracking.js</td><td>Open/update tracking panel with aircraft status bar</td></tr>
+          <tr><td><code>AIRPORTS_DATA</code></td><td>airports.js</td><td>Detect aircraft at airports (landing/departure)</td></tr>
+          <tr><td><code>adsbLabelsControl</code></td><td>air-globals.js → adsb-labels.js</td><td>Sync label visibility when ADS-B is toggled</td></tr>
+          <tr><td><code>_overlayStates</code></td><td>overlay-state.js</td><td>Read initial visibility setting</td></tr>
+          <tr><td><code>_saveOverlayStates</code></td><td>overlay-state.js</td><td>Persist visibility change</td></tr>
+          <tr><td><code>/api/air/adsb/point/…</code></td><td>Backend REST API</td><td>Fetch live aircraft data</td></tr>
+          <tr><td><code>localStorage['trackedHex']</code></td><td>browser</td><td>Restore selected aircraft on reload</td></tr>
+          <tr><td><code>localStorage['followEnabled']</code></td><td>browser</td><td>Restore follow mode on reload</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="map-deps">
+      <h2>MapComponent — Who Depends On It</h2>
+      <p>Every module in the air domain depends on <code>window.MapComponent</code>.</p>
+      <table>
+        <thead><tr><th>Module</th><th>Uses from MapComponent</th></tr></thead>
+        <tbody>
+          <tr><td>map-alias.js</td><td><code>MapComponent.map</code> — exposes as bare <code>map</code></td></tr>
+          <tr><td>overlay-reinit.js</td><td><code>MapComponent.onStyleLoad()</code></td></tr>
+          <tr><td>range-rings.js</td><td><code>MapComponent.buildRingsGeoJSON()</code>, <code>RING_DISTANCES_NM</code></td></tr>
+          <tr><td>aara.js</td><td><code>MapComponent.computeCentroid()</code>, <code>computeTextRotate()</code>, <code>computeLongestEdge()</code></td></tr>
+          <tr><td>user-location.js</td><td><code>MapComponent.map</code> (via alias)</td></tr>
+          <tr><td>side-menu.js</td><td><code>MapComponent.map</code> (via alias)</td></tr>
+          <tr><td>All controls</td><td><code>map</code> (via alias) for layer/source/event management</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="notifications-deps">
+      <h2>_Notifications — Who Calls It</h2>
+      <table>
+        <thead><tr><th>Caller</th><th>Method Called</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td>AdsbLiveControl</td><td><code>.add()</code></td><td>Emergency squawk detected (7500/7600/7700)</td></tr>
+          <tr><td>AdsbLiveControl</td><td><code>.add()</code></td><td>Landing/departure event detected</td></tr>
+          <tr><td>AdsbLiveControl</td><td><code>.update()</code></td><td>Emergency details change (altitude update)</td></tr>
+          <tr><td>AdsbLiveControl</td><td><code>.dismiss()</code></td><td>Aircraft squawk returns to normal</td></tr>
+          <tr><td>_FilterPanel</td><td><code>.add()</code> / <code>.dismiss()</code></td><td>Bell icon toggle per aircraft in filter results</td></tr>
+          <tr><td>map.js</td><td><code>.add()</code></td><td>Connectivity state changes</td></tr>
+          <tr><td>boot.js</td><td><code>.init()</code></td><td>Page load initialization</td></tr>
+          <tr><td>_Tracking</td><td>(mutex only)</td><td>Opens tracking → closes notifications</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="filter-deps">
+      <h2>_FilterPanel — Detailed Dependencies</h2>
+      <table>
+        <thead><tr><th>Dependency</th><th>Used For</th></tr></thead>
+        <tbody>
+          <tr><td><code>adsbControl._geojson</code></td><td>Read current aircraft feature data for search</td></tr>
+          <tr><td><code>adsbControl._selectedHex</code></td><td>Read/write selected aircraft</td></tr>
+          <tr><td><code>adsbControl._applySelection()</code></td><td>Apply bracket highlight after filter selection</td></tr>
+          <tr><td><code>adsbControl.setTypeFilter(mode)</code></td><td>Mode bar: ALL/CIVIL/MIL buttons</td></tr>
+          <tr><td><code>adsbControl.setAllHidden(hidden)</code></td><td>HIDE ALL mode bar button</td></tr>
+          <tr><td><code>adsbControl._notifEnabled</code></td><td>Read notification state for bell icon in results</td></tr>
+          <tr><td><code>AIRPORTS_DATA</code></td><td>Airport search data</td></tr>
+          <tr><td><code>airportsControl._showAirportPanel()</code></td><td>Open airport detail on click</td></tr>
+          <tr><td><code>RAF_DATA</code></td><td>RAF base search data</td></tr>
+          <tr><td><code>rafControl._showRAFPanel()</code></td><td>Open RAF base detail on click</td></tr>
+          <tr><td><code>window._Notifications</code></td><td>Toggle aircraft notifications from results</td></tr>
+          <tr><td><code>map</code></td><td>Fly to selected feature</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="control-deps">
+      <h2>Controls Dependency Matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Control</th>
+            <th>Extends SentinelControlBase</th>
+            <th>Uses map</th>
+            <th>Uses _Notifications</th>
+            <th>Uses _Tracking</th>
+            <th>Uses MapComponent helpers</th>
+            <th>Uses overlay-state</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>RoadsToggleControl</td><td>✓</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>✓</td></tr>
+          <tr><td>ResetViewControl</td><td>✓</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+          <tr><td>AirportsToggleControl</td><td>✓</td><td>✓</td><td>–</td><td>✓</td><td>–</td><td>✓</td></tr>
+          <tr><td>RAFToggleControl</td><td>✓</td><td>✓</td><td>–</td><td>✓</td><td>–</td><td>✓</td></tr>
+          <tr><td>NamesToggleControl</td><td>✓</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>✓</td></tr>
+          <tr><td>RangeRingsControl</td><td>✓</td><td>✓</td><td>–</td><td>–</td><td>buildRingsGeoJSON</td><td>✓</td></tr>
+          <tr><td>AARToggleControl</td><td>✓</td><td>✓</td><td>–</td><td>–</td><td>computeCentroid, computeTextRotate, computeLongestEdge</td><td>✓</td></tr>
+          <tr><td>AWACSToggleControl</td><td>✓</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>✓</td></tr>
+          <tr><td>AdsbLiveControl</td><td>– (IControl direct)</td><td>✓</td><td>✓</td><td>✓</td><td>–</td><td>✓</td></tr>
+          <tr><td>AdsbLabelsToggleControl</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>–</td><td>✓</td></tr>
+          <tr><td>ClearOverlaysControl</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>–</td><td>✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="backend-deps">
+      <h2>Backend Module Dependency Matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Module</th>
+            <th>Uses config</th>
+            <th>Uses database</th>
+            <th>Uses cache</th>
+            <th>Uses models</th>
+            <th>Uses services</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>main.py</td><td>–</td><td>✓ (create_tables)</td><td>–</td><td>–</td><td>–</td></tr>
+          <tr><td>routers/air.py</td><td>✓</td><td>✓ (get_db)</td><td>✓</td><td>✓ (all 4 models)</td><td>✓ (adsb, geocode)</td></tr>
+          <tr><td>routers/space.py</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+          <tr><td>routers/sea.py</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+          <tr><td>routers/land.py</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+          <tr><td>services/adsb.py</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+          <tr><td>services/geocode.py</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+          <tr><td>database.py</td><td>✓</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+          <tr><td>models.py</td><td>–</td><td>✓ (Base)</td><td>–</td><td>–</td><td>–</td></tr>
+          <tr><td>cache.py</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

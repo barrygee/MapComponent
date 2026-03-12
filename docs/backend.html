@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL – Backend Architecture</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<header>
+  <a href="index.html" class="logo">
+    <svg width="24" height="24" viewBox="0 0 32 32"><rect x="0" y="0" width="6" height="6" fill="#c8ff00"/><rect x="26" y="0" width="6" height="6" fill="#c8ff00"/><rect x="0" y="26" width="6" height="6" fill="#c8ff00"/><rect x="26" y="26" width="6" height="6" fill="#c8ff00"/><circle cx="16" cy="16" r="4" fill="#c8ff00"/><circle cx="16" cy="16" r="8" fill="none" stroke="#c8ff00" stroke-width="1" stroke-dasharray="2 2"/></svg>
+    <h1>SENTINEL</h1>
+  </a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="overview.html">Overview</a>
+    <a href="frontend.html">Frontend</a>
+    <a href="backend.html" class="active">Backend</a>
+    <a href="features.html">Features</a>
+    <a href="api.html">API</a>
+    <a href="dependencies.html">Dependencies</a>
+  </nav>
+</header>
+<div class="layout">
+  <nav class="sidebar">
+    <h4>Backend</h4>
+    <a href="#overview" class="active">Overview</a>
+    <a href="#main">main.py</a>
+    <a href="#config">config.py</a>
+    <a href="#database">database.py</a>
+    <a href="#cache">cache.py</a>
+    <a href="#models">models.py</a>
+    <h4>Routers</h4>
+    <a href="#router-air">air.py</a>
+    <a href="#router-space">space.py</a>
+    <a href="#router-sea">sea.py</a>
+    <a href="#router-land">land.py</a>
+    <h4>Services</h4>
+    <a href="#service-adsb">adsb.py</a>
+    <a href="#service-geocode">geocode.py</a>
+    <h4>Cache Strategy</h4>
+    <a href="#cache-strategy">TTL / Stale</a>
+  </nav>
+  <main class="main">
+
+    <div class="section" id="overview">
+      <h2>Backend Overview</h2>
+      <p>The backend is a <strong>FastAPI</strong> application running on Python 3.12 with an async SQLAlchemy ORM backed by SQLite. It acts primarily as a <strong>proxy and cache</strong> — it does not own source data but fetches from upstream APIs and caches results to reduce load and provide degraded service when APIs are unavailable.</p>
+
+      <div class="diagram">
+        <svg width="700" height="300" viewBox="0 0 700 300" font-family="'Consolas', monospace" font-size="11" fill="#e0e0e0">
+          <!-- main.py -->
+          <rect x="280" y="10" width="140" height="40" rx="3" fill="#0f1500" stroke="#c8ff00"/>
+          <text x="350" y="30" text-anchor="middle" fill="#c8ff00">main.py</text>
+          <text x="350" y="45" text-anchor="middle" fill="#666" font-size="10">FastAPI app  lifespan</text>
+
+          <!-- config -->
+          <rect x="440" y="10" width="120" height="40" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="500" y="30" text-anchor="middle" fill="#ff9900">config.py</text>
+          <text x="500" y="45" text-anchor="middle" fill="#666" font-size="10">Settings (Pydantic)</text>
+
+          <!-- database -->
+          <rect x="140" y="10" width="120" height="40" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="200" y="30" text-anchor="middle" fill="#00aaff">database.py</text>
+          <text x="200" y="45" text-anchor="middle" fill="#666" font-size="10">engine  get_db()</text>
+
+          <!-- Routers -->
+          <rect x="10" y="100" width="110" height="36" rx="3" fill="#001020" stroke="#00336a"/>
+          <text x="65" y="120" text-anchor="middle" fill="#00aaff">air.py</text>
+          <text x="65" y="133" text-anchor="middle" fill="#666" font-size="9">LIVE</text>
+
+          <rect x="134" y="100" width="110" height="36" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="189" y="120" text-anchor="middle" fill="#555">space.py</text>
+          <text x="189" y="133" text-anchor="middle" fill="#444" font-size="9">STUB</text>
+
+          <rect x="258" y="100" width="110" height="36" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="313" y="120" text-anchor="middle" fill="#555">sea.py</text>
+          <text x="313" y="133" text-anchor="middle" fill="#444" font-size="9">STUB</text>
+
+          <rect x="382" y="100" width="110" height="36" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="437" y="120" text-anchor="middle" fill="#555">land.py</text>
+          <text x="437" y="133" text-anchor="middle" fill="#444" font-size="9">STUB</text>
+
+          <!-- Models -->
+          <rect x="10" y="190" width="200" height="90" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="110" y="208" text-anchor="middle" fill="#cc88ff">models.py</text>
+          <text x="110" y="224" text-anchor="middle" fill="#666" font-size="10">AdsbCache</text>
+          <text x="110" y="238" text-anchor="middle" fill="#666" font-size="10">GeocodeCache</text>
+          <text x="110" y="252" text-anchor="middle" fill="#666" font-size="10">AirMessage</text>
+          <text x="110" y="266" text-anchor="middle" fill="#666" font-size="10">AirTracking</text>
+
+          <!-- Services -->
+          <rect x="230" y="190" width="150" height="50" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="305" y="210" text-anchor="middle" fill="#00cc66">services/</text>
+          <text x="305" y="226" text-anchor="middle" fill="#666" font-size="10">adsb.py  geocode.py</text>
+
+          <!-- cache.py -->
+          <rect x="230" y="255" width="150" height="36" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="305" y="275" text-anchor="middle" fill="#ff9900">cache.py</text>
+          <text x="305" y="288" text-anchor="middle" fill="#666" font-size="10">now_ms  is_fresh  is_within_stale</text>
+
+          <!-- External APIs -->
+          <rect x="420" y="190" width="260" height="70" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="550" y="210" text-anchor="middle" fill="#c8ff00">External APIs</text>
+          <text x="550" y="228" text-anchor="middle" fill="#666" font-size="10">airplanes.live/v2/point/{lat}/{lon}/{radius}</text>
+          <text x="550" y="244" text-anchor="middle" fill="#666" font-size="10">nominatim.openstreetmap.org/reverse</text>
+
+          <!-- SQLite -->
+          <rect x="420" y="275" width="260" height="36" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="550" y="295" text-anchor="middle" fill="#555">sentinel.db (SQLite)</text>
+
+          <!-- Connections from main to routers -->
+          <line x1="350" y1="50" x2="65" y2="100" stroke="#333" stroke-width="1" stroke-dasharray="3 2"/>
+          <line x1="350" y1="50" x2="189" y2="100" stroke="#333" stroke-width="1" stroke-dasharray="3 2"/>
+          <line x1="350" y1="50" x2="313" y2="100" stroke="#333" stroke-width="1" stroke-dasharray="3 2"/>
+          <line x1="350" y1="50" x2="437" y2="100" stroke="#333" stroke-width="1" stroke-dasharray="3 2"/>
+
+          <!-- air.py to models and services -->
+          <line x1="65" y1="136" x2="110" y2="190" stroke="#333" stroke-width="1"/>
+          <line x1="65" y1="136" x2="305" y2="190" stroke="#333" stroke-width="1"/>
+          <!-- Services to External -->
+          <line x1="380" y1="215" x2="420" y2="215" stroke="#333" stroke-width="1" stroke-dasharray="3 2"/>
+          <!-- Models to SQLite -->
+          <line x1="200" y1="270" x2="420" y2="300" stroke="#333" stroke-width="1"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="section" id="main">
+      <h2>main.py — Application Entry Point</h2>
+      <p>Creates the FastAPI application, registers all domain routers, mounts static file serving, and runs the startup lifecycle.</p>
+
+      <div class="fn-block">
+        <div class="fn-sig">async lifespan(app: FastAPI) <span class="tag tag-fn">async context manager</span></div>
+        <div class="fn-desc">Runs <code>create_tables()</code> on startup. FastAPI calls this before accepting requests. Tear-down logic (if any) goes after the <code>yield</code>.</div>
+        <div class="fn-deps">Calls: <span>database.create_tables()</span></div>
+      </div>
+
+      <div class="fn-block">
+        <div class="fn-sig">GET /health → <code>{"status": "ok", "timestamp": int}</code></div>
+        <div class="fn-desc">Health check endpoint. Returns current Unix timestamp in seconds. Used by orchestration (Docker healthcheck, load balancer probes).</div>
+      </div>
+
+      <h4>Router Registration</h4>
+      <table>
+        <thead><tr><th>Router</th><th>Prefix</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td><code>routers.air</code></td><td><code>/api/air</code></td><td><span class="tag tag-live">Live</span></td></tr>
+          <tr><td><code>routers.space</code></td><td><code>/api/space</code></td><td><span class="tag tag-stub">Stub</span></td></tr>
+          <tr><td><code>routers.sea</code></td><td><code>/api/sea</code></td><td><span class="tag tag-stub">Stub</span></td></tr>
+          <tr><td><code>routers.land</code></td><td><code>/api/land</code></td><td><span class="tag tag-stub">Stub</span></td></tr>
+        </tbody>
+      </table>
+      <p>Static files are mounted at <code>/</code> to serve <code>index.html</code> and all frontend assets.</p>
+    </div>
+
+    <div class="section" id="config">
+      <h2>config.py — Configuration</h2>
+      <p>Pydantic <code>BaseSettings</code> reads configuration from environment variables and an optional <code>.env</code> file. A singleton <code>settings</code> object is imported by all other modules.</p>
+      <table>
+        <thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>db_path</code></td><td><code>backend/sentinel.db</code></td><td>SQLite file path (override to <code>/app/data/sentinel.db</code> in Docker)</td></tr>
+          <tr><td><code>adsb_ttl_ms</code></td><td><code>5000</code></td><td>ADS-B cache fresh window (5 seconds)</td></tr>
+          <tr><td><code>adsb_stale_ms</code></td><td><code>30000</code></td><td>ADS-B stale fallback window (30 seconds)</td></tr>
+          <tr><td><code>geocode_ttl_ms</code></td><td><code>600000</code></td><td>Geocode fresh window (10 minutes)</td></tr>
+          <tr><td><code>geocode_stale_ms</code></td><td><code>3600000</code></td><td>Geocode stale window (1 hour)</td></tr>
+          <tr><td><code>adsb_upstream_base</code></td><td><code>https://api.airplanes.live/v2</code></td><td>ADS-B API base URL</td></tr>
+          <tr><td><code>nominatim_base</code></td><td><code>https://nominatim.openstreetmap.org</code></td><td>Nominatim base URL</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="database">
+      <h2>database.py — Database Setup</h2>
+      <div class="fn-block">
+        <div class="fn-sig">engine <span class="tag tag-global">module-level</span></div>
+        <div class="fn-desc">Async SQLite engine created from <code>settings.db_path</code>. <code>check_same_thread=False</code> is set for async use.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">AsyncSessionLocal <span class="tag tag-global">module-level</span></div>
+        <div class="fn-desc">Session factory. <code>expire_on_commit=False</code> keeps attributes accessible after commit.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">async create_tables() → None</div>
+        <div class="fn-desc">Creates all ORM-mapped tables (<code>Base.metadata.create_all</code>). Called once at startup via <code>lifespan</code>.</div>
+        <div class="fn-deps">Uses: <span>engine, Base</span></div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">async get_db() → AsyncIterator[AsyncSession]</div>
+        <div class="fn-desc">FastAPI dependency. Yields a new session per request. Session is closed (and rolled back if exception) automatically.</div>
+        <div class="fn-deps">Uses: <span>AsyncSessionLocal</span></div>
+      </div>
+    </div>
+
+    <div class="section" id="cache">
+      <h2>cache.py — Cache Helpers</h2>
+      <div class="fn-block">
+        <div class="fn-sig">now_ms() → int</div>
+        <div class="fn-desc">Returns current Unix time in milliseconds. Used as the base for all TTL calculations.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">is_fresh(expires_at: int) → bool</div>
+        <div class="fn-desc">Returns <code>True</code> if <code>now_ms() &lt; expires_at</code>. Used to check if cached data is still within its primary TTL.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">is_within_stale(fetched_at: int, stale_ms: int) → bool</div>
+        <div class="fn-desc">Returns <code>True</code> if data is old but within its stale window. Used as a fallback when upstream API is unavailable.</div>
+      </div>
+    </div>
+
+    <div class="section" id="models">
+      <h2>models.py — ORM Models</h2>
+
+      <h3>AdsbCache</h3>
+      <p>Caches raw ADS-B JSON responses. One row per query region (cache key = <code>"{lat}_{lon}_{radius}"</code>).</p>
+      <table>
+        <thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>Integer PK</td><td>Auto-increment primary key</td></tr>
+          <tr><td><code>cache_key</code></td><td>String (unique)</td><td>e.g. <code>"54.1453_-4.4815_250"</code></td></tr>
+          <tr><td><code>lat</code>, <code>lon</code></td><td>Float</td><td>Query centre coordinates</td></tr>
+          <tr><td><code>radius_nm</code></td><td>Integer</td><td>Search radius (default 250)</td></tr>
+          <tr><td><code>payload</code></td><td>Text</td><td>Raw JSON string from upstream</td></tr>
+          <tr><td><code>ac_count</code></td><td>Integer</td><td>Aircraft count in response</td></tr>
+          <tr><td><code>fetched_at</code></td><td>BigInteger</td><td>Unix ms when data was fetched</td></tr>
+          <tr><td><code>expires_at</code></td><td>BigInteger</td><td>Unix ms when data expires (fetched_at + adsb_ttl_ms)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>GeocodeCache</h3>
+      <p>Caches Nominatim reverse-geocode results. Cache key is rounded to 2 decimal places (~1km grid resolution).</p>
+      <table>
+        <thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>Integer PK</td><td></td></tr>
+          <tr><td><code>cache_key</code></td><td>String (unique)</td><td>e.g. <code>"54.14_-4.48"</code></td></tr>
+          <tr><td><code>lat</code>, <code>lon</code></td><td>Float</td><td>Original coordinates</td></tr>
+          <tr><td><code>raw</code></td><td>Text</td><td>Full Nominatim JSON</td></tr>
+          <tr><td><code>fetched_at</code></td><td>BigInteger</td><td>Unix ms</td></tr>
+          <tr><td><code>expires_at</code></td><td>BigInteger</td><td>Unix ms</td></tr>
+        </tbody>
+      </table>
+
+      <h3>AirMessage</h3>
+      <p>Persistent notification store for the air domain. Client-generated <code>msg_id</code> ensures idempotency.</p>
+      <table>
+        <thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>Integer PK</td><td></td></tr>
+          <tr><td><code>msg_id</code></td><td>String (unique)</td><td>Client-generated UUID/hash</td></tr>
+          <tr><td><code>type</code></td><td>String</td><td><code>emergency</code>, <code>flight</code>, <code>system</code>, <code>squawk-clr</code>, etc.</td></tr>
+          <tr><td><code>title</code></td><td>String</td><td>Headline shown in notification panel</td></tr>
+          <tr><td><code>detail</code></td><td>String</td><td>Optional secondary text</td></tr>
+          <tr><td><code>ts</code></td><td>BigInteger</td><td>Event Unix ms timestamp</td></tr>
+          <tr><td><code>dismissed</code></td><td>Boolean</td><td>Soft-delete flag (default False)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>AirTracking</h3>
+      <p>Tracks aircraft the user is actively following. One row per ICAO hex.</p>
+      <table>
+        <thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>Integer PK</td><td></td></tr>
+          <tr><td><code>hex</code></td><td>String (unique)</td><td>ICAO 24-bit hex identifier</td></tr>
+          <tr><td><code>callsign</code></td><td>String</td><td>Aircraft callsign (may be empty)</td></tr>
+          <tr><td><code>follow</code></td><td>Boolean</td><td>Camera-follow mode active</td></tr>
+          <tr><td><code>added_at</code></td><td>BigInteger</td><td>Unix ms when tracking started</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="router-air">
+      <h2>routers/air.py — Air Domain Router</h2>
+      <p>All endpoints are prefixed <code>/api/air</code>. Full endpoint details are in the <a href="api.html">API Reference</a>.</p>
+
+      <h3>Request Bodies</h3>
+      <div class="fn-block">
+        <div class="fn-sig">MessageIn <span class="tag tag-class">Pydantic model</span></div>
+        <div class="fn-desc">POST body for creating notifications. Fields: <code>msg_id: str</code>, <code>type: str</code>, <code>title: str</code>, <code>detail: str = ""</code>, <code>ts: int</code>.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">TrackingIn <span class="tag tag-class">Pydantic model</span></div>
+        <div class="fn-desc">POST body for tracking aircraft. Fields: <code>hex: str</code>, <code>callsign: str = ""</code>, <code>follow: bool = False</code>.</div>
+      </div>
+
+      <h3>ADS-B Cache Strategy</h3>
+      <div class="callout">
+        <strong>Write-through with stale fallback:</strong><br>
+        1. Check SQLite for a row matching cache key.<br>
+        2. If <code>is_fresh(expires_at)</code> → return cached payload with <code>X-Cache: HIT</code>.<br>
+        3. If expired → call <code>adsb_service.fetch_aircraft_from_upstream()</code>.<br>
+        4. On upstream success → upsert to SQLite, return with <code>X-Cache: MISS</code>.<br>
+        5. On upstream failure → if <code>is_within_stale(fetched_at, adsb_stale_ms)</code> → return stale with <code>X-Cache: STALE</code>.<br>
+        6. Otherwise → raise HTTP 503.
+      </div>
+    </div>
+
+    <div class="section" id="router-space">
+      <h2>routers/space.py — Space Domain (Stub)</h2>
+      <p>Returns <code>{"status": "not_implemented", "domain": "space"}</code> from <code>GET /api/space/status</code>. Planned endpoints: satellite positions (Celestrak TLE), ISS position, space weather.</p>
+    </div>
+
+    <div class="section" id="router-sea">
+      <h2>routers/sea.py — Sea Domain (Stub)</h2>
+      <p>Returns <code>{"status": "not_implemented", "domain": "sea"}</code> from <code>GET /api/sea/status</code>. Planned endpoints: AIS vessel tracking, UK port metadata, maritime exclusion zones.</p>
+    </div>
+
+    <div class="section" id="router-land">
+      <h2>routers/land.py — Land Domain (Stub)</h2>
+      <p>Returns <code>{"status": "not_implemented", "domain": "land"}</code> from <code>GET /api/land/status</code>. Planned endpoints: ground vehicle positions, army/NATO base metadata, exercise zones.</p>
+    </div>
+
+    <div class="section" id="service-adsb">
+      <h2>services/adsb.py — ADS-B Client</h2>
+      <div class="fn-block">
+        <div class="fn-sig">async fetch_aircraft_from_upstream(lat: float, lon: float, radius: int) → dict</div>
+        <div class="fn-desc">HTTP GET to <code>{adsb_upstream_base}/point/{lat}/{lon}/{radius}</code>. Sets <code>User-Agent: SENTINEL/1.0</code>. Raises <code>httpx.HTTPError</code> on failure. Returns raw JSON dict.</div>
+        <div class="fn-deps">Uses: <span>httpx.AsyncClient, settings.adsb_upstream_base</span></div>
+      </div>
+      <p><code>fetch_aircraft</code> is an alias for backward compatibility.</p>
+    </div>
+
+    <div class="section" id="service-geocode">
+      <h2>services/geocode.py — Nominatim Client</h2>
+      <div class="fn-block">
+        <div class="fn-sig">async reverse_geocode_coordinates(lat: float, lon: float) → dict</div>
+        <div class="fn-desc">HTTP GET to <code>{nominatim_base}/reverse?format=json&lat={lat}&lon={lon}</code>. Sets <code>User-Agent: SENTINEL/1.0</code> and <code>Accept-Language: en</code>. Returns raw Nominatim JSON. The <code>address.country</code> field is used to update the footer location label in the frontend.</div>
+        <div class="fn-deps">Uses: <span>httpx.AsyncClient, settings.nominatim_base</span></div>
+      </div>
+      <p><code>reverse_geocode</code> is an alias for backward compatibility.</p>
+    </div>
+
+    <div class="section" id="cache-strategy">
+      <h2>Cache Strategy Detail</h2>
+      <table>
+        <thead><tr><th>Resource</th><th>Fresh TTL</th><th>Stale Window</th><th>Cache Key</th></tr></thead>
+        <tbody>
+          <tr><td>ADS-B</td><td>5 seconds</td><td>30 seconds</td><td><code>"{lat}_{lon}_{radius}"</code></td></tr>
+          <tr><td>Geocode</td><td>10 minutes</td><td>1 hour</td><td><code>"{lat_2dp}_{lon_2dp}"</code> (1km grid)</td></tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        The geocode cache key is rounded to 2 decimal places (~1km resolution). This means nearby queries (e.g. 54.1453 and 54.1478) resolve to the same cache entry, reducing Nominatim API calls significantly.
+      </div>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

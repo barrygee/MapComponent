@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL – Frontend Architecture</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<header>
+  <a href="index.html" class="logo">
+    <svg width="24" height="24" viewBox="0 0 32 32"><rect x="0" y="0" width="6" height="6" fill="#c8ff00"/><rect x="26" y="0" width="6" height="6" fill="#c8ff00"/><rect x="0" y="26" width="6" height="6" fill="#c8ff00"/><rect x="26" y="26" width="6" height="6" fill="#c8ff00"/><circle cx="16" cy="16" r="4" fill="#c8ff00"/><circle cx="16" cy="16" r="8" fill="none" stroke="#c8ff00" stroke-width="1" stroke-dasharray="2 2"/></svg>
+    <h1>SENTINEL</h1>
+  </a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="overview.html">Overview</a>
+    <a href="frontend.html" class="active">Frontend</a>
+    <a href="backend.html">Backend</a>
+    <a href="features.html">Features</a>
+    <a href="api.html">API</a>
+    <a href="dependencies.html">Dependencies</a>
+  </nav>
+</header>
+<div class="layout">
+  <nav class="sidebar">
+    <h4>Frontend</h4>
+    <a href="#script-order" class="active">Script Load Order</a>
+    <a href="#window-globals">Window Globals</a>
+    <a href="#map-component">MapComponent</a>
+    <a href="#notifications">_Notifications</a>
+    <a href="#tracking">_Tracking</a>
+    <h4>Air Module</h4>
+    <a href="#air-globals">air-globals.js</a>
+    <a href="#overlay-state">overlay-state.js</a>
+    <a href="#overlay-reinit">overlay-reinit.js</a>
+    <a href="#control-base">SentinelControlBase</a>
+    <a href="#side-menu">side-menu.js</a>
+    <a href="#filter">filter.js</a>
+    <a href="#user-location">user-location.js</a>
+    <a href="#boot">boot.js</a>
+    <h4>State</h4>
+    <a href="#localstorage">localStorage Keys</a>
+    <a href="#constants">Key Constants</a>
+  </nav>
+  <main class="main">
+
+    <div class="section" id="script-order">
+      <h2>Script Load Order</h2>
+      <p>All JavaScript is loaded via <code>&lt;script&gt;</code> tags in <code>index.html</code>. There is no bundler — dependencies are satisfied by load order.</p>
+
+      <div class="diagram">
+        <svg width="720" height="480" viewBox="0 0 720 480" font-family="'Consolas', monospace" font-size="11" fill="#e0e0e0">
+          <!-- Phase labels -->
+          <text x="8" y="24" fill="#555" font-size="10" letter-spacing="1">PHASE 1</text>
+          <text x="8" y="84" fill="#555" font-size="10" letter-spacing="1">PHASE 2</text>
+          <text x="8" y="144" fill="#555" font-size="10" letter-spacing="1">PHASE 3</text>
+          <text x="8" y="204" fill="#555" font-size="10" letter-spacing="1">PHASE 4</text>
+          <text x="8" y="264" fill="#555" font-size="10" letter-spacing="1">PHASE 5</text>
+          <text x="8" y="324" fill="#555" font-size="10" letter-spacing="1">PHASE 6</text>
+          <text x="8" y="384" fill="#555" font-size="10" letter-spacing="1">PHASE 7</text>
+          <text x="8" y="444" fill="#555" font-size="10" letter-spacing="1">PHASE 8</text>
+
+          <!-- Phase 1: Libraries -->
+          <rect x="70" y="10" width="120" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="130" y="28" text-anchor="middle" fill="#666">pmtiles.js</text>
+          <rect x="200" y="10" width="130" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="265" y="28" text-anchor="middle" fill="#666">maplibre-gl.js</text>
+
+          <!-- Phase 2: Shared Panels -->
+          <rect x="70" y="70" width="130" height="28" rx="3" fill="#001020" stroke="#00336a"/>
+          <text x="135" y="88" text-anchor="middle" fill="#00aaff">notifications.js</text>
+          <rect x="210" y="70" width="120" height="28" rx="3" fill="#001020" stroke="#00336a"/>
+          <text x="270" y="88" text-anchor="middle" fill="#00aaff">tracking.js</text>
+
+          <!-- Phase 3: Map -->
+          <rect x="70" y="130" width="200" height="28" rx="3" fill="#0f1500" stroke="#c8ff00"/>
+          <text x="170" y="148" text-anchor="middle" fill="#c8ff00">map/map.js → window.MapComponent</text>
+
+          <!-- Phase 4: Air Setup -->
+          <rect x="70" y="190" width="110" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="125" y="208" text-anchor="middle" fill="#ff9900">air-globals.js</text>
+          <rect x="190" y="190" width="120" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="250" y="208" text-anchor="middle" fill="#ff9900">overlay-state.js</text>
+          <rect x="320" y="190" width="110" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="375" y="208" text-anchor="middle" fill="#ff9900">map-alias.js</text>
+
+          <!-- Phase 5: Controls (base + 11 controls) -->
+          <rect x="70" y="250" width="150" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="145" y="268" text-anchor="middle" fill="#cc88ff">sentinel-control-base.js</text>
+          <rect x="230" y="250" width="80" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="270" y="268" text-anchor="middle" fill="#cc88ff">roads.js</text>
+          <rect x="320" y="250" width="90" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="365" y="268" text-anchor="middle" fill="#cc88ff">reset-view.js</text>
+          <rect x="420" y="250" width="90" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="465" y="268" text-anchor="middle" fill="#cc88ff">airports.js</text>
+          <rect x="520" y="250" width="70" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="555" y="268" text-anchor="middle" fill="#cc88ff">raf.js</text>
+          <rect x="600" y="250" width="80" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="640" y="268" text-anchor="middle" fill="#cc88ff">names.js</text>
+          <rect x="70" y="284" width="100" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="120" y="302" text-anchor="middle" fill="#cc88ff">range-rings.js</text>
+          <rect x="180" y="284" width="70" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="215" y="302" text-anchor="middle" fill="#cc88ff">aara.js</text>
+          <rect x="260" y="284" width="70" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="295" y="302" text-anchor="middle" fill="#cc88ff">awacs.js</text>
+          <rect x="340" y="284" width="60" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="370" y="302" text-anchor="middle" fill="#cc88ff">adsb.js</text>
+          <rect x="410" y="284" width="100" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="460" y="302" text-anchor="middle" fill="#cc88ff">adsb-labels.js</text>
+          <rect x="520" y="284" width="120" height="28" rx="3" fill="#1a001a" stroke="#3a003a"/>
+          <text x="580" y="302" text-anchor="middle" fill="#cc88ff">clear-overlays.js</text>
+
+          <!-- Phase 6: Reinit -->
+          <rect x="70" y="330" width="170" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="155" y="348" text-anchor="middle" fill="#ff9900">overlay-reinit.js</text>
+
+          <!-- Phase 7: UI -->
+          <rect x="70" y="390" width="110" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="125" y="408" text-anchor="middle" fill="#ff9900">side-menu.js</text>
+          <rect x="190" y="390" width="80" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="230" y="408" text-anchor="middle" fill="#ff9900">filter.js</text>
+          <rect x="280" y="390" width="120" height="28" rx="3" fill="#161616" stroke="#2a2a2a"/>
+          <text x="340" y="408" text-anchor="middle" fill="#ff9900">user-location.js</text>
+          <rect x="410" y="390" width="80" height="28" rx="3" fill="#0f1500" stroke="#c8ff00"/>
+          <text x="450" y="408" text-anchor="middle" fill="#c8ff00">boot.js</text>
+
+          <!-- Phase 8: Dev hook -->
+          <rect x="70" y="450" width="130" height="28" rx="3" fill="#1a1a00" stroke="#3a3a00"/>
+          <text x="135" y="468" text-anchor="middle" fill="#888">squawk-test.js</text>
+        </svg>
+      </div>
+
+      <div class="callout warn">
+        <strong>Load order is critical.</strong> <code>map.js</code> must load before any control file. <code>air-globals.js</code> must load before any control that references global variables. <code>boot.js</code> must be last to ensure all controls are initialized.
+      </div>
+    </div>
+
+    <div class="section" id="window-globals">
+      <h2>Window Global Objects</h2>
+      <p>Each shared module exposes itself on <code>window</code> to allow cross-file access without ES module imports.</p>
+      <table>
+        <thead><tr><th>Global</th><th>Source File</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>window.MapComponent</code></td><td>map/map.js</td><td>MapLibre map instance + geometry helpers</td></tr>
+          <tr><td><code>window._Notifications</code></td><td>notifications/notifications.js</td><td>Notification panel API</td></tr>
+          <tr><td><code>window._Tracking</code></td><td>tracking/tracking.js</td><td>Tracking panel API</td></tr>
+          <tr><td><code>window._FilterPanel</code></td><td>air/filter.js</td><td>Search filter panel API</td></tr>
+          <tr><td><code>window._adsb</code></td><td>air/controls/adsb.js</td><td>AdsbLiveControl instance</td></tr>
+          <tr><td><code>window._is3DActive</code></td><td>air/side-menu.js</td><td>Function — returns current 3D state</td></tr>
+          <tr><td><code>window._set3DActive</code></td><td>air/side-menu.js</td><td>Function — set 3D state</td></tr>
+        </tbody>
+      </table>
+      <p>Control instances (e.g. <code>adsbControl</code>, <code>airportsControl</code>) are declared in <code>air-globals.js</code> as module-scoped <code>let</code> variables — not on <code>window</code> — since they are only needed within the air module.</p>
+    </div>
+
+    <div class="section" id="map-component">
+      <h2>map/map.js — MapComponent</h2>
+      <p>Initializes MapLibre GL, handles connectivity, and provides geometry utilities to all controls.</p>
+
+      <h3>Connectivity Detection</h3>
+      <div class="fn-block">
+        <div class="fn-sig">_checkInternetConnection() <span class="tag tag-fn">runs every 2s</span></div>
+        <div class="fn-desc">Polls the OSM favicon URL with a no-cache fetch. On success/failure, calls <code>_switchMapStyle(online)</code> if state changed. Also listens to <code>window.online</code> / <code>window.offline</code> events.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">_switchMapStyle(online: boolean)</div>
+        <div class="fn-desc">Sets <code>map.setStyle()</code> to <code>fiord-online.json</code> (online) or <code>fiord.json</code> (PMTiles, offline). All overlay callbacks registered via <code>onStyleLoad</code> are re-fired.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">_updateConnStatusPill(online: boolean)</div>
+        <div class="fn-desc">Updates the footer connection indicator text (<code>"ONLINE"</code> / <code>"OFFLINE"</code>) and color.</div>
+      </div>
+
+      <h3>Geometry Helpers</h3>
+      <div class="fn-block">
+        <div class="fn-sig">generateGeodesicCircle(lng, lat, radiusNm) → Array&lt;[number,number]&gt;</div>
+        <div class="fn-desc">Generates 181 points forming a great-circle arc at <code>radiusNm</code> nautical miles from the centre. Used by <code>buildRingsGeoJSON</code> and range-rings control.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">buildRingsGeoJSON(lng, lat) → {lines, labels}</div>
+        <div class="fn-desc">Builds GeoJSON for 5 geodesic rings at 50, 100, 150, 200, 250nm from the given centre point. Returns separate <code>lines</code> FeatureCollection and <code>labels</code> FeatureCollection (points at ring top with distance text).</div>
+        <div class="fn-deps">Calls: <span>generateGeodesicCircle()</span></div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">computeCentroid(coordinates) → [number, number]</div>
+        <div class="fn-desc">Shoelace formula to find the area-weighted centroid of a polygon. Used to place AARA zone labels.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">computeTextRotate(coordinates) → number</div>
+        <div class="fn-desc">Returns the bearing (degrees) of the longest polygon edge. Used to rotate AARA labels to align with the zone shape.</div>
+        <div class="fn-deps">Calls: <span>computeLongestEdge()</span></div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">computeLongestEdge(coordinates) → [[lng,lat],[lng,lat]]</div>
+        <div class="fn-desc">Returns the two endpoints of the longest edge of a polygon ring. Used by <code>computeTextRotate</code>.</div>
+      </div>
+
+      <h3>Public API (window.MapComponent)</h3>
+      <table>
+        <thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>map</code></td><td>maplibregl.Map</td><td>The MapLibre map instance</td></tr>
+          <tr><td><code>onStyleLoad(fn)</code></td><td>Function</td><td>Register callback to run after every style load/switch</td></tr>
+          <tr><td><code>isOnline()</code></td><td>Function → bool</td><td>Current connectivity state</td></tr>
+          <tr><td><code>buildRingsGeoJSON</code></td><td>Function</td><td>See above</td></tr>
+          <tr><td><code>generateGeodesicCircle</code></td><td>Function</td><td>See above</td></tr>
+          <tr><td><code>computeCentroid</code></td><td>Function</td><td>See above</td></tr>
+          <tr><td><code>computeTextRotate</code></td><td>Function</td><td>See above</td></tr>
+          <tr><td><code>computeLongestEdge</code></td><td>Function</td><td>See above</td></tr>
+          <tr><td><code>RING_DISTANCES_NM</code></td><td>[50,100,150,200,250]</td><td>Ring distances array</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="notifications">
+      <h2>notifications/notifications.js — _Notifications</h2>
+      <p>Reusable notification panel shared by all features. Persists to localStorage and syncs with the backend <code>/api/air/messages</code> endpoint.</p>
+
+      <h3>Public API</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>add(opts)</code></td><td>Create a notification. <code>opts</code>: <code>{type, title, detail, ts, action?, clickAction?}</code>. Returns generated id.</td></tr>
+          <tr><td><code>update(opts)</code></td><td>Mutate an existing notification in-place by id.</td></tr>
+          <tr><td><code>dismiss(id)</code></td><td>Fade out and remove a notification. POSTs DELETE to backend.</td></tr>
+          <tr><td><code>clearAll()</code></td><td>Dismiss all notifications. POSTs DELETE-all to backend.</td></tr>
+          <tr><td><code>toggle()</code></td><td>Open/close the panel.</td></tr>
+          <tr><td><code>init()</code></td><td>Bootstrap: load from localStorage, render, start bell pulse.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Key Behaviors</h3>
+      <ul style="color: var(--muted); font-size: 0.85rem; padding-left: 20px; margin-bottom: 12px;">
+        <li>Panel is mutually exclusive with tracking panel (tab behavior).</li>
+        <li>Unread notifications pulse the bell icon every 15 seconds when panel is closed.</li>
+        <li>A "MORE ↓" indicator appears when there are off-screen notifications.</li>
+        <li>Each notification type has a labeled header (e.g. "⚠ EMERGENCY", "✈ FLIGHT").</li>
+      </ul>
+    </div>
+
+    <div class="section" id="tracking">
+      <h2>tracking/tracking.js — _Tracking</h2>
+      <p>Tracking panel that displays the aircraft status bar. Mutually exclusive with notifications panel.</p>
+      <table>
+        <thead><tr><th>Method</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>openPanel()</code></td><td>Open panel, close notifications.</td></tr>
+          <tr><td><code>closePanel()</code></td><td>Close panel.</td></tr>
+          <tr><td><code>toggle()</code></td><td>Toggle open/closed.</td></tr>
+          <tr><td><code>setCount(n)</code></td><td>Update the tracking count badge.</td></tr>
+          <tr><td><code>init()</code></td><td>Bootstrap from saved state.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="air-globals">
+      <h2>air/air-globals.js — Cross-Control References</h2>
+      <p>Declares all control instance variables as <code>let</code> at module scope. Controls assign themselves to these variables when initialized (<code>rangeRingsControl = new RangeRingsControl()</code>, etc.) and reference each other via these globals.</p>
+      <table>
+        <thead><tr><th>Variable</th><th>Assigned by</th></tr></thead>
+        <tbody>
+          <tr><td><code>rangeRingsControl</code></td><td>boot.js / side-menu.js</td></tr>
+          <tr><td><code>adsbLabelsControl</code></td><td>boot.js / side-menu.js</td></tr>
+          <tr><td><code>roadsControl</code></td><td>boot.js / side-menu.js</td></tr>
+          <tr><td><code>namesControl</code></td><td>boot.js / side-menu.js</td></tr>
+          <tr><td><code>airportsControl</code></td><td>boot.js / side-menu.js</td></tr>
+          <tr><td><code>rafControl</code></td><td>boot.js / side-menu.js</td></tr>
+          <tr><td><code>aarControl</code></td><td>boot.js / side-menu.js</td></tr>
+          <tr><td><code>awacsControl</code></td><td>boot.js / side-menu.js</td></tr>
+          <tr><td><code>adsbControl</code></td><td>boot.js / side-menu.js</td></tr>
+          <tr><td><code>clearControl</code></td><td>boot.js / side-menu.js</td></tr>
+          <tr><td><code>rangeRingCenter</code></td><td>user-location.js</td></tr>
+          <tr><td><code>_syncSideMenuForPlanes</code></td><td>side-menu.js (callback)</td></tr>
+          <tr><td><code>_onGoToUserLocation</code></td><td>side-menu.js (callback)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="overlay-state">
+      <h2>air/overlay-state.js — Overlay Persistence</h2>
+      <p>Saves all overlay toggle states to <code>localStorage['overlayStates']</code>. Called by each control's <code>toggle()</code> method.</p>
+      <div class="fn-block">
+        <div class="fn-sig">_saveOverlayStates()</div>
+        <div class="fn-desc">Reads the current <code>visible</code> property from every control instance and writes to localStorage. Controls restored from localStorage on next page load.</div>
+        <div class="fn-deps">Reads: <span>roadsControl.roadsVisible, adsbControl.visible, airportsControl.visible, rafControl.visible, aarControl.visible, awacsControl.visible, namesControl.namesVisible, rangeRingsControl.ringsVisible, adsbLabelsControl.labelsVisible</span></div>
+      </div>
+      <p>The <code>_overlayStates</code> object is initialized from <code>localStorage['overlayStates']</code> with defaults if no saved state exists.</p>
+    </div>
+
+    <div class="section" id="overlay-reinit">
+      <h2>air/overlay-reinit.js — Style Switch Handler</h2>
+      <p>Registers a <code>MapComponent.onStyleLoad</code> callback that re-initializes all overlays whenever the map style changes (online ↔ offline switch).</p>
+      <p>Re-initialization order:</p>
+      <ol style="color: var(--muted); font-size: 0.85rem; padding-left: 20px; margin-bottom: 12px;">
+        <li><code>roadsControl.updateRoadsVisibility()</code></li>
+        <li><code>namesControl.applyNamesVisibility()</code></li>
+        <li><code>rangeRingsControl.initRings()</code></li>
+        <li><code>aarControl.initLayers()</code></li>
+        <li><code>awacsControl.initLayers()</code></li>
+        <li><code>airportsControl.initLayers()</code></li>
+        <li><code>rafControl.initLayers()</code></li>
+        <li><code>adsbControl.initLayers()</code></li>
+      </ol>
+    </div>
+
+    <div class="section" id="control-base">
+      <h2>controls/sentinel-control-base.js — SentinelControlBase</h2>
+      <p>Abstract base class implementing the MapLibre <code>IControl</code> interface. All overlay controls extend this class.</p>
+      <div class="fn-block">
+        <div class="fn-sig">onAdd(mapInstance) → HTMLElement</div>
+        <div class="fn-desc">Called by MapLibre when the control is added to the map. Creates a <code>div.maplibregl-ctrl</code> containing a button. Subclasses set button text in their constructor.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">onRemove()</div>
+        <div class="fn-desc">Called by MapLibre on cleanup. Removes DOM element and map reference.</div>
+      </div>
+      <div class="fn-block">
+        <div class="fn-sig">setButtonActive(active: boolean)</div>
+        <div class="fn-desc">Sets button color to <code>#c8ff00</code> (active) or <code>#ffffff</code> at 30% opacity (inactive).</div>
+      </div>
+
+      <h4>Subclasses</h4>
+      <table>
+        <thead><tr><th>Class</th><th>File</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>RoadsToggleControl</code></td><td>roads.js</td><td>Toggle 15 road layer IDs</td></tr>
+          <tr><td><code>ResetViewControl</code></td><td>reset-view.js</td><td>Fly to home centre</td></tr>
+          <tr><td><code>AirportsToggleControl</code></td><td>airports.js</td><td>Civil airport markers + detail panels</td></tr>
+          <tr><td><code>RAFToggleControl</code></td><td>raf.js</td><td>RAF/USAF base markers + detail panels</td></tr>
+          <tr><td><code>NamesToggleControl</code></td><td>names.js</td><td>Place name + water name layers</td></tr>
+          <tr><td><code>RangeRingsControl</code></td><td>range-rings.js</td><td>Geodesic distance rings</td></tr>
+          <tr><td><code>AARToggleControl</code></td><td>aara.js</td><td>Air-to-air refuelling areas</td></tr>
+          <tr><td><code>AWACSToggleControl</code></td><td>awacs.js</td><td>AWACS orbit zones</td></tr>
+          <tr><td><code>AdsbLabelsToggleControl</code></td><td>adsb-labels.js</td><td>Callsign label toggle</td></tr>
+          <tr><td><code>ClearOverlaysControl</code></td><td>clear-overlays.js</td><td>Hide/restore all overlays</td></tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        <code>AdsbLiveControl</code> does NOT extend <code>SentinelControlBase</code> — it implements the MapLibre <code>IControl</code> interface directly due to its complexity.
+      </div>
+    </div>
+
+    <div class="section" id="side-menu">
+      <h2>air/side-menu.js — Side Menu</h2>
+      <p>Collapsible right-side overlay control panel. Contains overlay toggle buttons, 3D view toggle, and 3D controls widget. Calls <code>buildSideMenu()</code> on load.</p>
+      <table>
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>makeGroup(id)</code></td><td>Create a <code>div.sm-group</code> container</td></tr>
+          <tr><td><code>makeNavBtn(content, title, onClick)</code></td><td>Zoom +/−, go-to-location buttons</td></tr>
+          <tr><td><code>makeOverlayBtn(icon, label, getActive, doToggle)</code></td><td>Toggle button that reads and calls its control</td></tr>
+          <tr><td><code>_onGoToUserLocation</code></td><td>Callback — sets location button active when GPS fires</td></tr>
+          <tr><td><code>_syncSideMenuForPlanes</code></td><td>Callback — syncs PLANES button state (called by clear-overlays)</td></tr>
+        </tbody>
+      </table>
+      <p>The 3D view toggle animates pitch between 0 (flat) and 45 degrees. A 3×3 grid of tilt/rotate/zoom controls appears only when 3D is active. State persisted in <code>localStorage['sentinel_3d']</code>.</p>
+    </div>
+
+    <div class="section" id="filter">
+      <h2>air/filter.js — _FilterPanel</h2>
+      <p>Real-time search panel across aircraft, airports, and RAF bases. Exposed as <code>window._FilterPanel</code>.</p>
+      <table>
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>init()</code></td><td>Bootstrap: inject HTML, bind events</td></tr>
+          <tr><td><code>toggle()</code></td><td>Open/close panel</td></tr>
+          <tr><td><code>_search(query)</code></td><td>Search across plane callsign/hex/reg/squawk and airport/base ICAO/name</td></tr>
+          <tr><td><code>_matchesQuery(q, ...fields)</code></td><td>Case-insensitive substring match</td></tr>
+          <tr><td><code>_selectPlane(feature)</code></td><td>Apply selection to ADS-B control, zoom to aircraft</td></tr>
+          <tr><td><code>_selectAirport(feature)</code></td><td>Zoom to airport bounds, show detail panel</td></tr>
+          <tr><td><code>_selectMil(feature)</code></td><td>Zoom to RAF base bounds, show detail panel</td></tr>
+          <tr><td><code>_renderResults(results, query)</code></td><td>Render result list (AIRCRAFT, AIRPORTS, MILITARY sections)</td></tr>
+        </tbody>
+      </table>
+      <p>Mode bar buttons: <strong>ALL / CIVIL / MILITARY / HIDE ALL</strong> — calls <code>adsbControl.setTypeFilter()</code> or <code>adsbControl.setAllHidden()</code>.</p>
+      <p>Opened via Ctrl+F / Cmd+F keyboard shortcut registered in <code>boot.js</code>.</p>
+    </div>
+
+    <div class="section" id="user-location">
+      <h2>air/user-location.js — User Location</h2>
+      <table>
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>createUserMarkerElement(lng, lat)</code></td><td>Creates animated SVG marker with ring, dot, and coordinate typewriter animation</td></tr>
+          <tr><td><code>setUserLocation(position)</code></td><td>Main GPS callback — updates marker, caches to localStorage, updates range rings, triggers reverse-geocode every 2 minutes</td></tr>
+          <tr><td><code>goToUserLocation()</code></td><td>Fly to cached GPS position or request fresh fix</td></tr>
+        </tbody>
+      </table>
+      <p>Manual location pins (right-click context menu) are never overwritten by GPS updates. Cached GPS positions expire after 5 minutes.</p>
+      <p>Calls <code>fetch('/api/air/geocode/reverse')</code> to get country name for the footer label.</p>
+    </div>
+
+    <div class="section" id="boot">
+      <h2>air/boot.js — Bootstrap Sequence</h2>
+      <p>Loaded last. On <code>map.once('load')</code>:</p>
+      <ol style="color: var(--muted); font-size: 0.85rem; padding-left: 20px;">
+        <li>Restore 3D pitch from <code>localStorage</code></li>
+        <li>Start <code>navigator.geolocation.watchPosition(setUserLocation)</code></li>
+        <li>Call <code>_Notifications.init()</code></li>
+        <li>Call <code>_Tracking.init()</code></li>
+        <li>Call <code>_FilterPanel.init()</code></li>
+        <li>Register Ctrl+F / Cmd+F shortcut for filter panel</li>
+        <li>Run logo typewriter animation IIFE</li>
+      </ol>
+    </div>
+
+    <div class="section" id="localstorage">
+      <h2>localStorage Keys</h2>
+      <table>
+        <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>overlayStates</code></td><td>JSON object</td><td>Boolean visibility state for each overlay</td></tr>
+          <tr><td><code>notifications</code></td><td>JSON array</td><td>Persisted notification objects</td></tr>
+          <tr><td><code>notificationsOpen</code></td><td><code>"0"</code> / <code>"1"</code></td><td>Notification panel open state</td></tr>
+          <tr><td><code>userLocation</code></td><td>JSON object</td><td><code>{longitude, latitude, ts, manual?}</code></td></tr>
+          <tr><td><code>sentinel_3d</code></td><td><code>"0"</code> / <code>"1"</code></td><td>3D mode active state</td></tr>
+          <tr><td><code>trackedHex</code></td><td>string</td><td>Currently selected aircraft ICAO hex</td></tr>
+          <tr><td><code>followEnabled</code></td><td><code>"0"</code> / <code>"1"</code></td><td>Camera follow mode state</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" id="constants">
+      <h2>Key Constants</h2>
+      <table>
+        <thead><tr><th>Constant</th><th>Value</th><th>Location</th></tr></thead>
+        <tbody>
+          <tr><td><code>HOME_CENTER</code></td><td><code>[-4.4815, 54.1453]</code></td><td>reset-view.js</td></tr>
+          <tr><td><code>HOME_ZOOM</code></td><td><code>6</code></td><td>reset-view.js</td></tr>
+          <tr><td><code>RING_DISTANCES_NM</code></td><td><code>[50,100,150,200,250]</code></td><td>map.js</td></tr>
+          <tr><td><code>_OFFLINE_BOUNDS</code></td><td><code>[[-20,44],[32,67]]</code></td><td>map.js</td></tr>
+          <tr><td><code>_emergencySquawks</code></td><td><code>{'7700','7600','7500'}</code></td><td>adsb.js</td></tr>
+          <tr><td><code>AIRPORTS_DATA</code></td><td>26 UK/Ireland airports GeoJSON</td><td>airports.js</td></tr>
+          <tr><td><code>RAF_DATA</code></td><td>24 RAF/USAF bases GeoJSON</td><td>raf.js</td></tr>
+          <tr><td><code>AARA_ZONES</code></td><td>14 UK airspace polygons GeoJSON</td><td>aara.js</td></tr>
+          <tr><td><code>AWACS_ORBITS</code></td><td>~50 orbit zone polygons GeoJSON</td><td>awacs.js</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>
