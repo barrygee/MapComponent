@@ -1,0 +1,138 @@
+/* ============================================================
+   MAP VIEWPORT
+   The MapLibre canvas sits between the 68px header and 44px
+   footer, spanning the full viewport width. The brightness /
+   saturation filter dims the tile set to match a dark
+   tactical aesthetic (mimics adsb.lol dim mode).
+   ============================================================ */
+#map {
+    position: absolute;
+    top: 68px;      /* below fixed nav */
+    bottom: 44px;   /* above fixed footer */
+    width: 100%;
+}
+
+/* Dim mode applied to the raw MapLibre canvas element.
+   Reduces brightness to 65% and desaturates to 85% so the
+   dark fiord tile set sits naturally against the black chrome. */
+.maplibregl-canvas {
+    filter: brightness(0.65) saturate(0.85);
+}
+
+
+/* ============================================================
+   MAPLIBRE BUILT-IN CONTROLS
+   Override MapLibre's default rounded/white controls with a
+   pure black, sharp-cornered, Anduril-style theme.
+   All !important flags are required to beat the library's
+   inline and scoped styles.
+   ============================================================ */
+
+/* Control group container (zoom, compass, etc.) */
+.maplibregl-ctrl-group {
+    background-color: #000000 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 0 !important;     /* sharp corners throughout */
+    box-shadow: none !important;
+}
+
+/* Divider between stacked buttons within a group */
+.maplibregl-ctrl-group button + button {
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Invert the default SVG icons so they appear white on black */
+.maplibregl-ctrl-icon {
+    filter: invert(1) brightness(1.2) !important;
+}
+
+/* Subtle hover state for all built-in control buttons */
+.maplibregl-ctrl-group button:hover {
+    background-color: #111111 !important;
+}
+
+/* Compass icon needs extra brightness to read clearly when rotated */
+.maplibregl-ctrl-compass .maplibregl-ctrl-icon {
+    filter: invert(1) brightness(2) !important;
+}
+
+/* Shared cursor and transition for all control buttons */
+.maplibregl-ctrl-group button {
+    cursor: pointer;
+    transition: opacity 0.2s, color 0.2s;
+}
+
+/* Nudge the top-right control cluster inward to align with nav padding */
+.maplibregl-ctrl-top-right {
+    right: 14px;
+    top: 12px;
+}
+
+/* Custom (non-group) controls — e.g. the side menu container —
+   get the same border style but remain frameless */
+.maplibregl-ctrl:not(.maplibregl-ctrl-group) {
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 0 !important;
+}
+
+/* Font applied to all map control buttons (built-in + custom) */
+.maplibregl-ctrl button {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif !important;
+    letter-spacing: 0.08em !important;
+    font-weight: 600 !important;
+    transition: opacity 0.2s, color 0.2s !important;
+}
+
+
+/* ============================================================
+   USER LOCATION MARKER
+   SVG marker injected into the map at the user's GPS position.
+   The element is a MapLibre DOM marker (not a layer/symbol),
+   so it sits above the canvas on its own stacking context.
+
+   Animations:
+     marker-circle-draw   — outer ring strokes in via dashoffset
+     marker-dot-pulse     — inner dot flashes white→lime on first
+                            appearance to attract attention
+     marker-dot-end-pulse — steady slow pulse once settled
+     marker-coord-bg-in/out — coordinate label slides in/out
+                              using clip-path when user taps marker
+   ============================================================ */
+
+/* Circle ring draws in by animating stroke-dashoffset to 0 */
+@keyframes marker-circle-draw {
+    to { stroke-dashoffset: 0; }
+}
+
+/* Initial dot pulse: white → lime → white (attention grab on first fix) */
+@keyframes marker-dot-pulse {
+    0%   { opacity: 1; fill: white; }
+    50%  { opacity: 1; fill: #c8ff00; }
+    100% { opacity: 1; fill: white; }
+}
+
+/* Ongoing dot pulse: dips near-transparent then returns fully opaque */
+@keyframes marker-dot-end-pulse {
+    0%   { opacity: 1;    fill: white; }
+    40%  { opacity: 0.08; fill: white; }
+    100% { opacity: 1;    fill: white; }
+}
+
+/* Coordinate label background reveals left-to-right */
+@keyframes marker-coord-bg-in {
+    from { clip-path: inset(0 100% 0 0); }
+    to   { clip-path: inset(0 0% 0 0); }
+}
+
+/* Coordinate label background hides right-to-left */
+@keyframes marker-coord-bg-out {
+    from { clip-path: inset(0 0% 0 0); }
+    to   { clip-path: inset(0 100% 0 0); }
+}
+
+/* Wrapper div injected by MapLibre's Marker API */
+.user-location-marker {
+    cursor: pointer;
+    position: relative;
+    z-index: 9999;  /* above all map layers, below panels */
+}

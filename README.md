@@ -1,244 +1,168 @@
 # SENTINEL
 
-An interactive dark-themed situational awareness map covering the UK and surrounding airspace, built with [MapLibre GL JS](https://maplibre.org/) and [PMTiles](https://protomaps.com/docs/pmtiles).
+Interactive dark-themed situational awareness map for the UK and surrounding airspace, built with [MapLibre GL JS](https://maplibre.org/) and [PMTiles](https://protomaps.com/docs/pmtiles).
 
 ---
 
 ## Requirements
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+- [uv](https://docs.astral.sh/uv/) (for local development without Docker)
 
 ---
 
-## Running the App
+## Running
+
+### Docker (recommended)
 
 ```bash
 docker compose up --build
 ```
 
-Then open [http://localhost:8080](http://localhost:8080) in your browser.
-
-To stop:
+| Service | URL |
+|---------|-----|
+| App (nginx) | http://localhost:8080 |
+| API (FastAPI) | http://localhost:8000 |
+| API docs | http://localhost:8000/docs |
 
 ```bash
 docker compose down
 ```
 
+### Local development
+
+Install dependencies and start the API with hot-reload:
+
+```bash
+cd backend
+uv sync
+uv run uvicorn backend.main:app --reload --port 8000
+```
+
+The API is available at http://localhost:8000 and serves static files (index.html, main.js) directly from the project root in dev mode.
+
+> **After adding new models**, restart uvicorn — `create_tables()` runs on startup and will create any missing tables automatically.
+
+#### Rebuilding Docker after code changes
+
+The backend container bakes source code in at build time, so any changes to `backend/` require a rebuild:
+
+```bash
+docker compose up --build
+```
+
+Skipping `--build` will run the previously built image and new endpoints/models will not be available.
+
 ---
 
-## Features
+## Architecture
 
-### Map
+```
+nginx (:8080)          — serves static files (index.html, main.js, assets)
+  └── /api/* proxy ──→ FastAPI (:8000)
+                           ├── GET  /api/air/adsb/point/{lat}/{lon}/{radius}
+                           ├── GET  /api/air/geocode/reverse
+                           ├── GET  /api/air/messages
+                           ├── POST /api/air/messages
+                           ├── DELETE /api/air/messages/{msg_id}
+                           ├── DELETE /api/air/messages
+                           ├── GET  /api/air/tracking
+                           ├── POST /api/air/tracking
+                           ├── DELETE /api/air/tracking/{hex}
+                           ├── GET  /api/space/status
+                           ├── GET  /api/sea/status
+                           └── GET  /api/land/status
+```
 
-- Dark-themed vector map rendered with MapLibre GL JS
-- Tile data served via PMTiles (offline-capable)
-- Covers the UK and surrounding regions
+### Backend (`backend/`)
 
-### Online / Offline Detection
+FastAPI application with SQLite caching.
 
-The app continuously monitors network connectivity and automatically switches between two map styles:
+| File | Purpose |
+|------|---------|
+| `main.py` | App factory, router mounts, `/health` endpoint, static file serving |
+| `config.py` | Settings via `pydantic-settings` (TTLs, upstream URLs, DB path) |
+| `database.py` | Async SQLAlchemy engine + session factory (aiosqlite) |
+| `models.py` | `AdsbCache`, `GeocodeCache`, `AirMessage`, `AirTracking` ORM models |
+| `cache.py` | TTL helpers (`is_fresh`, `is_within_stale`) |
+| `routers/air.py` | ADS-B proxy, reverse geocode proxy, messages, tracking |
+| `routers/space.py` | Space domain stub |
+| `routers/sea.py` | Sea domain stub |
+| `routers/land.py` | Land domain stub |
+| `services/adsb.py` | httpx fetch from airplanes.live |
+| `services/geocode.py` | httpx fetch from Nominatim |
 
-- **Online** — full worldwide tile coverage with no bounds restriction
-- **Offline** — locally bundled PMTiles covering the UK and surrounding areas (approximately 20°W–32°E, 44°N–67°N)
+#### Caching
 
-The current status is shown in the footer as `● ONLINE` or `● OFFLINE`.
+| Endpoint | TTL | Stale window |
+|----------|-----|-------------|
+| ADS-B | 5 s | 30 s (served on upstream failure) |
+| Geocode | 10 min | 1 hr |
 
-### Navigation Header
+Cache status is returned in the `X-Cache` response header: `HIT`, `MISS`, or `STALE`.
 
-The top navigation bar contains domain tabs: **AIR**, **SPACE**, **SEA**, **LAND**. The **AIR** domain is currently active.
+#### Air messages
 
-### Map Overlays
+`POST /api/air/messages` persists a notification (emergency squawk, system alert, etc.) to SQLite. The `msg_id` is client-generated and the endpoint is idempotent — duplicate posts return `{"status": "exists"}`. `DELETE /api/air/messages/{msg_id}` soft-dismisses a single message; `DELETE /api/air/messages` clears all. `GET /api/air/messages` returns non-dismissed messages newest-first.
 
-All overlays are toggled via the control buttons on the right-hand side of the map. Active overlays are highlighted in yellow-green (`#c8ff00`); inactive overlays appear dimmed. Toggle states are persisted across sessions via `localStorage`.
+#### Air tracking
 
-| Button | Overlay | Description |
-|--------|---------|-------------|
-| `R` | Road network | Toggles road lines and road name labels. Visibility is also zoom-dependent. |
-| `N` | Place names | Toggles city, town, village, country and water body labels. |
-| `◎` | Range rings | Geodesic distance rings (25, 50, 100, 200, 300 nm) centred on the user's location or the map centre. Includes a north-bearing label line. |
-| `=` | AAR zones | UK Air-to-Air Refuelling areas (AARA 1–14), shown as dashed lime outlines with zone name labels. |
-| `○` | AWACS orbits | UK AWACS orbit areas, shown as solid lime outlines with a subtle fill. |
-| `CVL` | Civil airports | Major civil airports across the UK and Ireland, shown as dots with ICAO code and airport name. |
-| `RAF` | RAF bases | UK RAF and US co-located bases, shown as dots with ICAO code and base name. |
+`POST /api/air/tracking` adds an aircraft (ICAO hex + callsign + follow flag) to the tracked set. If the hex already exists, callsign and follow are updated. `DELETE /api/air/tracking/{hex}` removes it. `GET /api/air/tracking` lists all currently tracked aircraft.
 
-### Civil Airports
+#### Adding a dependency
 
-The following airports are plotted:
-
-| ICAO | Name |
-|------|------|
-| EGLL | Heathrow |
-| EGKK | Gatwick |
-| EGGW | Luton |
-| EGSS | Stansted |
-| EGCC | Manchester |
-| EGNT | Newcastle |
-| EGPF | Glasgow |
-| EGPK | Glasgow Prestwick |
-| EGPH | Edinburgh |
-| EGGD | Bristol |
-| EGBB | Birmingham |
-| EGAC | Belfast City |
-| EGAA | Aldergrove |
-| EGNV | Teesside |
-| EGGP | Liverpool John Lennon |
-| EGNH | Blackpool |
-| EGNS | Isle of Man Ronaldsway |
-| EGNM | Leeds Bradford |
-| EIDW | Dublin |
-
-### RAF & Co-located Bases
-
-Includes all major UK RAF stations and USAF co-located bases:
-
-Benson, Boulmer, Brize Norton, Coningsby, Cosford, Cranwell, Digby, Fylingdales, Honington, Leeming, Lossiemouth, Marham, Northolt, Odiham, Shawbury, Spadeadam, Valley, Waddington, Wittering, Woodvale, Wyton, Alconbury, Croughton, Fairford, Lakenheath, Mildenhall.
-
-### Geolocation
-
-When the browser grants location access, the app:
-
-- Places a custom crosshair marker at the user's position showing latitude and longitude coordinates
-- Centres the range rings on the user's location
-- Reverse-geocodes the position and displays the country/region name in the footer
-- Caches the last known location for up to 5 minutes so it is restored immediately on next load
-- Continuously tracks position changes via `navigator.geolocation.watchPosition`
-
-### Footer
-
-The footer displays:
-
-- **Left** — current active domain (`[AIR]`)
-- **Right** — connectivity status (`● ONLINE` / `● OFFLINE`) and reverse-geocoded location name
+```bash
+cd backend
+uv add <package>
+```
 
 ---
 
 ## Data Sources
 
-### Live Aircraft (ADS-B)
+| Data | Source |
+|------|--------|
+| Live aircraft (ADS-B) | [airplanes.live](https://airplanes.live) public API — 250 nm radius, polled every 1 s |
+| Reverse geocoding | [Nominatim](https://nominatim.openstreetmap.org) — throttled, cached 10 min |
+| Map tiles (online) | [OpenFreeMap](https://openfreemap.org) vector tiles |
+| Map tiles (offline) | Locally bundled PMTiles (`uk.pmtiles`, `surroundings.pmtiles`) |
+| Airports, RAF bases, AARA, AWACS | Hardcoded GeoJSON in `main.js` |
 
-Live aircraft positions are fetched from the [airplanes.live](https://airplanes.live) public API:
+Offline tiles cover approximately 20°W–32°E, 44°N–67°N. Download with `download-world-tiles.sh` or `download-world-tiles.py`.
 
-```
-https://api.airplanes.live/v2/point/{lat}/{lon}/250
-```
+---
 
-The app queries a 250 nm radius around the user's location (or map centre) every second. No API key is required. Data includes position, altitude, heading, ground speed, squawk code, registration, aircraft type, and military classification.
+## Features
 
-### Map Tiles
-
-| Mode | Source | Format |
-|------|--------|--------|
-| Online | [OpenFreeMap](https://openfreemap.org) (`tiles.openfreemap.org/planet`) | Vector tiles over HTTPS |
-| Offline | Locally bundled PMTiles (`uk.pmtiles`, `surroundings.pmtiles`) | PMTiles (served by nginx) |
-
-The offline tile files cover approximately 20°W–32°E, 44°N–67°N and must be downloaded separately using the provided `download-world-tiles.sh` / `download-world-tiles.py` scripts.
-
-### Reverse Geocoding
-
-The footer location label is resolved using the [Nominatim](https://nominatim.openstreetmap.org) reverse geocoding API (OpenStreetMap):
-
-```
-https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}
-```
-
-Requests are throttled to once every 2 minutes per the Nominatim usage policy.
-
-### Connectivity Check
-
-Network connectivity is probed every 2 seconds by sending a `HEAD` request to:
-
-```
-https://tile.openstreetmap.org/favicon.ico
-```
-
-This uses `mode: 'no-cors'` so any reachable response counts as online; a network failure triggers the offline style switch.
-
-### Static Reference Data
-
-The following data is bundled directly in the application (no external API):
-
-| Dataset | Source / Notes |
-|---------|---------------|
-| Civil airports (26) | Hardcoded coordinates, ICAO/IATA codes, and ATC frequencies for major UK and Irish airports |
-| RAF & co-located bases (24) | Hardcoded coordinates and ICAO codes for UK RAF stations and USAF co-located bases |
-| UK Air-to-Air Refuelling Areas (AARA 1–14) | Hardcoded GeoJSON polygons for UK AARA zones |
-| AWACS orbit areas | Hardcoded GeoJSON polygons |
+- Dark vector map with online/offline tile switching
+- Live ADS-B aircraft tracking with military detection, emergency squawk alerts, and trail history
+- Civil airports, RAF/USAF bases, AARA zones, AWACS orbits
+- Range rings (25–300 nm) centred on user location
+- GPS geolocation with reverse geocode footer label
+- Notifications and aircraft tracking panel
+- 3D tilt mode
+- Filter panel (callsign / ICAO / squawk search, ALL / CIVIL / MIL / HIDE modes)
 
 ---
 
 ## Testing Emergency Visuals
 
-The app includes a dev helper (`squawk-test.js`) that mocks the ADS-B API feed so you can trigger emergency states without waiting for a real emergency squawk.
+A dev helper (`squawk-test.js`) mocks the ADS-B feed to trigger emergency states.
 
-### Setup
-
-1. Start the app and open it in the browser.
-2. Open DevTools and load the script in the console:
+Load it in the browser console:
 
 ```js
 const s = document.createElement('script'); s.src = '/squawk-test.js'; document.head.appendChild(s);
-```
-
-The helper attaches itself to `window.sqkTest`. Confirm it loaded:
-
-```js
 sqkTest.help()
 ```
 
-### Testing emergency colour behaviour (red icon, label, trail dots)
-
-**Step 1 — trigger an emergency aircraft:**
+Key commands:
 
 ```js
-sqkTest.enterEmergency('7700')
-```
-
-The mock replaces the next ADS-B poll (runs every ~5 s) with a single aircraft (`TEST001`, squawk `7700`) near London. Once the poll fires you should see:
-
-- A red blip + red bracket on the map
-- A red emergency notification in the notifications panel
-
-**Step 2 — select the aircraft:**
-
-Click the red blip on the map. Verify:
-
-- The data tag callsign (`TEST001`) is displayed in **red** (`#ff4040`)
-- The bracket remains red
-
-**Step 3 — enable tracking:**
-
-Click the **TRACK** button in the data tag. Verify:
-
-- The compact tracking tag callsign is **red**
-- The status bar (tracking panel) callsign is **red**
-- Trail dots appearing behind the aircraft are **red** (they appear after the aircraft moves; the mock aircraft is stationary so trails will only accumulate if you also run `sqkTest.fullFlow()` which moves it across poll cycles)
-
-**Quick end-to-end flow:**
-
-```js
-sqkTest.fullFlow('7700', 8000)
-```
-
-This triggers emergency → holds 8 s (select and track during this window) → clears to squawk `1200`. After clearing, the icon, label, and trail dots should revert to white/lime.
-
-**Test all three emergency codes simultaneously:**
-
-```js
-sqkTest.allCodes()
-```
-
-Places three aircraft (hex `test01`/`test02`/`test03`) each squawking `7700`, `7600`, `7500` in sequence over ~12 s.
-
-**Check internal state at any time:**
-
-```js
-sqkTest.status()
-```
-
-**Restore real ADS-B feed when done:**
-
-```js
-sqkTest.restore()
+sqkTest.enterEmergency('7700')   // trigger emergency aircraft
+sqkTest.fullFlow('7700', 8000)   // full flow: emergency → hold 8s → clear
+sqkTest.allCodes()               // test 7700, 7600, 7500 simultaneously
+sqkTest.restore()                // restore real ADS-B feed
 ```
 
 ---
@@ -249,8 +173,7 @@ sqkTest.restore()
 |-----------|-----------|
 | Map renderer | MapLibre GL JS |
 | Tile format | PMTiles |
-| Map style | Custom Fiord dark theme |
-| Fonts | Barlow / Barlow Condensed (Google Fonts) |
-| Server | Docker / nginx |
-| ADS-B data | airplanes.live public API |
-| Geocoding | Nominatim (OpenStreetMap) |
+| Frontend | Vanilla JS / CSS |
+| Backend | FastAPI + SQLite (aiosqlite / SQLAlchemy) |
+| Package manager | uv |
+| Server | nginx + uvicorn (Docker) |

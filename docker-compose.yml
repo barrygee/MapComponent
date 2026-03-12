@@ -1,9 +1,26 @@
 version: '3.8'
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: sentinel-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - sentinel_db:/app/data
+    environment:
+      - DB_PATH=/app/data/sentinel.db
+    restart: unless-stopped
+
   map-server:
     build: .
     container_name: sentinel
     ports:
       - "8080:80"
-    volumes:
-      - .:/usr/share/nginx/html
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  sentinel_db:

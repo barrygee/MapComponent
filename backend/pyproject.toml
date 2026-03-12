@@ -1,0 +1,13 @@
+[project]
+name = "sentinel-backend"
+version = "0.1.0"
+description = "SENTINEL surveillance map — FastAPI backend"
+requires-python = ">=3.12"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "fastapi>=0.135.1",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.13.1",
+    "sqlalchemy>=2.0",
+    "uvicorn[standard]>=0.41.0",
+]

@@ -1,0 +1,437 @@
+/* ============================================================
+   NOTIFICATIONS PANEL
+   Fixed overlay anchored bottom-left, between header and footer.
+   Grows upward from the footer anchor (justify-content: flex-end).
+   Contains a scrollable list of notification cards (.notif-item).
+
+   Opened by JS adding .notif-panel-open to #notifications-panel.
+   pointer-events: none on the panel container means only the
+   inner list (#notif-list-wrap) intercepts clicks when visible.
+
+   Notification types (data-type attribute on .notif-item):
+     flight     — new tracked flight entered range
+     departure  — tracked aircraft is departing/landing
+     track      — manual tracking started
+     tracking   — auto-follow state change
+     notif-off  — notifications disabled for a callsign
+     system     — general system message (connection, overlay)
+     message    — informational (blue)
+     emergency  — squawk 7500/7600/7700 alert (red)
+     squawk-clr — emergency squawk cleared
+   ============================================================ */
+#notifications-panel {
+    position: fixed;
+    bottom: calc(44px + 14px); /* footer height + breathing gap */
+    top: calc(68px + 8px);     /* header height + breathing gap — prevents overflow */
+    left: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;  /* new notifications stack up from the bottom */
+    pointer-events: none;       /* closed: pass map clicks through */
+}
+
+/* ---- Notification list wrapper ----
+   Flex row so the list and scroll-hint sit side by side.
+   Fades in/out with panel open state. flex: 0 1 auto lets it
+   shrink if the panel height is constrained by the viewport. */
+#notif-list-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: all;
+    touch-action: none;         /* JS handles touch scrolling to prevent map pan interference */
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    flex: 0 1 auto;
+    min-height: 0;
+}
+
+/* Show the list when the panel is opened */
+#notifications-panel.notif-panel-open #notif-list-wrap {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* ---- Panel header row ("NOTIFICATIONS" label + "CLEAR ALL" button) ----
+   Hidden when panel is closed; becomes flex row when open. */
+#notif-header {
+    display: none;
+    width: 220px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    pointer-events: none;
+}
+
+#notifications-panel.notif-panel-open #notif-header {
+    display: flex;
+}
+
+/* "CLEAR ALL" button — dismisses all notifications at once */
+#notif-clear-all-btn {
+    display: block;
+    pointer-events: all;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    padding: 4px 10px;
+    margin-bottom: 0;
+    line-height: 1;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+#notif-clear-all-btn:hover {
+    background: rgba(0, 0, 0, 0.7);
+    color: rgba(255, 255, 255, 0.75);
+}
+
+/* ---- Scrollable notification list ----
+   220px wide, max 580px tall (capped so it stays within the panel).
+   Scrollbar hidden on all browsers; scrolling still works natively. */
+#notif-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+    width: 220px;
+    max-height: 580px;          /* upper bound on large screens */
+    flex: 0 1 auto;             /* shrinks on small screens */
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;      /* Firefox */
+    pointer-events: none;       /* individual .notif-item re-enables pointer-events */
+}
+
+#notif-list::-webkit-scrollbar {
+    display: none;              /* Chrome / Safari */
+}
+
+/* ---- Scroll overflow hint ----
+   Small label that appears when the list is taller than the visible
+   area, telling the user there are more notifications to scroll to.
+   Arrow rotates 180° when the user is at the bottom (#notif-arrow-up). */
+#notif-scroll-hint {
+    background: rgba(0, 0, 0, 0.25);
+    color: rgba(255, 255, 255, 0.35);
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    pointer-events: none;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#notif-scroll-hint.notif-scroll-hint-visible {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Scroll direction arrow — rotates to indicate which direction has more */
+#notif-scroll-arrow {
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+/* Rotated upward when the user is scrolled to the bottom */
+#notif-scroll-arrow.notif-arrow-up {
+    transform: rotate(180deg);
+}
+
+/* ---- Individual notification card ----
+   Each card slides in from the left (translateX(-10px) → 0) and
+   fades in. Cards remain flex-shrink: 0 so they never squash.
+   pointer-events: auto overrides the parent's pointer-events: none. */
+.notif-item {
+    width: 220px;
+    background: #000;
+    color: #fff;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+/* JS adds this class once the card is inserted to trigger the slide-in */
+.notif-item.notif-visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Card header row: type label (left) + dismiss × button (right) */
+.notif-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 38px;
+    padding: 0 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: #000;
+    position: relative;
+    z-index: 1;
+}
+
+/* Type label — colour-coded per data-type (see selectors below) */
+.notif-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+/* ---- Notification type label colours ---- */
+.notif-item[data-type="flight"]     .notif-label { color: #c8ff00; opacity: 0.75; }
+.notif-item[data-type="departure"]  .notif-label { color: #c8ff00; opacity: 0.75; }
+.notif-item[data-type="track"]      .notif-label { color: #c8ff00; opacity: 0.75; }
+.notif-item[data-type="tracking"]   .notif-label { color: #c8ff00; opacity: 0.75; }
+.notif-item[data-type="notif-off"]  .notif-label { color: rgba(255, 255, 255, 0.45); }
+.notif-item[data-type="system"]     .notif-label { color: rgba(255, 255, 255, 0.45); }
+.notif-item[data-type="message"]    .notif-label { color: rgba(100, 160, 255, 0.8); }
+.notif-item[data-type="emergency"]  .notif-label { color: #ff2222; }
+.notif-item[data-type="squawk-clr"] .notif-label { color: rgba(255, 255, 255, 0.45); }
+
+/* × dismiss button — ghost style, brightens on hover */
+.notif-dismiss {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.3);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+    line-height: 1;
+}
+
+.notif-dismiss:hover {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+/* Card body: title + detail text + timestamp */
+.notif-body {
+    padding: 10px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+/* Main notification text (e.g. callsign or event description) */
+.notif-title {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: #fff;
+    line-height: 1.2;
+}
+
+/* Emergency title override — red to match the header label */
+.notif-item[data-type="emergency"] .notif-title {
+    color: #ff2222;
+}
+
+/* Supporting detail text (squawk code, altitude, route info) */
+.notif-detail {
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    line-height: 1.6;
+    white-space: pre-line;  /* allows \n in detail strings */
+}
+
+/* Timestamp shown below detail text */
+.notif-time {
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.25);
+    margin-top: 4px;
+}
+
+/* ---- Notification action button (e.g. "disable alerts for callsign") ----
+   Ghost button in the header row, to the left of the dismiss button.
+   Tooltip (::before) appears to the left. On hover the label text
+   swaps from default to a "disable" confirmation via sibling selector. */
+.notif-action {
+    position: relative;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 10px 6px 4px;
+    color: rgba(255, 255, 255, 0.3);
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s;
+}
+
+.notif-action:hover {
+    color: #c8ff00;
+}
+
+/* Default state label (shown when not hovering action) */
+.notif-label-default {
+    transition: opacity 0.15s;
+}
+
+/* "Disable" confirmation label — only visible while hovering the action */
+.notif-label-disable {
+    display: none;
+    color: #fff;
+}
+
+/* Swap the header labels when the action button is hovered */
+.notif-header:has(.notif-action:hover) .notif-label-default {
+    display: none;
+}
+
+.notif-header:has(.notif-action:hover) .notif-label-disable {
+    display: inline;
+}
+
+/* Action button tooltip — appears to the left, same style as side menu tooltips */
+.notif-action[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    right: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #000;
+    color: rgba(255, 255, 255, 0.75);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0 10px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 10001;
+}
+
+.notif-action[data-tooltip]:hover::before {
+    opacity: 1;
+}
+
+/* ---- Bell pulse animation ----
+   Fired on #notif-toggle-btn when a new notification arrives while
+   the panel is closed. Pulses 3× white→lime→white to alert the user. */
+@keyframes notif-bell-pulse {
+    0%   { opacity: 0.6; color: #fff; }
+    50%  { opacity: 1;   color: #c8ff00; }
+    100% { opacity: 0.6; color: #fff; }
+}
+
+#notif-toggle-btn.notif-btn-unread {
+    animation: notif-bell-pulse 0.6s ease-in-out 3;
+}
+
+/* ---- Notification toggle button ---- */
+#notif-toggle-btn {
+    height: 36px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 10px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #fff;
+    opacity: 0.6;               /* dim when panel is closed */
+    transition: background 0.2s, opacity 0.2s, color 0.2s;
+    flex-shrink: 0;
+    margin: 4px 0;
+}
+
+#notif-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    opacity: 1;
+}
+
+/* Opened state: full opacity */
+#notif-toggle-btn.notif-btn-active {
+    opacity: 1;
+    color: #fff;
+}
+
+/* ---- Diagonal strike line through the bell icon (panel closed only) ----
+   Created with a ::after pseudo-element on the icon span.
+   Rotated 45° to cut diagonally through the bell SVG. */
+#notif-toggle-btn:not(.notif-btn-active) {
+    position: relative;
+}
+
+#notif-toggle-btn:not(.notif-btn-active) #notif-icon {
+    position: relative;
+}
+
+#notif-toggle-btn:not(.notif-btn-active) #notif-icon::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 2px;
+    height: 22px;
+    background: rgba(255, 255, 255, 0.55);
+    transform: translate(-50%, -50%) rotate(45deg);
+    pointer-events: none;
+}
+
+/* Bell SVG icon element */
+#notif-icon {
+    display: block;
+    flex-shrink: 0;
+    width: auto;
+    height: 15px;
+}
+
+/* Notification count badge next to the bell icon */
+#notif-count {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.4);
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+/* Unread state: lime count badge when there are unseen notifications */
+#notif-count.notif-count-unread {
+    color: #c8ff00;
+}
