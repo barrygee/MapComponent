@@ -4,26 +4,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENTINEL</title>
+    <title>SENTINEL – LAND</title>
     <!-- Favicon — ICO (Safari + legacy, always checked at root) -->
-    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="shortcut icon" href="../favicon.ico">
     <!-- Favicon — modern browsers (SVG, scales to any size) -->
-    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
     <!-- Favicon — PNG fallbacks -->
-    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16.png">
     <!-- Apple touch icon — iOS / iPadOS / macOS dock -->
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png">
     <!-- Android / PWA theme colour -->
     <meta name="theme-color" content="#000000">
-    <link href='./assets/maplibre-gl.css' rel='stylesheet' />
+    <link href='../assets/maplibre-gl.css' rel='stylesheet' />
     <link href='https://fonts.googleapis.com/css2?family=Barlow:wght@100;300;400;500;600;700;900&family=Barlow+Condensed:wght@400;500;600;700;900&display=swap' rel='stylesheet' />
-    <link rel="stylesheet" href="./frontend/components/shell/shell.css">
-    <link rel="stylesheet" href="./frontend/components/map/map.css">
-    <link rel="stylesheet" href="./frontend/components/notifications/notifications.css">
-    <link rel="stylesheet" href="./frontend/components/tracking/tracking.css">
-    <link rel="stylesheet" href="./frontend/components/filter/filter.css">
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="../frontend/components/shell/shell.css">
+    <link rel="stylesheet" href="../frontend/components/map/map.css">
+    <link rel="stylesheet" href="../frontend/components/notifications/notifications.css">
+    <link rel="stylesheet" href="../frontend/components/tracking/tracking.css">
+    <link rel="stylesheet" href="../frontend/components/filter/filter.css">
+    <link rel="stylesheet" href="../style.css?v=25">
 </head>
 
 <body>
@@ -42,10 +42,10 @@
             </svg>
         </div>
         <nav id="nav-right">
-            <a href="./air/" class="nav-link nav-link--active" data-domain="air">AIR</a>
-            <a href="./space/" class="nav-link" data-domain="space">SPACE</a>
-            <a href="./sea/" class="nav-link" data-domain="sea">SEA</a>
-            <a href="./land/" class="nav-link" data-domain="land">LAND</a>
+            <a href="../air/" class="nav-link" data-domain="air">AIR</a>
+            <a href="../space/" class="nav-link" data-domain="space">SPACE</a>
+            <a href="../sea/" class="nav-link" data-domain="sea">SEA</a>
+            <a href="../land/" class="nav-link nav-link--active" data-domain="land">LAND</a>
         </nav>
     </header>
 
@@ -62,7 +62,7 @@
     </div>
 
     <div id="tracking-panel">
-        <div id="adsb-status-bar"></div>
+        <div id="tracking-status-bar"></div>
     </div>
 
     <footer id="footer">
@@ -88,47 +88,18 @@
         </div>
         <div id="footer-right">
             <span id="conn-status" class="conn-checking">—</span>
-            <span id="footer-location" class="footer-label">UNITED KINGDOM</span>
+            <span id="footer-location" class="footer-label">LAND</span>
         </div>
     </footer>
 
-    <script src="./assets/pmtiles.js"></script>
-    <script src='./assets/maplibre-gl.js'></script>
-    <script src="./frontend/components/notifications/notifications.js"></script>
-    <script src="./frontend/components/tracking/tracking.js"></script>
+    <script src="../assets/pmtiles.js"></script>
+    <script src='../assets/maplibre-gl.js'></script>
+    <script src="../frontend/components/notifications/notifications.js"></script>
+    <script src="../frontend/components/tracking/tracking.js"></script>
 
     <!-- Map component (tile loading, connectivity, geometry helpers) -->
-    <script src="./frontend/components/map/map.js"></script>
+    <script src="../frontend/components/map/map.js"></script>
 
-    <!-- Air component: shared globals and state -->
-    <script src="./frontend/components/air/air-globals.js"></script>
-    <script src="./frontend/components/air/overlay-state.js"></script>
-    <script src="./frontend/components/air/map-alias.js"></script>
-
-    <!-- Air component: map overlay controls -->
-    <script src="./frontend/components/air/controls/sentinel-control-base.js"></script>
-    <script src="./frontend/components/air/controls/roads.js"></script>
-    <script src="./frontend/components/air/controls/reset-view.js"></script>
-    <script src="./frontend/components/air/controls/airports.js"></script>
-    <script src="./frontend/components/air/controls/raf.js"></script>
-    <script src="./frontend/components/air/controls/names.js"></script>
-    <script src="./frontend/components/air/controls/range-rings.js"></script>
-    <script src="./frontend/components/air/controls/aara.js"></script>
-    <script src="./frontend/components/air/controls/awacs.js"></script>
-    <script src="./frontend/components/air/controls/adsb/adsb.js"></script>
-    <script src="./frontend/components/air/controls/adsb-labels.js"></script>
-    <script src="./frontend/components/air/controls/clear-overlays.js"></script>
-
-    <!-- Style reload re-init (must follow all controls) -->
-    <script src="./frontend/components/air/overlay-reinit.js"></script>
-
-    <!-- Side panel, filter, user location, boot -->
-    <script src="./frontend/components/air/side-menu.js"></script>
-    <script src="./frontend/components/filter/filter.js"></script>
-    <script src="./frontend/components/air/user-location.js"></script>
-    <script src="./frontend/components/air/boot.js"></script>
-
-    <script src="squawk-test.js"></script>
 </body>
 
 </html>
