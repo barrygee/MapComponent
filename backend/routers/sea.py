@@ -14,5 +14,6 @@ router = APIRouter(prefix="/api/sea", tags=["sea"])
 
 
 @router.get("/status")
-async def status():
+async def sea_status():
+    """Placeholder — sea domain not yet implemented."""
     return JSONResponse({"status": "not_implemented", "domain": "sea"})

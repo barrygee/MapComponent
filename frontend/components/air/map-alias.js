@@ -1,8 +1,11 @@
 // ============================================================
 // MAP ALIAS
-// Exposes the MapLibre map instance as a bare `map` global so
-// all air control files can reference `map` directly without
-// knowing about the MapComponent wrapper.
-// Must be loaded immediately after map.js.
+// Exposes the MapLibre GL map instance as a bare `map` global
+// so all air control files can write `map.addLayer(...)` etc.
+// without needing to know about the MapComponent wrapper.
+//
+// Must be loaded immediately after map.js (and before any controls).
 // ============================================================
+
+// Unwrap the map instance from the public MapComponent API
 const map = window.MapComponent.map;

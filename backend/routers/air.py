@@ -2,21 +2,15 @@
 Air domain router — ADS-B live tracking and geocoding.
 
 Endpoints:
-  GET  /api/air/adsb/point/{lat}/{lon}/{radius}  — ADS-B aircraft proxy with SQLite cache
-  GET  /api/air/geocode/reverse                  — Nominatim reverse geocode proxy with cache
-  GET  /api/air/messages                         — List air-domain notification messages
-  POST /api/air/messages                         — Create a new air message
-  DELETE /api/air/messages/{msg_id}              — Dismiss (soft-delete) a message
-  DELETE /api/air/messages                       — Dismiss all messages
-  GET  /api/air/tracking                         — List currently tracked aircraft
-  POST /api/air/tracking                         — Add aircraft to tracking
-  DELETE /api/air/tracking/{hex}                 — Remove aircraft from tracking
-
-Future endpoints (when data sources are identified):
-  GET /api/air/airports      — UK/Ireland airport metadata
-  GET /api/air/raf           — RAF/USAF base metadata
-  GET /api/air/aara          — Air-to-Air Refuelling Areas polygons
-  GET /api/air/awacs         — AWACS orbit zones
+  GET    /api/air/adsb/point/{lat}/{lon}/{radius}  — ADS-B aircraft proxy with SQLite cache
+  GET    /api/air/geocode/reverse                  — Nominatim reverse geocode proxy with cache
+  GET    /api/air/messages                         — List air-domain notification messages
+  POST   /api/air/messages                         — Create a new air message
+  DELETE /api/air/messages/{msg_id}                — Dismiss (soft-delete) a message
+  DELETE /api/air/messages                         — Dismiss all messages
+  GET    /api/air/tracking                         — List currently tracked aircraft
+  POST   /api/air/tracking                         — Add aircraft to tracking
+  DELETE /api/air/tracking/{hex}                   — Remove aircraft from tracking
 """
 
 import json
@@ -36,53 +30,65 @@ from backend.services import adsb as adsb_service
 from backend.services import geocode as geocode_service
 
 
+# ── Request body schemas ───────────────────────────────────────────────────────
+
 class MessageIn(BaseModel):
-    msg_id: str
-    type: str
-    title: str
-    detail: str = ""
-    ts: int
+    """Body for POST /api/air/messages — creates a new notification message."""
+    msg_id: str   # client-generated unique id
+    type: str     # 'emergency' | 'flight' | 'system' | 'squawk-clr' etc.
+    title: str    # short headline shown in the panel
+    detail: str = ""  # optional secondary text
+    ts: int       # event timestamp, Unix ms
 
 
 class TrackingIn(BaseModel):
-    hex: str
+    """Body for POST /api/air/tracking — adds or updates an aircraft in the tracking list."""
+    hex: str              # ICAO 24-bit hex identifier
     callsign: str = ""
-    follow: bool = False
+    follow: bool = False  # whether camera-follow mode is active
+
 
 router = APIRouter(prefix="/api/air", tags=["air"])
 
 
+# ── ADS-B proxy ────────────────────────────────────────────────────────────────
+
 @router.get("/adsb/point/{lat}/{lon}/{radius}")
-async def adsb_point(
+async def get_aircraft_near_point(
     lat: float,
     lon: float,
     radius: int = 250,
     db: AsyncSession = Depends(get_db),
 ):
+    """Proxy the airplanes.live /v2/point endpoint with a SQLite write-through cache.
+
+    Cache strategy:
+      - HIT:   fresh row exists (within adsb_ttl_ms = 5s) → return immediately
+      - MISS:  no row or expired → fetch upstream, upsert row, return fresh data
+      - STALE: upstream failed but stale row within adsb_stale_ms = 30s → serve old data
+      - 503:   upstream failed and no usable stale entry
     """
-    Proxy for airplanes.live /v2/point endpoint with SQLite cache.
-    Returns identical JSON shape: {"ac": [...], ...}
-    Cache TTL: 5s. Stale-while-revalidate: 30s on upstream failure.
-    """
+    # Build a deterministic cache key from the query parameters
     cache_key = f"{lat:.4f}_{lon:.4f}_{radius}"
+
+    # Look up any existing cache row for this key
     result = await db.execute(select(AdsbCache).where(AdsbCache.cache_key == cache_key))
     row = result.scalar_one_or_none()
 
+    # Return immediately if the cached data is still within its TTL
     if row and is_fresh(row.expires_at):
-        return JSONResponse(
-            content=json.loads(row.payload),
-            headers={"X-Cache": "HIT"},
-        )
+        return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "HIT"})
 
-    # Cache miss or stale — fetch from upstream
+    # Cache miss or expired — try to fetch fresh data from upstream
     try:
         data = await adsb_service.fetch_aircraft(lat, lon, radius)
         payload_str = json.dumps(data)
         ts = now_ms()
 
+        # Upsert: update existing row or insert new one
         if row:
-            row.payload = payload_str
-            row.ac_count = len(data.get("ac", []))
+            row.payload    = payload_str
+            row.ac_count   = len(data.get("ac", []))
             row.fetched_at = ts
             row.expires_at = ts + settings.adsb_ttl_ms
         else:
@@ -98,40 +104,37 @@ async def adsb_point(
             ))
         await db.commit()
 
-        return JSONResponse(
-            content=data,
-            headers={"X-Cache": "MISS"},
-        )
+        return JSONResponse(content=data, headers={"X-Cache": "MISS"})
 
     except (httpx.HTTPError, Exception):
-        # Upstream failed — return stale cache if within stale window
+        # Upstream unreachable — serve stale data if still within the stale window
         if row and is_within_stale(row.fetched_at, settings.adsb_stale_ms):
-            return JSONResponse(
-                content=json.loads(row.payload),
-                headers={"X-Cache": "STALE"},
-            )
+            return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "STALE"})
         raise HTTPException(status_code=503, detail="ADS-B upstream unavailable")
 
 
+# ── Reverse geocode proxy ──────────────────────────────────────────────────────
+
 @router.get("/geocode/reverse")
-async def geocode_reverse(
+async def reverse_geocode(
     lat: float,
     lon: float,
     db: AsyncSession = Depends(get_db),
 ):
+    """Proxy Nominatim reverse-geocode with a 10-minute SQLite cache.
+
+    Cache key is rounded to 2 decimal places (~1 km grid) so nearby positions
+    share the same cache entry. Returns the full Nominatim JSON — callers read
+    data.address.country for the footer location label.
     """
-    Proxy for Nominatim reverse geocode with SQLite cache (10min TTL).
-    Returns Nominatim's full JSON — data.address.country is preserved.
-    """
+    # Round coordinates to 2dp for the cache key (avoids excessive unique entries)
     cache_key = f"{lat:.2f}_{lon:.2f}"
+
     result = await db.execute(select(GeocodeCache).where(GeocodeCache.cache_key == cache_key))
     row = result.scalar_one_or_none()
 
     if row and is_fresh(row.expires_at):
-        return JSONResponse(
-            content=json.loads(row.raw),
-            headers={"X-Cache": "HIT"},
-        )
+        return JSONResponse(content=json.loads(row.raw), headers={"X-Cache": "HIT"})
 
     try:
         data = await geocode_service.reverse_geocode(lat, lon)
@@ -139,7 +142,7 @@ async def geocode_reverse(
         ts = now_ms()
 
         if row:
-            row.raw = raw_str
+            row.raw        = raw_str
             row.fetched_at = ts
             row.expires_at = ts + settings.geocode_ttl_ms
         else:
@@ -153,29 +156,26 @@ async def geocode_reverse(
             ))
         await db.commit()
 
-        return JSONResponse(
-            content=data,
-            headers={"X-Cache": "MISS"},
-        )
+        return JSONResponse(content=data, headers={"X-Cache": "MISS"})
 
     except (httpx.HTTPError, Exception):
         if row and is_within_stale(row.fetched_at, settings.geocode_stale_ms):
-            return JSONResponse(
-                content=json.loads(row.raw),
-                headers={"X-Cache": "STALE"},
-            )
+            return JSONResponse(content=json.loads(row.raw), headers={"X-Cache": "STALE"})
         raise HTTPException(status_code=503, detail="Geocode upstream unavailable")
 
 
-# ── Messages ──────────────────────────────────────────────────────────────────
+# ── Notification messages ──────────────────────────────────────────────────────
 
 @router.get("/messages")
-async def list_messages(db: AsyncSession = Depends(get_db)):
+async def list_air_messages(db: AsyncSession = Depends(get_db)):
     """Return all non-dismissed air messages, newest first."""
     result = await db.execute(
-        select(AirMessage).where(AirMessage.dismissed == False).order_by(AirMessage.ts.desc())  # noqa: E712
+        select(AirMessage)
+        .where(AirMessage.dismissed == False)  # noqa: E712
+        .order_by(AirMessage.ts.desc())
     )
     rows = result.scalars().all()
+    # Serialise to plain dicts (omit the dismissed flag — client doesn't need it)
     return JSONResponse([
         {"msg_id": r.msg_id, "type": r.type, "title": r.title, "detail": r.detail, "ts": r.ts}
         for r in rows
@@ -183,11 +183,11 @@ async def list_messages(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/messages", status_code=201)
-async def create_message(body: MessageIn, db: AsyncSession = Depends(get_db)):
-    """Persist a new air message (idempotent on msg_id)."""
+async def create_air_message(body: MessageIn, db: AsyncSession = Depends(get_db)):
+    """Persist a new air message. Idempotent: if msg_id already exists, returns 200 'exists'."""
     existing = await db.execute(select(AirMessage).where(AirMessage.msg_id == body.msg_id))
     if existing.scalar_one_or_none():
-        return JSONResponse({"status": "exists"}, status_code=200)
+        return JSONResponse({"status": "exists"}, status_code=200)  # already stored, no-op
 
     db.add(AirMessage(
         msg_id=body.msg_id,
@@ -201,8 +201,8 @@ async def create_message(body: MessageIn, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/messages/{msg_id}", status_code=200)
-async def dismiss_message(msg_id: str, db: AsyncSession = Depends(get_db)):
-    """Soft-delete a single message by msg_id."""
+async def dismiss_air_message(msg_id: str, db: AsyncSession = Depends(get_db)):
+    """Soft-delete a single message by msg_id (sets dismissed=True)."""
     result = await db.execute(select(AirMessage).where(AirMessage.msg_id == msg_id))
     row = result.scalar_one_or_none()
     if not row:
@@ -213,20 +213,18 @@ async def dismiss_message(msg_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/messages", status_code=200)
-async def dismiss_all_messages(db: AsyncSession = Depends(get_db)):
-    """Soft-delete all air messages."""
-    await db.execute(
-        AirMessage.__table__.update().values(dismissed=True)
-    )
+async def dismiss_all_air_messages(db: AsyncSession = Depends(get_db)):
+    """Soft-delete all air messages in one query."""
+    await db.execute(AirMessage.__table__.update().values(dismissed=True))
     await db.commit()
     return JSONResponse({"status": "cleared"})
 
 
-# ── Tracking ──────────────────────────────────────────────────────────────────
+# ── Tracking ───────────────────────────────────────────────────────────────────
 
 @router.get("/tracking")
-async def list_tracking(db: AsyncSession = Depends(get_db)):
-    """Return all currently tracked aircraft."""
+async def list_tracked_aircraft(db: AsyncSession = Depends(get_db)):
+    """Return all currently tracked aircraft, most recently added first."""
     result = await db.execute(select(AirTracking).order_by(AirTracking.added_at.desc()))
     rows = result.scalars().all()
     return JSONResponse([
@@ -236,13 +234,15 @@ async def list_tracking(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/tracking", status_code=201)
-async def add_tracking(body: TrackingIn, db: AsyncSession = Depends(get_db)):
-    """Add an aircraft to tracking (idempotent — updates callsign/follow if already tracked)."""
+async def add_tracked_aircraft(body: TrackingIn, db: AsyncSession = Depends(get_db)):
+    """Add an aircraft to tracking, or update callsign/follow if it is already tracked."""
     result = await db.execute(select(AirTracking).where(AirTracking.hex == body.hex))
     row = result.scalar_one_or_none()
+
     if row:
+        # Aircraft already tracked — update mutable fields only
         row.callsign = body.callsign
-        row.follow = body.follow
+        row.follow   = body.follow
         await db.commit()
         return JSONResponse({"status": "updated"}, status_code=200)
 
@@ -257,8 +257,8 @@ async def add_tracking(body: TrackingIn, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/tracking/{hex}", status_code=200)
-async def remove_tracking(hex: str, db: AsyncSession = Depends(get_db)):
-    """Remove an aircraft from tracking by ICAO hex."""
+async def remove_tracked_aircraft(hex: str, db: AsyncSession = Depends(get_db)):
+    """Remove an aircraft from tracking by ICAO hex. Returns 404 if not currently tracked."""
     result = await db.execute(select(AirTracking).where(AirTracking.hex == hex))
     row = result.scalar_one_or_none()
     if not row:

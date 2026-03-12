@@ -18,10 +18,11 @@
     <meta name="theme-color" content="#000000">
     <link href='./assets/maplibre-gl.css' rel='stylesheet' />
     <link href='https://fonts.googleapis.com/css2?family=Barlow:wght@100;300;400;500;600;700;900&family=Barlow+Condensed:wght@400;500;600;700;900&display=swap' rel='stylesheet' />
-    <link rel="stylesheet" href="./frontend/app/shell/shell.css">
-    <link rel="stylesheet" href="./frontend/app/map/map.css">
-    <link rel="stylesheet" href="./frontend/app/notifications/notifications.css">
-    <link rel="stylesheet" href="./frontend/app/tracking/tracking.css">
+    <link rel="stylesheet" href="./frontend/components/shell/shell.css">
+    <link rel="stylesheet" href="./frontend/components/map/map.css">
+    <link rel="stylesheet" href="./frontend/components/notifications/notifications.css">
+    <link rel="stylesheet" href="./frontend/components/tracking/tracking.css">
+    <link rel="stylesheet" href="./frontend/components/filter/filter.css">
     <link rel="stylesheet" href="style.css?v=25">
 </head>
 
@@ -49,25 +50,6 @@
     </header>
 
     <div id="map"></div>
-
-    <div id="filter-panel">
-        <div id="filter-mode-bar">
-            <button class="filter-mode-btn active" data-mode="all">ALL</button>
-            <button class="filter-mode-btn" data-mode="civil">CIVIL</button>
-            <button class="filter-mode-btn" data-mode="mil">MILITARY</button>
-            <button class="filter-mode-btn" data-mode="none">HIDE ALL</button>
-        </div>
-        <div id="filter-input-wrap">
-            <svg id="filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <line x1="1" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                <line x1="3" y1="6.5" x2="10" y2="6.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                <line x1="5" y1="10" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            </svg>
-            <input id="filter-input" type="text" placeholder="CALLSIGN · ICAO · SQUAWK" autocomplete="off" spellcheck="false" />
-            <button id="filter-clear-btn" aria-label="Clear filter">✕</button>
-        </div>
-        <div id="filter-results"></div>
-    </div>
 
     <div id="notifications-panel">
         <div id="notif-header">
@@ -112,11 +94,11 @@
 
     <script src="./assets/pmtiles.js"></script>
     <script src='./assets/maplibre-gl.js'></script>
-    <script src="./frontend/app/notifications/notifications.js"></script>
-    <script src="./frontend/app/tracking/tracking.js"></script>
+    <script src="./frontend/components/notifications/notifications.js"></script>
+    <script src="./frontend/components/tracking/tracking.js"></script>
 
     <!-- Map component (tile loading, connectivity, geometry helpers) -->
-    <script src="./frontend/app/map/map.js"></script>
+    <script src="./frontend/components/map/map.js"></script>
 
     <!-- Air component: shared globals and state -->
     <script src="./frontend/components/air/air-globals.js"></script>
@@ -141,7 +123,7 @@
 
     <!-- Side panel, filter, user location, boot -->
     <script src="./frontend/components/air/side-menu.js"></script>
-    <script src="./frontend/components/air/filter.js"></script>
+    <script src="./frontend/components/filter/filter.js"></script>
     <script src="./frontend/components/air/user-location.js"></script>
     <script src="./frontend/components/air/boot.js"></script>
 

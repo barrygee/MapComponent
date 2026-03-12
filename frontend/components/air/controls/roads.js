@@ -1,54 +1,39 @@
-// Roads Toggle Control
-// Toggles 15 road layer IDs via map.setLayoutProperty.
+// ============================================================
+// ROADS TOGGLE CONTROL
+// Toggles 15 road-related MapLibre layer IDs on/off.
+//
 // Depends on: map (global alias), _overlayStates, _saveOverlayStates
+// ============================================================
 
-// ---- RoadsToggleControl ----
-// Inputs:  none (reads _overlayStates.roads from constructor)
-// Outputs: toggles visibility on 15 road layer IDs via map.setLayoutProperty
-// Button:  'R' — lime when roads visible, white+dim when hidden
 class RoadsToggleControl {
     constructor() {
+        // Read persisted visibility state set by the previous session
         this.roadsVisible = _overlayStates.roads;
     }
 
     onAdd(map) {
         this.map = map;
+
+        // Wrapper container required by the MapLibre control API
         this.container = document.createElement('div');
         this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#000000';
-        this.container.style.borderRadius = '0';
-        this.container.style.marginTop = '4px';
+        this.container.style.cssText = 'background:#000;border-radius:0;margin-top:4px';
 
+        // Button element — lime when roads are visible, dimmed white when hidden
         this.button = document.createElement('button');
-        this.button.className = 'roads-toggle-btn';
-        this.button.title = 'Toggle road lines and names';
-        this.button.textContent = 'R';
-        this.button.style.width = '29px';
-        this.button.style.height = '29px';
-        this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#000000';
-        this.button.style.cursor = 'pointer';
-        this.button.style.fontSize = '16px';
-        this.button.style.color = '#ffffff';
-        this.button.style.fontWeight = 'bold';
-        this.button.style.display = 'flex';
-        this.button.style.alignItems = 'center';
-        this.button.style.justifyContent = 'center';
-        this.button.style.transition = 'opacity 0.2s';
-        this.button.style.opacity = '0.3';
-        this.button.onclick = () => this.toggleRoads();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
-        this.button.onmouseout = () => this.button.style.backgroundColor = '#000000';
+        this.button.className    = 'roads-toggle-btn';
+        this.button.title        = 'Toggle road lines and names';
+        this.button.textContent  = 'R';
+        this.button.style.cssText = 'width:29px;height:29px;border:none;background:#000;cursor:pointer;font-size:16px;color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center;transition:opacity 0.2s;opacity:0.3';
+        this.button.onclick      = () => this.toggleRoads();
+        this.button.onmouseover  = () => { this.button.style.background = '#111'; };
+        this.button.onmouseout   = () => { this.button.style.background = '#000'; };
 
         this.container.appendChild(this.button);
 
-        // Listen to zoom changes to update button state
-        this.map.on('zoom', () => this.updateButtonState());
-
-        // Set initial visibility based on zoom and toggle state
+        // Apply initial visibility after the style is ready
         this.updateRoadsVisibility();
-
-        // Re-apply visibility after style loads (initial call may fail if style not loaded)
+        // Re-apply after style reloads (handled by overlay-reinit.js — this once() is a safety net)
         this.map.once('style.load', () => this.updateRoadsVisibility());
 
         return this.container;
@@ -61,37 +46,33 @@ class RoadsToggleControl {
         this.map = undefined;
     }
 
+    /** Sync the button colour/opacity to the current roadsVisible state. */
     updateButtonState() {
-        const zoomAllowsRoads = true;
-        const shouldBeVisible = this.roadsVisible && zoomAllowsRoads;
-        this.button.style.opacity = shouldBeVisible ? '1' : '0.3';
-        this.button.style.color = shouldBeVisible ? '#c8ff00' : '#ffffff';
+        this.button.style.opacity = this.roadsVisible ? '1'        : '0.3';
+        this.button.style.color   = this.roadsVisible ? '#c8ff00'  : '#ffffff';
     }
 
+    /**
+     * Apply the current roadsVisible state to all 15 road layer IDs.
+     * Silently skips any layers that don't exist in the active style.
+     */
     updateRoadsVisibility() {
-        const zoomAllowsRoads = true;
-        const visibility = (this.roadsVisible && zoomAllowsRoads) ? 'visible' : 'none';
-
+        const visibility = this.roadsVisible ? 'visible' : 'none';
         const roadLayerIds = [
             'highway_path', 'highway_minor', 'highway_major_casing',
             'highway_major_inner', 'highway_major_subtle',
             'highway_motorway_casing', 'highway_motorway_inner',
             'highway_motorway_subtle', 'highway_name_motorway',
             'highway_name_other', 'highway_ref', 'tunnel_motorway_casing',
-            'tunnel_motorway_inner', 'road_area_pier', 'road_pier'
+            'tunnel_motorway_inner', 'road_area_pier', 'road_pier',
         ];
-
-        roadLayerIds.forEach(layerId => {
-            try {
-                this.map.setLayoutProperty(layerId, 'visibility', visibility);
-            } catch (e) {
-                // Layer might not exist, skip it
-            }
+        roadLayerIds.forEach(id => {
+            try { this.map.setLayoutProperty(id, 'visibility', visibility); } catch (e) {}
         });
-
         this.updateButtonState();
     }
 
+    /** Toggle road visibility and persist the new state. */
     toggleRoads() {
         this.roadsVisible = !this.roadsVisible;
         this.updateRoadsVisibility();

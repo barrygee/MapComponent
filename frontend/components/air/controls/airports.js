@@ -1,7 +1,21 @@
-// Airports Toggle Control
-// 26 UK/Ireland civil airports, HTML div markers, freq hover panels.
-// Depends on: map (global alias), maplibregl, _overlayStates, _saveOverlayStates, _Tracking, window._is3DActive
+// ============================================================
+// AIRPORTS TOGGLE CONTROL
+// 26 UK/Ireland civil airports with HTML label markers,
+// hover frequency panels, and a click-to-zoom status bar panel.
+//
+// Depends on:
+//   map (global alias), maplibregl, _overlayStates, _saveOverlayStates,
+//   _Tracking, window._is3DActive
+// ============================================================
 
+// ---- Airport dataset ----
+// GeoJSON FeatureCollection. Each feature has:
+//   properties.icao   — ICAO code (displayed lime)
+//   properties.iata   — IATA code
+//   properties.name   — Airport name
+//   properties.bounds — [w, s, e, n] approximate boundary (for future use)
+//   properties.freqs  — { tower, radar, approach, atis } frequency strings
+//   geometry          — Point [lng, lat]
 const AIRPORTS_DATA = {
     type: 'FeatureCollection',
     features: [
@@ -32,7 +46,7 @@ const AIRPORTS_DATA = {
         { type: 'Feature', properties: { icao: 'EGSH', iata: 'NWI', name: 'Norwich',       bounds: [ 1.2680,  52.6710,  1.2850,  52.6780], freqs: { tower: '124.250', radar: '119.350', approach: '119.350', atis: '128.625' } }, geometry: { type: 'Point', coordinates: [ 1.2828, 52.6758] } },
         { type: 'Feature', properties: { icao: 'EGCN', iata: 'DSA', name: 'Doncaster',     bounds: [-1.0200,  53.4750, -0.9810,  53.4900], freqs: { tower: '128.775', radar: '126.225', approach: '126.225', atis: '121.775' } }, geometry: { type: 'Point', coordinates: [-1.0106, 53.4805] } },
         { type: 'Feature', properties: { icao: 'EGNJ', iata: 'HUY', name: 'Humberside',    bounds: [-0.3620,  53.5720, -0.3320,  53.5870], freqs: { tower: '124.900', radar: '119.125', approach: '119.125', atis: '124.675' } }, geometry: { type: 'Point', coordinates: [-0.3506, 53.5744] } },
-    ]
+    ],
 };
 
 class AirportsToggleControl {
@@ -42,31 +56,20 @@ class AirportsToggleControl {
 
     onAdd(map) {
         this.map = map;
+
         this.container = document.createElement('div');
-        this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#000000';
-        this.container.style.borderRadius = '0';
-        this.container.style.marginTop = '4px';
+        this.container.className  = 'maplibregl-ctrl';
+        this.container.style.cssText = 'background:#000;border-radius:0;margin-top:4px';
 
         this.button = document.createElement('button');
-        this.button.title = 'Toggle airports';
+        this.button.title       = 'Toggle airports';
         this.button.textContent = 'CVL';
-        this.button.style.width = '29px';
-        this.button.style.height = '29px';
-        this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#000000';
-        this.button.style.cursor = 'pointer';
-        this.button.style.fontSize = '8px';
-        this.button.style.fontWeight = 'bold';
-        this.button.style.display = 'flex';
-        this.button.style.alignItems = 'center';
-        this.button.style.justifyContent = 'center';
-        this.button.style.transition = 'opacity 0.2s, color 0.2s';
-        this.button.style.opacity = this.visible ? '1' : '0.3';
-        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
-        this.button.onclick = () => this.toggle();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
-        this.button.onmouseout  = () => this.button.style.backgroundColor = '#000000';
+        this.button.style.cssText = 'width:29px;height:29px;border:none;background:#000;cursor:pointer;font-size:8px;font-weight:bold;display:flex;align-items:center;justify-content:center;transition:opacity 0.2s,color 0.2s';
+        this.button.style.opacity = this.visible ? '1'       : '0.3';
+        this.button.style.color   = this.visible ? '#c8ff00' : '#ffffff';
+        this.button.onclick     = () => this.toggle();
+        this.button.onmouseover = () => { this.button.style.background = '#111'; };
+        this.button.onmouseout  = () => { this.button.style.background = '#000'; };
 
         this.container.appendChild(this.button);
 
@@ -85,11 +88,17 @@ class AirportsToggleControl {
         this.map = undefined;
     }
 
+    /**
+     * Build the hover frequency panel HTML shown on mouseenter.
+     * Displayed inline below the airport label.
+     * @param {{ icao, name, freqs }} p  Airport properties
+     * @returns {string} HTML string
+     */
     _buildFreqPanel(p) {
         const rows = [
-            ['TWR', p.freqs.tower],
-            ['RAD', p.freqs.radar],
-            ['APP', p.freqs.approach],
+            ['TWR',  p.freqs.tower],
+            ['RAD',  p.freqs.radar],
+            ['APP',  p.freqs.approach],
             ['ATIS', p.freqs.atis],
         ];
         const rowsHTML = rows.map(([lbl, val]) =>
@@ -97,13 +106,9 @@ class AirportsToggleControl {
             `<span style="opacity:0.5;min-width:34px;letter-spacing:.05em">${lbl}</span>` +
             `<span>${val}</span></div>`
         ).join('');
-        return `<div style="` +
-            `display:inline-block;` +
-            `background:rgba(0,0,0,0.7);color:#fff;` +
-            `font-family:'Barlow Condensed','Barlow',sans-serif;` +
-            `font-size:14px;font-weight:400;` +
-            `padding:6px 14px 9px;` +
-            `pointer-events:none;white-space:nowrap;user-select:none">` +
+        return `<div style="display:inline-block;background:rgba(0,0,0,0.7);color:#fff;` +
+            `font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;` +
+            `padding:6px 14px 9px;pointer-events:none;white-space:nowrap;user-select:none">` +
             `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;` +
             `font-weight:600;font-size:15px;letter-spacing:.12em;` +
             `margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
@@ -112,11 +117,18 @@ class AirportsToggleControl {
             `</div>${rowsHTML}</div>`;
     }
 
+    /**
+     * Build the HTML content for the #adsb-status-bar airport detail panel.
+     * Shown in the tracking panel when the user clicks an airport marker.
+     * @param {{ icao, iata, name, freqs }} p  Airport properties
+     * @param {[number, number]} coords         [lng, lat]
+     * @returns {string} HTML string
+     */
     _buildAirportPanelHTML(p, coords) {
         const lat = coords[1].toFixed(4);
         const lng = coords[0].toFixed(4);
         const fields = [
-            ['IATA',  p.iata  || '—'],
+            ['IATA',  p.iata           || '—'],
             ['LAT',   lat],
             ['LON',   lng],
             ['TWR',   p.freqs.tower    || '—'],
@@ -141,19 +153,30 @@ class AirportsToggleControl {
             `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
     }
 
+    /**
+     * Populate #adsb-status-bar with the airport panel and open the tracking panel.
+     * Wires the CLOSE button to collapse the panel and fly back to home view.
+     * @param {{ icao, iata, name, freqs }} p
+     * @param {[number, number]} coords
+     */
     _showAirportPanel(p, coords) {
+        // Find or create the status bar element inside the tracking panel
         let bar = document.getElementById('adsb-status-bar');
         if (!bar) {
             bar = document.createElement('div');
             bar.id = 'adsb-status-bar';
             const trackingPanel = document.getElementById('tracking-panel');
             if (trackingPanel) trackingPanel.appendChild(bar);
-            else document.body.appendChild(bar);
+            else               document.body.appendChild(bar);
         }
-        bar.dataset.apt = '1';
-        bar.innerHTML = this._buildAirportPanelHTML(p, coords);
+        bar.dataset.apt = '1'; // flag that an airport (not an aircraft) is showing
+        bar.innerHTML   = this._buildAirportPanelHTML(p, coords);
         bar.classList.add('adsb-sb-visible');
+
+        // Open the tracking panel to show the airport details
         if (typeof _Tracking !== 'undefined') { _Tracking.setCount(1); _Tracking.openPanel(); }
+
+        // CLOSE button: collapse panel and fly home
         bar.querySelector('#apt-panel-close').addEventListener('click', (e) => {
             e.stopPropagation();
             bar.classList.remove('adsb-sb-visible');
@@ -164,45 +187,35 @@ class AirportsToggleControl {
         });
     }
 
+    /**
+     * Add the GeoJSON source and create HTML label markers for each airport.
+     * Markers are created once and reused across style reloads (DOM nodes persist).
+     * Called once on load and again by overlay-reinit.js after each style switch.
+     */
     initLayers() {
-        if (this.map.getSource('airports')) {
-            this.map.removeSource('airports');
-        }
-
+        // Remove any stale source from a previous style before adding a fresh one
+        if (this.map.getSource('airports')) this.map.removeSource('airports');
         this.map.addSource('airports', { type: 'geojson', data: AIRPORTS_DATA });
 
-        // Create HTML label markers once — they survive style changes as DOM nodes
         if (!this._markers) {
-            this._hoverMarker = null;
+            this._hoverMarker = null; // placeholder (unused — hover is inline, not a separate marker)
 
             this._markers = AIRPORTS_DATA.features.map(f => {
                 const p = f.properties;
-                // Outer wrapper — large hit area, anchored top-left to the coordinate
-                const el = document.createElement('div');
-                el.style.cssText = [
-                    'padding:6px 16px 6px 0',
-                    'cursor:pointer',
-                    'pointer-events:auto',
-                    'user-select:none',
-                ].join(';');
 
+                // Outer wrapper: large pointer-events hit area
+                const el = document.createElement('div');
+                el.style.cssText = 'padding:6px 16px 6px 0;cursor:pointer;pointer-events:auto;user-select:none';
+
+                // ICAO code (lime) + airport name (dimmed white) label
                 const label = document.createElement('div');
-                label.style.cssText = [
-                    'color:#ffffff',
-                    "font-family:'Barlow Condensed','Barlow',monospace",
-                    'font-size:10px',
-                    'font-weight:700',
-                    'letter-spacing:.08em',
-                    'line-height:1.5',
-                    'white-space:nowrap',
-                    'pointer-events:none',
-                ].join(';');
+                label.style.cssText = "color:#fff;font-family:'Barlow Condensed','Barlow',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;line-height:1.5;white-space:nowrap;pointer-events:none";
                 label.innerHTML =
                     `<span class="apt-icao" style="color:#c8ff00">${p.icao}</span>` +
                     `<br><span class="apt-name" style="opacity:0.7;font-weight:400">${p.name.toUpperCase()}</span>`;
                 el.appendChild(label);
 
-                // Click — fly to airport
+                // Click: fly to airport and open detail panel
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const pitch = (typeof window._is3DActive === 'function' && window._is3DActive()) ? 45 : undefined;
@@ -212,13 +225,13 @@ class AirportsToggleControl {
                     this._showAirportPanel(p, f.geometry.coordinates);
                 });
 
-                // Hover — show frequency panel inline inside the wrapper
+                // Hover: show frequency panel inline below the label
                 let freqPanel = null;
                 el.addEventListener('mouseenter', () => {
                     if (!freqPanel) {
                         freqPanel = document.createElement('div');
-                        freqPanel.innerHTML = this._buildFreqPanel(p);
-                        freqPanel.style.cssText = 'pointer-events:none;margin-top:4px;';
+                        freqPanel.innerHTML  = this._buildFreqPanel(p);
+                        freqPanel.style.cssText = 'pointer-events:none;margin-top:4px';
                         el.appendChild(freqPanel);
                     }
                 });
@@ -229,21 +242,24 @@ class AirportsToggleControl {
                 return new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [8, -6] })
                     .setLngLat(f.geometry.coordinates);
             });
+
             if (this.visible) this._markers.forEach(m => m.addTo(this.map));
         }
     }
 
+    /** Toggle airport marker visibility and persist the new state. */
     toggle() {
         this.visible = !this.visible;
         if (this._markers) {
-            if (this.visible) this._markers.forEach(m => m.addTo(this.map));
-            else {
+            if (this.visible) {
+                this._markers.forEach(m => m.addTo(this.map));
+            } else {
                 this._markers.forEach(m => m.remove());
                 if (this._hoverMarker) { this._hoverMarker.remove(); this._hoverMarker = null; }
             }
         }
-        this.button.style.opacity = this.visible ? '1' : '0.3';
-        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        this.button.style.opacity = this.visible ? '1'       : '0.3';
+        this.button.style.color   = this.visible ? '#c8ff00' : '#ffffff';
         _saveOverlayStates();
     }
 }

@@ -12,6 +12,31 @@
 const _FilterPanel = (() => {
     let _open = false;
 
+    // ---- Inject panel HTML if not already present ----
+    (function _injectHTML() {
+        if (document.getElementById('filter-panel')) return;
+        const panel = document.createElement('div');
+        panel.id = 'filter-panel';
+        panel.innerHTML =
+            `<div id="filter-mode-bar">` +
+                `<button class="filter-mode-btn active" data-mode="all">ALL</button>` +
+                `<button class="filter-mode-btn" data-mode="civil">CIVIL</button>` +
+                `<button class="filter-mode-btn" data-mode="mil">MILITARY</button>` +
+                `<button class="filter-mode-btn" data-mode="none">HIDE ALL</button>` +
+            `</div>` +
+            `<div id="filter-input-wrap">` +
+                `<svg id="filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+                    `<line x1="1" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
+                    `<line x1="3" y1="6.5" x2="10" y2="6.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
+                    `<line x1="5" y1="10" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
+                `</svg>` +
+                `<input id="filter-input" type="text" placeholder="CALLSIGN · ICAO · SQUAWK" autocomplete="off" spellcheck="false" />` +
+                `<button id="filter-clear-btn" aria-label="Clear filter">✕</button>` +
+            `</div>` +
+            `<div id="filter-results"></div>`;
+        document.body.appendChild(panel);
+    })();
+
     function _getPanel()   { return document.getElementById('filter-panel'); }
     function _getInput()   { return document.getElementById('filter-input'); }
     function _getResults() { return document.getElementById('filter-results'); }

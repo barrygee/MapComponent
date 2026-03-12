@@ -14,5 +14,6 @@ router = APIRouter(prefix="/api/land", tags=["land"])
 
 
 @router.get("/status")
-async def status():
+async def land_status():
+    """Placeholder — land domain not yet implemented."""
     return JSONResponse({"status": "not_implemented", "domain": "land"})

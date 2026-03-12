@@ -14,5 +14,6 @@ router = APIRouter(prefix="/api/space", tags=["space"])
 
 
 @router.get("/status")
-async def status():
+async def space_status():
+    """Placeholder — space domain not yet implemented."""
     return JSONResponse({"status": "not_implemented", "domain": "space"})

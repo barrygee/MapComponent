@@ -1,7 +1,19 @@
-// RAF Toggle Control
-// 24 RAF/USAF bases in UK, HTML div markers, click-to-zoom panels.
-// Depends on: map (global alias), maplibregl, _overlayStates, _saveOverlayStates, _Tracking, window._is3DActive
+// ============================================================
+// RAF TOGGLE CONTROL
+// 24 RAF/USAF bases in the UK with HTML label markers,
+// hover "click to zoom" panels, and a click-to-zoom status bar panel.
+//
+// Depends on:
+//   map (global alias), maplibregl, _overlayStates, _saveOverlayStates,
+//   _Tracking, window._is3DActive
+// ============================================================
 
+// ---- RAF/USAF base dataset ----
+// Each feature has:
+//   properties.icao   — ICAO code (shown lime; empty string for non-airfield sites)
+//   properties.name   — Base name
+//   properties.bounds — [w, s, e, n] approximate boundary (for future use)
+//   geometry          — Point [lng, lat]
 const RAF_DATA = {
     type: 'FeatureCollection',
     features: [
@@ -29,7 +41,7 @@ const RAF_DATA = {
         { type: 'Feature', properties: { icao: 'EGVA', name: 'RAF Fairford',     bounds: [-1.8300, 51.6600, -1.7500, 51.7050] }, geometry: { type: 'Point', coordinates: [ -1.7900,  51.6822] } },
         { type: 'Feature', properties: { icao: 'EGUL', name: 'RAF Lakenheath',   bounds: [  0.5250, 52.3900,  0.5950, 52.4300] }, geometry: { type: 'Point', coordinates: [  0.5611,  52.4094] } },
         { type: 'Feature', properties: { icao: 'EGUN', name: 'RAF Mildenhall',   bounds: [  0.4550, 52.3400,  0.5180, 52.3850] }, geometry: { type: 'Point', coordinates: [  0.4864,  52.3619] } },
-    ]
+    ],
 };
 
 class RAFToggleControl {
@@ -39,31 +51,20 @@ class RAFToggleControl {
 
     onAdd(map) {
         this.map = map;
+
         this.container = document.createElement('div');
-        this.container.className = 'maplibregl-ctrl';
-        this.container.style.backgroundColor = '#000000';
-        this.container.style.borderRadius = '0';
-        this.container.style.marginTop = '4px';
+        this.container.className  = 'maplibregl-ctrl';
+        this.container.style.cssText = 'background:#000;border-radius:0;margin-top:4px';
 
         this.button = document.createElement('button');
-        this.button.title = 'Toggle RAF bases';
+        this.button.title       = 'Toggle RAF bases';
         this.button.textContent = 'MIL';
-        this.button.style.width = '29px';
-        this.button.style.height = '29px';
-        this.button.style.border = 'none';
-        this.button.style.backgroundColor = '#000000';
-        this.button.style.cursor = 'pointer';
-        this.button.style.fontSize = '8px';
-        this.button.style.fontWeight = 'bold';
-        this.button.style.display = 'flex';
-        this.button.style.alignItems = 'center';
-        this.button.style.justifyContent = 'center';
-        this.button.style.transition = 'opacity 0.2s, color 0.2s';
-        this.button.style.opacity = this.visible ? '1' : '0.3';
-        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
-        this.button.onclick = () => this.toggle();
-        this.button.onmouseover = () => this.button.style.backgroundColor = '#111111';
-        this.button.onmouseout  = () => this.button.style.backgroundColor = '#000000';
+        this.button.style.cssText = 'width:29px;height:29px;border:none;background:#000;cursor:pointer;font-size:8px;font-weight:bold;display:flex;align-items:center;justify-content:center;transition:opacity 0.2s,color 0.2s';
+        this.button.style.opacity = this.visible ? '1'       : '0.3';
+        this.button.style.color   = this.visible ? '#c8ff00' : '#ffffff';
+        this.button.onclick     = () => this.toggle();
+        this.button.onmouseover = () => { this.button.style.background = '#111'; };
+        this.button.onmouseout  = () => { this.button.style.background = '#000'; };
 
         this.container.appendChild(this.button);
 
@@ -82,42 +83,32 @@ class RAFToggleControl {
         this.map = undefined;
     }
 
+    /**
+     * Add the GeoJSON source and create HTML label markers for each base.
+     * Markers are created once and reused across style reloads.
+     * Called once on load and again by overlay-reinit.js after each style switch.
+     */
     initLayers() {
-        if (this.map.getSource('raf-bases')) {
-            this.map.removeSource('raf-bases');
-        }
-
+        // Remove stale source before re-adding (style switch wipes all sources)
+        if (this.map.getSource('raf-bases')) this.map.removeSource('raf-bases');
         this.map.addSource('raf-bases', { type: 'geojson', data: RAF_DATA });
 
-        // Create HTML label markers once — they survive style changes as DOM nodes
         if (!this._markers) {
             this._markers = RAF_DATA.features.map(f => {
                 const p = f.properties;
 
                 const el = document.createElement('div');
-                el.style.cssText = [
-                    'padding:6px 16px 6px 0',
-                    'cursor:pointer',
-                    'pointer-events:auto',
-                    'user-select:none',
-                ].join(';');
+                el.style.cssText = 'padding:6px 16px 6px 0;cursor:pointer;pointer-events:auto;user-select:none';
 
+                // ICAO code (lime) if available; base name always shown (dimmed white)
                 const label = document.createElement('div');
-                label.style.cssText = [
-                    'color:#ffffff',
-                    "font-family:'Barlow Condensed','Barlow',monospace",
-                    'font-size:10px',
-                    'font-weight:700',
-                    'letter-spacing:.08em',
-                    'line-height:1.5',
-                    'white-space:nowrap',
-                    'pointer-events:none',
-                ].join(';');
+                label.style.cssText = "color:#fff;font-family:'Barlow Condensed','Barlow',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;line-height:1.5;white-space:nowrap;pointer-events:none";
                 label.innerHTML = p.icao
                     ? `<span style="color:#c8ff00">${p.icao}</span><br><span style="opacity:0.7;font-weight:400">${p.name.toUpperCase()}</span>`
                     : `<span style="opacity:0.7;font-weight:400">${p.name.toUpperCase()}</span>`;
                 el.appendChild(label);
 
+                // Click: zoom to base and show detail panel
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const pitch = (typeof window._is3DActive === 'function' && window._is3DActive()) ? 45 : undefined;
@@ -127,29 +118,38 @@ class RAFToggleControl {
                     this._showRAFPanel(p, f.geometry.coordinates);
                 });
 
-                let freqPanel = null;
+                // Hover: show "CLICK TO ZOOM" hint panel
+                let hintPanel = null;
                 el.addEventListener('mouseenter', () => {
-                    if (!freqPanel) {
-                        freqPanel = document.createElement('div');
-                        freqPanel.style.cssText = 'pointer-events:none;margin-top:4px;';
-                        freqPanel.innerHTML = `<div style="display:inline-block;background:rgba(0,0,0,0.7);color:#fff;` +
+                    if (!hintPanel) {
+                        hintPanel = document.createElement('div');
+                        hintPanel.style.cssText = 'pointer-events:none;margin-top:4px';
+                        hintPanel.innerHTML =
+                            `<div style="display:inline-block;background:rgba(0,0,0,0.7);color:#fff;` +
                             `font-family:'Barlow Condensed','Barlow',sans-serif;font-size:12px;font-weight:400;` +
                             `padding:5px 12px 7px;white-space:nowrap;user-select:none">` +
                             `<span style="opacity:0.5;letter-spacing:.05em">CLICK TO ZOOM</span></div>`;
-                        el.appendChild(freqPanel);
+                        el.appendChild(hintPanel);
                     }
                 });
                 el.addEventListener('mouseleave', () => {
-                    if (freqPanel) { freqPanel.remove(); freqPanel = null; }
+                    if (hintPanel) { hintPanel.remove(); hintPanel = null; }
                 });
 
                 return new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [8, -6] })
                     .setLngLat(f.geometry.coordinates);
             });
+
             if (this.visible) this._markers.forEach(m => m.addTo(this.map));
         }
     }
 
+    /**
+     * Build the HTML content for the #adsb-status-bar RAF base detail panel.
+     * @param {{ icao, name }} p
+     * @param {[number, number]} coords  [lng, lat]
+     * @returns {string} HTML string
+     */
     _buildRAFPanelHTML(p, coords) {
         const lat = coords[1].toFixed(4);
         const lng = coords[0].toFixed(4);
@@ -174,6 +174,10 @@ class RAFToggleControl {
             `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
     }
 
+    /**
+     * Populate #adsb-status-bar with the RAF panel and open the tracking panel.
+     * Wires the CLOSE button to collapse and fly home.
+     */
     _showRAFPanel(p, coords) {
         let bar = document.getElementById('adsb-status-bar');
         if (!bar) {
@@ -181,12 +185,13 @@ class RAFToggleControl {
             bar.id = 'adsb-status-bar';
             const trackingPanel = document.getElementById('tracking-panel');
             if (trackingPanel) trackingPanel.appendChild(bar);
-            else document.body.appendChild(bar);
+            else               document.body.appendChild(bar);
         }
-        bar.dataset.apt = '1';
-        bar.innerHTML = this._buildRAFPanelHTML(p, coords);
+        bar.dataset.apt = '1'; // flag that a base (not aircraft) is showing
+        bar.innerHTML   = this._buildRAFPanelHTML(p, coords);
         bar.classList.add('adsb-sb-visible');
         if (typeof _Tracking !== 'undefined') { _Tracking.setCount(1); _Tracking.openPanel(); }
+
         bar.querySelector('#apt-panel-close').addEventListener('click', (e) => {
             e.stopPropagation();
             bar.classList.remove('adsb-sb-visible');
@@ -197,14 +202,15 @@ class RAFToggleControl {
         });
     }
 
+    /** Toggle base marker visibility and persist the new state. */
     toggle() {
         this.visible = !this.visible;
         if (this._markers) {
             if (this.visible) this._markers.forEach(m => m.addTo(this.map));
             else              this._markers.forEach(m => m.remove());
         }
-        this.button.style.opacity = this.visible ? '1' : '0.3';
-        this.button.style.color = this.visible ? '#c8ff00' : '#ffffff';
+        this.button.style.opacity = this.visible ? '1'       : '0.3';
+        this.button.style.color   = this.visible ? '#c8ff00' : '#ffffff';
         _saveOverlayStates();
     }
 }
