@@ -49,24 +49,23 @@ function createUserMarkerElement(longitude: number, latitude: number): UserMarke
     el.style.zIndex   = '9999';
     el.classList.add('user-location-marker');
 
-    const R    = 13;
-    const CIRC = +(2 * Math.PI * R).toFixed(2);
+    const circleRadius = 13;
+    const circleCircumference = +(2 * Math.PI * circleRadius).toFixed(2);
 
-    const CY      = 30;
-    const BG_RIGHT = 97;
-    const BG_Y1   = CY - R;
-    const BG_Y2   = CY + R;
-    const arcX1 = CY;
-    const arcX2 = CY;
+    const circleCenterX = 30;
+    const circleCenterY = 30;
+    const coordBgRightEdge = 97;
+    const coordBgTopY    = circleCenterY - circleRadius;
+    const coordBgBottomY = circleCenterY + circleRadius;
 
     el.innerHTML = `<svg viewBox="0 0 120 60" width="120" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
         <path class="marker-coord-bg"
-              d="M ${arcX1},${BG_Y1} A ${R},${R} 0 0,1 ${CY + R},${CY} A ${R},${R} 0 0,1 ${arcX2},${BG_Y2} L ${BG_RIGHT},${BG_Y2} A ${R},${R} 0 0,0 ${BG_RIGHT},${BG_Y1} Z"
+              d="M ${circleCenterX},${coordBgTopY} A ${circleRadius},${circleRadius} 0 0,1 ${circleCenterX + circleRadius},${circleCenterY} A ${circleRadius},${circleRadius} 0 0,1 ${circleCenterX},${coordBgBottomY} L ${coordBgRightEdge},${coordBgBottomY} A ${circleRadius},${circleRadius} 0 0,0 ${coordBgRightEdge},${coordBgTopY} Z"
               fill="black" opacity="0.75"
               style="clip-path:inset(0 100% 0 0)"/>
-        <circle class="marker-ring" cx="${CY}" cy="${CY}" r="${R}" fill="none" stroke="#c8ff00" stroke-width="1.8"
-                stroke-dasharray="${CIRC}" stroke-dashoffset="${CIRC}"/>
-        <circle class="marker-dot" cx="${CY}" cy="${CY}" r="3.5" fill="white" opacity="0"/>
+        <circle class="marker-ring" cx="${circleCenterX}" cy="${circleCenterY}" r="${circleRadius}" fill="none" stroke="#c8ff00" stroke-width="1.8"
+                stroke-dasharray="${circleCircumference}" stroke-dashoffset="${circleCircumference}"/>
+        <circle class="marker-dot" cx="${circleCenterX}" cy="${circleCenterY}" r="3.5" fill="white" opacity="0"/>
         <text x="52" y="26" fill="white" font-size="7.5" font-family="monospace">
             <tspan class="marker-lat-label" fill="#c8ff00" font-size="6"></tspan><tspan class="marker-lat"></tspan>
         </text>
@@ -182,7 +181,7 @@ function createUserMarkerElement(longitude: number, latitude: number): UserMarke
         const latText = latitude  !== undefined ? latitude.toFixed(3)  : '';
         const lonText = longitude !== undefined ? longitude.toFixed(3) : '';
 
-        ring.style.strokeDashoffset = String(CIRC);
+        ring.style.strokeDashoffset = String(circleCircumference);
         ring.style.animation        = 'none';
         dot.style.opacity           = '0';
         dot.style.animation         = 'none';

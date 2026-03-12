@@ -81,24 +81,24 @@ class ClearOverlaysControl extends SentinelControlBase {
      */
     _restoreAllOverlays(): void {
         if (!this.savedStates) { this._cleared = false; return; }
-        const s = this.savedStates;
+        const savedStates = this.savedStates;
 
-        if (roadsControl      && s.roads      && !roadsControl.roadsVisible)      roadsControl.toggleRoads();
-        if (namesControl      && s.names      && !namesControl.namesVisible)       namesControl.toggleNames();
-        if (rangeRingsControl && s.rings      && !rangeRingsControl.ringsVisible)  rangeRingsControl.toggleRings();
-        if (aarControl        && s.aar        && !aarControl.visible)              aarControl.toggle();
-        if (awacsControl      && s.awacs      && !awacsControl.visible)            awacsControl.toggle();
-        if (airportsControl   && s.airports   && !airportsControl.visible)         airportsControl.toggle();
-        if (rafControl        && s.raf        && !rafControl.visible)              rafControl.toggle();
+        if (roadsControl      && savedStates.roads      && !roadsControl.roadsVisible)      roadsControl.toggleRoads();
+        if (namesControl      && savedStates.names      && !namesControl.namesVisible)       namesControl.toggleNames();
+        if (rangeRingsControl && savedStates.rings      && !rangeRingsControl.ringsVisible)  rangeRingsControl.toggleRings();
+        if (aarControl        && savedStates.aar        && !aarControl.visible)              aarControl.toggle();
+        if (awacsControl      && savedStates.awacs      && !awacsControl.visible)            awacsControl.toggle();
+        if (airportsControl   && savedStates.airports   && !airportsControl.visible)         airportsControl.toggle();
+        if (rafControl        && savedStates.raf        && !rafControl.visible)              rafControl.toggle();
 
-        if (adsbControl && s.adsb) {
+        if (adsbControl && savedStates.adsb) {
             adsbControl.setAllHidden(false);
             try { adsbControl.map.setLayoutProperty('adsb-trails', 'visibility', 'visible'); } catch (e) {}
             if (adsbLabelsControl) {
-                adsbLabelsControl.labelsVisible        = s.adsbLabels;
-                adsbLabelsControl.button.style.opacity = s.adsbLabels ? '1'       : '0.3';
-                adsbLabelsControl.button.style.color   = s.adsbLabels ? '#c8ff00' : '#ffffff';
-                adsbControl.setLabelsVisible(s.adsbLabels);
+                adsbLabelsControl.labelsVisible        = savedStates.adsbLabels;
+                adsbLabelsControl.button.style.opacity = savedStates.adsbLabels ? '1'       : '0.3';
+                adsbLabelsControl.button.style.color   = savedStates.adsbLabels ? '#c8ff00' : '#ffffff';
+                adsbControl.setLabelsVisible(savedStates.adsbLabels);
             }
             _saveOverlayStates();
         }

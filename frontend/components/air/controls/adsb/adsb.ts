@@ -251,90 +251,106 @@ class AdsbLiveControl implements maplibregl.IControl {
     // ---- Canvas sprite factories ----
 
     private _createRadarBlip(color = '#ffffff', scale = 1): ImageData {
-        const S = 64, cx = S / 2, cy = S / 2;
+        const canvasSize = 64, centerX = canvasSize / 2, centerY = canvasSize / 2;
         const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = S;
+        canvas.width = canvas.height = canvasSize;
         const ctx = canvas.getContext('2d')!;
-        const apex = { x: cx, y: cy - 13 }, bR = { x: cx + 9, y: cy + 10 }, bL = { x: cx - 9, y: cy + 10 };
-        const gcx = (apex.x + bR.x + bL.x) / 3, gcy = (apex.y + bR.y + bL.y) / 3;
-        const sv = (v: { x: number; y: number }) => ({ x: gcx + (v.x - gcx) * scale, y: gcy + (v.y - gcy) * scale });
-        const A = sv(apex), B = sv(bR), C = sv(bL);
-        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.lineTo(C.x, C.y);
+        const apexVertex      = { x: centerX,     y: centerY - 13 };
+        const bottomRightVertex = { x: centerX + 9, y: centerY + 10 };
+        const bottomLeftVertex  = { x: centerX - 9, y: centerY + 10 };
+        const triangleCentroidX = (apexVertex.x + bottomRightVertex.x + bottomLeftVertex.x) / 3;
+        const triangleCentroidY = (apexVertex.y + bottomRightVertex.y + bottomLeftVertex.y) / 3;
+        const scaleFromCentroid = (v: { x: number; y: number }) => ({
+            x: triangleCentroidX + (v.x - triangleCentroidX) * scale,
+            y: triangleCentroidY + (v.y - triangleCentroidY) * scale,
+        });
+        const scaledApex        = scaleFromCentroid(apexVertex);
+        const scaledBottomRight = scaleFromCentroid(bottomRightVertex);
+        const scaledBottomLeft  = scaleFromCentroid(bottomLeftVertex);
+        ctx.beginPath(); ctx.moveTo(scaledApex.x, scaledApex.y); ctx.lineTo(scaledBottomRight.x, scaledBottomRight.y); ctx.lineTo(scaledBottomLeft.x, scaledBottomLeft.y);
         ctx.closePath(); ctx.fillStyle = color; ctx.fill();
-        return ctx.getImageData(0, 0, S, S);
+        return ctx.getImageData(0, 0, canvasSize, canvasSize);
     }
 
     private _createBracket(color = '#c8ff00'): ImageData {
-        const S = 64;
+        const canvasSize = 64;
         const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = S;
+        canvas.width = canvas.height = canvasSize;
         const ctx = canvas.getContext('2d')!;
-        const x1 = 4, y1 = 4, x2 = 60, y2 = 56, arm = 10;
+        const left = 4, top = 4, right = 60, bottom = 56, cornerArmLength = 10;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
-        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.fillRect(left, top, right - left, bottom - top);
         ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineCap = 'square';
-        ctx.beginPath(); ctx.moveTo(x1 + arm, y1); ctx.lineTo(x1, y1); ctx.lineTo(x1, y1 + arm); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x2 - arm, y1); ctx.lineTo(x2, y1); ctx.lineTo(x2, y1 + arm); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x1 + arm, y2); ctx.lineTo(x1, y2); ctx.lineTo(x1, y2 - arm); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x2 - arm, y2); ctx.lineTo(x2, y2); ctx.lineTo(x2, y2 - arm); ctx.stroke();
-        return ctx.getImageData(0, 0, S, S);
+        ctx.beginPath(); ctx.moveTo(left + cornerArmLength, top);    ctx.lineTo(left,  top);    ctx.lineTo(left,  top    + cornerArmLength); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(right - cornerArmLength, top);   ctx.lineTo(right, top);    ctx.lineTo(right, top    + cornerArmLength); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(left + cornerArmLength, bottom);  ctx.lineTo(left,  bottom); ctx.lineTo(left,  bottom - cornerArmLength); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(right - cornerArmLength, bottom); ctx.lineTo(right, bottom); ctx.lineTo(right, bottom - cornerArmLength); ctx.stroke();
+        return ctx.getImageData(0, 0, canvasSize, canvasSize);
     }
 
     private _createMilBracket(): ImageData {
-        const S = 64;
+        const canvasSize = 64;
         const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = S;
+        canvas.width = canvas.height = canvasSize;
         const ctx = canvas.getContext('2d')!;
-        const x1 = 4, y1 = 4, x2 = 60, y2 = 56, arm = 10;
+        const left = 4, top = 4, right = 60, bottom = 56, cornerArmLength = 10;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.fillRect(left, top, right - left, bottom - top);
         ctx.strokeStyle = '#000000'; ctx.lineWidth = 3; ctx.lineCap = 'square';
-        ctx.beginPath(); ctx.moveTo(x1 + arm, y1); ctx.lineTo(x1, y1); ctx.lineTo(x1, y1 + arm); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x2 - arm, y1); ctx.lineTo(x2, y1); ctx.lineTo(x2, y1 + arm); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x1 + arm, y2); ctx.lineTo(x1, y2); ctx.lineTo(x1, y2 - arm); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x2 - arm, y2); ctx.lineTo(x2, y2); ctx.lineTo(x2, y2 - arm); ctx.stroke();
-        return ctx.getImageData(0, 0, S, S);
+        ctx.beginPath(); ctx.moveTo(left + cornerArmLength, top);    ctx.lineTo(left,  top);    ctx.lineTo(left,  top    + cornerArmLength); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(right - cornerArmLength, top);   ctx.lineTo(right, top);    ctx.lineTo(right, top    + cornerArmLength); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(left + cornerArmLength, bottom);  ctx.lineTo(left,  bottom); ctx.lineTo(left,  bottom - cornerArmLength); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(right - cornerArmLength, bottom); ctx.lineTo(right, bottom); ctx.lineTo(right, bottom - cornerArmLength); ctx.stroke();
+        return ctx.getImageData(0, 0, canvasSize, canvasSize);
     }
 
     private _createTowerBlip(scale = 1.1): ImageData {
-        const S = 64;
+        const canvasSize = 64;
         const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = S;
+        canvas.width = canvas.height = canvasSize;
         const ctx = canvas.getContext('2d')!;
-        ctx.beginPath(); ctx.arc(S / 2, S / 2, 9 * scale, 0, Math.PI * 2);
+        ctx.beginPath(); ctx.arc(canvasSize / 2, canvasSize / 2, 9 * scale, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff'; ctx.fill();
-        return ctx.getImageData(0, 0, S, S);
+        return ctx.getImageData(0, 0, canvasSize, canvasSize);
     }
 
     private _createGroundVehicleBlip(color = '#ffffff', scale = 1.1): ImageData {
-        const S = 64;
+        const canvasSize = 64;
         const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = S;
+        canvas.width = canvas.height = canvasSize;
         const ctx = canvas.getContext('2d')!;
-        const half = 9 * scale, cx = S / 2, cy = S / 2;
+        const halfSquareSize = 9 * scale, centerX = canvasSize / 2, centerY = canvasSize / 2;
         ctx.fillStyle = color;
-        ctx.fillRect(cx - half, cy - half, half * 2, half * 2);
-        return ctx.getImageData(0, 0, S, S);
+        ctx.fillRect(centerX - halfSquareSize, centerY - halfSquareSize, halfSquareSize * 2, halfSquareSize * 2);
+        return ctx.getImageData(0, 0, canvasSize, canvasSize);
     }
 
     private _createUAVBlip(color = '#ffffff', scale = 1.1): ImageData {
-        const S = 64, cx = S / 2, cy = S / 2;
+        const canvasSize = 64, centerX = canvasSize / 2, centerY = canvasSize / 2;
         const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = S;
+        canvas.width = canvas.height = canvasSize;
         const ctx = canvas.getContext('2d')!;
-        const apex = { x: cx, y: cy - 13 }, bR = { x: cx + 9, y: cy + 10 }, bL = { x: cx - 9, y: cy + 10 };
-        const gcx = (apex.x + bR.x + bL.x) / 3, gcy = (apex.y + bR.y + bL.y) / 3;
-        const sv = (v: { x: number; y: number }) => ({ x: gcx + (v.x - gcx) * scale, y: gcy + (v.y - gcy) * scale });
-        const A = sv(apex), B = sv(bR), C = sv(bL);
-        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.lineTo(C.x, C.y);
+        const apexVertex        = { x: centerX,     y: centerY - 13 };
+        const bottomRightVertex = { x: centerX + 9, y: centerY + 10 };
+        const bottomLeftVertex  = { x: centerX - 9, y: centerY + 10 };
+        const triangleCentroidX = (apexVertex.x + bottomRightVertex.x + bottomLeftVertex.x) / 3;
+        const triangleCentroidY = (apexVertex.y + bottomRightVertex.y + bottomLeftVertex.y) / 3;
+        const scaleFromCentroid = (v: { x: number; y: number }) => ({
+            x: triangleCentroidX + (v.x - triangleCentroidX) * scale,
+            y: triangleCentroidY + (v.y - triangleCentroidY) * scale,
+        });
+        const scaledApex        = scaleFromCentroid(apexVertex);
+        const scaledBottomRight = scaleFromCentroid(bottomRightVertex);
+        const scaledBottomLeft  = scaleFromCentroid(bottomLeftVertex);
+        ctx.beginPath(); ctx.moveTo(scaledApex.x, scaledApex.y); ctx.lineTo(scaledBottomRight.x, scaledBottomRight.y); ctx.lineTo(scaledBottomLeft.x, scaledBottomLeft.y);
         ctx.closePath(); ctx.fillStyle = color; ctx.fill();
-        const xSize = 4.5 * scale;
+        const crosshairHalfSize = 4.5 * scale;
         ctx.strokeStyle = '#000000'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(gcx - xSize, gcy - xSize); ctx.lineTo(gcx + xSize, gcy + xSize);
-        ctx.moveTo(gcx + xSize, gcy - xSize); ctx.lineTo(gcx - xSize, gcy + xSize);
+        ctx.moveTo(triangleCentroidX - crosshairHalfSize, triangleCentroidY - crosshairHalfSize); ctx.lineTo(triangleCentroidX + crosshairHalfSize, triangleCentroidY + crosshairHalfSize);
+        ctx.moveTo(triangleCentroidX + crosshairHalfSize, triangleCentroidY - crosshairHalfSize); ctx.lineTo(triangleCentroidX - crosshairHalfSize, triangleCentroidY + crosshairHalfSize);
         ctx.stroke();
-        return ctx.getImageData(0, 0, S, S);
+        return ctx.getImageData(0, 0, canvasSize, canvasSize);
     }
 
     // ---- Sprite registration ----
@@ -362,7 +378,7 @@ class AdsbLiveControl implements maplibregl.IControl {
     // ---- Map layer initialisation ----
 
     initLayers(): void {
-        const vis = this.visible ? 'visible' : 'none';
+        const layerVisibility = this.visible ? 'visible' : 'none';
 
         ['adsb-icons', 'adsb-bracket', 'adsb-trails'].forEach(id => {
             try { this.map.removeLayer(id); } catch(e) {}
@@ -377,7 +393,7 @@ class AdsbLiveControl implements maplibregl.IControl {
         this.map.addSource('adsb-trails-source', { type: 'geojson', data: this._trailsGeojson as GeoJSON.GeoJSON });
         this.map.addLayer({
             id: 'adsb-trails', type: 'circle', source: 'adsb-trails-source',
-            layout: { visibility: vis },
+            layout: { visibility: layerVisibility },
             paint: {
                 'circle-radius': 2.5,
                 'circle-opacity': ['get', 'opacity'],
@@ -395,7 +411,7 @@ class AdsbLiveControl implements maplibregl.IControl {
                 ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
             ] as maplibregl.FilterSpecification,
             layout: {
-                visibility: vis,
+                visibility: layerVisibility,
                 'icon-image': ['case',
                     ['==', ['get', 'squawkEmerg'], 1], 'adsb-bracket-emerg',
                     ['boolean', ['get', 'military'], false], 'adsb-bracket-mil',
@@ -421,7 +437,7 @@ class AdsbLiveControl implements maplibregl.IControl {
                 ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
             ] as maplibregl.FilterSpecification,
             layout: {
-                visibility: vis,
+                visibility: layerVisibility,
                 'icon-image': ['case',
                     ['==', ['get', 'squawkEmerg'], 1],                    'adsb-blip-emerg',
                     ['boolean', ['get', 'military'], false],               'adsb-blip-mil',

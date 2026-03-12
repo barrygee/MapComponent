@@ -80,43 +80,43 @@ window._FilterPanel = (() => {
         return [];
     }
 
-    function _matchesQuery(q: string, ...fields: (string | undefined)[]): boolean {
-        const lq = q.toLowerCase();
-        return fields.some(f => f && f.toLowerCase().includes(lq));
+    function _matchesQuery(query: string, ...fields: (string | undefined)[]): boolean {
+        const lowerQuery = query.toLowerCase();
+        return fields.some(field => field && field.toLowerCase().includes(lowerQuery));
     }
 
     function _search(query: string): SearchResult[] {
-        const q = query.trim();
+        const trimmedQuery = query.trim();
         const results: SearchResult[] = [];
 
-        if (!q) return results;
+        if (!trimmedQuery) return results;
 
         const planes = _getAircraftData();
-        for (const f of planes) {
-            const p = f.properties as AircraftProperties;
-            const callsign = (p.flight || '').trim();
-            const hex      = (p.hex || '').trim();
-            const reg      = (p.r || '').trim();
-            const squawk   = (p.squawk || '').trim();
-            if (_matchesQuery(q, callsign, hex, reg, squawk)) {
-                results.push({ kind: 'plane', feature: f, callsign, hex, reg, squawk, emergency: !!p.emergency && p.emergency !== 'none' });
+        for (const feature of planes) {
+            const props = feature.properties as AircraftProperties;
+            const callsign = (props.flight || '').trim();
+            const hex      = (props.hex || '').trim();
+            const reg      = (props.r || '').trim();
+            const squawk   = (props.squawk || '').trim();
+            if (_matchesQuery(trimmedQuery, callsign, hex, reg, squawk)) {
+                results.push({ kind: 'plane', feature, callsign, hex, reg, squawk, emergency: !!props.emergency && props.emergency !== 'none' });
             }
         }
 
         if (typeof AIRPORTS_DATA !== 'undefined') {
-            for (const f of AIRPORTS_DATA.features) {
-                const p = f.properties as AirportProperties;
-                if (_matchesQuery(q, p.icao, p.iata, p.name)) {
-                    results.push({ kind: 'airport', feature: f as GeoJSON.Feature, name: p.name, icao: p.icao, iata: p.iata });
+            for (const feature of AIRPORTS_DATA.features) {
+                const props = feature.properties as AirportProperties;
+                if (_matchesQuery(trimmedQuery, props.icao, props.iata, props.name)) {
+                    results.push({ kind: 'airport', feature: feature as GeoJSON.Feature, name: props.name, icao: props.icao, iata: props.iata });
                 }
             }
         }
 
         if (typeof RAF_DATA !== 'undefined') {
-            for (const f of RAF_DATA.features) {
-                const p = f.properties as RAFProperties;
-                if (_matchesQuery(q, p.icao, p.name)) {
-                    results.push({ kind: 'mil', feature: f as GeoJSON.Feature, name: p.name, icao: p.icao });
+            for (const feature of RAF_DATA.features) {
+                const props = feature.properties as RAFProperties;
+                if (_matchesQuery(trimmedQuery, props.icao, props.name)) {
+                    results.push({ kind: 'mil', feature: feature as GeoJSON.Feature, name: props.name, icao: props.icao });
                 }
             }
         }
@@ -126,8 +126,8 @@ window._FilterPanel = (() => {
 
     function _selectPlane(feature: GeoJSON.Feature): void {
         if (!adsbControl) return;
-        const p = feature.properties as AircraftProperties;
-        const hex = p.hex;
+        const props = feature.properties as AircraftProperties;
+        const hex = props.hex;
         adsbControl._selectedHex = hex;
         adsbControl._applySelection();
         const coords = adsbControl._interpolatedCoords(hex) || (feature.geometry as GeoJSON.Point).coordinates;
@@ -135,36 +135,36 @@ window._FilterPanel = (() => {
     }
 
     function _selectAirport(feature: GeoJSON.Feature): void {
-        const p = feature.properties as AirportProperties;
-        const b = p.bounds;
+        const props = feature.properties as AirportProperties;
+        const bounds = props.bounds;
         const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right') as HTMLElement | null;
         const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
         const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
         const pad = 80;
         const topExtra = Math.max(0, ctrlH / 2 - pad);
         map.fitBounds(
-            [[b[0], b[1]], [b[2], b[3]]],
+            [[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
             { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 }
         );
         if (airportsControl) {
-            airportsControl._showAirportPanel(p, (feature.geometry as GeoJSON.Point).coordinates as LngLat);
+            airportsControl._showAirportPanel(props, (feature.geometry as GeoJSON.Point).coordinates as LngLat);
         }
     }
 
     function _selectMil(feature: GeoJSON.Feature): void {
-        const p = feature.properties as RAFProperties;
-        const b = p.bounds;
+        const props = feature.properties as RAFProperties;
+        const bounds = props.bounds;
         const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right') as HTMLElement | null;
         const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
         const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
         const pad = 80;
         const topExtra = Math.max(0, ctrlH / 2 - pad);
         map.fitBounds(
-            [[b[0], b[1]], [b[2], b[3]]],
+            [[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
             { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 }
         );
         if (rafControl) {
-            rafControl._showRAFPanel(p, (feature.geometry as GeoJSON.Point).coordinates as LngLat);
+            rafControl._showRAFPanel(props, (feature.geometry as GeoJSON.Point).coordinates as LngLat);
         }
     }
 
@@ -422,9 +422,9 @@ window._FilterPanel = (() => {
         if (!input) return;
 
         input.addEventListener('input', () => {
-            const q = input.value;
-            if (clearBtn) clearBtn.classList.toggle('filter-clear-visible', q.length > 0);
-            _renderResults(_search(q), q);
+            const inputValue = input.value;
+            if (clearBtn) clearBtn.classList.toggle('filter-clear-visible', inputValue.length > 0);
+            _renderResults(_search(inputValue), inputValue);
         });
 
         input.addEventListener('keydown', (e: KeyboardEvent) => {

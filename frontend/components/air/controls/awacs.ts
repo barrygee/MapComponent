@@ -123,13 +123,13 @@ class AWACSToggleControl extends SentinelControlBase {
     initLayers(): void {
         this.map.addSource('awacs-orbits', { type: 'geojson', data: AWACS_ORBITS as GeoJSON.GeoJSON });
 
-        const vis = this.visible ? 'visible' : 'none';
+        const layerVisibility = this.visible ? 'visible' : 'none';
 
         this.map.addLayer({
             id: 'awacs-fill',
             type: 'fill',
             source: 'awacs-orbits',
-            layout: { visibility: vis },
+            layout: { visibility: layerVisibility },
             paint: {
                 'fill-color': 'rgba(200, 255, 0, 0.04)',
                 'fill-outline-color': 'rgba(0,0,0,0)',
@@ -140,7 +140,7 @@ class AWACSToggleControl extends SentinelControlBase {
             id: 'awacs-outline',
             type: 'line',
             source: 'awacs-orbits',
-            layout: { visibility: vis },
+            layout: { visibility: layerVisibility },
             paint: {
                 'line-color': 'rgba(200, 255, 0, 0.75)',
                 'line-width': 1.5,
@@ -151,9 +151,9 @@ class AWACSToggleControl extends SentinelControlBase {
     /** Toggle AWACS layer visibility and persist the new state. */
     toggle(): void {
         this.visible = !this.visible;
-        const vis = this.visible ? 'visible' : 'none';
+        const layerVisibility = this.visible ? 'visible' : 'none';
         ['awacs-fill', 'awacs-outline'].forEach(id => {
-            try { this.map.setLayoutProperty(id, 'visibility', vis); } catch (e) {}
+            try { this.map.setLayoutProperty(id, 'visibility', layerVisibility); } catch (e) {}
         });
         this.setButtonActive(this.visible);
         _saveOverlayStates();

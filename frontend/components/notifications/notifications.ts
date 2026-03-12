@@ -59,8 +59,8 @@ window._Notifications = ((): NotificationsAPI => {
     // ---- Formatting helpers ----
 
     function _formatTimestamp(ts: number): string {
-        const d = new Date(ts);
-        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ' LOCAL';
+        const date = new Date(ts);
+        return String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0') + ' LOCAL';
     }
 
     function _getLabelForType(type: string): string {
