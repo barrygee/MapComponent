@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /usr/local/bin/node /opt/homebrew/bin/node ~/.nvm/versions/node/*/bin/node)",
+      "Read(//Users/barry/.nvm/**)",
+      "Bash(ls /opt/homebrew/bin/n*)",
+      "Bash(export PATH=\"/Users/barry/.nvm/versions/node/v20.10.0/bin:$PATH\")",
+      "Bash(tee /tmp/build_output.txt)",
+      "Bash(echo \"EXIT: $?\")"
+    ]
+  }
+}

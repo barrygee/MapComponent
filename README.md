@@ -167,13 +167,50 @@ sqkTest.restore()                // restore real ADS-B feed
 
 ---
 
+## Frontend TypeScript
+
+The frontend source is written in TypeScript (`.ts` files). TypeScript compiles directly to sibling `.js` files — no bundler is used, and `index.html` loads the compiled `.js` files unchanged.
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) v18+ (via [nvm](https://github.com/nvm-sh/nvm) recommended)
+
+### Install
+
+```bash
+npm install
+```
+
+### Build (compile all `.ts` → `.js`)
+
+```bash
+npm run build
+```
+
+### Watch mode (recompile on save)
+
+```bash
+npm run watch
+```
+
+### Type-check only (no output)
+
+```bash
+npm run typecheck
+```
+
+> Compiled `.js` files are written next to their `.ts` source. The `frontend/components/air/controls/adsb/adsb.js` entry point is loaded by `index.html`.
+
+---
+
 ## Tech Stack
 
 | Component | Technology |
 |-----------|-----------|
 | Map renderer | MapLibre GL JS |
 | Tile format | PMTiles |
-| Frontend | Vanilla JS / CSS |
+| Frontend | TypeScript (compiled to JS) / CSS |
 | Backend | FastAPI + SQLite (aiosqlite / SQLAlchemy) |
-| Package manager | uv |
+| Package manager (frontend) | npm |
+| Package manager (backend) | uv |
 | Server | nginx + uvicorn (Docker) |
