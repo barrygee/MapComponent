@@ -4,29 +4,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENTINEL – SPACE</title>
+    <title>SENTINEL</title>
     <!-- Favicon — ICO (Safari + legacy, always checked at root) -->
-    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="shortcut icon" href="/favicon.ico">
     <!-- Favicon — modern browsers (SVG, scales to any size) -->
-    <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
     <!-- Favicon — PNG fallbacks -->
-    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png">
     <!-- Apple touch icon — iOS / iPadOS / macOS dock -->
-    <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
     <!-- Android / PWA theme colour -->
     <meta name="theme-color" content="#000000">
-    <link href='../assets/maplibre-gl.css' rel='stylesheet' />
+    <link href='/assets/maplibre-gl.css' rel='stylesheet' />
     <link href='https://fonts.googleapis.com/css2?family=Barlow:wght@100;300;400;500;600;700;900&family=Barlow+Condensed:wght@400;500;600;700;900&display=swap' rel='stylesheet' />
-    <link rel="stylesheet" href="../frontend/components/shell/shell.css">
-    <link rel="stylesheet" href="../frontend/components/map/map.css">
-    <link rel="stylesheet" href="../frontend/components/notifications/notifications.css">
-    <link rel="stylesheet" href="../frontend/components/tracking/tracking.css">
-    <link rel="stylesheet" href="../frontend/components/filter/filter.css">
-    <link rel="stylesheet" href="../style.css?v=25">
+    <link rel="stylesheet" href="/frontend/components/shell/shell.css">
+    <link rel="stylesheet" href="/frontend/components/notifications/notifications.css">
+    <link rel="stylesheet" href="/frontend/components/tracking/tracking.css">
+    <link rel="stylesheet" href="/style.css?v=25">
+    {% block head %}{% endblock %}
 </head>
 
-<body data-domain="space">
+<body data-domain="{{ domain }}">
     <header id="nav">
         <div id="nav-logo">
             <svg id="logo-img" viewBox="0 0 410 60" xmlns="http://www.w3.org/2000/svg" aria-label="SENTINEL" overflow="visible">
@@ -42,14 +41,14 @@
             </svg>
         </div>
         <nav id="nav-right">
-            <a href="../air/" class="nav-link" data-domain="air">AIR</a>
-            <a href="../space/" class="nav-link nav-link--active" data-domain="space">SPACE</a>
-            <a href="../sea/" class="nav-link" data-domain="sea">SEA</a>
-            <a href="../land/" class="nav-link" data-domain="land">LAND</a>
+            <a href="/air/" class="nav-link{% if domain == 'air' %} nav-link--active{% endif %}" data-domain="air">AIR</a>
+            <a href="/space/" class="nav-link{% if domain == 'space' %} nav-link--active{% endif %}" data-domain="space">SPACE</a>
+            <a href="/sea/" class="nav-link{% if domain == 'sea' %} nav-link--active{% endif %}" data-domain="sea">SEA</a>
+            <a href="/land/" class="nav-link{% if domain == 'land' %} nav-link--active{% endif %}" data-domain="land">LAND</a>
         </nav>
     </header>
 
-    <div id="map"></div>
+    {% block content %}{% endblock %}
 
     <div id="notifications-panel">
         <div id="notif-header">
@@ -62,7 +61,7 @@
     </div>
 
     <div id="tracking-panel">
-        <div id="tracking-status-bar"></div>
+        <div id="adsb-status-bar"></div>
     </div>
 
     <footer id="footer">
@@ -88,23 +87,28 @@
         </div>
         <div id="footer-right">
             <span id="conn-status" class="conn-checking">—</span>
+            <button id="settings-btn" aria-label="Settings" data-tooltip="SETTINGS">
+                <svg width="18" height="18" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M6.18 1.5h2.64l.38 1.52a5 5 0 0 1 1.1.64l1.5-.5 1.32 2.28-1.16 1.03a5.06 5.06 0 0 1 0 1.26l1.16 1.03-1.32 2.28-1.5-.5a5 5 0 0 1-1.1.64l-.38 1.52H6.18l-.38-1.52a5 5 0 0 1-1.1-.64l-1.5.5L1.88 9.26l1.16-1.03a5.06 5.06 0 0 1 0-1.26L1.88 5.94 3.2 3.66l1.5.5a5 5 0 0 1 1.1-.64L6.18 1.5Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
+                    <circle cx="7.5" cy="7.5" r="1.75" stroke="currentColor" stroke-width="1.1"/>
+                </svg>
+            </button>
             <span id="footer-location" class="footer-label"></span>
         </div>
     </footer>
 
-    <script src="../assets/pmtiles.js"></script>
-    <script src='../assets/maplibre-gl.js'></script>
-    <script src="../frontend/components/notifications/notifications.js"></script>
-    <script src="../frontend/components/tracking/tracking.js"></script>
+    <!-- Core libraries -->
+    <script src="/assets/pmtiles.js"></script>
+    <script src='/assets/maplibre-gl.js'></script>
 
-    <!-- Map component (tile loading, connectivity, geometry helpers) -->
-    <script src="../frontend/components/map/map.js"></script>
+    <!-- Shared components -->
+    <script src="/frontend/components/notifications/notifications.js"></script>
+    <script src="/frontend/components/tracking/tracking.js"></script>
 
-    <!-- Shared boot: panel init + logo animation -->
-    <script src="../frontend/components/shared/boot.js"></script>
-    <!-- Domain status: calls /api/space/status, shows coming-soon banner -->
-    <script src="../frontend/components/shared/domain-status.js"></script>
+    <!-- Map component -->
+    <script src="/frontend/components/map/map.js"></script>
 
+    {% block scripts %}{% endblock %}
 </body>
 
 </html>

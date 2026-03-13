@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block head %}
+    <link rel="stylesheet" href="/frontend/components/map/map.css">
+    <link rel="stylesheet" href="/frontend/components/filter/filter.css">
+{% endblock %}
+
+{% block content %}
+    <div id="map"></div>
+{% endblock %}
+
+{% block scripts %}
+    <!-- Air component: shared globals and state -->
+    <script src="/frontend/components/air/init/air-globals.js"></script>
+    <script src="/frontend/components/air/overlay/overlay-state.js"></script>
+    <script src="/frontend/components/air/init/map-alias.js"></script>
+
+    <!-- Air component: map overlay controls -->
+    <script src="/frontend/components/air/controls/sentinel-control-base/sentinel-control-base.js"></script>
+    <script src="/frontend/components/air/controls/roads/roads.js"></script>
+    <script src="/frontend/components/air/controls/reset-view/reset-view.js"></script>
+    <script src="/frontend/components/air/controls/airports/airports.js"></script>
+    <script src="/frontend/components/air/controls/raf/raf.js"></script>
+    <script src="/frontend/components/air/controls/names/names.js"></script>
+    <script src="/frontend/components/air/controls/range-rings/range-rings.js"></script>
+    <script src="/frontend/components/air/controls/aara/aara.js"></script>
+    <script src="/frontend/components/air/controls/awacs/awacs.js"></script>
+    <script src="/frontend/components/air/controls/adsb/adsb.js"></script>
+    <script src="/frontend/components/air/controls/adsb-labels/adsb-labels.js"></script>
+    <script src="/frontend/components/air/controls/clear-overlays/clear-overlays.js"></script>
+
+    <!-- Style reload re-init (must follow all controls) -->
+    <script src="/frontend/components/air/init/overlay-reinit.js"></script>
+
+    <!-- Side panel, filter, user location, boot -->
+    <script src="/frontend/components/air/overlay/side-menu.js"></script>
+    <script src="/frontend/components/filter/filter.js"></script>
+    <script src="/frontend/components/air/user-location/user-location.js"></script>
+    <script src="/frontend/components/air/init/boot.js"></script>
+
+    <script src="/squawk-test.js"></script>
+{% endblock %}

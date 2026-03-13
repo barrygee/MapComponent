@@ -1,12 +1,19 @@
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from backend.database import create_tables
 from backend.routers import air, space, sea, land
+
+
+ROOT_DIR = Path(__file__).parent.parent
+TEMPLATES_DIR = ROOT_DIR / "frontend" / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 @asynccontextmanager
@@ -35,5 +42,49 @@ async def health_check():
     return JSONResponse({"status": "ok", "timestamp": int(time.time() * 1000)})
 
 
-# Serve the project root as static files (dev convenience — nginx handles this in production)
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
+# ── Root-level static files ────────────────────────────────────────────────────
+
+@app.get("/style.css")
+async def style_css():
+    return FileResponse(ROOT_DIR / "style.css", media_type="text/css")
+
+@app.get("/favicon.ico")
+async def favicon_ico():
+    return FileResponse(ROOT_DIR / "favicon.ico", media_type="image/x-icon")
+
+@app.get("/squawk-test.js")
+async def squawk_test_js():
+    return FileResponse(ROOT_DIR / "squawk-test.js", media_type="application/javascript")
+
+
+# ── Page routes ────────────────────────────────────────────────────────────────
+
+@app.get("/")
+async def root_redirect():
+    return RedirectResponse(url="/air/", status_code=302)
+
+
+@app.get("/air/")
+async def air_page(request: Request):
+    return templates.TemplateResponse("air/index.html", {"request": request, "domain": "air"})
+
+
+@app.get("/sea/")
+async def sea_page(request: Request):
+    return templates.TemplateResponse("sea/index.html", {"request": request, "domain": "sea"})
+
+
+@app.get("/space/")
+async def space_page(request: Request):
+    return templates.TemplateResponse("space/index.html", {"request": request, "domain": "space"})
+
+
+@app.get("/land/")
+async def land_page(request: Request):
+    return templates.TemplateResponse("land/index.html", {"request": request, "domain": "land"})
+
+
+# ── Static files ───────────────────────────────────────────────────────────────
+# Mount specific directories rather than "/" so page routes are never shadowed.
+app.mount("/assets",   StaticFiles(directory=str(ROOT_DIR / "assets")),   name="assets")
+app.mount("/frontend", StaticFiles(directory=str(ROOT_DIR / "frontend")),  name="frontend")
