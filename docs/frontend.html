@@ -54,6 +54,8 @@
     <a href="#index-html">index.html</a>
     <a href="#main-js">main.js</a>
     <a href="#squawk-test">squawk-test.js</a>
+    <h4>Testing</h4>
+    <a href="#testing">Jest test suite</a>
   </nav>
   <main class="main">
 
@@ -819,6 +821,112 @@
       </table>
       <div class="callout">
         ADS-B polls run automatically every 5 s — after calling <code>enterEmergency()</code> you just wait for the next poll. Always call <code>sqkTest.restore()</code> when done to re-enable real data.
+      </div>
+    </div>
+
+    <div class="section" id="testing">
+      <h2>Testing</h2>
+      <p>
+        The TypeScript test suite uses <a href="https://jestjs.io/" target="_blank">Jest</a> with
+        <a href="https://kulshekhar.github.io/ts-jest/" target="_blank">ts-jest</a> for TypeScript
+        transpilation and <code>jest-environment-jsdom</code> for a browser-like DOM environment.
+        Tests run entirely in Node — no browser, no MapLibre instance, no server required.
+      </p>
+
+      <h3>Running the tests</h3>
+      <p>Ensure Node.js v18+ is installed and <code>npm install</code> has been run once.</p>
+
+      <table>
+        <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>npm test</code></td><td>Run the full test suite</td></tr>
+          <tr><td><code>npm run test:coverage</code></td><td>Run tests and emit an Istanbul coverage report to <code>coverage/</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Test files</h3>
+      <p>All test files live in <code>tests/</code> at the project root.</p>
+
+      <table>
+        <thead><tr><th>File</th><th>Source module</th><th>What is covered</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>tests/geometry-helpers.test.ts</code></td>
+            <td><code>frontend/components/shared/map/map.ts</code></td>
+            <td>
+              <code>generateGeodesicCircle</code> — 181-point great-circle ring, per-point haversine distance check, ring closure;<br>
+              <code>buildRingsGeoJSON</code> — 5 LineString features + 5 Point labels, label text, north alignment;<br>
+              <code>computeCentroid</code> — shoelace formula for squares, rectangles, and triangles;<br>
+              <code>computeTextRotate</code> — bearing normalised to (−90°, 90°], rounded to 1 d.p.;<br>
+              <code>computeLongestEdge</code> — correct endpoints for rectangles, triangles, equal-edge squares;<br>
+              <code>RING_DISTANCES_NM</code> — correct values and count
+            </td>
+          </tr>
+          <tr>
+            <td><code>tests/notification-helpers.test.ts</code></td>
+            <td><code>frontend/components/shared/notifications/notifications.ts</code></td>
+            <td>
+              <code>_formatTimestamp</code> — zero-padded HH:MM LOCAL output, timezone-agnostic construction;<br>
+              <code>_getLabelForType</code> — all nine <code>NotificationType</code> values, unknown-type fallback, case-sensitivity
+            </td>
+          </tr>
+          <tr>
+            <td><code>tests/filter-search.test.ts</code></td>
+            <td><code>frontend/components/air/air-filter/air-filter.ts</code></td>
+            <td>
+              <code>_matchesQuery</code> — exact match, substring, case-insensitive, undefined fields, empty fields;<br>
+              <code>_search</code> logic — aircraft by callsign/hex/reg/squawk, airports by ICAO/IATA/name, military bases, cross-category results, whitespace trimming, empty query short-circuit
+            </td>
+          </tr>
+          <tr>
+            <td><code>tests/sentinel-control-base.test.ts</code></td>
+            <td><code>frontend/components/air/controls/sentinel-control-base/sentinel-control-base.ts</code></td>
+            <td>
+              <code>onAdd</code> — returns container, sets CSS class, stores map ref, creates button, calls <code>onInit()</code>;<br>
+              <code>onRemove</code> — detaches from DOM, clears map ref, safe no-op without parent;<br>
+              <code>setButtonActive</code> — lime (#c8ff00) / white (#ffffff) colour, 1 / 0.3 opacity;<br>
+              click delegation — <code>handleClick()</code> invoked per click;<br>
+              hover events — background toggles between #111 and #000
+            </td>
+          </tr>
+          <tr>
+            <td><code>tests/overlay-state.test.ts</code></td>
+            <td><code>frontend/components/air/overlay/overlay-state.ts</code></td>
+            <td>
+              <code>OVERLAY_DEFAULTS</code> — all nine key names and their boolean defaults;<br>
+              <code>loadOverlayStates</code> — returns defaults on null / empty / malformed JSON, merges partial saves, full-save round-trip;<br>
+              <code>serializeOverlayStates</code> — produces parseable JSON, changed values survive round-trip
+            </td>
+          </tr>
+          <tr>
+            <td><code>tests/user-location-cache.test.ts</code></td>
+            <td><code>frontend/components/air/user-location/user-location.ts</code></td>
+            <td>
+              <code>parseStoredLocationJson</code> — null / empty / malformed JSON handling, GPS payload, manual flag;<br>
+              <code>shouldRestoreCachedLocation</code> — 5-minute expiry boundary, missing ts, manual pins never expire;<br>
+              <code>shouldGpsUpdateBeBlocked</code> — blocked by manual pin, allowed for cache/manual overrides;<br>
+              storage payload builders — correct structure for GPS fix and manual pin;<br>
+              coordinate formatting — <code>toFixed(3)</code) on positive, negative, zero, and whole-number values
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Configuration files</h3>
+      <table>
+        <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>jest.config.js</code></td><td>Jest configuration — <code>ts-jest</code> preset, <code>jsdom</code> environment, <code>tests/**/*.test.ts</code> glob, coverage source paths</td></tr>
+          <tr><td><code>tsconfig.test.json</code></td><td>TypeScript compiler options for tests — <code>CommonJS</code> module output required by Jest's Node runtime, <code>@types/jest</code> and <code>@types/node</code> included</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        Because the frontend TypeScript files bootstrap MapLibre GL, register pmtiles protocols,
+        and read/write DOM globals at module-evaluation time, the test suite re-implements the
+        pure logic functions verbatim rather than importing the original files. This keeps
+        tests fast and side-effect-free. Any change to a source function must also be
+        applied to its copy in the relevant test file.
       </div>
     </div>
 

@@ -4,10 +4,16 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "maplibre-gl": "^4.5.0"
+    "@types/jest": "^30.0.0",
+    "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.3.0",
+    "maplibre-gl": "^4.5.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.4.0"
   }
 }

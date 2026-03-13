@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        // CommonJS is required because Jest runs in Node and cannot load ES modules natively
+        "module": "CommonJS",
+        "moduleResolution": "Node",
+        "target": "ES2020",
+        "lib": ["ES2020", "DOM", "DOM.Iterable"],
+        "strict": true,
+        "noImplicitAny": true,
+        // exactOptionalPropertyTypes causes test object literals to need explicit
+        // undefined assignments — disable for test ergonomics only
+        "exactOptionalPropertyTypes": false,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "types": ["jest", "node"]
+    },
+    "include": ["tests/**/*.ts"]
+}
