@@ -126,9 +126,30 @@ uv add <package>
 | Reverse geocoding | [Nominatim](https://nominatim.openstreetmap.org) — throttled, cached 10 min |
 | Map tiles (online) | [OpenFreeMap](https://openfreemap.org) vector tiles |
 | Map tiles (offline) | Locally bundled PMTiles (`uk.pmtiles`, `surroundings.pmtiles`) |
+| World overview tiles | Natural Earth raster tiles downloaded via `download-world-tiles.py` |
 | Airports, RAF bases, AARA, AWACS | Hardcoded GeoJSON in `main.js` |
 
-Offline tiles cover approximately 20°W–32°E, 44°N–67°N. Download with `download-world-tiles.sh` or `download-world-tiles.py`.
+Offline tiles cover approximately 20°W–32°E, 44°N–67°N.
+
+---
+
+## Downloading World Overview Tiles
+
+SENTINEL uses Natural Earth raster tiles (zoom 0–6) as a world-overview background layer. These are not bundled in the repo and must be downloaded separately before running offline.
+
+```bash
+python3 download-world-tiles.py
+```
+
+This downloads **5,461 PNG tiles** from [OpenFreeMap](https://openfreemap.org) (Natural Earth 2 with shading/relief) and saves them to `assets/tiles/world/{z}/{x}/{y}.png`.
+
+- Skips tiles that already exist — safe to re-run if interrupted
+- Uses 6 parallel workers
+- Prints progress every 200 tiles
+
+**You only need to run this once.** The tiles are static and do not change.
+
+> Requires Python 3 (stdlib only — no pip installs needed).
 
 ---
 

@@ -30,6 +30,7 @@
     <a href="#data-flow">Data Flow</a>
     <a href="#connectivity">Online / Offline</a>
     <a href="#deployment">Deployment</a>
+    <a href="#world-tiles">World Tiles</a>
     <a href="#directories">Directory Structure</a>
   </nav>
   <main class="main">
@@ -292,6 +293,33 @@ docker compose down -v</code></pre>
       </div>
     </div>
 
+    <div class="section" id="world-tiles">
+      <h2>World Overview Tiles</h2>
+      <p>SENTINEL uses Natural Earth raster tiles (zoom 0–6) as a world-overview background layer. These are not bundled in the repository and must be downloaded once before the offline map will display correctly at low zoom levels.</p>
+
+      <h3>Download</h3>
+      <pre><code>python3 download-world-tiles.py</code></pre>
+      <p>Downloads <strong>5,461 PNG tiles</strong> from <a href="https://openfreemap.org">OpenFreeMap</a> (Natural Earth 2 with shading and relief) and saves them to <code>assets/tiles/world/{z}/{x}/{y}.png</code>.</p>
+
+      <h3>Behaviour</h3>
+      <table>
+        <thead><tr><th>Property</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Source</td><td>OpenFreeMap — Natural Earth 2 SR (<code>ne2sr</code>)</td></tr>
+          <tr><td>Zoom range</td><td>0–6</td></tr>
+          <tr><td>Total tiles</td><td>5,461 PNG files</td></tr>
+          <tr><td>Output path</td><td><code>assets/tiles/world/{z}/{x}/{y}.png</code></td></tr>
+          <tr><td>Concurrency</td><td>6 parallel workers</td></tr>
+          <tr><td>Skip existing</td><td>Yes — safe to re-run if interrupted</td></tr>
+          <tr><td>Requirements</td><td>Python 3 stdlib only (no pip installs)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        You only need to run this once. The Natural Earth tiles are static and do not change. Incomplete downloads (e.g. zero-byte files from network errors) are automatically removed so the script can be safely re-run.
+      </div>
+    </div>
+
     <div class="section" id="directories">
       <h2>Directory Structure</h2>
       <pre><code>MapComponent/
@@ -302,9 +330,11 @@ docker compose down -v</code></pre>
 ├── package.json                # TypeScript build config
 ├── docker-compose.yml          # Multi-container orchestration
 ├── Dockerfile                  # Frontend nginx image
+├── download-world-tiles.py     # One-time download of Natural Earth overview tiles (zoom 0–6)
 ├── assets/                     # MapLibre/PMTiles JS, sprite sheets, map styles
 │   ├── fiord.json              # Offline map style
 │   ├── fiord-online.json       # Online map style
+│   ├── tiles/world/            # Natural Earth raster tiles (generated — not in repo)
 │   └── …
 ├── backend/
 │   ├── Dockerfile              # Backend image
