@@ -20,7 +20,7 @@
             banner.id = 'domain-status-banner';
             banner.innerHTML =
                 `<span class="domain-status-label">${domain.toUpperCase()}</span>` +
-                `<span class="domain-status-msg">DOMAIN COMING SOON</span>`;
+                `<span class="domain-status-msg">COMING SOON</span>`;
             document.body.appendChild(banner);
         })
         .catch(() => { /* backend unavailable — show nothing */ });

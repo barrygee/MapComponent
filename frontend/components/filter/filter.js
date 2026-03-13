@@ -1,13 +1,13 @@
 "use strict";
 // ============================================================
 // FILTER PANEL  (_FilterPanel IIFE)
-// Real-time search across live aircraft, airports, and RAF bases.
+// Real-time search across live aircraft, airports, and military bases.
 // Integrated into the side menu; results wire directly to map selection/zoom.
 //
 // PUBLIC API: init(), toggle(), open(), close()
 // DOM: #filter-panel, #filter-input, #filter-results, #filter-clear-btn, #filter-mode-bar
-// Depends on: map (global alias), adsbControl, AIRPORTS_DATA, RAF_DATA,
-//             airportsControl, rafControl, _syncSideMenuForPlanes
+// Depends on: map (global alias), adsbControl, AIRPORTS_DATA, MILITARY_BASES_DATA,
+//             airportsControl, militaryBasesControl, _syncSideMenuForPlanes
 // ============================================================
 /// <reference path="../globals.d.ts" />
 /// <reference path="../types.ts" />
@@ -79,8 +79,8 @@ window._FilterPanel = (() => {
                 }
             }
         }
-        if (typeof RAF_DATA !== 'undefined') {
-            for (const f of RAF_DATA.features) {
+        if (typeof MILITARY_BASES_DATA !== 'undefined') {
+            for (const f of MILITARY_BASES_DATA.features) {
                 const p = f.properties;
                 if (_matchesQuery(q, p.icao, p.name)) {
                     results.push({ kind: 'mil', feature: f, name: p.name, icao: p.icao });
@@ -121,8 +121,8 @@ window._FilterPanel = (() => {
         const pad = 80;
         const topExtra = Math.max(0, ctrlH / 2 - pad);
         map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 });
-        if (rafControl) {
-            rafControl._showRAFPanel(p, feature.geometry.coordinates);
+        if (militaryBasesControl) {
+            militaryBasesControl._showMilitaryBasesPanel(p, feature.geometry.coordinates);
         }
     }
     function _renderResults(results, query) {

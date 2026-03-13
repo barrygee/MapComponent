@@ -1,12 +1,12 @@
 // ============================================================
 // FILTER PANEL  (_FilterPanel IIFE)
-// Real-time search across live aircraft, airports, and RAF bases.
+// Real-time search across live aircraft, airports, and military bases.
 // Integrated into the side menu; results wire directly to map selection/zoom.
 //
 // PUBLIC API: init(), toggle(), open(), close()
 // DOM: #filter-panel, #filter-input, #filter-results, #filter-clear-btn, #filter-mode-bar
-// Depends on: map (global alias), adsbControl, AIRPORTS_DATA, RAF_DATA,
-//             airportsControl, rafControl, _syncSideMenuForPlanes
+// Depends on: map (global alias), adsbControl, AIRPORTS_DATA, MILITARY_BASES_DATA,
+//             airportsControl, militaryBasesControl, _syncSideMenuForPlanes
 // ============================================================
 
 /// <reference path="../globals.d.ts" />
@@ -112,9 +112,9 @@ window._FilterPanel = (() => {
             }
         }
 
-        if (typeof RAF_DATA !== 'undefined') {
-            for (const feature of RAF_DATA.features) {
-                const props = feature.properties as RAFProperties;
+        if (typeof MILITARY_BASES_DATA !== 'undefined') {
+            for (const feature of MILITARY_BASES_DATA.features) {
+                const props = feature.properties as MilitaryBaseProperties;
                 if (_matchesQuery(trimmedQuery, props.icao, props.name)) {
                     results.push({ kind: 'mil', feature: feature as GeoJSON.Feature, name: props.name, icao: props.icao });
                 }
@@ -152,7 +152,7 @@ window._FilterPanel = (() => {
     }
 
     function _selectMil(feature: GeoJSON.Feature): void {
-        const props = feature.properties as RAFProperties;
+        const props = feature.properties as MilitaryBaseProperties;
         const bounds = props.bounds;
         const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right') as HTMLElement | null;
         const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
@@ -163,8 +163,8 @@ window._FilterPanel = (() => {
             [[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
             { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 }
         );
-        if (rafControl) {
-            rafControl._showRAFPanel(props, (feature.geometry as GeoJSON.Point).coordinates as LngLat);
+        if (militaryBasesControl) {
+            militaryBasesControl._showMilitaryBasesPanel(props, (feature.geometry as GeoJSON.Point).coordinates as LngLat);
         }
     }
 

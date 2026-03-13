@@ -21,8 +21,8 @@ window.MapComponent.onStyleLoad(function () {
         awacsControl.initLayers();
     if (airportsControl)
         airportsControl.initLayers();
-    if (rafControl)
-        rafControl.initLayers();
+    if (militaryBasesControl)
+        militaryBasesControl.initLayers();
     if (adsbControl)
         adsbControl.initLayers();
 });

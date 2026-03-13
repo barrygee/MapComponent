@@ -1,5 +1,5 @@
 // ============================================================
-// RAF TOGGLE CONTROL
+// MILITARY BASES TOGGLE CONTROL
 // 24 RAF/USAF bases in the UK with HTML label markers,
 // hover "click to zoom" panels, and a click-to-zoom status bar panel.
 //
@@ -12,7 +12,7 @@
 /// <reference path="../../types.ts" />
 /// <reference path="sentinel-control-base.ts" />
 
-const RAF_DATA: GeoJSON.FeatureCollection<GeoJSON.Point, RAFProperties> = {
+const MILITARY_BASES_DATA: GeoJSON.FeatureCollection<GeoJSON.Point, MilitaryBaseProperties> = {
     type: 'FeatureCollection',
     features: [
         { type: 'Feature', properties: { icao: 'EGUB', name: 'RAF Benson',       bounds: [-1.1200, 51.6020, -1.0720, 51.6300] }, geometry: { type: 'Point', coordinates: [ -1.0972,  51.6164] } },
@@ -42,17 +42,17 @@ const RAF_DATA: GeoJSON.FeatureCollection<GeoJSON.Point, RAFProperties> = {
     ],
 };
 
-class RAFToggleControl extends SentinelControlBase {
+class MilitaryBasesToggleControl extends SentinelControlBase {
     visible: boolean;
     private _markers: maplibregl.Marker[] | null = null;
 
     constructor() {
         super();
-        this.visible = _overlayStates.raf;
+        this.visible = _overlayStates.militaryBases;
     }
 
     get buttonLabel(): string { return 'MIL'; }
-    get buttonTitle(): string { return 'Toggle RAF bases'; }
+    get buttonTitle(): string { return 'Toggle military bases'; }
 
     protected onInit(): void {
         this.button.style.fontSize = '8px';
@@ -71,7 +71,7 @@ class RAFToggleControl extends SentinelControlBase {
         super.onRemove();
     }
 
-    _buildRAFPanelHTML(p: RAFProperties, coords: LngLat): string {
+    _buildMilitaryBasesPanelHTML(p: MilitaryBaseProperties, coords: LngLat): string {
         const lat = coords[1].toFixed(4);
         const lng = coords[0].toFixed(4);
         const fields: [string, string][] = [
@@ -86,7 +86,7 @@ class RAFToggleControl extends SentinelControlBase {
             `</div>`
         ).join('');
         return `<div class="adsb-sb-header">` +
-            `<span class="adsb-sb-label-tag">RAF BASE</span>` +
+            `<span class="adsb-sb-label-tag">MIL BASE</span>` +
             `<button class="adsb-sb-untrack-btn" id="apt-panel-close">CLOSE</button>` +
             `</div>` +
             `<div class="adsb-sb-header" style="border-top:none;border-bottom:1px solid rgba(255,255,255,0.08);height:auto;padding:8px 14px 9px">` +
@@ -95,7 +95,7 @@ class RAFToggleControl extends SentinelControlBase {
             `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
     }
 
-    _showRAFPanel(p: RAFProperties, coords: LngLat): void {
+    _showMilitaryBasesPanel(p: MilitaryBaseProperties, coords: LngLat): void {
         let bar = document.getElementById('adsb-status-bar');
         if (!bar) {
             bar = document.createElement('div');
@@ -105,7 +105,7 @@ class RAFToggleControl extends SentinelControlBase {
             else               document.body.appendChild(bar);
         }
         bar.dataset['apt'] = '1';
-        bar.innerHTML      = this._buildRAFPanelHTML(p, coords);
+        bar.innerHTML      = this._buildMilitaryBasesPanelHTML(p, coords);
         bar.classList.add('adsb-sb-visible');
         if (typeof window._Tracking !== 'undefined') { window._Tracking.setCount(1); window._Tracking.openPanel(); }
 
@@ -120,11 +120,11 @@ class RAFToggleControl extends SentinelControlBase {
     }
 
     initLayers(): void {
-        if (this.map.getSource('raf-bases')) this.map.removeSource('raf-bases');
-        this.map.addSource('raf-bases', { type: 'geojson', data: RAF_DATA });
+        if (this.map.getSource('military-bases')) this.map.removeSource('military-bases');
+        this.map.addSource('military-bases', { type: 'geojson', data: MILITARY_BASES_DATA });
 
         if (!this._markers) {
-            this._markers = RAF_DATA.features.map(f => {
+            this._markers = MILITARY_BASES_DATA.features.map(f => {
                 const p      = f.properties;
                 const coords = f.geometry.coordinates as LngLat;
 
@@ -144,7 +144,7 @@ class RAFToggleControl extends SentinelControlBase {
                     const easeOpts: maplibregl.EaseToOptions = { center: coords, zoom: 16, duration: 800 };
                     if (pitch !== undefined) easeOpts.pitch = pitch;
                     this.map.easeTo(easeOpts);
-                    this._showRAFPanel(p, coords);
+                    this._showMilitaryBasesPanel(p, coords);
                 });
 
                 let hintPanel: HTMLDivElement | null = null;
@@ -183,5 +183,5 @@ class RAFToggleControl extends SentinelControlBase {
     }
 }
 
-rafControl = new RAFToggleControl();
-map.addControl(rafControl, 'top-right');
+militaryBasesControl = new MilitaryBasesToggleControl();
+map.addControl(militaryBasesControl, 'top-right');

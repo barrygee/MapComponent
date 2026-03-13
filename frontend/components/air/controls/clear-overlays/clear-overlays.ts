@@ -49,7 +49,7 @@ class ClearOverlaysControl extends SentinelControlBase {
             aar:        aarControl        ? aarControl.visible                  : false,
             awacs:      awacsControl      ? awacsControl.visible                : false,
             airports:   airportsControl   ? airportsControl.visible             : false,
-            raf:        rafControl        ? rafControl.visible                  : false,
+            militaryBases: militaryBasesControl ? militaryBasesControl.visible  : false,
             adsb:       adsbControl       ? adsbControl.visible                 : false,
             adsbLabels: adsbLabelsControl ? adsbLabelsControl.labelsVisible     : false,
         };
@@ -60,7 +60,7 @@ class ClearOverlaysControl extends SentinelControlBase {
         if (aarControl        && aarControl.visible)              aarControl.toggle();
         if (awacsControl      && awacsControl.visible)            awacsControl.toggle();
         if (airportsControl   && airportsControl.visible)         airportsControl.toggle();
-        if (rafControl        && rafControl.visible)              rafControl.toggle();
+        if (militaryBasesControl && militaryBasesControl.visible) militaryBasesControl.toggle();
 
         if (adsbControl && adsbControl.visible) {
             adsbControl.setAllHidden(true);
@@ -89,7 +89,7 @@ class ClearOverlaysControl extends SentinelControlBase {
         if (aarControl        && savedStates.aar        && !aarControl.visible)              aarControl.toggle();
         if (awacsControl      && savedStates.awacs      && !awacsControl.visible)            awacsControl.toggle();
         if (airportsControl   && savedStates.airports   && !airportsControl.visible)         airportsControl.toggle();
-        if (rafControl        && savedStates.raf        && !rafControl.visible)              rafControl.toggle();
+        if (militaryBasesControl && savedStates.militaryBases && !militaryBasesControl.visible) militaryBasesControl.toggle();
 
         if (adsbControl && savedStates.adsb) {
             adsbControl.setAllHidden(false);

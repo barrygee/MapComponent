@@ -7,7 +7,7 @@
 //
 // Depends on (all globals):
 //   map, adsbControl, adsbLabelsControl, rangeRingsControl,
-//   airportsControl, rafControl, aarControl, awacsControl,
+//   airportsControl, militaryBasesControl, aarControl, awacsControl,
 //   namesControl, roadsControl, clearControl, _FilterPanel
 // ============================================================
 /// <reference path="../globals.d.ts" />
@@ -228,8 +228,8 @@
         airportsControl.toggle(); });
     cvlBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(cvlBtn);
-    const milBtn = makeOverlayBtn('MIL', '8px', 'MILITARY BASES', () => rafControl ? rafControl.visible : false, () => { if (rafControl)
-        rafControl.toggle(); });
+    const milBtn = makeOverlayBtn('MIL', '8px', 'MILITARY BASES', () => militaryBasesControl ? militaryBasesControl.visible : false, () => { if (militaryBasesControl)
+        militaryBasesControl.toggle(); });
     milBtn.classList.add('sm-expanded-only');
     overlayGroup.appendChild(milBtn);
     const citiesBtn = makeOverlayBtn('N', '14px', 'LOCATIONS', () => namesControl ? namesControl.namesVisible : false, () => { if (namesControl)

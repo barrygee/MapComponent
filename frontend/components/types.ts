@@ -18,12 +18,12 @@ interface OverlayStates {
     aar:        boolean;
     awacs:      boolean;
     airports:   boolean;
-    raf:        boolean;
+    militaryBases: boolean;
     adsb:       boolean;
     adsbLabels: boolean;
 }
 
-// ----- Airport / RAF data -----
+// ----- Airport / Military base data -----
 interface AirportFrequencies {
     tower:    string;
     radar:    string;
@@ -39,7 +39,7 @@ interface AirportProperties {
     freqs:  AirportFrequencies;
 }
 
-interface RAFProperties {
+interface MilitaryBaseProperties {
     icao:   string;
     name:   string;
     bounds: LngLatBounds;

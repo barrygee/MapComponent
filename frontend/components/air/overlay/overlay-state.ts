@@ -14,7 +14,7 @@ const _OVERLAY_DEFAULTS: OverlayStates = {
     aar:        false,
     awacs:      false,
     airports:   true,
-    raf:        false,
+    militaryBases: false,
     adsb:       true,
     adsbLabels: true,
 };
@@ -45,7 +45,7 @@ function _saveOverlayStates(): void {
             aar:        aarControl        ? aarControl.visible                  : _overlayStates.aar,
             awacs:      awacsControl      ? awacsControl.visible                : _overlayStates.awacs,
             airports:   airportsControl   ? airportsControl.visible             : _overlayStates.airports,
-            raf:        rafControl        ? rafControl.visible                  : _overlayStates.raf,
+            militaryBases: militaryBasesControl ? militaryBasesControl.visible  : _overlayStates.militaryBases,
             adsb:       adsbControl       ? adsbControl.visible                 : _overlayStates.adsb,
             adsbLabels: adsbLabelsControl ? adsbLabelsControl.labelsVisible     : _overlayStates.adsbLabels,
         }));
