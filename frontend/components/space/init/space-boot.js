@@ -4,11 +4,23 @@
 // The final script in the space page load order.
 //
 // Responsibilities:
-//   1. Initialise shared notification panel
-//   2. Play the SENTINEL logo animation
+//   1. Start the GPS watchPosition watcher
+//   2. Initialise shared notification panel
+//   3. Play the SENTINEL logo animation
 // ============================================================
 
-// ---- 1. Panel initialisation ----
+// ---- 1. GPS watcher ----
+if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(
+        setSpaceUserLocation,
+        function (error) { console.error('[space/location] watchPosition error:', error.code, error.message); },
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
+    );
+} else {
+    console.warn('[space/location] geolocation not available in navigator');
+}
+
+// ---- 2. Panel initialisation ----
 if (typeof window._Notifications !== 'undefined') {
     window._Notifications.init();
 }

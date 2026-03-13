@@ -14,3 +14,7 @@ let daynightControl = null;
 
 // Side-menu sync callback — assigned by space-side-menu.js IIFE on load
 let _spaceSyncSideMenu = null;
+
+// User location — set by space-user-location.js
+let spaceUserLocationCenter = null;
+let _onGoToSpaceUserLocation = null;

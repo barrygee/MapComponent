@@ -53,6 +53,14 @@
         <path d="M15 2C10 2 5 6.5 5 12s5 10 10 10c-6 0-11-4.5-11-10S9 2 15 2z" fill="#ffffff"/>
     </svg>`;
 
+    const LOC_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="4" stroke="#c8ff00" stroke-width="1.8" fill="none"/>
+        <line x1="12" y1="2" x2="12" y2="7" stroke="#c8ff00" stroke-width="1.8"/>
+        <line x1="12" y1="17" x2="12" y2="22" stroke="#c8ff00" stroke-width="1.8"/>
+        <line x1="2" y1="12" x2="7" y2="12" stroke="#c8ff00" stroke-width="1.8"/>
+        <line x1="17" y1="12" x2="22" y2="12" stroke="#c8ff00" stroke-width="1.8"/>
+    </svg>`;
+
     function makeNavBtn(content, title, onClick, isHTML) {
         const btn = document.createElement('button');
         btn.className = 'sm-nav-btn';
@@ -104,10 +112,33 @@
     toggleGroup.appendChild(toggleBtn);
     panel.appendChild(toggleGroup);
 
-    // ---- Group 2: zoom in / zoom out ----
+    // ---- Group 2: zoom in / zoom out / go to location ----
     const navGroup = makeGroup('ssm-group-nav');
     navGroup.appendChild(makeNavBtn('+', 'Zoom in', () => map.zoomIn()));
     navGroup.appendChild(makeNavBtn('−', 'Zoom out', () => map.zoomOut()));
+
+    const locBtn = makeNavBtn(LOC_SVG, 'Go to my location', () => goToSpaceUserLocation(), true);
+    navGroup.appendChild(locBtn);
+
+    // Activate locBtn after flying to location; deactivate on pan/zoom-out
+    _onGoToSpaceUserLocation = function () {
+        locBtn.classList.add('active');
+        const startZoom = map.getZoom();
+        function deactivate() {
+            locBtn.classList.remove('active');
+            map.off('moveend', onMoveEnd);
+            map.off('zoom', onZoom);
+        }
+        function onZoom() {
+            if (map.getZoom() < startZoom - 2) deactivate();
+        }
+        function onMoveEnd() { deactivate(); }
+        map.once('moveend', function () {
+            map.on('moveend', onMoveEnd);
+            map.on('zoom', onZoom);
+        });
+    };
+
     panel.appendChild(navGroup);
 
     // ---- Group 3: ISS + ground track + footprint ----
