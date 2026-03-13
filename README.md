@@ -69,9 +69,9 @@ nginx (:8080)          — serves static files (index.html, main.js, assets)
                            ├── GET  /api/air/tracking
                            ├── POST /api/air/tracking
                            ├── DELETE /api/air/tracking/{hex}
-                           ├── GET  /api/space/status
-                           ├── GET  /api/sea/status
-                           └── GET  /api/land/status
+                           ├── GET  /api/space/status  (stub — not called by frontend)
+                           ├── GET  /api/sea/status    (stub — not called by frontend)
+                           └── GET  /api/land/status   (stub — not called by frontend)
 ```
 
 ### Backend (`backend/`)
