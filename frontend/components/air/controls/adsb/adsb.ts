@@ -1586,5 +1586,4 @@ class AdsbLiveControl implements maplibregl.IControl {
 adsbControl = new AdsbLiveControl();
 map.addControl(adsbControl, 'top-right');
 
-// Expose on window for dev testing via squawk-test.js
-window._adsb = adsbControl;
+

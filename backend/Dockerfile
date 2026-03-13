@@ -13,7 +13,7 @@ RUN uv sync --frozen --no-dev
 COPY backend/ ./backend/
 
 # Copy static files so FastAPI can serve them
-COPY index.html main.js style.css squawk-test.js favicon.ico ./
+COPY style.css ./
 COPY frontend/ ./frontend/
 
 RUN mkdir -p /app/data

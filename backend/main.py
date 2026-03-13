@@ -50,11 +50,7 @@ async def style_css():
 
 @app.get("/favicon.ico")
 async def favicon_ico():
-    return FileResponse(ROOT_DIR / "favicon.ico", media_type="image/x-icon")
-
-@app.get("/squawk-test.js")
-async def squawk_test_js():
-    return FileResponse(ROOT_DIR / "squawk-test.js", media_type="application/javascript")
+    return FileResponse(ROOT_DIR / "frontend" / "assets" / "favicon.ico", media_type="image/x-icon")
 
 
 # ── Page routes ────────────────────────────────────────────────────────────────

@@ -1738,6 +1738,5 @@ class AdsbLiveControl {
 // Instantiate and register with MapLibre.
 adsbControl = new AdsbLiveControl();
 map.addControl(adsbControl, 'top-right');
-// Expose on window for dev testing via squawk-test.js
-window._adsb = adsbControl;
+
 //# sourceMappingURL=adsb.js.map
