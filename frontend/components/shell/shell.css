@@ -217,3 +217,54 @@ html {
 #footer-left:not(:has(.notif-btn-active)):not(:has(.tracking-btn-active)) #tracking-toggle-btn[data-tooltip]:hover::before {
     opacity: 1;
 }
+
+/* ---- Settings button (footer-right) ---- */
+#settings-btn {
+    height: 36px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    opacity: 0.6;
+    transition: background 0.2s, opacity 0.2s;
+    flex-shrink: 0;
+    margin: 4px 0;
+    position: relative;
+}
+
+#settings-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    opacity: 1;
+}
+
+#settings-btn[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    right: 0;
+    background: #000;
+    color: rgba(255, 255, 255, 0.75);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0 14px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 10001;
+}
+
+#settings-btn[data-tooltip]:hover::before {
+    opacity: 1;
+}
