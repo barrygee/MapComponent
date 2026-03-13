@@ -11,4 +11,4 @@
 const map = window.MapComponent.map;
 
 // Set global view — centred on equator, zoomed out to show full Earth
-map.jumpTo({ center: [0, 20], zoom: 1.5 });
+map.jumpTo({ center: [0, 20], zoom: 2.2 });

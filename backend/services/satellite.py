@@ -103,14 +103,15 @@ def compute_position(tle_line1: str, tle_line2: str) -> dict:
     }
 
 
-def compute_ground_track(tle_line1: str, tle_line2: str,
-                         minutes_back: int = 184,
-                         minutes_forward: int = 184) -> dict:
-    """Compute past and future ground track as a GeoJSON FeatureCollection.
+def compute_ground_track(tle_line1: str, tle_line2: str) -> dict:
+    """Compute past 1 orbit and next 2 orbits as a GeoJSON FeatureCollection.
 
-    Samples every 1 minute for ±2 orbits (~184 min each).
+    ISS orbital period ~92 minutes, so:
+      - past:    -92..0   minutes  → properties.track = 'past'
+      - orbit1:   0..92   minutes  → properties.track = 'orbit1'  (current orbit)
+      - orbit2:  92..184  minutes  → properties.track = 'orbit2'  (next orbit)
+
     Splits LineStrings at the antimeridian (±180°) to avoid map wrapping artefacts.
-    Each Feature has properties.type = 'past' or 'future'.
     """
     sat = Satrec.twoline2rv(tle_line1, tle_line2)
     jd, fr = _jday_now()
@@ -118,8 +119,9 @@ def compute_ground_track(tle_line1: str, tle_line2: str,
     features = []
 
     for track_type, start_min, end_min in [
-        ("past", -minutes_back, 0),
-        ("future", 0, minutes_forward),
+        ("past",   -92,   0),
+        ("orbit1",   0,  92),
+        ("orbit2",  92, 184),
     ]:
         segments: list[list[list[float]]] = []
         current_segment: list[list[float]] = []
@@ -163,7 +165,7 @@ def compute_ground_track(tle_line1: str, tle_line2: str,
             features.append({
                 "type": "Feature",
                 "geometry": {"type": "LineString", "coordinates": seg},
-                "properties": {"type": track_type},
+                "properties": {"track": track_type},
             })
 
     return {"type": "FeatureCollection", "features": features}

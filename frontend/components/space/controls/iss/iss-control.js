@@ -6,8 +6,9 @@
 // Renders all three as MapLibre layers.
 //
 // Layers:
-//   iss-track-past    — dashed dim line (past ground track)
-//   iss-track-future  — solid bright line (future ground track)
+//   iss-track-past    — dashed dim line (previous orbit)
+//   iss-track-orbit1  — solid bright line (current orbit)
+//   iss-track-orbit2  — solid dimmer line (next orbit)
 //   iss-footprint     — dashed circle (visibility horizon)
 //   iss-bracket       — military-style bracket at ISS position
 //   iss-icon          — satellite icon rotated to heading
@@ -27,6 +28,7 @@ class IssControl extends SentinelControlBase {
         this._pollInterval    = null;
         this._tagMarker       = null;
         this._lastPosition    = null;
+        this._labelMarker     = null;
         // GeoJSON stores
         this._issGeojson       = { type: 'FeatureCollection', features: [] };
         this._trackGeojson     = { type: 'FeatureCollection', features: [] };
@@ -48,12 +50,18 @@ class IssControl extends SentinelControlBase {
         this.setButtonActive(this.issVisible);
         if (this.map.isStyleLoaded()) {
             this.initLayers();
+            if (this.issVisible) {
+                this._fetch();
+                this._startPolling();
+            }
         } else {
-            this.map.once('style.load', () => this.initLayers());
-        }
-        if (this.issVisible) {
-            this._fetch();
-            this._startPolling();
+            this.map.once('style.load', () => {
+                this.initLayers();
+                if (this.issVisible) {
+                    this._fetch();
+                    this._startPolling();
+                }
+            });
         }
     }
 
@@ -61,7 +69,7 @@ class IssControl extends SentinelControlBase {
 
     // ---- Canvas sprite factories ----
     _createSatelliteIcon() {
-        const size = 64;
+        const size = 96;
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = size;
         const ctx = canvas.getContext('2d');
@@ -69,36 +77,36 @@ class IssControl extends SentinelControlBase {
 
         // Body: diamond shape in lime
         ctx.beginPath();
-        ctx.moveTo(cx, cy - 7);
-        ctx.lineTo(cx + 6, cy);
-        ctx.lineTo(cx, cy + 7);
-        ctx.lineTo(cx - 6, cy);
+        ctx.moveTo(cx, cy - 11);
+        ctx.lineTo(cx + 9, cy);
+        ctx.lineTo(cx, cy + 11);
+        ctx.lineTo(cx - 9, cy);
         ctx.closePath();
         ctx.fillStyle = '#c8ff00';
         ctx.fill();
 
         // Solar panels: horizontal bars
         ctx.fillStyle = 'rgba(200,255,0,0.55)';
-        ctx.fillRect(cx - 18, cy - 3, 10, 6);  // left panel
-        ctx.fillRect(cx + 8,  cy - 3, 10, 6);  // right panel
+        ctx.fillRect(cx - 28, cy - 4, 15, 8);  // left panel
+        ctx.fillRect(cx + 13,  cy - 4, 15, 8);  // right panel
 
         // Antenna: vertical line up
         ctx.strokeStyle = 'rgba(200,255,0,0.55)';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(cx, cy - 7);
-        ctx.lineTo(cx, cy - 14);
+        ctx.moveTo(cx, cy - 11);
+        ctx.lineTo(cx, cy - 21);
         ctx.stroke();
 
         return ctx.getImageData(0, 0, size, size);
     }
 
     _createSatBracket() {
-        const size = 64;
+        const size = 96;
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = size;
         const ctx = canvas.getContext('2d');
-        const left = 6, top = 6, right = 58, bottom = 58, arm = 10;
+        const left = 8, top = 8, right = 88, bottom = 88, arm = 14;
 
         ctx.fillStyle = 'rgba(0,0,0,0.10)';
         ctx.fillRect(left, top, right - left, bottom - top);
@@ -119,7 +127,7 @@ class IssControl extends SentinelControlBase {
     // ---- Layer init ----
     initLayers() {
         // Clean up existing layers/sources
-        ['iss-track-past', 'iss-track-future', 'iss-footprint', 'iss-bracket', 'iss-icon'].forEach(id => {
+        ['iss-track-past', 'iss-track-future', 'iss-track-orbit1', 'iss-track-orbit2', 'iss-footprint-fill', 'iss-footprint', 'iss-bracket', 'iss-icon'].forEach(id => {
             try { this.map.removeLayer(id); } catch (e) {}
         });
         ['iss-track-source', 'iss-footprint-source', 'iss-live'].forEach(id => {
@@ -137,44 +145,69 @@ class IssControl extends SentinelControlBase {
         const fpVis    = (this.issVisible && this.footprintVisible) ? 'visible' : 'none';
         const issVis   = this.issVisible ? 'visible' : 'none';
 
-        // Ground track source — both past and future features in one collection
+        // Ground track source — past, orbit1, orbit2 features in one collection
         this.map.addSource('iss-track-source', { type: 'geojson', data: this._trackGeojson });
 
-        // Past track: dashed, dimmer
+        // Past orbit: dashed, dim
         this.map.addLayer({
             id: 'iss-track-past',
             type: 'line',
             source: 'iss-track-source',
-            filter: ['==', ['get', 'type'], 'past'],
+            filter: ['==', ['get', 'track'], 'past'],
             layout: { visibility: trackVis },
             paint: {
                 'line-color': '#c8ff00',
                 'line-width': 1.5,
-                'line-opacity': 0.35,
+                'line-opacity': 0.30,
                 'line-dasharray': [4, 3],
             },
         });
 
-        // Future track: solid, brighter
+        // Current orbit: solid, bright
         this.map.addLayer({
-            id: 'iss-track-future',
+            id: 'iss-track-orbit1',
             type: 'line',
             source: 'iss-track-source',
-            filter: ['==', ['get', 'type'], 'future'],
+            filter: ['==', ['get', 'track'], 'orbit1'],
             layout: { visibility: trackVis },
             paint: {
                 'line-color': '#c8ff00',
                 'line-width': 1.5,
-                'line-opacity': 0.75,
+                'line-opacity': 0.80,
             },
         });
 
-        // Footprint source + layer
+        // Next orbit: solid, dimmer
+        this.map.addLayer({
+            id: 'iss-track-orbit2',
+            type: 'line',
+            source: 'iss-track-source',
+            filter: ['==', ['get', 'track'], 'orbit2'],
+            layout: { visibility: trackVis },
+            paint: {
+                'line-color': '#c8ff00',
+                'line-width': 1.5,
+                'line-opacity': 0.45,
+            },
+        });
+
+        // Footprint source + layers (fill + outline)
         this.map.addSource('iss-footprint-source', { type: 'geojson', data: this._footprintGeojson });
+        this.map.addLayer({
+            id: 'iss-footprint-fill',
+            type: 'fill',
+            source: 'iss-footprint-source',
+            filter: ['==', ['geometry-type'], 'Polygon'],
+            layout: { visibility: fpVis },
+            paint: {
+                'fill-color': 'rgba(0,0,0,0.22)',
+            },
+        });
         this.map.addLayer({
             id: 'iss-footprint',
             type: 'line',
             source: 'iss-footprint-source',
+            filter: ['==', ['geometry-type'], 'LineString'],
             layout: { visibility: fpVis },
             paint: {
                 'line-color': 'rgba(200,255,0,0.5)',
@@ -261,11 +294,18 @@ class IssControl extends SentinelControlBase {
 
             this._footprintGeojson = {
                 type: 'FeatureCollection',
-                features: [{
-                    type: 'Feature',
-                    geometry: { type: 'LineString', coordinates: footprint },
-                    properties: {},
-                }],
+                features: [
+                    {
+                        type: 'Feature',
+                        geometry: { type: 'LineString', coordinates: footprint },
+                        properties: {},
+                    },
+                    {
+                        type: 'Feature',
+                        geometry: { type: 'Polygon', coordinates: [footprint] },
+                        properties: {},
+                    },
+                ],
             };
 
             // Push to map sources
@@ -277,6 +317,11 @@ class IssControl extends SentinelControlBase {
 
             const fpSource = this.map && this.map.getSource('iss-footprint-source');
             if (fpSource) fpSource.setData(this._footprintGeojson);
+
+            // Keep callsign label in sync
+            if (this.issVisible) {
+                this._showLabel(position.lon, position.lat);
+            }
 
             // Keep tag position in sync while open
             if (this._tagMarker) {
@@ -296,6 +341,41 @@ class IssControl extends SentinelControlBase {
 
     _stopPolling() {
         if (this._pollInterval) { clearInterval(this._pollInterval); this._pollInterval = null; }
+    }
+
+    // ---- Callsign label ----
+    _buildLabelEl() {
+        const el = document.createElement('div');
+        el.style.cssText = [
+            'background:rgba(0,0,0,0.5)',
+            'color:#c8ff00',
+            "font-family:'Barlow Condensed','Barlow','Helvetica Neue',Arial,sans-serif",
+            'font-size:13px',
+            'font-weight:400',
+            'letter-spacing:.12em',
+            'text-transform:uppercase',
+            'padding:1px 8px',
+            'white-space:nowrap',
+            'pointer-events:none',
+            'user-select:none',
+        ].join(';');
+        el.textContent = 'ISS';
+        return el;
+    }
+
+    _showLabel(lon, lat) {
+        if (this._labelMarker) {
+            this._labelMarker.setLngLat([lon, lat]);
+            return;
+        }
+        const el = this._buildLabelEl();
+        this._labelMarker = new maplibregl.Marker({ element: el, anchor: 'left', offset: [22, 0] })
+            .setLngLat([lon, lat])
+            .addTo(this.map);
+    }
+
+    _hideLabel() {
+        if (this._labelMarker) { this._labelMarker.remove(); this._labelMarker = null; }
     }
 
     // ---- Info tag ----
@@ -359,14 +439,17 @@ class IssControl extends SentinelControlBase {
         ['iss-icon', 'iss-bracket'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', issVis); } catch (e) {}
         });
-        ['iss-track-past', 'iss-track-future'].forEach(id => {
+        ['iss-track-past', 'iss-track-orbit1', 'iss-track-orbit2'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', trackVis); } catch (e) {}
         });
-        try { this.map.setLayoutProperty('iss-footprint', 'visibility', fpVis); } catch (e) {}
+        ['iss-footprint-fill', 'iss-footprint'].forEach(id => {
+            try { this.map.setLayoutProperty(id, 'visibility', fpVis); } catch (e) {}
+        });
         this.setButtonActive(this.issVisible);
         if (!this.issVisible) {
             this._stopPolling();
             this._hideTag();
+            this._hideLabel();
         } else {
             this._fetch();
             this._startPolling();
@@ -377,7 +460,7 @@ class IssControl extends SentinelControlBase {
     toggleTrack() {
         this.trackVisible = !this.trackVisible;
         const trackVis = (this.issVisible && this.trackVisible) ? 'visible' : 'none';
-        ['iss-track-past', 'iss-track-future'].forEach(id => {
+        ['iss-track-past', 'iss-track-orbit1', 'iss-track-orbit2'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', trackVis); } catch (e) {}
         });
         if (typeof _spaceSyncSideMenu === 'function') _spaceSyncSideMenu();
@@ -386,13 +469,16 @@ class IssControl extends SentinelControlBase {
     toggleFootprint() {
         this.footprintVisible = !this.footprintVisible;
         const fpVis = (this.issVisible && this.footprintVisible) ? 'visible' : 'none';
-        try { this.map.setLayoutProperty('iss-footprint', 'visibility', fpVis); } catch (e) {}
+        ['iss-footprint-fill', 'iss-footprint'].forEach(id => {
+            try { this.map.setLayoutProperty(id, 'visibility', fpVis); } catch (e) {}
+        });
         if (typeof _spaceSyncSideMenu === 'function') _spaceSyncSideMenu();
     }
 
     onRemove() {
         this._stopPolling();
         this._hideTag();
+        this._hideLabel();
         super.onRemove();
     }
 }
