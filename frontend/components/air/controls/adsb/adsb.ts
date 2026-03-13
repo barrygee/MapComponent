@@ -355,7 +355,7 @@ class AdsbLiveControl implements maplibregl.IControl {
 
     // ---- Sprite registration ----
 
-    private _registerIcons(): void {
+    _registerIcons(): void {
         const toRemove = ['adsb-bracket', 'adsb-bracket-mil', 'adsb-bracket-emerg',
                           'adsb-blip', 'adsb-blip-mil', 'adsb-blip-emerg', 'adsb-blip-uav',
                           'adsb-blip-gnd', 'adsb-blip-tower', 'adsb-blip-emerg-gnd',

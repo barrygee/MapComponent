@@ -304,7 +304,9 @@ _sentinelMap.on('error', (e) => {
     console.error('Map error:', e);
 });
 
-_sentinelMap.on('styleimagemissing', () => {});
+_sentinelMap.on('styleimagemissing', () => {
+    if (typeof adsbControl !== 'undefined' && adsbControl) adsbControl._registerIcons();
+});
 
 
 // ============================================================

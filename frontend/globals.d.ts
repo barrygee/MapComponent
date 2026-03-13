@@ -49,5 +49,5 @@ declare namespace maplibregl {
     type EaseToOptions           = import('maplibre-gl').EaseToOptions;
 }
 
-// ---- Dataset constants (declared in their respective control files) ----
-// These are const declarations in their respective .ts files — no declare needed here.
+// ---- Air control instances (declared in air-globals.js, assigned at addControl time) ----
+declare let adsbControl: { _registerIcons(): void } | null;
