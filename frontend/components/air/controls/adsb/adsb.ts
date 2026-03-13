@@ -294,9 +294,9 @@ class AdsbLiveControl implements maplibregl.IControl {
         canvas.width = canvas.height = canvasSize;
         const ctx = canvas.getContext('2d')!;
         const left = 4, top = 4, right = 60, bottom = 56, cornerArmLength = 10;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
         ctx.fillRect(left, top, right - left, bottom - top);
-        ctx.strokeStyle = '#000000'; ctx.lineWidth = 3; ctx.lineCap = 'square';
+        ctx.strokeStyle = '#c8ff00'; ctx.lineWidth = 3; ctx.lineCap = 'square';
         ctx.beginPath(); ctx.moveTo(left + cornerArmLength, top);    ctx.lineTo(left,  top);    ctx.lineTo(left,  top    + cornerArmLength); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(right - cornerArmLength, top);   ctx.lineTo(right, top);    ctx.lineTo(right, top    + cornerArmLength); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(left + cornerArmLength, bottom);  ctx.lineTo(left,  bottom); ctx.lineTo(left,  bottom - cornerArmLength); ctx.stroke();
@@ -1423,6 +1423,7 @@ class AdsbLiveControl implements maplibregl.IControl {
                 } else { this._hideSelectedTag(); this._hideStatusBar(); }
             }
             this._updateCallsignMarkers();
+            this._interpolate();
             this._raiseLayers();
             this._fetchFailCount = 0;
 

@@ -267,9 +267,9 @@ class AdsbLiveControl {
         canvas.width = canvas.height = S;
         const ctx = canvas.getContext('2d');
         const x1 = 4, y1 = 4, x2 = 60, y2 = 56, arm = 10;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
         ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
-        ctx.strokeStyle = '#000000';
+        ctx.strokeStyle = '#c8ff00';
         ctx.lineWidth = 3;
         ctx.lineCap = 'square';
         ctx.beginPath();
@@ -1536,6 +1536,7 @@ class AdsbLiveControl {
                 }
             }
             this._updateCallsignMarkers();
+            this._interpolate();
             this._raiseLayers();
             this._fetchFailCount = 0;
         }

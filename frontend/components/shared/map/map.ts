@@ -233,9 +233,12 @@ const _mapStyleURL = _mapIsOnline
     ? `${_mapOrigin}/assets/fiord-online.json`
     : `${_mapOrigin}/assets/fiord.json`;
 
+// MapLibre 4.x rejects root-relative sprite/glyphs paths in the style spec.
+// transformStyle is only called by setStyle(), not during initial construction,
+// so we omit `style` from the constructor and call setStyle() immediately after
+// so that _fixStylePaths rewrites the paths before MapLibre validates them.
 const _sentinelMap = new maplibregl.Map({
     container: 'map',
-    style: _mapStyleURL,
     center: _mapIsOnline ? [-4.4815, 54.1453] : [-4.5481, 54.2361],
     zoom:     _mapIsOnline ? 6 : 5,
     minZoom:  _mapIsOnline ? 2 : 5,
@@ -244,8 +247,8 @@ const _sentinelMap = new maplibregl.Map({
     fadeDuration: 0,
     cooperativeGestures: false,
     transformRequest: (url: string) => ({ url: url.startsWith('/') ? _mapOrigin + url : url }),
-    transformStyle: _fixStylePaths,
 } as unknown as maplibregl.MapOptions);
+_sentinelMap.setStyle(_mapStyleURL, { transformStyle: _fixStylePaths });
 _sentinelMap.scrollZoom.enable();
 
 // Style.load handler registration
