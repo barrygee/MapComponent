@@ -268,3 +268,41 @@ html {
 #settings-btn[data-tooltip]:hover::before {
     opacity: 1;
 }
+
+
+/* ============================================================
+   DOMAIN STATUS BANNER — coming-soon overlay for unimplemented domains
+   ============================================================ */
+#domain-status-banner {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 28px 40px;
+    background: #000;
+    border: 1px solid #c8ff00;
+    pointer-events: none;
+}
+
+.domain-status-label {
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    color: #c8ff00;
+    text-transform: uppercase;
+}
+
+.domain-status-msg {
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 6px;
+    color: #ffffff;
+    text-transform: uppercase;
+}
