@@ -201,6 +201,61 @@ npm run typecheck
 
 ---
 
+## Testing
+
+The test suite uses [Jest](https://jestjs.io/) with [ts-jest](https://kulshekhar.github.io/ts-jest/) (TypeScript transpilation) and [jest-environment-jsdom](https://jestjs.io/docs/configuration#testenvironment-string) (browser-like DOM environment).
+
+### Prerequisites
+
+Node.js v18+ must be installed (see Frontend TypeScript → Prerequisites above).
+Run `npm install` once to install all dev dependencies including Jest.
+
+### Run all tests
+
+```bash
+npm test
+```
+
+### Run tests with coverage report
+
+```bash
+npm run test:coverage
+```
+
+### Test files
+
+Tests are split into two subdirectories:
+
+```
+tests/
+├── frontend/   — TypeScript / DOM logic (Jest + jsdom)
+└── backend/    — FastAPI endpoints and helpers (pytest — coming soon)
+```
+
+#### `tests/frontend/`
+
+| File | What it tests |
+|------|---------------|
+| `tests/frontend/geometry-helpers.test.ts` | `generateGeodesicCircle`, `buildRingsGeoJSON`, `computeCentroid`, `computeTextRotate`, `computeLongestEdge`, `RING_DISTANCES_NM` — all pure geometry helpers from `frontend/components/shared/map/map.ts` |
+| `tests/frontend/notification-helpers.test.ts` | `_formatTimestamp` (timestamp → `HH:MM LOCAL`) and `_getLabelForType` (type string → display label) from `frontend/components/shared/notifications/notifications.ts` |
+| `tests/frontend/filter-search.test.ts` | `_matchesQuery` (case-insensitive substring matching) and the full search logic from `frontend/components/air/air-filter/air-filter.ts` covering aircraft, airports, and military bases |
+| `tests/frontend/sentinel-control-base.test.ts` | `SentinelControlBase.onAdd`, `onRemove`, `setButtonActive`, button click delegation, and hover event visual feedback from `frontend/components/air/controls/sentinel-control-base/sentinel-control-base.ts` |
+| `tests/frontend/overlay-state.test.ts` | `OVERLAY_DEFAULTS` values, `loadOverlayStates` (merge over defaults, partial saves, malformed JSON recovery), and JSON round-trips from `frontend/components/air/overlay/overlay-state.ts` |
+| `tests/frontend/user-location-cache.test.ts` | GPS 5-minute cache expiry, manual-pin persistence, `shouldGpsUpdateBeBlocked`, storage payload JSON structure, and coordinate display formatting from `frontend/components/air/user-location/user-location.ts` |
+
+#### `tests/backend/`
+
+Backend tests (pytest) will go here.
+
+### Configuration
+
+| File | Purpose |
+|------|---------|
+| `jest.config.js` | Jest configuration — `ts-jest` preset, `jsdom` environment, `tests/**/*.test.ts` glob |
+| `tsconfig.test.json` | TypeScript config for tests — `CommonJS` module output required by Jest's Node runtime |
+
+---
+
 ## Tech Stack
 
 | Component | Technology |
