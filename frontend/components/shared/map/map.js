@@ -106,17 +106,17 @@ function _toDeg(rad) { return rad * 180 / Math.PI; }
  * Generate 181 geodesic (great-circle) points forming a circle on the Earth's surface.
  */
 function generateGeodesicCircle(lng, lat, radiusNm) {
-    const d = radiusNm / 3440.065;
-    const latR = _toRad(lat);
-    const lngR = _toRad(lng);
-    const pts = [];
+    const angularDistanceRad = radiusNm / 3440.065;
+    const latRad = _toRad(lat);
+    const lngRad = _toRad(lng);
+    const points = [];
     for (let i = 0; i <= 180; i++) {
-        const b = _toRad(i * 2);
-        const lat2 = Math.asin(Math.sin(latR) * Math.cos(d) + Math.cos(latR) * Math.sin(d) * Math.cos(b));
-        const lng2 = lngR + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(latR), Math.cos(d) - Math.sin(latR) * Math.sin(lat2));
-        pts.push([_toDeg(lng2), _toDeg(lat2)]);
+        const bearingRad = _toRad(i * 2);
+        const lat2 = Math.asin(Math.sin(latRad) * Math.cos(angularDistanceRad) + Math.cos(latRad) * Math.sin(angularDistanceRad) * Math.cos(bearingRad));
+        const lng2 = lngRad + Math.atan2(Math.sin(bearingRad) * Math.sin(angularDistanceRad) * Math.cos(latRad), Math.cos(angularDistanceRad) - Math.sin(latRad) * Math.sin(lat2));
+        points.push([_toDeg(lng2), _toDeg(lat2)]);
     }
-    return pts;
+    return points;
 }
 /**
  * Build GeoJSON FeatureCollections for all 5 range rings (50–250 nm) plus north-point labels.
@@ -127,13 +127,13 @@ function buildRingsGeoJSON(lng, lat) {
     const latR = _toRad(lat);
     const lngR = _toRad(lng);
     RING_DISTANCES_NM.forEach(nm => {
-        const d = nm / 3440.065;
+        const angularDistanceRad = nm / 3440.065;
         lines.features.push({
             type: 'Feature',
             geometry: { type: 'LineString', coordinates: generateGeodesicCircle(lng, lat, nm) },
             properties: {},
         });
-        const lat2 = Math.asin(Math.sin(latR) * Math.cos(d) + Math.cos(latR) * Math.sin(d));
+        const lat2 = Math.asin(Math.sin(latR) * Math.cos(angularDistanceRad) + Math.cos(latR) * Math.sin(angularDistanceRad));
         labels.features.push({
             type: 'Feature',
             geometry: { type: 'Point', coordinates: [_toDeg(lngR), _toDeg(lat2)] },
@@ -147,17 +147,17 @@ function buildRingsGeoJSON(lng, lat) {
  */
 function computeCentroid(coordinates) {
     const ring = coordinates[0];
-    let area = 0, cx = 0, cy = 0;
+    let area = 0, centroidX = 0, centroidY = 0;
     for (let i = 0; i < ring.length - 1; i++) {
         const x0 = ring[i][0], y0 = ring[i][1];
         const x1 = ring[i + 1][0], y1 = ring[i + 1][1];
         const cross = x0 * y1 - x1 * y0;
         area += cross;
-        cx += (x0 + x1) * cross;
-        cy += (y0 + y1) * cross;
+        centroidX += (x0 + x1) * cross;
+        centroidY += (y0 + y1) * cross;
     }
     area *= 0.5;
-    return [cx / (6 * area), cy / (6 * area)];
+    return [centroidX / (6 * area), centroidY / (6 * area)];
 }
 /**
  * Compute the MapLibre text-rotate angle aligned with the polygon's longest edge.
@@ -175,12 +175,12 @@ function computeTextRotate(coordinates) {
             bearing = Math.atan2(dLng * Math.cos(midLat * Math.PI / 180), dLat) * 180 / Math.PI;
         }
     }
-    let rot = bearing - 90;
-    if (rot > 90)
-        rot -= 180;
-    if (rot <= -90)
-        rot += 180;
-    return Math.round(rot * 10) / 10;
+    let textRotation = bearing - 90;
+    if (textRotation > 90)
+        textRotation -= 180;
+    if (textRotation <= -90)
+        textRotation += 180;
+    return Math.round(textRotation * 10) / 10;
 }
 /**
  * Find the two endpoints of the polygon's longest edge.
@@ -209,6 +209,10 @@ const _mapOrigin = window.location.origin;
 const _mapStyleURL = _mapIsOnline
     ? `${_mapOrigin}/assets/fiord-online.json`
     : `${_mapOrigin}/assets/fiord.json`;
+// MapLibre 4.x rejects root-relative sprite/glyphs paths in the style spec.
+// transformStyle is only called by setStyle(), not during initial construction,
+// so we omit `style` from the constructor and call setStyle() immediately after
+// so that _fixStylePaths rewrites the paths before MapLibre validates them.
 const _sentinelMap = new maplibregl.Map({
     container: 'map',
     center: _mapIsOnline ? [-4.4815, 54.1453] : [-4.5481, 54.2361],
@@ -275,7 +279,8 @@ _sentinelMap.on('error', (e) => {
     console.error('Map error:', e);
 });
 _sentinelMap.on('styleimagemissing', () => {
-    if (typeof adsbControl !== 'undefined' && adsbControl) adsbControl._registerIcons();
+    if (typeof adsbControl !== 'undefined' && adsbControl)
+        adsbControl._registerIcons();
 });
 // ============================================================
 // PUBLIC API

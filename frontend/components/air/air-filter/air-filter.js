@@ -9,8 +9,8 @@
 // Depends on: map (global alias), adsbControl, AIRPORTS_DATA, MILITARY_BASES_DATA,
 //             airportsControl, militaryBasesControl, _syncSideMenuForPlanes
 // ============================================================
-/// <reference path="../globals.d.ts" />
-/// <reference path="../types.ts" />
+/// <reference path="../../globals.d.ts" />
+/// <reference path="../../types.ts" />
 window._FilterPanel = (() => {
     let _open = false;
     // ---- Inject panel HTML if not already present ----
@@ -51,39 +51,39 @@ window._FilterPanel = (() => {
         }
         return [];
     }
-    function _matchesQuery(q, ...fields) {
-        const lq = q.toLowerCase();
-        return fields.some(f => f && f.toLowerCase().includes(lq));
+    function _matchesQuery(query, ...fields) {
+        const lowerQuery = query.toLowerCase();
+        return fields.some(field => field && field.toLowerCase().includes(lowerQuery));
     }
     function _search(query) {
-        const q = query.trim();
+        const trimmedQuery = query.trim();
         const results = [];
-        if (!q)
+        if (!trimmedQuery)
             return results;
         const planes = _getAircraftData();
-        for (const f of planes) {
-            const p = f.properties;
-            const callsign = (p.flight || '').trim();
-            const hex = (p.hex || '').trim();
-            const reg = (p.r || '').trim();
-            const squawk = (p.squawk || '').trim();
-            if (_matchesQuery(q, callsign, hex, reg, squawk)) {
-                results.push({ kind: 'plane', feature: f, callsign, hex, reg, squawk, emergency: !!p.emergency && p.emergency !== 'none' });
+        for (const feature of planes) {
+            const props = feature.properties;
+            const callsign = (props.flight || '').trim();
+            const hex = (props.hex || '').trim();
+            const reg = (props.r || '').trim();
+            const squawk = (props.squawk || '').trim();
+            if (_matchesQuery(trimmedQuery, callsign, hex, reg, squawk)) {
+                results.push({ kind: 'plane', feature, callsign, hex, reg, squawk, emergency: !!props.emergency && props.emergency !== 'none' });
             }
         }
         if (typeof AIRPORTS_DATA !== 'undefined') {
-            for (const f of AIRPORTS_DATA.features) {
-                const p = f.properties;
-                if (_matchesQuery(q, p.icao, p.iata, p.name)) {
-                    results.push({ kind: 'airport', feature: f, name: p.name, icao: p.icao, iata: p.iata });
+            for (const feature of AIRPORTS_DATA.features) {
+                const props = feature.properties;
+                if (_matchesQuery(trimmedQuery, props.icao, props.iata, props.name)) {
+                    results.push({ kind: 'airport', feature: feature, name: props.name, icao: props.icao, iata: props.iata });
                 }
             }
         }
         if (typeof MILITARY_BASES_DATA !== 'undefined') {
-            for (const f of MILITARY_BASES_DATA.features) {
-                const p = f.properties;
-                if (_matchesQuery(q, p.icao, p.name)) {
-                    results.push({ kind: 'mil', feature: f, name: p.name, icao: p.icao });
+            for (const feature of MILITARY_BASES_DATA.features) {
+                const props = feature.properties;
+                if (_matchesQuery(trimmedQuery, props.icao, props.name)) {
+                    results.push({ kind: 'mil', feature: feature, name: props.name, icao: props.icao });
                 }
             }
         }
@@ -92,37 +92,37 @@ window._FilterPanel = (() => {
     function _selectPlane(feature) {
         if (!adsbControl)
             return;
-        const p = feature.properties;
-        const hex = p.hex;
+        const props = feature.properties;
+        const hex = props.hex;
         adsbControl._selectedHex = hex;
         adsbControl._applySelection();
         const coords = adsbControl._interpolatedCoords(hex) || feature.geometry.coordinates;
         map.easeTo({ center: coords, zoom: Math.max(map.getZoom(), 10), duration: 600 });
     }
     function _selectAirport(feature) {
-        const p = feature.properties;
-        const b = p.bounds;
+        const props = feature.properties;
+        const bounds = props.bounds;
         const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right');
         const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
         const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
         const pad = 80;
         const topExtra = Math.max(0, ctrlH / 2 - pad);
-        map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 });
+        map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 });
         if (airportsControl) {
-            airportsControl._showAirportPanel(p, feature.geometry.coordinates);
+            airportsControl._showAirportPanel(props, feature.geometry.coordinates);
         }
     }
     function _selectMil(feature) {
-        const p = feature.properties;
-        const b = p.bounds;
+        const props = feature.properties;
+        const bounds = props.bounds;
         const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right');
         const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
         const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
         const pad = 80;
         const topExtra = Math.max(0, ctrlH / 2 - pad);
-        map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 });
+        map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 });
         if (militaryBasesControl) {
-            militaryBasesControl._showMilitaryBasesPanel(p, feature.geometry.coordinates);
+            militaryBasesControl._showMilitaryBasesPanel(props, feature.geometry.coordinates);
         }
     }
     function _renderResults(results, query) {
@@ -368,10 +368,10 @@ window._FilterPanel = (() => {
         if (!input)
             return;
         input.addEventListener('input', () => {
-            const q = input.value;
+            const inputValue = input.value;
             if (clearBtn)
-                clearBtn.classList.toggle('filter-clear-visible', q.length > 0);
-            _renderResults(_search(q), q);
+                clearBtn.classList.toggle('filter-clear-visible', inputValue.length > 0);
+            _renderResults(_search(inputValue), inputValue);
         });
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {

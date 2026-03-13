@@ -82,32 +82,32 @@ class ClearOverlaysControl extends SentinelControlBase {
             this._cleared = false;
             return;
         }
-        const s = this.savedStates;
-        if (roadsControl && s.roads && !roadsControl.roadsVisible)
+        const savedStates = this.savedStates;
+        if (roadsControl && savedStates.roads && !roadsControl.roadsVisible)
             roadsControl.toggleRoads();
-        if (namesControl && s.names && !namesControl.namesVisible)
+        if (namesControl && savedStates.names && !namesControl.namesVisible)
             namesControl.toggleNames();
-        if (rangeRingsControl && s.rings && !rangeRingsControl.ringsVisible)
+        if (rangeRingsControl && savedStates.rings && !rangeRingsControl.ringsVisible)
             rangeRingsControl.toggleRings();
-        if (aarControl && s.aar && !aarControl.visible)
+        if (aarControl && savedStates.aar && !aarControl.visible)
             aarControl.toggle();
-        if (awacsControl && s.awacs && !awacsControl.visible)
+        if (awacsControl && savedStates.awacs && !awacsControl.visible)
             awacsControl.toggle();
-        if (airportsControl && s.airports && !airportsControl.visible)
+        if (airportsControl && savedStates.airports && !airportsControl.visible)
             airportsControl.toggle();
-        if (militaryBasesControl && s.militaryBases && !militaryBasesControl.visible)
+        if (militaryBasesControl && savedStates.militaryBases && !militaryBasesControl.visible)
             militaryBasesControl.toggle();
-        if (adsbControl && s.adsb) {
+        if (adsbControl && savedStates.adsb) {
             adsbControl.setAllHidden(false);
             try {
                 adsbControl.map.setLayoutProperty('adsb-trails', 'visibility', 'visible');
             }
             catch (e) { }
             if (adsbLabelsControl) {
-                adsbLabelsControl.labelsVisible = s.adsbLabels;
-                adsbLabelsControl.button.style.opacity = s.adsbLabels ? '1' : '0.3';
-                adsbLabelsControl.button.style.color = s.adsbLabels ? '#c8ff00' : '#ffffff';
-                adsbControl.setLabelsVisible(s.adsbLabels);
+                adsbLabelsControl.labelsVisible = savedStates.adsbLabels;
+                adsbLabelsControl.button.style.opacity = savedStates.adsbLabels ? '1' : '0.3';
+                adsbLabelsControl.button.style.color = savedStates.adsbLabels ? '#c8ff00' : '#ffffff';
+                adsbControl.setLabelsVisible(savedStates.adsbLabels);
             }
             _saveOverlayStates();
         }

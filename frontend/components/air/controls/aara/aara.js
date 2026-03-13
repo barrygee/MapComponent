@@ -59,16 +59,16 @@ class AARToggleControl extends SentinelControlBase {
      * Add the GeoJSON source, fill layer, outline layer, and centred HTML label markers.
      */
     initLayers() {
-        const vis = this.visible ? 'visible' : 'none';
+        const layerVisibility = this.visible ? 'visible' : 'none';
         this.map.addSource('aara-zones', { type: 'geojson', data: AARA_ZONES });
         this.map.addLayer({
             id: 'aara-fill', type: 'fill', source: 'aara-zones',
-            layout: { visibility: vis },
+            layout: { visibility: layerVisibility },
             paint: { 'fill-color': 'rgba(200, 255, 0, 0.04)', 'fill-outline-color': 'rgba(0,0,0,0)' },
         });
         this.map.addLayer({
             id: 'aara-outline', type: 'line', source: 'aara-zones',
-            layout: { visibility: vis },
+            layout: { visibility: layerVisibility },
             paint: { 'line-color': 'rgba(200, 255, 0, 0.75)', 'line-width': 1.5, 'line-dasharray': [6, 3] },
         });
         if (!this._labelMarkers) {
@@ -111,10 +111,10 @@ class AARToggleControl extends SentinelControlBase {
     /** Toggle AARA layer and label visibility; persist state. */
     toggle() {
         this.visible = !this.visible;
-        const vis = this.visible ? 'visible' : 'none';
+        const layerVisibility = this.visible ? 'visible' : 'none';
         ['aara-fill', 'aara-outline'].forEach(id => {
             try {
-                this.map.setLayoutProperty(id, 'visibility', vis);
+                this.map.setLayoutProperty(id, 'visibility', layerVisibility);
             }
             catch (e) { }
         });
