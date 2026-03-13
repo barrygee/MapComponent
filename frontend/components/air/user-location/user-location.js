@@ -316,4 +316,3 @@ if (_cachedLocation) {
         map.on('zoom', removeContextMenu);
     });
 })();
-//# sourceMappingURL=user-location.js.map

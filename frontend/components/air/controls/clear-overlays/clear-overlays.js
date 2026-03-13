@@ -120,4 +120,3 @@ class ClearOverlaysControl extends SentinelControlBase {
 }
 clearControl = new ClearOverlaysControl();
 map.addControl(clearControl, 'top-right');
-//# sourceMappingURL=clear-overlays.js.map

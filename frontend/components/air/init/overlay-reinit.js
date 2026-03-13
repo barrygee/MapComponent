@@ -26,4 +26,3 @@ window.MapComponent.onStyleLoad(function () {
     if (adsbControl)
         adsbControl.initLayers();
 });
-//# sourceMappingURL=overlay-reinit.js.map

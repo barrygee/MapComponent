@@ -52,4 +52,3 @@ class NamesToggleControl extends SentinelControlBase {
 }
 namesControl = new NamesToggleControl();
 map.addControl(namesControl, 'top-right');
-//# sourceMappingURL=names.js.map

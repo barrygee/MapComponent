@@ -482,4 +482,3 @@ window._FilterPanel = (() => {
     }
     return { open, close, toggle, init, reposition: _repositionPanel };
 })();
-//# sourceMappingURL=filter.js.map

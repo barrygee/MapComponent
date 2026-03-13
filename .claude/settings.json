@@ -16,7 +16,9 @@
       "Bash(echo \"=== $f ===\")",
       "Read(//Users/barry/Desktop/Sentinel/**)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(open\\(''$f''\\)\\); print\\(''version:'', d.get\\(''version''\\), ''| file:'', d.get\\(''file''\\)\\)\")",
-      "Bash(find /Users/barry/Desktop/Sentinel/frontend -name \"*.js.map\" -delete)"
+      "Bash(find /Users/barry/Desktop/Sentinel/frontend -name \"*.js.map\" -delete)",
+      "Bash(while read:*)",
+      "Bash(do sed:*)"
     ]
   }
 }

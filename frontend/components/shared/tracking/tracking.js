@@ -89,4 +89,3 @@ window._Tracking = (() => {
     }
     return { openPanel, closePanel, toggle, init, setCount };
 })();
-//# sourceMappingURL=tracking.js.map

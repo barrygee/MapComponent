@@ -306,4 +306,3 @@
     if (_tiltActive)
         ctrl3d.style.display = 'grid';
 })();
-//# sourceMappingURL=side-menu.js.map

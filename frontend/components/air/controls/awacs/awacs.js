@@ -141,4 +141,3 @@ class AWACSToggleControl extends SentinelControlBase {
 }
 awacsControl = new AWACSToggleControl();
 map.addControl(awacsControl, 'top-right');
-//# sourceMappingURL=awacs.js.map

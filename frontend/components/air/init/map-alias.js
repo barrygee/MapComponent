@@ -11,4 +11,3 @@
 /// <reference path="../types.ts" />
 // Unwrap the map instance from the public MapComponent API
 const map = window.MapComponent.map;
-//# sourceMappingURL=map-alias.js.map

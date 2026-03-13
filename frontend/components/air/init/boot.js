@@ -88,4 +88,3 @@ document.addEventListener('keydown', (e) => {
     logoSvg.style.cursor = 'pointer';
     logoSvg.addEventListener('click', playLogoAnimation);
 })();
-//# sourceMappingURL=boot.js.map

@@ -180,4 +180,4 @@ class MilitaryBasesToggleControl extends SentinelControlBase {
 }
 militaryBasesControl = new MilitaryBasesToggleControl();
 map.addControl(militaryBasesControl, 'top-right');
-//# sourceMappingURL=military-bases.js.map
+

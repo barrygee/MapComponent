@@ -49,4 +49,3 @@ class AdsbLabelsToggleControl extends SentinelControlBase {
 }
 adsbLabelsControl = new AdsbLabelsToggleControl();
 map.addControl(adsbLabelsControl, 'top-right');
-//# sourceMappingURL=adsb-labels.js.map

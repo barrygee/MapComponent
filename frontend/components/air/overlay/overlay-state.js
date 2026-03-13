@@ -50,4 +50,3 @@ function _saveOverlayStates() {
     }
     catch (e) { }
 }
-//# sourceMappingURL=overlay-state.js.map

@@ -1739,4 +1739,3 @@ class AdsbLiveControl {
 adsbControl = new AdsbLiveControl();
 map.addControl(adsbControl, 'top-right');
 
-//# sourceMappingURL=adsb.js.map

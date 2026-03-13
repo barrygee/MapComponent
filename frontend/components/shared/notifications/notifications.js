@@ -429,4 +429,3 @@ window._Notifications = (() => {
     }
     return { add, update, dismiss, clearAll, render, init, toggle, repositionBar: _repositionBar };
 })();
-//# sourceMappingURL=notifications.js.map

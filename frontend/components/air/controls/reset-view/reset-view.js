@@ -30,4 +30,3 @@ class ResetViewControl extends SentinelControlBase {
     }
 }
 map.addControl(new ResetViewControl(), 'top-right');
-//# sourceMappingURL=reset-view.js.map

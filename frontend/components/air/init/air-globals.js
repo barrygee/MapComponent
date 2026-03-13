@@ -28,4 +28,3 @@ let clearControl = null;
 // Side-menu callbacks — assigned by the side-menu.ts IIFE on load.
 let _syncSideMenuForPlanes = null;
 let _onGoToUserLocation = null;
-//# sourceMappingURL=air-globals.js.map

@@ -71,4 +71,3 @@ class RangeRingsControl extends SentinelControlBase {
 }
 rangeRingsControl = new RangeRingsControl();
 map.addControl(rangeRingsControl, 'top-right');
-//# sourceMappingURL=range-rings.js.map

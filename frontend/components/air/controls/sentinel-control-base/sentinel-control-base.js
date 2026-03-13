@@ -49,4 +49,3 @@ class SentinelControlBase {
         this.button.style.color = active ? '#c8ff00' : '#ffffff';
     }
 }
-//# sourceMappingURL=sentinel-control-base.js.map

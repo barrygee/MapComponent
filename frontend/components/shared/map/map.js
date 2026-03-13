@@ -290,4 +290,3 @@ window.MapComponent = {
     computeLongestEdge,
     RING_DISTANCES_NM,
 };
-//# sourceMappingURL=map.js.map

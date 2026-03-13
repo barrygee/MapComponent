@@ -212,4 +212,3 @@ class AirportsToggleControl extends SentinelControlBase {
 }
 airportsControl = new AirportsToggleControl();
 map.addControl(airportsControl, 'top-right');
-//# sourceMappingURL=airports.js.map

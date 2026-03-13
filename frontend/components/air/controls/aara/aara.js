@@ -132,4 +132,3 @@ aarControl = new AARToggleControl();
 map.addControl(aarControl, 'top-right');
 map.on('rotate', () => aarControl._updateLabelRotations());
 map.on('pitch', () => aarControl._updateLabelRotations());
-//# sourceMappingURL=aara.js.map

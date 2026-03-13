@@ -55,4 +55,3 @@ class RoadsToggleControl extends SentinelControlBase {
 }
 roadsControl = new RoadsToggleControl();
 map.addControl(roadsControl, 'top-right');
-//# sourceMappingURL=roads.js.map
