@@ -1469,10 +1469,9 @@ class AdsbLiveControl {
                 if (!seen.has(hex))
                     delete this._trails[hex];
             }
-            for (const hex of Object.keys(this._lastPositions)) {
-                if (!seen.has(hex))
-                    delete this._lastPositions[hex];
-            }
+            // Do NOT delete _lastPositions when a plane drops from the API response.
+            // _interpolate() uses lastSeen age to freeze-in-place (stale) then remove at REMOVE_SEC (60s).
+            // Deleting here causes a snap-back to the raw API coordinates on the next interpolation frame.
             for (const hex of Object.keys(this._prevAlt)) {
                 if (!seen.has(hex) && !this._parkedTimers[hex])
                     delete this._prevAlt[hex];
