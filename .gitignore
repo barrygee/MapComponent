@@ -3,3 +3,7 @@ pmtiles
 *.pmtiles
 node_modules/
 .DS_Store
+__pycache__/
+*.py[cod]
+*.db
+.venv/
