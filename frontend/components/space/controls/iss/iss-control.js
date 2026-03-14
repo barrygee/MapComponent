@@ -126,7 +126,7 @@ class IssControl extends SentinelControlBase {
     // ---- Layer init ----
     initLayers() {
         // Clean up existing layers/sources
-        ['iss-track-orbit1', 'iss-track-orbit2', 'iss-footprint-fill', 'iss-footprint', 'iss-bracket', 'iss-icon'].forEach(id => {
+        ['iss-track-orbit1', 'iss-track-orbit2', 'iss-footprint-fill-outer', 'iss-footprint-fill-mid', 'iss-footprint-fill-inner', 'iss-footprint-fill-core', 'iss-footprint', 'iss-bracket', 'iss-icon'].forEach(id => {
             try { this.map.removeLayer(id); } catch (e) {}
         });
         ['iss-track-source', 'iss-footprint-source', 'iss-live'].forEach(id => {
@@ -175,18 +175,25 @@ class IssControl extends SentinelControlBase {
             },
         });
 
-        // Footprint source + layers (fill + outline)
+        // Footprint source + layers (concentric rings for gradient fade + outline)
         this.map.addSource('iss-footprint-source', { type: 'geojson', data: this._footprintGeojson });
-        this.map.addLayer({
-            id: 'iss-footprint-fill',
-            type: 'fill',
-            source: 'iss-footprint-source',
-            filter: ['==', ['geometry-type'], 'Polygon'],
-            layout: { visibility: fpVis },
-            paint: {
-                'fill-color': 'rgba(0,0,0,0.22)',
-            },
-        });
+
+        // Four concentric rings: outermost is most transparent, innermost most opaque
+        const ringOpacities = { outer: 0.04, mid: 0.07, inner: 0.10, core: 0.13 };
+        for (const [ring, opacity] of Object.entries(ringOpacities)) {
+            this.map.addLayer({
+                id: `iss-footprint-fill-${ring}`,
+                type: 'fill',
+                source: 'iss-footprint-source',
+                filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'ring'], ring]],
+                layout: { visibility: fpVis },
+                paint: {
+                    'fill-color': '#c8e8ff',
+                    'fill-opacity': opacity,
+                },
+            });
+        }
+
         this.map.addLayer({
             id: 'iss-footprint',
             type: 'line',
@@ -194,8 +201,8 @@ class IssControl extends SentinelControlBase {
             filter: ['==', ['geometry-type'], 'LineString'],
             layout: { visibility: fpVis },
             paint: {
-                'line-color': '#000000',
-                'line-width': 1.2,
+                'line-color': 'rgba(200, 232, 255, 0.35)',
+                'line-width': 0.8,
             },
         });
 
@@ -275,19 +282,15 @@ class IssControl extends SentinelControlBase {
 
             this._trackGeojson = ground_track;
 
+            const cx = position.lon, cy = position.lat;
             this._footprintGeojson = {
                 type: 'FeatureCollection',
                 features: [
-                    {
-                        type: 'Feature',
-                        geometry: { type: 'LineString', coordinates: footprint },
-                        properties: {},
-                    },
-                    {
-                        type: 'Feature',
-                        geometry: { type: 'Polygon', coordinates: [footprint] },
-                        properties: {},
-                    },
+                    { type: 'Feature', geometry: { type: 'LineString', coordinates: footprint }, properties: {} },
+                    { type: 'Feature', geometry: { type: 'Polygon', coordinates: [footprint] }, properties: { ring: 'outer' } },
+                    { type: 'Feature', geometry: { type: 'Polygon', coordinates: [this._scaleFootprint(footprint, cx, cy, 0.75)] }, properties: { ring: 'mid' } },
+                    { type: 'Feature', geometry: { type: 'Polygon', coordinates: [this._scaleFootprint(footprint, cx, cy, 0.50)] }, properties: { ring: 'inner' } },
+                    { type: 'Feature', geometry: { type: 'Polygon', coordinates: [this._scaleFootprint(footprint, cx, cy, 0.25)] }, properties: { ring: 'core' } },
                 ],
             };
 
@@ -315,6 +318,14 @@ class IssControl extends SentinelControlBase {
         } catch (e) {
             // Silently ignore fetch errors
         }
+    }
+
+    // Scale footprint ring points toward center by `factor` (0–1)
+    _scaleFootprint(ring, cx, cy, factor) {
+        return ring.map(([lon, lat]) => [
+            cx + (lon - cx) * factor,
+            cy + (lat - cy) * factor,
+        ]);
     }
 
     _startPolling() {
@@ -425,7 +436,7 @@ class IssControl extends SentinelControlBase {
         ['iss-track-orbit1', 'iss-track-orbit2'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', trackVis); } catch (e) {}
         });
-        ['iss-footprint-fill', 'iss-footprint'].forEach(id => {
+        ['iss-footprint-fill-outer', 'iss-footprint-fill-mid', 'iss-footprint-fill-inner', 'iss-footprint-fill-core', 'iss-footprint'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', fpVis); } catch (e) {}
         });
         this.setButtonActive(this.issVisible);
@@ -452,7 +463,7 @@ class IssControl extends SentinelControlBase {
     toggleFootprint() {
         this.footprintVisible = !this.footprintVisible;
         const fpVis = (this.issVisible && this.footprintVisible) ? 'visible' : 'none';
-        ['iss-footprint-fill', 'iss-footprint'].forEach(id => {
+        ['iss-footprint-fill-outer', 'iss-footprint-fill-mid', 'iss-footprint-fill-inner', 'iss-footprint-fill-core', 'iss-footprint'].forEach(id => {
             try { this.map.setLayoutProperty(id, 'visibility', fpVis); } catch (e) {}
         });
         if (typeof _spaceSyncSideMenu === 'function') _spaceSyncSideMenu();
