@@ -57,8 +57,8 @@ class DaynightControl extends SentinelControlBase {
             source: 'daynight-source',
             layout: { visibility: this.dnVisible ? 'visible' : 'none' },
             paint: {
-                'fill-color': 'rgba(10, 10, 60, 0.28)',
-                'fill-outline-color': 'rgba(10, 10, 60, 0.28)',
+                'fill-color': 'rgba(10, 10, 60, 0.18)',
+                'fill-outline-color': 'rgba(10, 10, 60, 0.18)',
                 'fill-opacity': 1,
             },
         });
