@@ -25,6 +25,13 @@ if (typeof window._Notifications !== 'undefined') {
     window._Notifications.init();
 }
 
+// ---- 2b. Sync space overlay states from backend (after controls are ready) ----
+map.once('load', function () {
+    if (typeof _syncSpaceOverlayStatesFromBackend === 'function') {
+        _syncSpaceOverlayStatesFromBackend();
+    }
+});
+
 // ---- 2. Logo animation ----
 (function () {
     const logoSvg = document.getElementById('logo-img');

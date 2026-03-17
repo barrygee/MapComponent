@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Float, Integer, Text
+from sqlalchemy import Boolean, Column, Float, Integer, Text, UniqueConstraint
 
 from backend.database import Base
 
@@ -60,3 +60,20 @@ class AirTracking(Base):
     callsign  = Column(Text, nullable=False, default="")
     follow    = Column(Boolean, nullable=False, default=False)  # camera-follow mode active
     added_at  = Column(Integer, nullable=False)            # Unix ms when tracking began
+
+
+class UserSettings(Base):
+    """User preferences and overlay toggle states, persisted across browser sessions.
+
+    Keyed by (namespace, key) — e.g. ('air', 'overlayStates') or ('app', 'theme').
+    value is stored as a JSON string to support booleans, strings, and objects.
+    """
+    __tablename__ = "user_settings"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    namespace  = Column(Text, nullable=False)   # 'app' | 'air' | 'space' | 'sea' | 'land' | 'sdr'
+    key        = Column(Text, nullable=False)   # e.g. 'theme', 'overlayStates', 'spaceOverlayStates'
+    value      = Column(Text, nullable=False)   # JSON-serialised value
+    updated_at = Column(Integer, nullable=False)  # Unix ms
+
+    __table_args__ = (UniqueConstraint('namespace', 'key', name='uq_user_settings_ns_key'),)

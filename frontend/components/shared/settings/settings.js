@@ -114,7 +114,35 @@ window._SettingsPanel = (function () {
             track.setAttribute('aria-checked', isDark ? 'true' : 'false');
             var mode = isDark ? 'dark' : 'light';
             try { localStorage.setItem(STORAGE_KEY, mode); } catch (e) {}
+            if (window._SettingsAPI) {
+                window._SettingsAPI.put('app', 'theme', mode);
+            }
         });
+
+        // Phase 2: sync theme from backend (migration + restore)
+        (function _syncThemeFromBackend() {
+            if (!window._SettingsAPI) return;
+            var MIGRATED_FLAG = 'sentinel_settings_migrated_theme';
+            if (!localStorage.getItem(MIGRATED_FLAG)) {
+                // One-time migration: push existing localStorage value to backend
+                var existingMode = saved;
+                window._SettingsAPI.put('app', 'theme', existingMode);
+                localStorage.setItem(MIGRATED_FLAG, '1');
+                return;
+            }
+            // Fetch from backend and reconcile
+            window._SettingsAPI.getNamespace('app').then(function (ns) {
+                if (!ns || !ns.theme) return;
+                var backendMode = ns.theme;
+                var localMode = isDark ? 'dark' : 'light';
+                if (backendMode !== localMode) {
+                    isDark = backendMode === 'dark';
+                    track.classList.toggle('is-dark', isDark);
+                    track.setAttribute('aria-checked', isDark ? 'true' : 'false');
+                    try { localStorage.setItem(STORAGE_KEY, backendMode); } catch (e) {}
+                }
+            });
+        })();
 
         wrap.appendChild(labelLight);
         wrap.appendChild(track);
