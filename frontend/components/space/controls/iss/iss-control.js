@@ -123,12 +123,14 @@ class IssControl extends SentinelControlBase {
 
     // ---- Layer init ----
     initLayers() {
-        // Clean up existing layers/sources
-        ['iss-track-orbit1', 'iss-track-orbit2', 'iss-footprint-fill', 'iss-footprint', 'iss-bracket', 'iss-icon'].forEach(id => {
+        // Clean up existing layers/sources (includes legacy layer IDs from older builds)
+        ['iss-track-past', 'iss-track-future', 'iss-track-orbit1', 'iss-track-orbit2',
+         'iss-footprint-fill-outer', 'iss-footprint-fill-mid', 'iss-footprint-fill-inner', 'iss-footprint-fill-core',
+         'iss-footprint-fill', 'iss-footprint', 'iss-bracket', 'iss-icon'].forEach(id => {
             try { this.map.removeLayer(id); } catch (e) {}
         });
         ['iss-track-source', 'iss-footprint-source', 'iss-live'].forEach(id => {
-            if (this.map.getSource(id)) this.map.removeSource(id);
+            try { if (this.map.getSource(id)) this.map.removeSource(id); } catch (e) {}
         });
 
         // Register sprites

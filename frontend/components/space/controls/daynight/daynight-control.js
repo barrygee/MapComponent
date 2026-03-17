@@ -25,7 +25,15 @@ class DaynightControl extends SentinelControlBase {
 
     onInit() {
         this.setButtonActive(this.dnVisible);
-        this._fetch();
+        const init = () => {
+            this.initLayers();
+            this._fetch();
+        };
+        if (this.map.isStyleLoaded()) {
+            init();
+        } else {
+            this.map.once('style.load', init);
+        }
         this._pollInterval = setInterval(() => this._fetch(), 60000);
     }
 
@@ -36,9 +44,7 @@ class DaynightControl extends SentinelControlBase {
         ['daynight-fill'].forEach(id => {
             try { this.map.removeLayer(id); } catch (e) {}
         });
-        if (this.map.getSource('daynight-source')) {
-            this.map.removeSource('daynight-source');
-        }
+        try { if (this.map.getSource('daynight-source')) this.map.removeSource('daynight-source'); } catch (e) {}
 
         const emptyGeoJSON = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[]] } };
         this.map.addSource('daynight-source', {
