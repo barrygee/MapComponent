@@ -15,7 +15,7 @@ window._SettingsPanel = (function () {
             sectionLabel: 'App Settings',
             id: 'theme',
             label: 'Theme',
-            desc: 'Light, dark, or match system preference',
+            desc: 'Switch between light and dark mode',
             renderControl: _renderThemeToggle
         }
     ];
@@ -35,6 +35,45 @@ window._SettingsPanel = (function () {
 
         var panel = document.createElement('div');
         panel.id = 'settings-panel';
+
+        // Topographic background SVG
+        var topoNS = 'http://www.w3.org/2000/svg';
+        var topo = document.createElementNS(topoNS, 'svg');
+        topo.id = 'settings-topo-bg';
+        topo.setAttribute('viewBox', '0 0 1440 800');
+        topo.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+        topo.setAttribute('aria-hidden', 'true');
+        var topoEllipses = [
+            // Centre cluster
+            [720, 400, 680, 340, 0.045], [720, 400, 600, 290, 0.04],
+            [720, 400, 520, 240, 0.04],  [720, 400, 440, 190, 0.038],
+            [720, 400, 360, 145, 0.035], [720, 400, 280, 105, 0.03],
+            [720, 400, 200,  70, 0.025], [720, 400, 125,  42, 0.02],
+            // Top-left
+            [200, 160, 320, 180, 0.03],  [200, 160, 240, 130, 0.028],
+            [200, 160, 160,  85, 0.025], [200, 160,  90,  48, 0.02],
+            // Bottom-right
+            [1260, 640, 300, 195, 0.03], [1260, 640, 220, 140, 0.027],
+            [1260, 640, 145,  90, 0.023],[1260, 640,  75,  48, 0.018],
+            // Top-right
+            [1100, 100, 260, 130, 0.025],[1100, 100, 180,  88, 0.022],
+            [1100, 100, 105,  52, 0.018],
+            // Bottom-left
+            [320, 700, 280, 150, 0.025], [320, 700, 200, 105, 0.022],
+            [320, 700, 125,  65, 0.018]
+        ];
+        topoEllipses.forEach(function (e) {
+            var el = document.createElementNS(topoNS, 'ellipse');
+            el.setAttribute('cx', e[0]);
+            el.setAttribute('cy', e[1]);
+            el.setAttribute('rx', e[2]);
+            el.setAttribute('ry', e[3]);
+            el.setAttribute('fill', 'none');
+            el.setAttribute('stroke', 'rgba(255,255,255,' + e[4] + ')');
+            el.setAttribute('stroke-width', '0.8');
+            topo.appendChild(el);
+        });
+        panel.appendChild(topo);
 
         // Sidebar
         var sidebar = document.createElement('div');
@@ -84,24 +123,40 @@ window._SettingsPanel = (function () {
         var STORAGE_KEY = 'sentinel_theme';
         var saved = 'dark';
         try { saved = localStorage.getItem(STORAGE_KEY) || 'dark'; } catch (e) {}
+        var isDark = saved !== 'light';
 
         var wrap = document.createElement('div');
-        wrap.className = 'settings-theme-toggle';
+        wrap.className = 'settings-theme-switch';
 
-        ['light', 'dark', 'system'].forEach(function (mode) {
-            var btn = document.createElement('button');
-            btn.className = 'settings-theme-btn' + (mode === saved ? ' active' : '');
-            btn.textContent = mode.toUpperCase();
-            btn.dataset.mode = mode;
-            btn.addEventListener('click', function () {
-                wrap.querySelectorAll('.settings-theme-btn').forEach(function (b) {
-                    b.classList.remove('active');
-                });
-                btn.classList.add('active');
-                try { localStorage.setItem(STORAGE_KEY, mode); } catch (e) {}
-            });
-            wrap.appendChild(btn);
+        var labelLight = document.createElement('span');
+        labelLight.className = 'settings-theme-label';
+        labelLight.textContent = 'LIGHT';
+
+        var track = document.createElement('button');
+        track.className = 'settings-theme-track' + (isDark ? ' is-dark' : '');
+        track.setAttribute('role', 'switch');
+        track.setAttribute('aria-checked', isDark ? 'true' : 'false');
+        track.setAttribute('aria-label', 'Toggle dark mode');
+
+        var thumb = document.createElement('span');
+        thumb.className = 'settings-theme-thumb';
+        track.appendChild(thumb);
+
+        var labelDark = document.createElement('span');
+        labelDark.className = 'settings-theme-label';
+        labelDark.textContent = 'DARK';
+
+        track.addEventListener('click', function () {
+            isDark = !isDark;
+            track.classList.toggle('is-dark', isDark);
+            track.setAttribute('aria-checked', isDark ? 'true' : 'false');
+            var mode = isDark ? 'dark' : 'light';
+            try { localStorage.setItem(STORAGE_KEY, mode); } catch (e) {}
         });
+
+        wrap.appendChild(labelLight);
+        wrap.appendChild(track);
+        wrap.appendChild(labelDark);
 
         return wrap;
     }
