@@ -20,12 +20,6 @@ class RangeRingsControl extends SentinelControlBase {
     get buttonTitle() { return 'Toggle range rings'; }
     onInit() {
         this.setButtonActive(this.ringsVisible);
-        if (this.map.isStyleLoaded()) {
-            this.initRings();
-        }
-        else {
-            this.map.once('style.load', () => this.initRings());
-        }
     }
     handleClick() { this.toggleRings(); }
     /**

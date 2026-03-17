@@ -283,7 +283,12 @@ _sentinelMap.on('styleimagemissing', () => {
 // ============================================================
 window.MapComponent = {
     map: _sentinelMap,
-    onStyleLoad: (fn) => { _styleLoadCallbacks.push(fn); },
+    onStyleLoad: (fn) => {
+        _styleLoadCallbacks.push(fn);
+        if (_styleHasLoadedOnce) {
+            try { fn(); } catch (e) { console.error('style.load handler error:', e); }
+        }
+    },
     isOnline: () => _mapConnState,
     generateGeodesicCircle,
     buildRingsGeoJSON,

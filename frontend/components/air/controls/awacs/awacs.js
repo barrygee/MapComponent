@@ -89,12 +89,6 @@ class AWACSToggleControl extends SentinelControlBase {
     get buttonTitle() { return 'Toggle UK AWACS orbits'; }
     onInit() {
         this.setButtonActive(this.visible);
-        if (this.map.isStyleLoaded()) {
-            this.initLayers();
-        }
-        else {
-            this.map.once('style.load', () => this.initLayers());
-        }
     }
     handleClick() { this.toggle(); }
     /**

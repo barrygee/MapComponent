@@ -17,12 +17,6 @@ class NamesToggleControl extends SentinelControlBase {
     get buttonTitle() { return 'Toggle city names'; }
     onInit() {
         this.setButtonActive(this.namesVisible);
-        if (this.map.isStyleLoaded()) {
-            this.applyNamesVisibility();
-        }
-        else {
-            this.map.once('style.load', () => this.applyNamesVisibility());
-        }
     }
     handleClick() { this.toggleNames(); }
     /**

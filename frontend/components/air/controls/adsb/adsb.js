@@ -184,16 +184,7 @@ class AdsbLiveControl {
         this.container.appendChild(this.button);
         if (this.visible)
             this._fetch();
-        this._spriteReady.then(() => {
-            if (!this.map)
-                return;
-            if (this.map.isStyleLoaded()) {
-                this.initLayers();
-            }
-            else {
-                this.map.once('style.load', () => this.initLayers());
-            }
-        });
+        // initLayers is handled by overlay-reinit.js via MapComponent.onStyleLoad
         return this.container;
     }
     onRemove() {

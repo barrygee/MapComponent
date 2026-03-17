@@ -42,12 +42,6 @@ class AARToggleControl extends SentinelControlBase {
     get buttonTitle() { return 'Toggle UK air-to-air refuelling areas'; }
     onInit() {
         this.setButtonActive(this.visible);
-        if (this.map.isStyleLoaded()) {
-            this.initLayers();
-        }
-        else {
-            this.map.once('style.load', () => this.initLayers());
-        }
     }
     handleClick() { this.toggle(); }
     onRemove() {

@@ -16,8 +16,6 @@ class RoadsToggleControl extends SentinelControlBase {
     get buttonLabel() { return 'R'; }
     get buttonTitle() { return 'Toggle road lines and names'; }
     onInit() {
-        this.updateRoadsVisibility();
-        this.map.once('style.load', () => this.updateRoadsVisibility());
     }
     handleClick() { this.toggleRoads(); }
     /** Sync the button colour/opacity to the current roadsVisible state. */

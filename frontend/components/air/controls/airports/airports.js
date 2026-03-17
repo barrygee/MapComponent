@@ -55,12 +55,6 @@ class AirportsToggleControl extends SentinelControlBase {
     onInit() {
         this.button.style.fontSize = '8px';
         this.setButtonActive(this.visible);
-        if (this.map.isStyleLoaded()) {
-            this.initLayers();
-        }
-        else {
-            this.map.once('style.load', () => this.initLayers());
-        }
     }
     handleClick() { this.toggle(); }
     onRemove() {
