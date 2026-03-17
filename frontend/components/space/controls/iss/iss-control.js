@@ -48,18 +48,14 @@ class IssControl extends SentinelControlBase {
 
     onInit() {
         this.setButtonActive(this.issVisible);
-        const init = () => {
+        if (this.map.isStyleLoaded()) {
             this.initLayers();
             if (this.issVisible) {
                 this._fetch();
                 this._startPolling();
             }
-        };
-        if (this.map.isStyleLoaded()) {
-            init();
-        } else {
-            this.map.once('style.load', init);
         }
+        // Style-reload reinit is handled by space-overlay-reinit.js via MapComponent.onStyleLoad
     }
 
     handleClick() { this.toggleIss(); }

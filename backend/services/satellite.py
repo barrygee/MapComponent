@@ -6,7 +6,7 @@ All outputs use [longitude, latitude] coordinate order (GeoJSON convention).
 """
 
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sgp4.api import Satrec, jday
 
@@ -22,15 +22,16 @@ def _jday_now() -> tuple[int, float]:
     return jd, fr
 
 
-def _eci_to_geodetic(r_km: list[float]) -> tuple[float, float, float]:
+def _eci_to_geodetic(r_km: list[float], t: datetime | None = None) -> tuple[float, float, float]:
     """Convert ECI position vector (km) to geodetic lat/lon/alt.
 
     Returns (latitude_deg, longitude_deg, altitude_km).
     Uses a simplified spherical Earth model — sufficient for display purposes.
     """
-    now = datetime.now(timezone.utc)
+    if t is None:
+        t = datetime.now(timezone.utc)
     # Greenwich Mean Sidereal Time (radians) — simple approximation
-    j2000 = (now.replace(tzinfo=None) - datetime(2000, 1, 1, 12, 0, 0)).total_seconds() / 86400.0
+    j2000 = (t.replace(tzinfo=None) - datetime(2000, 1, 1, 12, 0, 0)).total_seconds() / 86400.0
     gmst = math.fmod(280.46061837 + 360.98564736629 * j2000, 360.0)
     gmst_rad = math.radians(gmst)
 
@@ -75,17 +76,17 @@ def compute_position(tle_line1: str, tle_line2: str) -> dict:
         raise RuntimeError("SGP4 propagation error at current time")
 
     r, v = result
-    lat, lon, alt_km = _eci_to_geodetic(r)
+    now = datetime.now(timezone.utc)
+    lat, lon, alt_km = _eci_to_geodetic(r, now)
     velocity_kms = math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
 
     # Compute heading: propagate 10 seconds ahead for bearing estimate
-    now = datetime.now(timezone.utc)
     fr2 = fr + 10.0 / 86400.0  # +10 seconds in fractional days
     result2 = _propagate_at(sat, jd, fr2)
     track_deg = 0.0
     if result2:
         r2, _ = result2
-        lat2, lon2, _ = _eci_to_geodetic(r2)
+        lat2, lon2, _ = _eci_to_geodetic(r2, now + timedelta(seconds=10))
         d_lat = math.radians(lat2 - lat)
         d_lon = math.radians(lon2 - lon)
         lat_r = math.radians(lat)
@@ -114,6 +115,7 @@ def compute_ground_track(tle_line1: str, tle_line2: str) -> dict:
     """
     sat = Satrec.twoline2rv(tle_line1, tle_line2)
     jd, fr = _jday_now()
+    now = datetime.now(timezone.utc)
 
     features = []
 
@@ -143,7 +145,8 @@ def compute_ground_track(tle_line1: str, tle_line2: str) -> dict:
                 continue
 
             r, _ = result
-            lat, lon, _ = _eci_to_geodetic(r)
+            t_propagated = now + timedelta(minutes=minute)
+            lat, lon, _ = _eci_to_geodetic(r, t_propagated)
 
             # Detect antimeridian crossing (longitude jump > 180°)
             if prev_lon is not None and abs(lon - prev_lon) > 180:

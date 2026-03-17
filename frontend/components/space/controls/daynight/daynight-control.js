@@ -25,15 +25,11 @@ class DaynightControl extends SentinelControlBase {
 
     onInit() {
         this.setButtonActive(this.dnVisible);
-        const init = () => {
+        if (this.map.isStyleLoaded()) {
             this.initLayers();
             this._fetch();
-        };
-        if (this.map.isStyleLoaded()) {
-            init();
-        } else {
-            this.map.once('style.load', init);
         }
+        // Style-reload reinit is handled by space-overlay-reinit.js via MapComponent.onStyleLoad
         this._pollInterval = setInterval(() => this._fetch(), 60000);
     }
 
