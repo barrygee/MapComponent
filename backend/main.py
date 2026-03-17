@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from backend.database import create_tables
-from backend.routers import air, space, sea, land
+from backend.routers import air, space, sea, land, sdr
 
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -34,6 +34,7 @@ app.include_router(air.router)
 app.include_router(space.router)
 app.include_router(sea.router)
 app.include_router(land.router)
+app.include_router(sdr.router)
 
 
 @app.get("/health")
@@ -74,6 +75,11 @@ async def space_page(request: Request):
 @app.get("/land/")
 async def land_page(request: Request):
     return templates.TemplateResponse("land/index.html", {"request": request, "domain": "land"})
+
+
+@app.get("/sdr/")
+async def sdr_page(request: Request):
+    return templates.TemplateResponse("sdr/index.html", {"request": request, "domain": "sdr"})
 
 
 # ── Static files ───────────────────────────────────────────────────────────────
