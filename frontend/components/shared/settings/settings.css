@@ -1,0 +1,248 @@
+/* ============================================================
+   SETTINGS PANEL — full-screen overlay
+   ============================================================ */
+
+#settings-panel {
+    position: fixed;
+    top: 68px;
+    bottom: 44px;
+    left: 0;
+    right: 0;
+    z-index: 1500;
+    display: none;
+    flex-direction: row;
+    background-color: #000;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cpath d='M-10 60 Q20 20 60 50 Q100 80 130 40' fill='none' stroke='rgba(255,255,255,0.035)' stroke-width='1'/%3E%3Cpath d='M-10 90 Q20 50 60 80 Q100 110 130 70' fill='none' stroke='rgba(255,255,255,0.025)' stroke-width='1'/%3E%3Cpath d='M-10 30 Q20 -10 60 20 Q100 50 130 10' fill='none' stroke='rgba(255,255,255,0.025)' stroke-width='1'/%3E%3Cpath d='M-10 110 Q30 70 70 100 Q110 130 140 90' fill='none' stroke='rgba(255,255,255,0.02)' stroke-width='1'/%3E%3Cpath d='M10 -10 Q40 30 20 70 Q0 110 30 140' fill='none' stroke='rgba(255,255,255,0.02)' stroke-width='1'/%3E%3Cpath d='M80 -10 Q110 30 90 70 Q70 110 100 140' fill='none' stroke='rgba(255,255,255,0.015)' stroke-width='1'/%3E%3C/svg%3E");
+    background-size: 120px 120px;
+    background-repeat: repeat;
+}
+
+#settings-panel.settings-panel-visible {
+    display: flex;
+}
+
+/* ---- Sidebar ---- */
+#settings-sidebar {
+    width: 200px;
+    flex-shrink: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+#settings-sidebar::-webkit-scrollbar {
+    display: none;
+}
+
+.settings-nav-item {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+    padding: 11px 24px;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+    border-left: 2px solid transparent;
+    user-select: none;
+}
+
+.settings-nav-item:hover {
+    color: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.settings-nav-item.active {
+    color: #c8ff00;
+    border-left-color: #c8ff00;
+    background: rgba(200, 255, 0, 0.04);
+}
+
+/* ---- Content area ---- */
+#settings-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* ---- Search ---- */
+#settings-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+#settings-search-wrap svg {
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.25);
+}
+
+#settings-search-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: rgba(255, 255, 255, 0.9);
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    caret-color: #c8ff00;
+    min-width: 0;
+}
+
+#settings-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+}
+
+#settings-search-clear {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.3);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+    flex-shrink: 0;
+}
+
+#settings-search-clear.settings-search-clear-visible {
+    display: flex;
+}
+
+#settings-search-clear:hover {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* ---- Body ---- */
+#settings-body {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+#settings-body::-webkit-scrollbar {
+    display: none;
+}
+
+/* ---- Section labels ---- */
+.settings-section-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.3);
+    padding: 20px 24px 8px;
+    text-transform: uppercase;
+}
+
+/* ---- Setting items ---- */
+.settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    gap: 24px;
+}
+
+.settings-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.settings-item-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.75);
+    text-transform: uppercase;
+}
+
+.settings-item-desc {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* ---- Search result breadcrumb ---- */
+.settings-result-breadcrumb {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.2);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+/* ---- Empty / coming soon ---- */
+.settings-empty {
+    padding: 32px 24px;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.15);
+    text-transform: uppercase;
+}
+
+/* ---- Theme toggle ---- */
+.settings-theme-toggle {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.settings-theme-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.4);
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    text-transform: uppercase;
+}
+
+.settings-theme-btn:hover {
+    color: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.settings-theme-btn.active {
+    color: #000;
+    background: #c8ff00;
+    border-color: #c8ff00;
+}
+
+/* ---- Footer settings button active state ---- */
+#settings-btn.settings-btn-active {
+    opacity: 1;
+    color: #c8ff00;
+    background: rgba(200, 255, 0, 0.08);
+    border-radius: 6px;
+}
+
+#settings-btn.settings-btn-active[data-tooltip]::before {
+    opacity: 0 !important;
+}
