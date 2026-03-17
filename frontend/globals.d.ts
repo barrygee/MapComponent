@@ -7,11 +7,17 @@
 /// <reference types="maplibre-gl" />
 
 // ---- Window interface extensions ----
+interface SettingsAPI {
+    getNamespace(ns: string): Promise<Record<string, unknown> | null>;
+    put(ns: string, key: string, value: unknown): Promise<void>;
+}
+
 interface Window {
     MapComponent:    MapComponentAPI;
     _Notifications:  NotificationsAPI;
     _Tracking:       TrackingAPI;
     _FilterPanel:    FilterPanelAPI;
+    _SettingsAPI:    SettingsAPI | undefined;
     _adsb:           AdsbLiveControl | undefined;
     _is3DActive:     (() => boolean) | undefined;
     _getTargetPitch: (() => number)  | undefined;
@@ -51,3 +57,16 @@ declare namespace maplibregl {
 
 // ---- Air control instances (declared in air-globals.js, assigned at addControl time) ----
 declare let adsbControl: { _registerIcons(): void } | null;
+
+// ---- SentinelControlBase — loaded globally, extended by both air and space controls ----
+declare abstract class SentinelControlBase implements maplibregl.IControl {
+    map: maplibregl.Map;
+    button: HTMLButtonElement;
+    abstract readonly buttonLabel: string;
+    abstract readonly buttonTitle: string;
+    protected abstract onInit(): void;
+    protected abstract handleClick(): void;
+    onAdd(mapInstance: maplibregl.Map): HTMLElement;
+    onRemove(): void;
+    protected setButtonActive(active: boolean): void;
+}
