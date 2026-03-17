@@ -11,7 +11,7 @@
     position: fixed;
     bottom: calc(44px + 14px); /* footer height + breathing gap */
     top: calc(68px + 8px);     /* header height + breathing gap */
-    left: 24px;
+    left: 24px; /* overridden dynamically by JS to align with tracking button */
     z-index: 10000;
     display: flex;
     flex-direction: column;

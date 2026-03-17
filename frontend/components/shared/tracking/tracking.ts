@@ -52,6 +52,10 @@ window._Tracking = ((): TrackingAPI => {
     function openPanel(): void {
         const panel = _getPanel();
         const btn   = _getBtn();
+        if (panel && btn) {
+            const rect = btn.getBoundingClientRect();
+            panel.style.left = `${rect.left}px`;
+        }
         if (panel) panel.classList.add('tracking-panel-open');
         if (btn)   btn.classList.add('tracking-btn-active');
         _refreshBadge();

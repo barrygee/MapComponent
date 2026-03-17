@@ -44,6 +44,10 @@ window._Tracking = (() => {
     function openPanel() {
         const panel = _getPanel();
         const btn = _getBtn();
+        if (panel && btn) {
+            const rect = btn.getBoundingClientRect();
+            panel.style.left = `${rect.left}px`;
+        }
         if (panel)
             panel.classList.add('tracking-panel-open');
         if (btn)

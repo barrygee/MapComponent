@@ -316,7 +316,7 @@ class IssControl extends SentinelControlBase {
             'font-weight:400',
             'letter-spacing:.12em',
             'text-transform:uppercase',
-            'padding:1px 8px',
+            'padding:3px 10px',
             'white-space:nowrap',
             isTracking ? 'pointer-events:auto' : 'pointer-events:none',
             'user-select:none',
@@ -327,8 +327,10 @@ class IssControl extends SentinelControlBase {
         el.appendChild(nameSpan);
         if (isTracking) {
             const trkSpan = document.createElement('span');
-            trkSpan.style.cssText = 'color:#c8ff00;font-size:10px;font-weight:700;letter-spacing:.1em';
+            trkSpan.style.cssText = 'color:#c8ff00;font-size:10px;font-weight:700;letter-spacing:.1em;transition:color 0.2s';
             trkSpan.textContent = 'TRACKING';
+            el.addEventListener('mouseenter', () => { trkSpan.textContent = 'UNTRACK'; trkSpan.style.color = 'rgba(255,255,255,0.75)'; });
+            el.addEventListener('mouseleave', () => { trkSpan.textContent = 'TRACKING'; trkSpan.style.color = '#c8ff00'; });
             el.appendChild(trkSpan);
         }
         return el;
