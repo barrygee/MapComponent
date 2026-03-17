@@ -12,27 +12,15 @@
     display: none;
     flex-direction: row;
     background-color: #000;
-    overflow: hidden;
 }
 
 #settings-panel.settings-panel-visible {
     display: flex;
 }
 
-/* ---- Topographic background ---- */
-#settings-topo-bg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 0;
-}
-
 #settings-sidebar,
 #settings-content {
     position: relative;
-    z-index: 1;
 }
 
 /* ---- Sidebar ---- */
