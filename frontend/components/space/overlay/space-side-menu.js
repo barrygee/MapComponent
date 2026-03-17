@@ -47,13 +47,7 @@
     const MOON_SVG = `<svg width="13" height="14" viewBox="0 0 20 22" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M15 2C10 2 5 6.5 5 12s5 10 10 10c-6 0-11-4.5-11-10S9 2 15 2z" fill="#ffffff"/>
     </svg>`;
-    const LOC_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="12" r="4" stroke="#c8ff00" stroke-width="1.8" fill="none"/>
-        <line x1="12" y1="2" x2="12" y2="7" stroke="#c8ff00" stroke-width="1.8"/>
-        <line x1="12" y1="17" x2="12" y2="22" stroke="#c8ff00" stroke-width="1.8"/>
-        <line x1="2" y1="12" x2="7" y2="12" stroke="#c8ff00" stroke-width="1.8"/>
-        <line x1="17" y1="12" x2="22" y2="12" stroke="#c8ff00" stroke-width="1.8"/>
-    </svg>`;
+    const LOC_SVG = `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="7.5" stroke="#c8ff00" stroke-width="1.8"/><circle cx="10" cy="10" r="2" fill="white"/></svg>`;
     function makeNavBtn(content, title, onClick, isHTML) {
         const btn = document.createElement('button');
         btn.className = 'sm-nav-btn';
