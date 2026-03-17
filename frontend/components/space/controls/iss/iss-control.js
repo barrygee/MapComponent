@@ -13,7 +13,8 @@
 //   iss-bracket       — military-style bracket at ISS position
 //   iss-icon          — satellite icon rotated to heading
 //
-// Click on ISS shows an info tag with altitude, velocity, heading.
+// Hover on ISS shows an info tag with altitude, velocity, heading + TRACK button.
+// TRACK keeps ISS centred on map and shows status bar in tracking panel.
 //
 // Depends on: map (global alias), SentinelControlBase,
 //             _spaceOverlayStates, _saveSpaceOverlayStates
@@ -27,8 +28,11 @@ class IssControl extends SentinelControlBase {
         this.footprintVisible = _spaceOverlayStates.footprint;
         this._pollInterval    = null;
         this._tagMarker       = null;
+        this._hoverTagMarker  = null;
         this._lastPosition    = null;
         this._labelMarker     = null;
+        this._followEnabled   = false;
+        this._hoverHideTimer  = null;
         // GeoJSON stores
         this._issGeojson       = { type: 'FeatureCollection', features: [] };
         this._trackGeojson     = { type: 'FeatureCollection', features: [] };
@@ -227,17 +231,11 @@ class IssControl extends SentinelControlBase {
             },
         });
 
-        // Click on ISS — show info tag
-        this.map.on('click', 'iss-icon',    (e) => this._showTag(e));
-        this.map.on('click', 'iss-bracket', (e) => this._showTag(e));
-        this.map.on('click', (e) => {
-            const hits = this.map.queryRenderedFeatures(e.point, { layers: ['iss-icon', 'iss-bracket'] });
-            if (!hits.length) this._hideTag();
-        });
-        this.map.on('mouseenter', 'iss-icon',    () => { this.map.getCanvas().style.cursor = 'pointer'; });
-        this.map.on('mouseleave', 'iss-icon',    () => { this.map.getCanvas().style.cursor = ''; });
-        this.map.on('mouseenter', 'iss-bracket', () => { this.map.getCanvas().style.cursor = 'pointer'; });
-        this.map.on('mouseleave', 'iss-bracket', () => { this.map.getCanvas().style.cursor = ''; });
+        // Hover on ISS icon/bracket — show info tag
+        this.map.on('mouseenter', 'iss-icon',    (e) => { this.map.getCanvas().style.cursor = 'pointer'; this._showHoverTag(e); });
+        this.map.on('mouseenter', 'iss-bracket', (e) => { this.map.getCanvas().style.cursor = 'pointer'; this._showHoverTag(e); });
+        this.map.on('mouseleave', 'iss-icon',    () => { this.map.getCanvas().style.cursor = ''; this._scheduleHideHoverTag(); });
+        this.map.on('mouseleave', 'iss-bracket', () => { this.map.getCanvas().style.cursor = ''; this._scheduleHideHoverTag(); });
     }
 
     // ---- Data fetch ----
@@ -285,15 +283,24 @@ class IssControl extends SentinelControlBase {
             const fpSource = this.map && this.map.getSource('iss-footprint-source');
             if (fpSource) fpSource.setData(this._footprintGeojson);
 
-            // Keep callsign label in sync
-            if (this.issVisible) {
+            // Keep callsign label in sync (only when tag is not shown)
+            if (this.issVisible && !this._hoverTagMarker && !this._followEnabled) {
                 this._showLabel(position.lon, position.lat);
+            } else if (this.issVisible && this._labelMarker) {
+                this._labelMarker.setLngLat([position.lon, position.lat]);
             }
 
-            // Keep tag position in sync while open
-            if (this._tagMarker) {
+            // Keep hover tag position in sync while open
+            if (this._hoverTagMarker) {
+                this._hoverTagMarker.setLngLat([position.lon, position.lat]);
+                this._updateHoverTagContent(position);
+            }
+
+            // Keep follow tag position in sync and centre map
+            if (this._tagMarker && this._followEnabled) {
                 this._tagMarker.setLngLat([position.lon, position.lat]);
-                this._updateTagContent(position);
+                this._updateStatusBar(position);
+                this.map.easeTo({ center: [position.lon, position.lat], duration: 150, easing: t => t });
             }
 
         } catch (e) {
@@ -315,7 +322,7 @@ class IssControl extends SentinelControlBase {
         const el = document.createElement('div');
         el.style.cssText = [
             'background:rgba(0,0,0,0.5)',
-            'color:#c8ff00',
+            'color:#ffffff',
             "font-family:'Barlow Condensed','Barlow','Helvetica Neue',Arial,sans-serif",
             'font-size:13px',
             'font-weight:400',
@@ -345,19 +352,12 @@ class IssControl extends SentinelControlBase {
         if (this._labelMarker) { this._labelMarker.remove(); this._labelMarker = null; }
     }
 
-    // ---- Info tag ----
-    _buildTagEl(props) {
-        const el = document.createElement('div');
-        el.style.cssText = [
-            'pointer-events:none',
-            'white-space:nowrap',
-            'z-index:1000',
-        ].join(';');
-        el.innerHTML = this._tagHTML(props);
-        return el;
-    }
+    // ---- Hover tag ----
+    _tagHTML(p, isTracking) {
+        const trkColor   = isTracking ? '#c8ff00' : 'rgba(255,255,255,0.3)';
+        const trkText    = isTracking ? 'TRACKING' : 'TRACK';
+        const trkBtn = `<button class="iss-track-btn" style="background:none;border:none;cursor:pointer;padding:8px 12px;color:${trkColor};font-family:'Barlow Condensed','Barlow',sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1;touch-action:manipulation;-webkit-tap-highlight-color:transparent">${trkText}</button>`;
 
-    _tagHTML(p) {
         const rows = [
             ['ALT', `${p.alt_km} km`],
             ['VEL', `${p.velocity_kms} km/s`],
@@ -372,29 +372,207 @@ class IssControl extends SentinelControlBase {
         ).join('');
         return `<div style="background:rgba(0,0,0,0.7);color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;padding:6px 14px 9px;white-space:nowrap;user-select:none">` +
             `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;font-size:15px;letter-spacing:.12em;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
-            `<span style="font-size:13px;font-weight:400;pointer-events:none;color:#c8ff00;letter-spacing:.12em">ISS</span></div>` +
+            `<span style="font-size:13px;font-weight:400;pointer-events:none;color:#c8ff00;letter-spacing:.12em">ISS</span>` +
+            `${trkBtn}</div>` +
             `<div style="pointer-events:none">` + rowsHTML + `</div></div>`;
     }
 
-    _updateTagContent(position) {
-        if (!this._tagMarker) return;
-        const el = this._tagMarker.getElement();
-        if (el) el.innerHTML = this._tagHTML(position);
-    }
-
-    _showTag(e) {
+    _showHoverTag(e) {
         if (!e.features || !e.features.length) return;
-        const props = e.features[0].properties;
+        if (this._followEnabled) return; // tracking tag already shown
+        if (this._hoverHideTimer) { clearTimeout(this._hoverHideTimer); this._hoverHideTimer = null; }
+        if (this._hoverTagMarker) return; // already shown
+
+        const props  = e.features[0].properties;
         const coords = e.features[0].geometry.coordinates;
-        this._hideTag();
-        const el = this._buildTagEl(props);
-        this._tagMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -13] })
+
+        // Hide the label while tag is visible
+        if (this._labelMarker) this._labelMarker.getElement().style.visibility = 'hidden';
+
+        const el = document.createElement('div');
+        el.style.pointerEvents = 'auto';
+        el.innerHTML = this._tagHTML(props, false);
+        el.addEventListener('mouseenter', () => {
+            if (this._hoverHideTimer) { clearTimeout(this._hoverHideTimer); this._hoverHideTimer = null; }
+        });
+        el.addEventListener('mouseleave', () => this._scheduleHideHoverTag());
+        this._wireTrackButton(el, props);
+
+        this._hoverTagMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -13] })
             .setLngLat(coords)
             .addTo(this.map);
     }
 
-    _hideTag() {
+    _scheduleHideHoverTag() {
+        if (this._hoverHideTimer) clearTimeout(this._hoverHideTimer);
+        this._hoverHideTimer = setTimeout(() => {
+            this._hoverHideTimer = null;
+            this._hideHoverTagNow();
+        }, 80);
+    }
+
+    _hideHoverTagNow() {
+        if (this._hoverTagMarker) { this._hoverTagMarker.remove(); this._hoverTagMarker = null; }
+        // Restore label when not tracking
+        if (!this._followEnabled && this._labelMarker) {
+            this._labelMarker.getElement().style.visibility = '';
+        }
+    }
+
+    _updateHoverTagContent(position) {
+        if (!this._hoverTagMarker) return;
+        const el = this._hoverTagMarker.getElement();
+        if (el) {
+            // Preserve pointer-events:auto set on the container
+            const inner = el.querySelector('[style*="background:rgba"]');
+            if (inner) {
+                const rows = [
+                    ['ALT', `${position.alt_km} km`],
+                    ['VEL', `${position.velocity_kms} km/s`],
+                    ['HDG', `${position.track_deg}°`],
+                    ['LAT', `${position.lat}°`],
+                    ['LON', `${position.lon}°`],
+                ];
+                const rowsDiv = inner.querySelector('div:last-child');
+                if (rowsDiv) rowsDiv.innerHTML = rows.map(([lbl, val]) =>
+                    `<div style="display:flex;gap:14px;line-height:1.8">` +
+                    `<span style="opacity:0.5;min-width:34px;letter-spacing:.05em">${lbl}</span>` +
+                    `<span>${val}</span></div>`
+                ).join('');
+            }
+        }
+    }
+
+    // ---- Track button wiring ----
+    _wireTrackButton(el, props) {
+        const btn = el.querySelector('.iss-track-btn');
+        if (!btn) return;
+        btn.addEventListener('mousedown', (e) => e.stopPropagation());
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._hideHoverTagNow();
+            this._startFollowing();
+        });
+    }
+
+    // ---- Following / tracked tag ----
+    _startFollowing() {
+        if (!this._lastPosition) return;
+        this._followEnabled = true;
+        const pos = this._lastPosition;
+        const coords = [pos.lon, pos.lat];
+
+        // Hide label while tracking
+        if (this._labelMarker) this._labelMarker.getElement().style.visibility = 'hidden';
+
+        const el = document.createElement('div');
+        el.style.pointerEvents = 'auto';
+        el.innerHTML = this._tagHTML(pos, true);
+        el.addEventListener('mouseenter', () => {
+            const b = el.querySelector('.iss-track-btn');
+            if (b) b.textContent = 'UNTRACK';
+        });
+        el.addEventListener('mouseleave', () => {
+            const b = el.querySelector('.iss-track-btn');
+            if (b) b.textContent = 'TRACKING';
+        });
+        this._wireUntrackButton(el);
+
         if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
+        this._tagMarker = new maplibregl.Marker({ element: el, anchor: 'left', offset: [14, 0] })
+            .setLngLat(coords)
+            .addTo(this.map);
+
+        this._showStatusBar(pos);
+        this.map.easeTo({ center: coords, zoom: 4, duration: 600 });
+    }
+
+    _wireUntrackButton(el) {
+        const btn = el.querySelector('.iss-track-btn');
+        if (!btn) return;
+        btn.addEventListener('mousedown', (e) => e.stopPropagation());
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._stopFollowing();
+        });
+    }
+
+    _stopFollowing() {
+        this._followEnabled = false;
+        if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
+        this._hideStatusBar();
+        // Restore label
+        if (this._labelMarker) this._labelMarker.getElement().style.visibility = '';
+    }
+
+    // ---- Status bar ----
+    _buildStatusBarHTML(p) {
+        const fields = [
+            ['ALT', `${p.alt_km} km`],
+            ['VEL', `${p.velocity_kms} km/s`],
+            ['HDG', `${p.track_deg}°`],
+            ['LAT', `${p.lat}°`],
+            ['LON', `${p.lon}°`],
+        ];
+        const fieldsHTML = fields.map(([lbl, val]) =>
+            `<div class="adsb-sb-field">` +
+            `<span class="adsb-sb-label">${lbl}</span>` +
+            `<span class="adsb-sb-value">${val}</span>` +
+            `</div>`
+        ).join('');
+        return `<div class="adsb-sb-header">` +
+            `<span class="adsb-sb-label-tag">TRACKING</span>` +
+            `<button class="adsb-sb-untrack-btn">UNTRACK</button>` +
+            `</div>` +
+            `<div class="adsb-sb-header" style="border-top:none;height:auto;padding:8px 14px 9px">` +
+            `<span class="adsb-sb-callsign" style="color:#c8ff00">ISS</span>` +
+            `</div>` +
+            `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
+    }
+
+    _showStatusBar(p) {
+        let bar = document.getElementById('iss-status-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'iss-status-bar';
+            // Reuse the same CSS classes as adsb-status-bar
+            bar.style.cssText = 'width:220px;background:#000;color:#fff;font-family:"Barlow","Helvetica Neue",Arial,sans-serif;pointer-events:auto;display:none;flex-direction:column;gap:0;user-select:none;box-sizing:border-box;';
+            const panel = document.getElementById('tracking-panel');
+            if (panel) panel.appendChild(bar);
+            else document.body.appendChild(bar);
+        }
+        bar.innerHTML = this._buildStatusBarHTML(p);
+        bar.style.display = 'flex';
+        // Wire untrack button
+        const untrackBtn = bar.querySelector('.adsb-sb-untrack-btn');
+        if (untrackBtn) {
+            untrackBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._stopFollowing();
+            });
+        }
+        if (typeof window._Tracking !== 'undefined') { window._Tracking.setCount(1); window._Tracking.openPanel(); }
+        if (typeof window._FilterPanel !== 'undefined') window._FilterPanel.reposition();
+    }
+
+    _hideStatusBar() {
+        const bar = document.getElementById('iss-status-bar');
+        if (bar) bar.style.display = 'none';
+        if (typeof window._Tracking !== 'undefined') { window._Tracking.setCount(0); window._Tracking.closePanel(); }
+        if (typeof window._FilterPanel !== 'undefined') window._FilterPanel.reposition();
+    }
+
+    _updateStatusBar(p) {
+        const bar = document.getElementById('iss-status-bar');
+        if (!bar || bar.style.display === 'none') return;
+        bar.innerHTML = this._buildStatusBarHTML(p);
+        const untrackBtn = bar.querySelector('.adsb-sb-untrack-btn');
+        if (untrackBtn) {
+            untrackBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._stopFollowing();
+            });
+        }
     }
 
     // ---- Visibility toggles ----
@@ -415,7 +593,8 @@ class IssControl extends SentinelControlBase {
         this.setButtonActive(this.issVisible);
         if (!this.issVisible) {
             this._stopPolling();
-            this._hideTag();
+            this._stopFollowing();
+            this._hideHoverTagNow();
             this._hideLabel();
         } else {
             this._fetch();
@@ -444,7 +623,8 @@ class IssControl extends SentinelControlBase {
 
     onRemove() {
         this._stopPolling();
-        this._hideTag();
+        this._stopFollowing();
+        this._hideHoverTagNow();
         this._hideLabel();
         super.onRemove();
     }
