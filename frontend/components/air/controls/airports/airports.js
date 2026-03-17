@@ -10,7 +10,7 @@
 // ============================================================
 /// <reference path="../../globals.d.ts" />
 /// <reference path="../../types.ts" />
-/// <reference path="sentinel-control-base.ts" />
+/// <reference path="../sentinel-control-base/sentinel-control-base.ts" />
 const AIRPORTS_DATA = {
     type: 'FeatureCollection',
     features: [
@@ -55,6 +55,12 @@ class AirportsToggleControl extends SentinelControlBase {
     onInit() {
         this.button.style.fontSize = '8px';
         this.setButtonActive(this.visible);
+        if (this.map.isStyleLoaded()) {
+            this.initLayers();
+        }
+        else {
+            this.map.once('style.load', () => this.initLayers());
+        }
     }
     handleClick() { this.toggle(); }
     onRemove() {

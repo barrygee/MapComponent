@@ -8,7 +8,7 @@
 
 /// <reference path="../../globals.d.ts" />
 /// <reference path="../../types.ts" />
-/// <reference path="sentinel-control-base.ts" />
+/// <reference path="../sentinel-control-base/sentinel-control-base.ts" />
 
 // ---- AWACS orbit zone dataset ----
 // GeoJSON FeatureCollection of approximated circular patrol lobes.

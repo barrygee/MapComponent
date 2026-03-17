@@ -6,9 +6,9 @@
 //
 // Must be loaded immediately after map.js (shared) and before any controls.
 // ============================================================
-
+/// <reference path="../globals.d.ts" />
 // Unwrap the map instance from the public MapComponent API
-const map = window.MapComponent.map;
-
+// eslint-disable-next-line no-var
+var map = window.MapComponent.map;
 // Set global view — centred on equator, zoomed out to show full Earth
 map.jumpTo({ center: [12, 20], zoom: 2 });

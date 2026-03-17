@@ -13,6 +13,6 @@
     "sourceMap": false,
     "skipLibCheck": true
   },
-  "include": ["frontend/components/**/*.ts"],
+  "include": ["frontend/types.ts", "frontend/components/**/*.ts"],
   "exclude": ["node_modules", "**/*.js"]
 }

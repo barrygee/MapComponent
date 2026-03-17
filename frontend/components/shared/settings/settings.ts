@@ -1,37 +1,58 @@
-"use strict";
 /* ============================================================
    SETTINGS PANEL — window._SettingsPanel
    ============================================================ */
+
 /// <reference path="../../globals.d.ts" />
 /// <reference path="../../types.ts" />
+
 window._SettingsPanel = (function () {
+
     // ── State ────────────────────────────────────────────────
     let _open = false;
     let _activeSection = 'app';
-    const _settings = [
+
+    // ── Settings registry ────────────────────────────────────
+    interface SettingItem {
+        section:       string;
+        sectionLabel:  string;
+        id:            string;
+        label:         string;
+        desc:          string;
+        renderControl: () => HTMLElement;
+    }
+
+    interface NavSection {
+        key:   string;
+        label: string;
+    }
+
+    const _settings: SettingItem[] = [
         {
-            section: 'app',
-            sectionLabel: 'App Settings',
-            id: 'theme',
-            label: 'Theme',
-            desc: 'Switch between light and dark mode',
+            section:       'app',
+            sectionLabel:  'App Settings',
+            id:            'theme',
+            label:         'Theme',
+            desc:          'Switch between light and dark mode',
             renderControl: _renderThemeToggle,
         },
     ];
-    const _NAV_SECTIONS = [
-        { key: 'app', label: 'App Settings' },
-        { key: 'air', label: 'AIR' },
+
+    const _NAV_SECTIONS: NavSection[] = [
+        { key: 'app',   label: 'App Settings' },
+        { key: 'air',   label: 'AIR' },
         { key: 'space', label: 'SPACE' },
-        { key: 'sea', label: 'SEA' },
-        { key: 'land', label: 'LAND' },
-        { key: 'sdr', label: 'SDR' },
+        { key: 'sea',   label: 'SEA' },
+        { key: 'land',  label: 'LAND' },
+        { key: 'sdr',   label: 'SDR' },
     ];
+
     // ── DOM injection ────────────────────────────────────────
     (function _injectHTML() {
-        if (document.getElementById('settings-panel'))
-            return;
+        if (document.getElementById('settings-panel')) return;
+
         const panel = document.createElement('div');
         panel.id = 'settings-panel';
+
         // Sidebar
         const sidebar = document.createElement('div');
         sidebar.id = 'settings-sidebar';
@@ -42,77 +63,83 @@ window._SettingsPanel = (function () {
             item.dataset['section'] = s.key;
             sidebar.appendChild(item);
         });
+
         // Content area
         const content = document.createElement('div');
         content.id = 'settings-content';
+
         // Search row
         const searchWrap = document.createElement('div');
         searchWrap.id = 'settings-search-wrap';
         searchWrap.innerHTML =
             '<div id="settings-search-inner">' +
                 '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-                '<circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.2"/>' +
-                '<line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>' +
+                    '<circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.2"/>' +
+                    '<line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>' +
                 '</svg>' +
                 '<input id="settings-search-input" type="text" placeholder="SEARCH SETTINGS" autocomplete="off" spellcheck="false">' +
                 '<button id="settings-search-clear" aria-label="Clear search">' +
-                '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-                '<line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
-                '<line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
-                '</svg>' +
+                    '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+                        '<line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
+                        '<line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
+                    '</svg>' +
                 '</button>' +
-                '</div>';
+            '</div>';
+
         // Body
         const body = document.createElement('div');
         body.id = 'settings-body';
+
         content.appendChild(searchWrap);
         content.appendChild(body);
+
         panel.appendChild(sidebar);
         panel.appendChild(content);
         document.body.appendChild(panel);
     })();
+
     // ── Controls ─────────────────────────────────────────────
-    function _renderThemeToggle() {
+    function _renderThemeToggle(): HTMLElement {
         const STORAGE_KEY = 'sentinel_theme';
         let saved = 'dark';
-        try {
-            saved = localStorage.getItem(STORAGE_KEY) || 'dark';
-        }
-        catch (e) { }
+        try { saved = localStorage.getItem(STORAGE_KEY) || 'dark'; } catch (e) {}
         let isDark = saved !== 'light';
+
         const wrap = document.createElement('div');
         wrap.className = 'settings-theme-switch';
+
         const labelLight = document.createElement('span');
         labelLight.className = 'settings-theme-label';
         labelLight.textContent = 'LIGHT';
+
         const track = document.createElement('button');
         track.className = 'settings-theme-track' + (isDark ? ' is-dark' : '');
         track.setAttribute('role', 'switch');
         track.setAttribute('aria-checked', isDark ? 'true' : 'false');
         track.setAttribute('aria-label', 'Toggle dark mode');
+
         const thumb = document.createElement('span');
         thumb.className = 'settings-theme-thumb';
         track.appendChild(thumb);
+
         const labelDark = document.createElement('span');
         labelDark.className = 'settings-theme-label';
         labelDark.textContent = 'DARK';
+
         track.addEventListener('click', function () {
             isDark = !isDark;
             track.classList.toggle('is-dark', isDark);
             track.setAttribute('aria-checked', isDark ? 'true' : 'false');
             const mode = isDark ? 'dark' : 'light';
-            try {
-                localStorage.setItem(STORAGE_KEY, mode);
-            }
-            catch (e) { }
+            try { localStorage.setItem(STORAGE_KEY, mode); } catch (e) {}
             if (window._SettingsAPI) {
                 window._SettingsAPI.put('app', 'theme', mode);
             }
         });
+
         // Phase 2: sync theme from backend (migration + restore)
         (function _syncThemeFromBackend() {
-            if (!window._SettingsAPI)
-                return;
+            if (!window._SettingsAPI) return;
             const MIGRATED_FLAG = 'sentinel_settings_migrated_theme';
             if (!localStorage.getItem(MIGRATED_FLAG)) {
                 // One-time migration: push existing localStorage value to backend
@@ -123,55 +150,63 @@ window._SettingsPanel = (function () {
             }
             // Fetch from backend and reconcile
             window._SettingsAPI.getNamespace('app').then(function (ns) {
-                if (!ns || !ns['theme'])
-                    return;
-                const backendMode = ns['theme'];
+                if (!ns || !ns['theme']) return;
+                const backendMode = ns['theme'] as string;
                 const localMode = isDark ? 'dark' : 'light';
                 if (backendMode !== localMode) {
                     isDark = backendMode === 'dark';
                     track.classList.toggle('is-dark', isDark);
                     track.setAttribute('aria-checked', isDark ? 'true' : 'false');
-                    try {
-                        localStorage.setItem(STORAGE_KEY, backendMode);
-                    }
-                    catch (e) { }
+                    try { localStorage.setItem(STORAGE_KEY, backendMode); } catch (e) {}
                 }
             });
         })();
+
         wrap.appendChild(labelLight);
         wrap.appendChild(track);
         wrap.appendChild(labelDark);
+
         return wrap;
     }
+
     // ── Rendering ────────────────────────────────────────────
-    function _makeSettingRow(item) {
+    function _makeSettingRow(item: SettingItem): HTMLElement {
         const row = document.createElement('div');
         row.className = 'settings-item';
+
         const info = document.createElement('div');
         info.className = 'settings-item-info';
+
         const label = document.createElement('div');
         label.className = 'settings-item-label';
         label.textContent = item.label;
+
         info.appendChild(label);
+
         if (item.desc) {
             const desc = document.createElement('div');
             desc.className = 'settings-item-desc';
             desc.textContent = item.desc;
             info.appendChild(desc);
         }
+
         row.appendChild(info);
+
         if (item.renderControl) {
             const control = item.renderControl();
             row.appendChild(control);
         }
+
         return row;
     }
-    function _renderSection(sectionKey) {
+
+    function _renderSection(sectionKey: string): void {
         const body = document.getElementById('settings-body');
-        if (!body)
-            return;
+        if (!body) return;
         body.innerHTML = '';
+
         const items = _settings.filter(function (s) { return s.section === sectionKey; });
+
         if (!items.length) {
             const placeholder = document.createElement('div');
             placeholder.className = 'settings-empty';
@@ -179,30 +214,33 @@ window._SettingsPanel = (function () {
             body.appendChild(placeholder);
             return;
         }
+
         const labelEl = document.createElement('div');
         labelEl.className = 'settings-section-label';
         const navSection = _NAV_SECTIONS.find(function (s) { return s.key === sectionKey; });
         labelEl.textContent = navSection ? navSection.label : sectionKey;
         body.appendChild(labelEl);
+
         items.forEach(function (item) {
             body.appendChild(_makeSettingRow(item));
         });
     }
-    function _search(query) {
+
+    function _search(query: string): SettingItem[] | null {
         const q = query.trim().toLowerCase();
-        if (!q)
-            return null;
+        if (!q) return null;
         return _settings.filter(function (s) {
             return s.label.toLowerCase().indexOf(q) !== -1 ||
-                s.desc.toLowerCase().indexOf(q) !== -1 ||
-                s.sectionLabel.toLowerCase().indexOf(q) !== -1;
+                   s.desc.toLowerCase().indexOf(q) !== -1 ||
+                   s.sectionLabel.toLowerCase().indexOf(q) !== -1;
         });
     }
-    function _renderSearchResults(results) {
+
+    function _renderSearchResults(results: SettingItem[]): void {
         const body = document.getElementById('settings-body');
-        if (!body)
-            return;
+        if (!body) return;
         body.innerHTML = '';
+
         if (!results.length) {
             const empty = document.createElement('div');
             empty.className = 'settings-empty';
@@ -210,9 +248,10 @@ window._SettingsPanel = (function () {
             body.appendChild(empty);
             return;
         }
+
         // Group by section
-        const groups = {};
-        const groupOrder = [];
+        const groups: Record<string, SettingItem[]> = {};
+        const groupOrder: string[] = [];
         results.forEach(function (item) {
             if (!groups[item.section]) {
                 groups[item.section] = [];
@@ -220,6 +259,7 @@ window._SettingsPanel = (function () {
             }
             groups[item.section].push(item);
         });
+
         groupOrder.forEach(function (sectionKey) {
             const sectionItems = groups[sectionKey];
             const lbl = document.createElement('div');
@@ -231,95 +271,87 @@ window._SettingsPanel = (function () {
             });
         });
     }
+
     // ── Open / close / toggle ────────────────────────────────
-    function open() {
+    function open(): void {
         _open = true;
         const panel = document.getElementById('settings-panel');
-        if (panel)
-            panel.classList.add('settings-panel-visible');
+        if (panel) panel.classList.add('settings-panel-visible');
         const btn = document.getElementById('settings-btn');
-        if (btn)
-            btn.classList.add('settings-btn-active');
+        if (btn) btn.classList.add('settings-btn-active');
         _renderSection(_activeSection);
         const input = document.getElementById('settings-search-input');
-        if (input)
-            input.focus();
+        if (input) (input as HTMLInputElement).focus();
     }
-    function close() {
+
+    function close(): void {
         _open = false;
         const panel = document.getElementById('settings-panel');
-        if (panel)
-            panel.classList.remove('settings-panel-visible');
+        if (panel) panel.classList.remove('settings-panel-visible');
         const btn = document.getElementById('settings-btn');
-        if (btn)
-            btn.classList.remove('settings-btn-active');
-        const input = document.getElementById('settings-search-input');
-        if (input)
-            input.value = '';
+        if (btn) btn.classList.remove('settings-btn-active');
+        const input = document.getElementById('settings-search-input') as HTMLInputElement | null;
+        if (input) input.value = '';
         const clearBtn = document.getElementById('settings-search-clear');
-        if (clearBtn)
-            clearBtn.classList.remove('settings-search-clear-visible');
+        if (clearBtn) clearBtn.classList.remove('settings-search-clear-visible');
         const body = document.getElementById('settings-body');
-        if (body)
-            body.innerHTML = '';
+        if (body) body.innerHTML = '';
     }
-    function toggle() {
-        if (_open)
-            close();
-        else
-            open();
+
+    function toggle(): void {
+        if (_open) close(); else open();
     }
+
     // ── Init ────────────────────────────────────────────────
-    function init() {
+    function init(): void {
         const settingsBtn = document.getElementById('settings-btn');
         if (settingsBtn) {
             settingsBtn.addEventListener('click', toggle);
         }
-        const input = document.getElementById('settings-search-input');
+
+        const input    = document.getElementById('settings-search-input') as HTMLInputElement | null;
         const clearBtn = document.getElementById('settings-search-clear');
+
         if (input) {
             input.addEventListener('input', function () {
                 const q = input.value;
-                if (clearBtn)
-                    clearBtn.classList.toggle('settings-search-clear-visible', q.length > 0);
+                if (clearBtn) clearBtn.classList.toggle('settings-search-clear-visible', q.length > 0);
                 const results = _search(q);
                 if (results === null) {
                     _renderSection(_activeSection);
-                }
-                else {
+                } else {
                     _renderSearchResults(results);
                 }
             });
-            input.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape')
-                    close();
+
+            input.addEventListener('keydown', function (e: KeyboardEvent) {
+                if (e.key === 'Escape') close();
             });
         }
+
         if (clearBtn) {
             clearBtn.addEventListener('click', function () {
-                if (input) {
-                    input.value = '';
-                    input.focus();
-                }
+                if (input) { input.value = ''; input.focus(); }
                 clearBtn.classList.remove('settings-search-clear-visible');
                 _renderSection(_activeSection);
             });
         }
+
         // Sidebar nav
-        document.querySelectorAll('.settings-nav-item').forEach(function (el) {
+        document.querySelectorAll<HTMLElement>('.settings-nav-item').forEach(function (el) {
             el.addEventListener('click', function () {
                 _activeSection = el.dataset['section'] ?? 'app';
                 document.querySelectorAll('.settings-nav-item').forEach(function (n) {
                     n.classList.remove('active');
                 });
                 el.classList.add('active');
-                if (input)
-                    input.value = '';
-                if (clearBtn)
-                    clearBtn.classList.remove('settings-search-clear-visible');
+                if (input) input.value = '';
+                if (clearBtn) clearBtn.classList.remove('settings-search-clear-visible');
                 _renderSection(_activeSection);
             });
         });
     }
+
     return { open, close, toggle, init };
+
 })();

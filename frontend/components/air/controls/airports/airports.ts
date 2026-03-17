@@ -10,7 +10,7 @@
 
 /// <reference path="../../globals.d.ts" />
 /// <reference path="../../types.ts" />
-/// <reference path="sentinel-control-base.ts" />
+/// <reference path="../sentinel-control-base/sentinel-control-base.ts" />
 
 const AIRPORTS_DATA: GeoJSON.FeatureCollection<GeoJSON.Point, AirportProperties> = {
     type: 'FeatureCollection',

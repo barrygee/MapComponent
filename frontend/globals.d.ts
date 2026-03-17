@@ -55,18 +55,3 @@ declare namespace maplibregl {
     type EaseToOptions           = import('maplibre-gl').EaseToOptions;
 }
 
-// ---- Air control instances (declared in air-globals.js, assigned at addControl time) ----
-declare let adsbControl: { _registerIcons(): void } | null;
-
-// ---- SentinelControlBase — loaded globally, extended by both air and space controls ----
-declare abstract class SentinelControlBase implements maplibregl.IControl {
-    map: maplibregl.Map;
-    button: HTMLButtonElement;
-    abstract readonly buttonLabel: string;
-    abstract readonly buttonTitle: string;
-    protected abstract onInit(): void;
-    protected abstract handleClick(): void;
-    onAdd(mapInstance: maplibregl.Map): HTMLElement;
-    onRemove(): void;
-    protected setButtonActive(active: boolean): void;
-}

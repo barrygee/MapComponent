@@ -92,7 +92,7 @@ class AdsbLiveControl implements maplibregl.IControl {
     // Squawk / filter — public so side-menu.ts/filter.ts can read
     private _emergencySquawks: Set<string> = new Set(['7700', '7600', '7500']);
     private _prevSquawk:       Record<string, string> = {};
-    private _typeFilter:       'all' | 'civil' | 'mil' = 'all';
+    _typeFilter:               'all' | 'civil' | 'mil' = 'all';
     _allHidden         = false;
     _hideGroundVehicles = false;
     _hideTowers         = false;

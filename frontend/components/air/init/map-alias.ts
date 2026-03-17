@@ -11,4 +11,5 @@
 /// <reference path="../types.ts" />
 
 // Unwrap the map instance from the public MapComponent API
-const map: maplibregl.Map = window.MapComponent.map;
+// eslint-disable-next-line no-var
+var map: maplibregl.Map = window.MapComponent.map;

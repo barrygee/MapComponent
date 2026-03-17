@@ -7,7 +7,7 @@
 // ============================================================
 /// <reference path="../../globals.d.ts" />
 /// <reference path="../../types.ts" />
-/// <reference path="sentinel-control-base.ts" />
+/// <reference path="../sentinel-control-base/sentinel-control-base.ts" />
 class NamesToggleControl extends SentinelControlBase {
     constructor() {
         super();
@@ -17,6 +17,12 @@ class NamesToggleControl extends SentinelControlBase {
     get buttonTitle() { return 'Toggle city names'; }
     onInit() {
         this.setButtonActive(this.namesVisible);
+        if (this.map.isStyleLoaded()) {
+            this.applyNamesVisibility();
+        }
+        else {
+            this.map.once('style.load', () => this.applyNamesVisibility());
+        }
     }
     handleClick() { this.toggleNames(); }
     /**

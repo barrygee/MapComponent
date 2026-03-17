@@ -22,14 +22,10 @@ if ('geolocation' in navigator) {
 else {
     console.warn('[location] geolocation not available in navigator');
 }
-// ---- 2. Restore 3D pitch + sync overlay states from backend ----
+// ---- 2. Restore 3D pitch ----
 map.once('load', () => {
     if (typeof window._is3DActive === 'function' && window._is3DActive()) {
         map.easeTo({ pitch: 45, duration: 400 });
-    }
-    // Phase 2: restore overlay states from backend database (after controls are ready)
-    if (typeof _syncOverlayStatesFromBackend === 'function') {
-        _syncOverlayStatesFromBackend();
     }
 });
 // ---- 3. Panel initialisation ----

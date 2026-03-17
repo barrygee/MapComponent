@@ -10,7 +10,7 @@
 // ============================================================
 /// <reference path="../../globals.d.ts" />
 /// <reference path="../../types.ts" />
-/// <reference path="sentinel-control-base.ts" />
+/// <reference path="../sentinel-control-base/sentinel-control-base.ts" />
 class RangeRingsControl extends SentinelControlBase {
     constructor() {
         super();
@@ -20,6 +20,12 @@ class RangeRingsControl extends SentinelControlBase {
     get buttonTitle() { return 'Toggle range rings'; }
     onInit() {
         this.setButtonActive(this.ringsVisible);
+        if (this.map.isStyleLoaded()) {
+            this.initRings();
+        }
+        else {
+            this.map.once('style.load', () => this.initRings());
+        }
     }
     handleClick() { this.toggleRings(); }
     /**

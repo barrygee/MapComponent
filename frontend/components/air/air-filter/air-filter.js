@@ -498,7 +498,10 @@ window._FilterPanel = (() => {
                         if (allHidden) {
                             adsbControl.setAllHidden(true);
                             const hideBtn = modeBar.querySelector('[data-mode="none"]');
-                            if (hideBtn) { hideBtn.textContent = 'SHOW ALL'; hideBtn.classList.add('active'); }
+                            if (hideBtn) {
+                                hideBtn.textContent = 'SHOW ALL';
+                                hideBtn.classList.add('active');
+                            }
                             modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => b.classList.remove('active'));
                         }
                         else if (typeFilter && typeFilter !== 'all') {

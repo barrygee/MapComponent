@@ -9,7 +9,8 @@
 /// <reference path="../globals.d.ts" />
 
 // Unwrap the map instance from the public MapComponent API
-const map: maplibregl.Map = window.MapComponent.map;
+// eslint-disable-next-line no-var
+var map: maplibregl.Map = window.MapComponent.map;
 
 // Set global view — centred on equator, zoomed out to show full Earth
 map.jumpTo({ center: [12, 20], zoom: 2 });

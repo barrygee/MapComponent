@@ -10,7 +10,7 @@
 // ============================================================
 /// <reference path="../../globals.d.ts" />
 /// <reference path="../../types.ts" />
-/// <reference path="sentinel-control-base.ts" />
+/// <reference path="../sentinel-control-base/sentinel-control-base.ts" />
 const AARA_ZONES = {
     type: 'FeatureCollection',
     features: [
@@ -42,6 +42,12 @@ class AARToggleControl extends SentinelControlBase {
     get buttonTitle() { return 'Toggle UK air-to-air refuelling areas'; }
     onInit() {
         this.setButtonActive(this.visible);
+        if (this.map.isStyleLoaded()) {
+            this.initLayers();
+        }
+        else {
+            this.map.once('style.load', () => this.initLayers());
+        }
     }
     handleClick() { this.toggle(); }
     onRemove() {

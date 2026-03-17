@@ -7,6 +7,7 @@
 //
 // Must be loaded after all space control instances have been constructed.
 // ============================================================
+/// <reference path="../globals.d.ts" />
 window.MapComponent.onStyleLoad(function () {
     if (daynightControl) {
         daynightControl.initLayers();

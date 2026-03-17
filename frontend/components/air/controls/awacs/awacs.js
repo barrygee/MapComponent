@@ -8,7 +8,7 @@
 // ============================================================
 /// <reference path="../../globals.d.ts" />
 /// <reference path="../../types.ts" />
-/// <reference path="sentinel-control-base.ts" />
+/// <reference path="../sentinel-control-base/sentinel-control-base.ts" />
 // ---- AWACS orbit zone dataset ----
 // GeoJSON FeatureCollection of approximated circular patrol lobes.
 // Each lobe is a ~37-point polygon generated at a fixed radius
@@ -89,6 +89,12 @@ class AWACSToggleControl extends SentinelControlBase {
     get buttonTitle() { return 'Toggle UK AWACS orbits'; }
     onInit() {
         this.setButtonActive(this.visible);
+        if (this.map.isStyleLoaded()) {
+            this.initLayers();
+        }
+        else {
+            this.map.once('style.load', () => this.initLayers());
+        }
     }
     handleClick() { this.toggle(); }
     /**

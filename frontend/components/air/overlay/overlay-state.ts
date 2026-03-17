@@ -95,5 +95,5 @@ async function _syncOverlayStatesFromBackend(): Promise<void> {
     if (airportsControl   && airportsControl.visible             !== _overlayStates.airports)   airportsControl.toggle();
     if (militaryBasesControl && militaryBasesControl.visible     !== _overlayStates.militaryBases) militaryBasesControl.toggle();
     if (adsbControl       && adsbControl.visible                 !== _overlayStates.adsb)       adsbControl.toggle();
-    if (adsbLabelsControl && adsbLabelsControl.labelsVisible     !== _overlayStates.adsbLabels) adsbLabelsControl.toggleLabels();
+    if (adsbLabelsControl && adsbLabelsControl.labelsVisible     !== _overlayStates.adsbLabels) adsbLabelsControl.toggle();
 }

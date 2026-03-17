@@ -288,7 +288,12 @@ window.MapComponent = {
     onStyleLoad: (fn) => {
         _styleLoadCallbacks.push(fn);
         if (_styleHasLoadedOnce) {
-            try { fn(); } catch (e) { console.error('style.load handler error:', e); }
+            try {
+                fn();
+            }
+            catch (e) {
+                console.error('style.load handler error:', e);
+            }
         }
     },
     isOnline: () => _mapConnState,
