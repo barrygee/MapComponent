@@ -94,6 +94,10 @@
     flex-shrink: 0;
 }
 
+#settings-search-wrap.settings-search-wrap--hidden {
+    display: none;
+}
+
 #settings-search-inner {
     display: flex;
     align-items: center;

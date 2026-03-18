@@ -1057,6 +1057,9 @@ window._SettingsPanel = (function () {
                     input.value = '';
                 if (clearBtn)
                     clearBtn.classList.remove('settings-search-clear-visible');
+                const searchWrap = document.getElementById('settings-search-wrap');
+                if (searchWrap)
+                    searchWrap.classList.toggle('settings-search-wrap--hidden', _activeSection !== 'app');
                 _renderSection(_activeSection);
             });
         });
