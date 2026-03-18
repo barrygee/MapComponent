@@ -147,8 +147,9 @@ window._Notifications = ((): NotificationsAPI => {
                 ? `<span class="notif-label"><span class="notif-label-default">${_getLabelForType(item.type)}</span><span class="notif-label-disable">DISABLE NOTIFICATIONS</span></span>`
                 : `<span class="notif-label">${_getLabelForType(item.type)}</span>`) +
             `<div style="display:flex;align-items:center;gap:8px">` +
-            (action ? `<button class="notif-action" aria-label="Disable notifications">${_BELL_SLASH_SVG}</button>` : '') +
-            `<button class="notif-dismiss" aria-label="Dismiss">✕</button>` +
+            (action
+                ? `<button class="notif-action" aria-label="Disable notifications">${_BELL_SLASH_SVG}</button>`
+                : `<button class="notif-dismiss" aria-label="Dismiss">✕</button>`) +
             `</div>` +
             `</div>` +
             `<div class="notif-body">` +
@@ -157,10 +158,12 @@ window._Notifications = ((): NotificationsAPI => {
             `<span class="notif-time">${_formatTimestamp(item.ts)}</span>` +
             `</div>`;
 
-        el.querySelector('.notif-dismiss')!.addEventListener('click', (e: Event) => {
-            e.stopPropagation();
-            dismiss(item.id);
-        });
+        if (!action) {
+            el.querySelector('.notif-dismiss')!.addEventListener('click', (e: Event) => {
+                e.stopPropagation();
+                dismiss(item.id);
+            });
+        }
 
         if (action) {
             el.querySelector('.notif-action')!.addEventListener('click', (e: Event) => {
@@ -371,15 +374,24 @@ window._Notifications = ((): NotificationsAPI => {
         const detailEl = el.querySelector('.notif-detail');
         if (detailEl) detailEl.textContent = item.detail;
 
-        const oldActionBtn = el.querySelector('.notif-action');
-        if (oldActionBtn) oldActionBtn.remove();
-        if (action) {
-            const ab = document.createElement('button');
-            ab.className = 'notif-action';
-            ab.setAttribute('aria-label', 'Disable notifications');
-            ab.innerHTML = _BELL_SLASH_SVG;
-            ab.addEventListener('click', (e: Event) => { e.stopPropagation(); action.callback(); dismiss(item.id); });
-            el.querySelector('.notif-dismiss')!.insertAdjacentElement('beforebegin', ab);
+        const btnWrap = el.querySelector<HTMLElement>('div[style]');
+        if (btnWrap) {
+            btnWrap.innerHTML = '';
+            if (action) {
+                const ab = document.createElement('button');
+                ab.className = 'notif-action';
+                ab.setAttribute('aria-label', 'Disable notifications');
+                ab.innerHTML = _BELL_SLASH_SVG;
+                ab.addEventListener('click', (e: Event) => { e.stopPropagation(); action.callback(); dismiss(item.id); });
+                btnWrap.appendChild(ab);
+            } else {
+                const db = document.createElement('button');
+                db.className = 'notif-dismiss';
+                db.setAttribute('aria-label', 'Dismiss');
+                db.textContent = '✕';
+                db.addEventListener('click', (e: Event) => { e.stopPropagation(); dismiss(item.id); });
+                btnWrap.appendChild(db);
+            }
         }
     }
 
