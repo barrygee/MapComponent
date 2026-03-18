@@ -26,7 +26,7 @@ window._Notifications = (() => {
     let _unreadCount = 0;
     const PANEL_HTML = `<div id="notifications-panel">` +
         `<div id="notif-header">` +
-        `<button id="notif-clear-all-btn" aria-label="Clear non-active notifications">CLEAR INACTIVE</button>` +
+        `<button id="notif-clear-all-btn" aria-label="Clear inactive notifications">CLEAR INACTIVE</button>` +
         `<div id="notif-scroll-hint">MORE ` +
         `<svg id="notif-scroll-arrow" width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">` +
         `<polyline points="1,2.5 4,5.5 7,2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` +
@@ -196,8 +196,7 @@ window._Notifications = (() => {
         }
         const clearBtn = document.getElementById('notif-clear-all-btn');
         if (clearBtn) {
-            const hasInactive = _load().some(i => i.type !== 'tracking' && i.type !== 'track');
-            clearBtn.style.display = (hasInactive && _isPanelOpen()) ? 'block' : 'none';
+            clearBtn.style.display = (total > 0 && _isPanelOpen()) ? 'block' : 'none';
         }
         const toggleBtn = _getBtn();
         if (toggleBtn) {
@@ -415,12 +414,12 @@ window._Notifications = (() => {
         const items = _load();
         if (!items.length)
             return;
-        const _isActive = (i) => !!_actions[i.id] || i.type === 'tracking' || i.type === 'track';
-        const toClear = items.filter(i => !_isActive(i));
-        const toKeep = items.filter(i => _isActive(i));
-        toClear.forEach(i => { delete _clickActions[i.id]; });
+        const isActive = (i) => !!_actions[i.id] || i.type === 'tracking' || i.type === 'track';
+        const toClear = items.filter(i => !isActive(i));
+        const toKeep = items.filter(i => isActive(i));
+        if (!toClear.length) return;
+        toClear.forEach(i => { delete _actions[i.id]; delete _clickActions[i.id]; });
         _save(toKeep);
-        // Delete only the cleared items from the backend
         toClear.forEach(i => {
             fetch(`/api/air/messages/${encodeURIComponent(i.id)}`, { method: 'DELETE' }).catch(() => { });
         });
@@ -436,8 +435,7 @@ window._Notifications = (() => {
             });
         }
         _refreshBadge();
-        if (!toKeep.length)
-            _stopBellPulse();
+        if (!toKeep.length) _stopBellPulse();
         setTimeout(_repositionBar, 230);
     }
     function toggle() {
