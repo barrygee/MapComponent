@@ -1,15 +1,14 @@
 import httpx
 
-from backend.config import settings
 
-
-async def fetch_aircraft_from_upstream(lat: float, lon: float, radius: int) -> dict:
-    """Fetch live aircraft data from the airplanes.live /v2/point endpoint.
+async def fetch_aircraft_from_upstream(lat: float, lon: float, radius: int, base_url: str) -> dict:
+    """Fetch live aircraft data from the configured ADS-B upstream endpoint.
 
     Args:
         lat: Centre latitude of the search area.
         lon: Centre longitude of the search area.
         radius: Search radius in nautical miles.
+        base_url: Base URL for the ADS-B API (read from user settings).
 
     Returns:
         Raw JSON dict from the API, shape: {"ac": [...], ...}
@@ -17,7 +16,7 @@ async def fetch_aircraft_from_upstream(lat: float, lon: float, radius: int) -> d
     Raises:
         httpx.HTTPError: If the upstream request fails or returns a non-2xx status.
     """
-    url = f"{settings.adsb_upstream_base}/point/{lat}/{lon}/{radius}"
+    url = f"{base_url}/point/{lat}/{lon}/{radius}"
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.get(
             url,

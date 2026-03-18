@@ -65,6 +65,7 @@
     background: rgba(200, 255, 0, 0.04);
 }
 
+
 /* ---- Content area ---- */
 #settings-content {
     flex: 1;
@@ -73,12 +74,28 @@
     min-width: 0;
 }
 
+/* ---- Section heading ---- */
+#settings-section-heading {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 36px 48px 0;
+    flex-shrink: 0;
+}
+
 /* ---- Search ---- */
 #settings-search-wrap {
     display: flex;
     align-items: center;
-    padding: 36px 48px 11px;
+    padding: 36px 48px 48px;
     flex-shrink: 0;
+}
+
+#settings-search-wrap.settings-search-wrap--hidden {
+    display: none;
 }
 
 #settings-search-inner {
@@ -149,6 +166,55 @@
     display: none;
 }
 
+/* ---- Footer / Apply bar ---- */
+#settings-footer {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 16px;
+    padding: 16px 32px;
+}
+
+#settings-apply-status {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: transparent;
+    transition: color 0.2s;
+}
+
+#settings-apply-status.settings-apply-status--ok {
+    color: #c8ff00;
+}
+
+#settings-apply-status.settings-apply-status--error {
+    color: rgba(255, 80, 80, 0.9);
+}
+
+#settings-apply-btn {
+    background: none;
+    border: 1px solid rgba(200, 255, 0, 0.4);
+    border-radius: 3px;
+    padding: 9px 24px;
+    color: #c8ff00;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+#settings-apply-btn:hover {
+    background: rgba(200, 255, 0, 0.08);
+    border-color: rgba(200, 255, 0, 0.7);
+    color: #c8ff00;
+}
+
 /* ---- Section labels ---- */
 .settings-section-label {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
@@ -156,7 +222,7 @@
     font-weight: 700;
     letter-spacing: 0.18em;
     color: rgba(255, 255, 255, 0.3);
-    padding: 48px 48px 12px;
+    padding: 48px 48px 24px;
     text-transform: uppercase;
 }
 
@@ -272,51 +338,6 @@
     letter-spacing: 0.14em;
 }
 
-.settings-location-action-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 12px;
-    margin-top: 4px;
-}
-
-.settings-location-status {
-    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: transparent;
-    transition: color 0.2s;
-}
-
-.settings-location-status--ok {
-    color: #c8ff00;
-}
-
-.settings-location-status--error {
-    color: rgba(255, 80, 80, 0.9);
-}
-
-.settings-location-apply {
-    background: none;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 3px;
-    padding: 7px 16px;
-    color: rgba(255, 255, 255, 0.6);
-    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
-}
-
-.settings-location-apply:hover {
-    color: rgba(255, 255, 255, 0.9);
-    border-color: rgba(255, 255, 255, 0.35);
-}
 
 /* ---- Theme toggle ---- */
 .settings-theme-switch {
@@ -366,6 +387,303 @@
 .settings-theme-track.is-dark .settings-theme-thumb {
     transform: translateX(20px);
     background: #c8ff00;
+}
+
+/* ---- Data source controls ---- */
+.settings-datasource-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 420px;
+}
+
+.settings-datasource-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+
+.settings-datasource-row:focus-within {
+    border-color: rgba(200, 255, 0, 0.4);
+}
+
+.settings-datasource-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.3);
+    text-transform: uppercase;
+    padding: 0 10px;
+    flex-shrink: 0;
+    user-select: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-datasource-input {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 9px 12px;
+    color: rgba(255, 255, 255, 0.9);
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    outline: none;
+    caret-color: #c8ff00;
+    min-width: 0;
+}
+
+.settings-datasource-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+}
+
+.settings-datasource-status {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: transparent;
+    transition: color 0.2s;
+    height: 16px;
+    line-height: 16px;
+}
+
+.settings-datasource-status--ok {
+    color: #c8ff00;
+}
+
+.settings-datasource-status--err {
+    color: rgba(255, 80, 80, 0.9);
+}
+
+/* ---- Connectivity mode toggle ---- */
+.settings-connectivity-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.settings-connectivity-switch {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-connectivity-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    user-select: none;
+}
+
+.settings-connectivity-track {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    padding: 0;
+}
+
+.settings-connectivity-track.is-online {
+    background: rgba(200, 255, 0, 0.15);
+    border-color: rgba(200, 255, 0, 0.4);
+}
+
+.settings-connectivity-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transition: transform 0.2s, background 0.2s;
+}
+
+.settings-connectivity-track.is-online .settings-connectivity-thumb {
+    transform: translateX(20px);
+    background: #c8ff00;
+}
+
+/* ---- Connectivity override summary ---- */
+.settings-connectivity-override-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    max-width: 420px;
+}
+
+.settings-conn-override-heading {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.25);
+    margin-bottom: 4px;
+}
+
+.settings-conn-override-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.settings-conn-override-ns {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.5);
+    width: 52px;
+}
+
+.settings-conn-override-arrow {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.2);
+    width: 32px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.settings-conn-override-val {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+}
+
+.settings-conn-override-val--online  { color: #c8ff00; }
+.settings-conn-override-val--offline { color: rgba(255, 80, 80, 0.8); }
+
+.settings-connectivity-warning {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(255, 160, 0, 0.08);
+    border: 1px solid rgba(255, 160, 0, 0.35);
+    border-radius: 3px;
+    max-width: 420px;
+}
+
+.settings-connectivity-warning-msg {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    color: rgba(255, 200, 80, 0.9);
+    line-height: 1.5;
+}
+
+.settings-connectivity-warning-btn {
+    align-self: flex-start;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    padding: 6px 16px;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    color: rgba(255, 255, 255, 0.6);
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.settings-connectivity-warning-btn--confirm {
+    border-color: rgba(200, 255, 0, 0.4);
+    color: #c8ff00;
+}
+
+.settings-connectivity-warning-btn--confirm:hover {
+    background: rgba(200, 255, 0, 0.08);
+    border-color: rgba(200, 255, 0, 0.7);
+}
+
+.settings-connectivity-warning-btn--cancel:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* ---- Source override control ---- */
+.settings-source-override-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settings-source-override-group {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    overflow: hidden;
+    width: fit-content;
+}
+
+.settings-source-override-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 7px 16px;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
+}
+
+.settings-source-override-btn:last-child {
+    border-right: none;
+}
+
+.settings-source-override-btn:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.settings-source-override-btn.is-active {
+    background: rgba(200, 255, 0, 0.12);
+    color: #c8ff00;
+}
+
+.settings-source-override-note {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    color: rgba(255, 200, 80, 0.75);
+    font-style: italic;
 }
 
 /* ---- Footer settings button active state ---- */

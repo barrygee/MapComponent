@@ -24,8 +24,66 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.cache import is_fresh, is_within_stale, now_ms
 from backend.config import settings
 from backend.database import get_db
-from backend.models import AdsbCache, AirMessage, AirTracking
+from backend.models import AdsbCache, AirMessage, AirTracking, UserSettings
 from backend.services import adsb as adsb_service
+
+
+async def _get_air_urls(db: AsyncSession) -> tuple[str | None, str | None]:
+    """Return (primary_url, fallback_url) for ADS-B based on connectivity mode and domain override.
+
+    Resolves effective mode:
+      1. If air.sourceOverride is 'online' or 'offline', use that.
+      2. Otherwise, fall back to app.connectivityMode ('online' | 'offline', default 'online').
+
+    When effective mode is 'online':  primary = online URL,  fallback = offline URL
+    When effective mode is 'offline': primary = offline URL, fallback = online URL
+    """
+    result = await db.execute(
+        select(UserSettings).where(
+            (UserSettings.namespace == "air") |
+            ((UserSettings.namespace == "app") & (UserSettings.key == "connectivityMode"))
+        )
+    )
+    rows = result.scalars().all()
+
+    ns: dict[str, object] = {}
+    for row in rows:
+        compound_key = f"{row.namespace}.{row.key}"
+        try:
+            ns[compound_key] = json.loads(row.value)
+        except (json.JSONDecodeError, TypeError):
+            ns[compound_key] = row.value
+
+    # Resolve effective mode
+    override = ns.get("air.sourceOverride", "auto")
+    if override in ("online", "offline"):
+        effective_mode = override
+    else:
+        effective_mode = ns.get("app.connectivityMode", "online") or "online"
+
+    # Resolve online URL
+    online_raw = ns.get("air.onlineUrl")
+    online_url: str | None = None
+    if isinstance(online_raw, str) and online_raw.strip():
+        online_url = online_raw.strip().rstrip("/")
+    if not online_url:
+        online_url = settings.adsb_upstream_base
+
+    # Resolve offline URL
+    offline_url: str | None = None
+    offline_raw = ns.get("air.offlineSource")
+    if isinstance(offline_raw, dict):
+        raw_u = offline_raw.get("url")
+    elif isinstance(offline_raw, str):
+        raw_u = offline_raw
+    else:
+        raw_u = None
+    if raw_u and isinstance(raw_u, str) and raw_u.strip() not in ("http://localhost", "https://", ""):
+        offline_url = raw_u.strip().rstrip("/")
+
+    if effective_mode == "offline":
+        return offline_url, online_url
+    return online_url, offline_url
 
 
 # ── Request body schemas ───────────────────────────────────────────────────────
@@ -78,8 +136,17 @@ async def get_aircraft_near_point(
         return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "HIT"})
 
     # Cache miss or expired — try to fetch fresh data from upstream
-    try:
-        data = await adsb_service.fetch_aircraft(lat, lon, radius)
+    primary_url, fallback_url = await _get_air_urls(db)
+
+    data: dict | None = None
+    for base_url in filter(None, [primary_url, fallback_url]):
+        try:
+            data = await adsb_service.fetch_aircraft(lat, lon, radius, base_url)
+            break
+        except (httpx.HTTPError, Exception):
+            continue
+
+    if data is not None:
         payload_str = json.dumps(data)
         ts = now_ms()
 
@@ -104,11 +171,10 @@ async def get_aircraft_near_point(
 
         return JSONResponse(content=data, headers={"X-Cache": "MISS"})
 
-    except (httpx.HTTPError, Exception):
-        # Upstream unreachable — serve stale data if still within the stale window
-        if row and is_within_stale(row.fetched_at, settings.adsb_stale_ms):
-            return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "STALE"})
-        raise HTTPException(status_code=503, detail="ADS-B upstream unavailable")
+    # All upstreams failed — serve stale data if still within the stale window
+    if row and is_within_stale(row.fetched_at, settings.adsb_stale_ms):
+        return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "STALE"})
+    raise HTTPException(status_code=503, detail="ADS-B upstream unavailable")
 
 
 # ── Notification messages ──────────────────────────────────────────────────────

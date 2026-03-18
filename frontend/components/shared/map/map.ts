@@ -36,16 +36,37 @@ let   _mapConnState = _mapIsOnline;
 // Viewport bounds used for the offline (PMTiles) style — covers UK/Ireland/Europe
 const _OFFLINE_BOUNDS: [[number, number], [number, number]] = [[-20, 44], [32, 67]];
 
+// 'auto' | 'online' | 'offline' — tracks whether the user has manually forced a mode
+let _connModeOverride: string = (function () {
+    try { return localStorage.getItem('sentinel_app_connectivityMode') || 'auto'; } catch { return 'auto'; }
+})();
+
 /**
  * Update the footer connection-status pill text and colour class.
+ * When _connModeOverride is 'online' or 'offline', shows the forced state
+ * with a distinct style so the user knows the mode has been overridden.
  */
 function _updateConnStatusPill(online: boolean): void {
     const el = document.getElementById('conn-status');
     if (!el) return;
-    el.className   = online ? 'conn-online' : 'conn-offline';
-    el.textContent = online ? '● ONLINE' : '● OFFLINE';
+    const forced = _connModeOverride === 'online' || _connModeOverride === 'offline';
+    if (forced) {
+        const isForceOnline = _connModeOverride === 'online';
+        el.className   = isForceOnline ? 'conn-online conn-mode-forced' : 'conn-offline conn-mode-forced';
+        el.textContent = isForceOnline ? '● ONLINE' : '● OFFLINE';
+    } else {
+        el.className   = online ? 'conn-online' : 'conn-offline';
+        el.textContent = online ? '● ONLINE' : '● OFFLINE';
+    }
 }
 _updateConnStatusPill(_mapIsOnline); // set pill immediately on load
+
+// Listen for manual connectivity mode changes from the settings panel
+window.addEventListener('sentinel:connectivityModeChanged', (e: Event) => {
+    const { mode } = (e as CustomEvent).detail as { mode: string };
+    _connModeOverride = mode; // 'online', 'offline', or 'auto'
+    _updateConnStatusPill(_mapConnState);
+});
 
 /**
  * TransformStyleFunction passed to map.setStyle().
@@ -73,11 +94,29 @@ function _switchMapStyle(online: boolean): void {
     );
 }
 
+// Connectivity probe URL — loaded from settings, falls back to a known reliable endpoint.
+const _PROBE_URL_LS_KEY = 'sentinel_app_connectivityProbeUrl';
+const _PROBE_URL_DEFAULT = 'https://tile.openstreetmap.org/favicon.ico';
+let _probeUrl: string = (function () {
+    try { return localStorage.getItem(_PROBE_URL_LS_KEY) || _PROBE_URL_DEFAULT; } catch { return _PROBE_URL_DEFAULT; }
+})();
+
+// Refresh probe URL from backend settings once on load
+fetch('/api/settings/app')
+    .then(r => r.ok ? r.json() : null)
+    .then((data: Record<string, unknown> | null) => {
+        if (data && typeof data['connectivityProbeUrl'] === 'string' && data['connectivityProbeUrl']) {
+            _probeUrl = data['connectivityProbeUrl'] as string;
+            try { localStorage.setItem(_PROBE_URL_LS_KEY, _probeUrl); } catch { /* ignore */ }
+        }
+    })
+    .catch(() => { /* non-fatal — keep default */ });
+
 /**
- * Poll OSM to detect real internet access.
+ * Poll the configured probe URL to detect real internet access.
  */
 function _checkInternetConnection(): void {
-    fetch('https://tile.openstreetmap.org/favicon.ico', { method: 'HEAD', cache: 'no-store', mode: 'no-cors' })
+    fetch(_probeUrl, { method: 'HEAD', cache: 'no-store', mode: 'no-cors' })
         .then(() => {
             if (!_mapConnState) {
                 _mapConnState = true;

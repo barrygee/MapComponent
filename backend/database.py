@@ -1,3 +1,7 @@
+import json
+import time
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -33,3 +37,51 @@ async def get_db():
     """FastAPI dependency that yields an async database session per request."""
     async with AsyncSessionLocal() as session:
         yield session
+
+
+# Default URL settings seeded into the database on first startup.
+# These are the canonical values previously hardcoded throughout the app.
+_DEFAULT_SETTINGS: list[tuple[str, str, object]] = [
+    # namespace, key, value
+    # onlineUrl  — plain string, used directly as the upstream base URL
+    # offlineSource — {url: string}, matches the frontend settings panel shape
+    ("app",   "connectivityProbeUrl", "https://tile.openstreetmap.org/favicon.ico"),
+    ("app",   "connectivityMode",    "online"),
+    ("air",   "onlineUrl",      settings.adsb_upstream_base),
+    ("air",   "offlineSource",  {"url": "http://localhost"}),
+    ("air",   "sourceOverride", "auto"),
+    ("space", "onlineUrl",      settings.celestrak_iss_url),
+    ("space", "offlineSource",  {"url": "http://localhost"}),
+    ("space", "sourceOverride", "auto"),
+    ("sea",   "onlineUrl",      "https://"),
+    ("sea",   "offlineSource",  {"url": "http://localhost"}),
+    ("sea",   "sourceOverride", "auto"),
+    ("land",  "onlineUrl",      "https://"),
+    ("land",  "offlineSource",  {"url": "http://localhost"}),
+    ("land",  "sourceOverride", "auto"),
+    ("sdr",   "onlineUrl",      "https://"),
+    ("sdr",   "offlineSource",  {"url": "http://localhost"}),
+]
+
+
+async def seed_default_settings() -> None:
+    """Insert default URL settings on startup — only if a row does not already exist."""
+    from backend.models import UserSettings  # avoid circular import
+
+    ts = int(time.time() * 1000)
+    async with AsyncSessionLocal() as session:
+        for namespace, key, value in _DEFAULT_SETTINGS:
+            result = await session.execute(
+                select(UserSettings).where(
+                    UserSettings.namespace == namespace,
+                    UserSettings.key == key,
+                )
+            )
+            if result.scalar_one_or_none() is None:
+                session.add(UserSettings(
+                    namespace=namespace,
+                    key=key,
+                    value=json.dumps(value),
+                    updated_at=ts,
+                ))
+        await session.commit()

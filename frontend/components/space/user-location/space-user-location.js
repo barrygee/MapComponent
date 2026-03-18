@@ -33,170 +33,18 @@ let _spaceUserMarker = null;
 // ============================================================
 // MARKER ELEMENT BUILDER
 // ============================================================
-function _createSpaceUserMarkerElement(longitude, latitude) {
+function _createSpaceUserMarkerElement() {
     const el = document.createElement('div');
     el.style.width = '60px';
     el.style.height = '60px';
     el.style.overflow = 'visible';
     el.style.position = 'relative';
-    el.style.zIndex = '9999';
     el.classList.add('space-user-location-marker');
-    const circleRadius = 13;
-    const circleCircumference = +(2 * Math.PI * circleRadius).toFixed(2);
-    const circleCenterX = 30;
-    const circleCenterY = 30;
-    const coordBgRightEdge = 97;
-    const coordBgTopY = circleCenterY - circleRadius;
-    const coordBgBottomY = circleCenterY + circleRadius;
-    el.innerHTML = `<svg viewBox="0 0 120 60" width="120" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-        <path class="marker-coord-bg"
-              d="M ${circleCenterX},${coordBgTopY} A ${circleRadius},${circleRadius} 0 0,1 ${circleCenterX + circleRadius},${circleCenterY} A ${circleRadius},${circleRadius} 0 0,1 ${circleCenterX},${coordBgBottomY} L ${coordBgRightEdge},${coordBgBottomY} A ${circleRadius},${circleRadius} 0 0,0 ${coordBgRightEdge},${coordBgTopY} Z"
-              fill="black" opacity="0.75"
-              style="clip-path:inset(0 100% 0 0)"/>
-        <circle class="marker-ring" cx="${circleCenterX}" cy="${circleCenterY}" r="${circleRadius}" fill="none" stroke="#c8ff00" stroke-width="1.8"
-                stroke-dasharray="${circleCircumference}" stroke-dashoffset="${circleCircumference}"/>
-        <circle class="marker-dot" cx="${circleCenterX}" cy="${circleCenterY}" r="3.5" fill="white" opacity="0"/>
-        <text x="52" y="26" fill="white" font-size="7.5" font-family="monospace">
-            <tspan class="marker-lat-label" fill="#c8ff00" font-size="6"></tspan><tspan class="marker-lat"></tspan>
-        </text>
-        <text x="52" y="39" fill="white" font-size="7.5" font-family="monospace">
-            <tspan class="marker-lon-label" fill="#c8ff00" font-size="6"></tspan><tspan class="marker-lon"></tspan>
-        </text>
+    const cx = 30, cy = 30, r = 13;
+    el.innerHTML = `<svg viewBox="0 0 60 60" width="60" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#c8ff00" stroke-width="1.8"/>
+        <circle cx="${cx}" cy="${cy}" r="3.5" fill="white"/>
     </svg>`;
-    const ring = el.querySelector('.marker-ring');
-    const dot = el.querySelector('.marker-dot');
-    const coordBg = el.querySelector('.marker-coord-bg');
-    const latLabelEl = el.querySelector('.marker-lat-label');
-    const lonLabelEl = el.querySelector('.marker-lon-label');
-    const latEl = el.querySelector('.marker-lat');
-    const lonEl = el.querySelector('.marker-lon');
-    const LAT_LABEL = 'LAT ';
-    const LON_LABEL = 'LON ';
-    let timers = [];
-    function after(ms, fn) {
-        const t = setTimeout(fn, ms);
-        timers.push(t);
-        return t;
-    }
-    function cancelAllTimers() { timers.forEach(clearTimeout); timers = []; }
-    function animateCoordCard(latText, lonText) {
-        coordBg.style.clipPath = 'inset(0 100% 0 0)';
-        coordBg.style.animation = 'none';
-        void coordBg.offsetWidth;
-        coordBg.style.animation = 'marker-coord-bg-in 0.3s ease-out forwards';
-        coordBg.addEventListener('animationend', function lockBgOpen(e) {
-            if (e.animationName !== 'marker-coord-bg-in')
-                return;
-            coordBg.removeEventListener('animationend', lockBgOpen);
-            coordBg.style.animation = 'none';
-            coordBg.style.clipPath = 'inset(0 0% 0 0)';
-        });
-        const latFull = LAT_LABEL + latText;
-        const lonFull = LON_LABEL + lonText;
-        let i = 0, j = 0;
-        latLabelEl.textContent = lonLabelEl.textContent = latEl.textContent = lonEl.textContent = '';
-        function typeOneChar() {
-            let more = false;
-            if (i < latFull.length) {
-                const ch = latFull.slice(0, ++i);
-                latLabelEl.textContent = ch.slice(0, Math.min(i, LAT_LABEL.length));
-                latEl.textContent = ch.slice(LAT_LABEL.length);
-                more = true;
-            }
-            if (j < lonFull.length) {
-                const ch = lonFull.slice(0, ++j);
-                lonLabelEl.textContent = ch.slice(0, Math.min(j, LON_LABEL.length));
-                lonEl.textContent = ch.slice(LON_LABEL.length);
-                more = true;
-            }
-            if (more)
-                after(65, typeOneChar);
-            else
-                scheduleCoordCardDismiss(latFull, lonFull);
-        }
-        after(300, typeOneChar);
-    }
-    function scheduleCoordCardDismiss(latFull, lonFull) {
-        after(3000, function () {
-            let i = latFull.length, j = lonFull.length;
-            function eraseOneChar() {
-                let more = false;
-                if (i > 0) {
-                    const ch = latFull.slice(0, --i);
-                    latLabelEl.textContent = ch.slice(0, Math.min(i, LAT_LABEL.length));
-                    latEl.textContent = ch.slice(LAT_LABEL.length);
-                    more = true;
-                }
-                if (j > 0) {
-                    const ch = lonFull.slice(0, --j);
-                    lonLabelEl.textContent = ch.slice(0, Math.min(j, LON_LABEL.length));
-                    lonEl.textContent = ch.slice(LON_LABEL.length);
-                    more = true;
-                }
-                if (more) {
-                    after(45, eraseOneChar);
-                }
-                else {
-                    coordBg.style.clipPath = 'inset(0 0% 0 0)';
-                    coordBg.style.animation = 'none';
-                    void coordBg.offsetWidth;
-                    coordBg.style.animation = 'marker-coord-bg-out 0.3s ease-in forwards';
-                    coordBg.addEventListener('animationend', function lockBgClosed(e) {
-                        if (e.animationName !== 'marker-coord-bg-out')
-                            return;
-                        coordBg.removeEventListener('animationend', lockBgClosed);
-                        coordBg.style.animation = 'none';
-                        coordBg.style.clipPath = 'inset(0 100% 0 0)';
-                    });
-                    after(300, function () {
-                        dot.style.animation = 'none';
-                        void dot.offsetWidth;
-                        dot.style.animation = 'marker-dot-end-pulse 0.18s ease-in-out 3 forwards';
-                        after(540, function () {
-                            el.dataset['animDone'] = '1';
-                            el.style.zIndex = '0';
-                        });
-                    });
-                }
-            }
-            eraseOneChar();
-        });
-    }
-    function runIntroAnimation() {
-        cancelAllTimers();
-        el.dataset['animDone'] = '0';
-        el.style.zIndex = '9999';
-        const latText = latitude !== undefined ? latitude.toFixed(3) : '';
-        const lonText = longitude !== undefined ? longitude.toFixed(3) : '';
-        ring.style.strokeDashoffset = String(circleCircumference);
-        ring.style.animation = 'none';
-        dot.style.opacity = '0';
-        dot.style.animation = 'none';
-        dot.style.fill = 'white';
-        coordBg.style.animation = 'none';
-        coordBg.style.clipPath = 'inset(0 100% 0 0)';
-        latLabelEl.textContent = lonLabelEl.textContent = latEl.textContent = lonEl.textContent = '';
-        after(20, function () {
-            ring.style.animation = 'marker-circle-draw 0.5s ease-out forwards';
-        });
-        after(550, function () {
-            dot.style.opacity = '1';
-            dot.style.animation = 'marker-dot-pulse 0.2s ease-in-out 2 forwards';
-        });
-        after(950, function () { animateCoordCard(latText, lonText); });
-    }
-    el.dataset['lat'] = latitude !== undefined ? latitude.toFixed(3) : '';
-    el.dataset['lon'] = longitude !== undefined ? longitude.toFixed(3) : '';
-    el.addEventListener('click', function () {
-        cancelAllTimers();
-        coordBg.style.animation = 'none';
-        void coordBg.offsetWidth;
-        coordBg.style.clipPath = 'inset(0 100% 0 0)';
-        latLabelEl.textContent = lonLabelEl.textContent = latEl.textContent = lonEl.textContent = '';
-        animateCoordCard(el.dataset['lat'] || '', el.dataset['lon'] || '');
-    });
-    runIntroAnimation();
-    el._replayIntro = runIntroAnimation;
     return el;
 }
 // ============================================================
@@ -215,16 +63,10 @@ function setSpaceUserLocation(position) {
     }
     if (_spaceUserMarker) {
         _spaceUserMarker.setLngLat([longitude, latitude]);
-        const el = _spaceUserMarker.getElement();
-        el.dataset['lat'] = latitude.toFixed(3);
-        el.dataset['lon'] = longitude.toFixed(3);
-        if (position._manual && typeof el._replayIntro === 'function') {
-            el._replayIntro();
-        }
     }
     else {
         _spaceUserMarker = new maplibregl.Marker({
-            element: _createSpaceUserMarkerElement(longitude, latitude),
+            element: _createSpaceUserMarkerElement(),
             anchor: 'center',
         }).setLngLat([longitude, latitude]).addTo(map);
     }
@@ -315,6 +157,9 @@ function setSpaceUserLocation(position) {
                 longitude: lng, latitude: lat, ts: Date.now(), manual: true,
             }));
             setSpaceUserLocation({ coords: { longitude: lng, latitude: lat }, _fromCache: false, _manual: true });
+            window.dispatchEvent(new CustomEvent('sentinel:locationChanged', {
+                detail: { longitude: lng, latitude: lat }
+            }));
         });
         menu.appendChild(item);
         map.getContainer().appendChild(menu);

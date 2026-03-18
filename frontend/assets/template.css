@@ -173,23 +173,6 @@ html {
     gap: 16px;
 }
 
-/* ---- Connection status indicator ----
-   Toggled between .conn-online / .conn-offline / .conn-checking
-   by the connectivity module whenever OSM poll results change. */
-#conn-status {
-    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-}
-
-/* Online: lime — matches the primary accent colour */
-.conn-online  { color: #c8ff00; }
-/* Offline: muted red — danger state, readable at small size */
-.conn-offline { color: rgba(255, 80, 80, 0.8); }
-/* Checking: near-invisible white — transitional, low noise */
-.conn-checking { color: rgba(255, 255, 255, 0.2); }
 
 /* Generic dim footer label (e.g. "LOC:" prefix) */
 .footer-label {
