@@ -31,64 +31,18 @@ function goToUserLocation() {
 }
 // The single MapLibre Marker for the user's position
 let userMarker = null;
-function createUserMarkerElement(longitude, latitude, skipIntro = false) {
+function createUserMarkerElement() {
     const el = document.createElement('div');
     el.style.width = '60px';
     el.style.height = '60px';
     el.style.overflow = 'visible';
     el.style.position = 'relative';
-    el.style.zIndex = '9999';
     el.classList.add('user-location-marker');
-    const circleRadius = 13;
-    const circleCircumference = +(2 * Math.PI * circleRadius).toFixed(2);
-    const circleCenterX = 30;
-    const circleCenterY = 30;
+    const cx = 30, cy = 30, r = 13;
     el.innerHTML = `<svg viewBox="0 0 60 60" width="60" height="60" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-        <circle class="marker-ring" cx="${circleCenterX}" cy="${circleCenterY}" r="${circleRadius}" fill="none" stroke="#c8ff00" stroke-width="1.8"
-                stroke-dasharray="${circleCircumference}" stroke-dashoffset="${circleCircumference}"/>
-        <circle class="marker-dot" cx="${circleCenterX}" cy="${circleCenterY}" r="3.5" fill="white" opacity="0"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#c8ff00" stroke-width="1.8"/>
+        <circle cx="${cx}" cy="${cy}" r="3.5" fill="white"/>
     </svg>`;
-    const ring = el.querySelector('.marker-ring');
-    const dot = el.querySelector('.marker-dot');
-    let timers = [];
-    const after = (ms, fn) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
-    function cancelAllTimers() { timers.forEach(clearTimeout); timers = []; }
-    function runIntroAnimation() {
-        cancelAllTimers();
-        el.dataset['animDone'] = '0';
-        el.style.zIndex = '9999';
-        ring.style.strokeDashoffset = String(circleCircumference);
-        ring.style.animation = 'none';
-        dot.style.opacity = '0';
-        dot.style.animation = 'none';
-        dot.style.fill = 'white';
-        after(20, () => {
-            ring.style.animation = 'marker-circle-draw 0.5s ease-out forwards';
-        });
-        after(550, () => {
-            dot.style.opacity = '1';
-            dot.style.animation = 'marker-dot-pulse 0.2s ease-in-out 2 forwards';
-        });
-        after(950, () => {
-            dot.style.animation = 'none';
-            void dot.offsetWidth;
-            dot.style.animation = 'marker-dot-end-pulse 0.18s ease-in-out 3 forwards';
-            after(540, () => {
-                el.dataset['animDone'] = '1';
-                el.style.zIndex = '0';
-            });
-        });
-    }
-    if (!skipIntro)
-        runIntroAnimation();
-    else {
-        ring.style.strokeDashoffset = '0';
-        dot.style.opacity = '1';
-        dot.style.animation = 'marker-dot-end-pulse 0.18s ease-in-out 3 forwards';
-        el.dataset['animDone'] = '1';
-        el.style.zIndex = '0';
-    }
-    el._replayIntro = runIntroAnimation;
     return el;
 }
 const setUserLocation = (function () {
@@ -106,16 +60,10 @@ const setUserLocation = (function () {
         }
         if (userMarker) {
             userMarker.setLngLat([longitude, latitude]);
-            const el = userMarker.getElement();
-            el.dataset['lat'] = latitude.toFixed(3);
-            el.dataset['lon'] = longitude.toFixed(3);
-            if (position._manual && typeof el._replayIntro === 'function') {
-                el._replayIntro();
-            }
         }
         else {
             userMarker = new maplibregl.Marker({
-                element: createUserMarkerElement(longitude, latitude, !!position._fromCache),
+                element: createUserMarkerElement(),
                 anchor: 'center',
             }).setLngLat([longitude, latitude]).addTo(map);
         }
