@@ -31,17 +31,42 @@ const _mapIsOnline = navigator.onLine;
 let _mapConnState = _mapIsOnline;
 // Viewport bounds used for the offline (PMTiles) style — covers UK/Ireland/Europe
 const _OFFLINE_BOUNDS = [[-20, 44], [32, 67]];
+// 'auto' | 'online' | 'offline' — tracks whether the user has manually forced a mode
+let _connModeOverride = (function () {
+    try {
+        return localStorage.getItem('sentinel_app_connectivityMode') || 'auto';
+    }
+    catch {
+        return 'auto';
+    }
+})();
 /**
  * Update the footer connection-status pill text and colour class.
+ * When _connModeOverride is 'online' or 'offline', shows the forced state
+ * with a distinct style so the user knows the mode has been overridden.
  */
 function _updateConnStatusPill(online) {
     const el = document.getElementById('conn-status');
     if (!el)
         return;
-    el.className = online ? 'conn-online' : 'conn-offline';
-    el.textContent = online ? '● ONLINE' : '● OFFLINE';
+    const forced = _connModeOverride === 'online' || _connModeOverride === 'offline';
+    if (forced) {
+        const isForceOnline = _connModeOverride === 'online';
+        el.className = isForceOnline ? 'conn-online conn-mode-forced' : 'conn-offline conn-mode-forced';
+        el.textContent = isForceOnline ? '● ONLINE' : '● OFFLINE';
+    }
+    else {
+        el.className = online ? 'conn-online' : 'conn-offline';
+        el.textContent = online ? '● ONLINE' : '● OFFLINE';
+    }
 }
 _updateConnStatusPill(_mapIsOnline); // set pill immediately on load
+// Listen for manual connectivity mode changes from the settings panel
+window.addEventListener('sentinel:connectivityModeChanged', (e) => {
+    const { mode } = e.detail;
+    _connModeOverride = mode; // 'online', 'offline', or 'auto'
+    _updateConnStatusPill(_mapConnState);
+});
 /**
  * TransformStyleFunction passed to map.setStyle().
  * Rewrites root-relative sprite/glyphs paths to absolute origin URLs.

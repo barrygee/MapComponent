@@ -24,10 +24,10 @@ window._SettingsPanel = (function () {
             sectionLabel: 'App Settings',
             id: 'app-connectivity-probe',
             label: 'Connectivity Probe URL',
-            desc: 'URL polled every 2 s to detect internet access',
+            desc: 'URL polled every 2 seconds to detect internet access',
             renderControl: function () { return _renderConnectivityProbeControl(); },
         },
-{
+        {
             section: 'app',
             sectionLabel: 'App Settings',
             id: 'location',
@@ -669,6 +669,43 @@ window._SettingsPanel = (function () {
         switchRow.appendChild(track);
         switchRow.appendChild(labelOnline);
         wrap.appendChild(switchRow);
+        // Override summary — lists domains conflicting with the current app mode
+        const overrideSummary = document.createElement('div');
+        overrideSummary.className = 'settings-connectivity-override-summary';
+        overrideSummary.style.display = 'none';
+        wrap.appendChild(overrideSummary);
+        function _refreshOverrideSummary() {
+            const appMode = isOnline ? 'online' : 'offline';
+            const conflicts = _getConflictingOverrides(appMode);
+            if (conflicts.length === 0) {
+                overrideSummary.style.display = 'none';
+                overrideSummary.innerHTML = '';
+                return;
+            }
+            overrideSummary.style.display = '';
+            overrideSummary.innerHTML = '';
+            const heading = document.createElement('div');
+            heading.className = 'settings-conn-override-heading';
+            heading.textContent = 'SECTION OVERRIDES';
+            overrideSummary.appendChild(heading);
+            conflicts.forEach(function ({ ns, override }) {
+                const row = document.createElement('div');
+                row.className = 'settings-conn-override-row';
+                const nsLabel = document.createElement('span');
+                nsLabel.className = 'settings-conn-override-ns';
+                nsLabel.textContent = ns.toUpperCase();
+                const arrow = document.createElement('span');
+                arrow.className = 'settings-conn-override-arrow';
+                arrow.textContent = '→';
+                const val = document.createElement('span');
+                val.className = 'settings-conn-override-val settings-conn-override-val--' + override;
+                val.textContent = override.toUpperCase();
+                row.appendChild(nsLabel);
+                row.appendChild(arrow);
+                row.appendChild(val);
+                overrideSummary.appendChild(row);
+            });
+        }
         // Warning / confirm area (hidden until needed)
         const warning = document.createElement('div');
         warning.className = 'settings-connectivity-warning';
@@ -695,6 +732,8 @@ window._SettingsPanel = (function () {
             catch (e) { }
             if (window._SettingsAPI)
                 window._SettingsAPI.put('app', 'connectivityMode', mode);
+            window.dispatchEvent(new CustomEvent('sentinel:connectivityModeChanged', { detail: { mode } }));
+            _refreshOverrideSummary();
         }
         function _resetAllOverrides() {
             for (const ns of DOMAIN_NAMESPACES) {
@@ -705,6 +744,7 @@ window._SettingsPanel = (function () {
                 if (window._SettingsAPI)
                     window._SettingsAPI.put(ns, 'sourceOverride', 'auto');
             }
+            _refreshOverrideSummary();
         }
         function _showWarning(pendingMode) {
             warning.style.display = '';
@@ -714,29 +754,7 @@ window._SettingsPanel = (function () {
             msg.textContent = 'Some domains have source overrides set. Switching to '
                 + pendingMode.toUpperCase()
                 + ' will reset all overrides to AUTO.';
-            const btnConfirm = document.createElement('button');
-            btnConfirm.className = 'settings-connectivity-warning-btn settings-connectivity-warning-btn--confirm';
-            btnConfirm.textContent = 'CONFIRM';
-            const btnCancel = document.createElement('button');
-            btnCancel.className = 'settings-connectivity-warning-btn settings-connectivity-warning-btn--cancel';
-            btnCancel.textContent = 'CANCEL';
-            btnConfirm.addEventListener('click', function () {
-                _applyMode(pendingMode);
-                _resetAllOverrides();
-                warning.style.display = 'none';
-                warning.innerHTML = '';
-            });
-            btnCancel.addEventListener('click', function () {
-                // Revert toggle visually — don't change the mode
-                isOnline = pendingMode !== 'online'; // pendingMode was not yet applied, so revert
-                track.classList.toggle('is-online', isOnline);
-                track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
-                warning.style.display = 'none';
-                warning.innerHTML = '';
-            });
             warning.appendChild(msg);
-            warning.appendChild(btnConfirm);
-            warning.appendChild(btnCancel);
         }
         track.addEventListener('click', function () {
             const newMode = isOnline ? 'offline' : 'online';
@@ -746,10 +764,9 @@ window._SettingsPanel = (function () {
             track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
             if (_hasOverrides()) {
                 _showWarning(newMode);
+                _resetAllOverrides();
             }
-            else {
-                _applyMode(newMode);
-            }
+            _applyMode(newMode);
         });
         // Sync from backend on load
         if (window._SettingsAPI) {
@@ -767,8 +784,11 @@ window._SettingsPanel = (function () {
                     }
                     catch (e) { }
                 }
+                _refreshOverrideSummary();
             });
         }
+        window.addEventListener('sentinel:sourceOverrideChanged', _refreshOverrideSummary);
+        _refreshOverrideSummary();
         return wrap;
     }
     function _renderSourceOverrideControl(ns) {
@@ -811,6 +831,7 @@ window._SettingsPanel = (function () {
                     catch (e) { }
                     if (window._SettingsAPI)
                         window._SettingsAPI.put(ns, 'sourceOverride', current);
+                    window.dispatchEvent(new CustomEvent('sentinel:sourceOverrideChanged'));
                 });
             });
             group.appendChild(btn);
@@ -833,6 +854,26 @@ window._SettingsPanel = (function () {
         wrap.appendChild(group);
         wrap.appendChild(note);
         return wrap;
+    }
+    // ── Override summary ─────────────────────────────────────
+    const _OVERRIDE_NAMESPACES = ['air', 'space', 'sea', 'land'];
+    /**
+     * Returns domains whose sourceOverride conflicts with the current app connectivity mode.
+     * A conflict is when sourceOverride is not 'auto' AND differs from the app mode.
+     */
+    function _getConflictingOverrides(appMode) {
+        const conflicts = [];
+        for (const ns of _OVERRIDE_NAMESPACES) {
+            let override = 'auto';
+            try {
+                override = localStorage.getItem('sentinel_' + ns + '_sourceOverride') || 'auto';
+            }
+            catch (e) { }
+            if (override !== 'auto' && override !== appMode) {
+                conflicts.push({ ns, override });
+            }
+        }
+        return conflicts;
     }
     // ── Rendering ────────────────────────────────────────────
     function _makeSettingRow(item) {

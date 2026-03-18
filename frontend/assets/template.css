@@ -190,6 +190,8 @@ html {
 .conn-offline { color: rgba(255, 80, 80, 0.8); }
 /* Checking: near-invisible white — transitional, low noise */
 .conn-checking { color: rgba(255, 255, 255, 0.2); }
+/* Forced mode: add an asterisk-style underline to signal manual override */
+.conn-mode-forced { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
 
 /* Generic dim footer label (e.g. "LOC:" prefix) */
 .footer-label {
