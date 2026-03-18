@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from backend.database import create_tables
+from backend.database import create_tables, seed_default_settings
 from backend.routers import air, space, sea, land, sdr, settings as settings_router
 
 
@@ -20,6 +20,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 async def lifespan(app: FastAPI):
     """Application lifespan handler — runs create_tables once on startup."""
     await create_tables()
+    await seed_default_settings()
     yield  # application runs here; nothing needed on shutdown
 
 

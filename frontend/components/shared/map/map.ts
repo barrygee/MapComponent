@@ -73,11 +73,29 @@ function _switchMapStyle(online: boolean): void {
     );
 }
 
+// Connectivity probe URL — loaded from settings, falls back to a known reliable endpoint.
+const _PROBE_URL_LS_KEY = 'sentinel_app_connectivityProbeUrl';
+const _PROBE_URL_DEFAULT = 'https://tile.openstreetmap.org/favicon.ico';
+let _probeUrl: string = (function () {
+    try { return localStorage.getItem(_PROBE_URL_LS_KEY) || _PROBE_URL_DEFAULT; } catch { return _PROBE_URL_DEFAULT; }
+})();
+
+// Refresh probe URL from backend settings once on load
+fetch('/api/settings/app')
+    .then(r => r.ok ? r.json() : null)
+    .then((data: Record<string, unknown> | null) => {
+        if (data && typeof data['connectivityProbeUrl'] === 'string' && data['connectivityProbeUrl']) {
+            _probeUrl = data['connectivityProbeUrl'] as string;
+            try { localStorage.setItem(_PROBE_URL_LS_KEY, _probeUrl); } catch { /* ignore */ }
+        }
+    })
+    .catch(() => { /* non-fatal — keep default */ });
+
 /**
- * Poll OSM to detect real internet access.
+ * Poll the configured probe URL to detect real internet access.
  */
 function _checkInternetConnection(): void {
-    fetch('https://tile.openstreetmap.org/favicon.ico', { method: 'HEAD', cache: 'no-store', mode: 'no-cors' })
+    fetch(_probeUrl, { method: 'HEAD', cache: 'no-store', mode: 'no-cors' })
         .then(() => {
             if (!_mapConnState) {
                 _mapConnState = true;

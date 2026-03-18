@@ -24,8 +24,48 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.cache import is_fresh, is_within_stale, now_ms
 from backend.config import settings
 from backend.database import get_db
-from backend.models import AdsbCache, AirMessage, AirTracking
+from backend.models import AdsbCache, AirMessage, AirTracking, UserSettings
 from backend.services import adsb as adsb_service
+
+
+async def _get_adsb_url(db: AsyncSession) -> str:
+    """Return the ADS-B base URL from user settings, falling back to config default."""
+    result = await db.execute(
+        select(UserSettings).where(
+            UserSettings.namespace == "air",
+            UserSettings.key == "onlineUrl",
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row:
+        try:
+            val = json.loads(row.value)
+            if isinstance(val, str) and val.strip():
+                return val.strip().rstrip("/")
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return settings.adsb_upstream_base
+
+
+async def _get_adsb_offline_url(db: AsyncSession) -> str | None:
+    """Return the ADS-B offline URL from user settings, or None if not configured."""
+    result = await db.execute(
+        select(UserSettings).where(
+            UserSettings.namespace == "air",
+            UserSettings.key == "offlineSource",
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row:
+        try:
+            val = json.loads(row.value)
+            # offlineSource is stored as {"url": "http://..."} by the frontend
+            url = val.get("url") if isinstance(val, dict) else (val if isinstance(val, str) else None)
+            if url and url.strip() and url.strip() not in ("http://localhost", "https://"):
+                return url.strip().rstrip("/")
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return None
 
 
 # ── Request body schemas ───────────────────────────────────────────────────────
@@ -78,8 +118,18 @@ async def get_aircraft_near_point(
         return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "HIT"})
 
     # Cache miss or expired — try to fetch fresh data from upstream
-    try:
-        data = await adsb_service.fetch_aircraft(lat, lon, radius)
+    online_url  = await _get_adsb_url(db)
+    offline_url = await _get_adsb_offline_url(db)
+
+    data: dict | None = None
+    for base_url in filter(None, [online_url, offline_url]):
+        try:
+            data = await adsb_service.fetch_aircraft(lat, lon, radius, base_url)
+            break
+        except (httpx.HTTPError, Exception):
+            continue
+
+    if data is not None:
         payload_str = json.dumps(data)
         ts = now_ms()
 
@@ -104,11 +154,10 @@ async def get_aircraft_near_point(
 
         return JSONResponse(content=data, headers={"X-Cache": "MISS"})
 
-    except (httpx.HTTPError, Exception):
-        # Upstream unreachable — serve stale data if still within the stale window
-        if row and is_within_stale(row.fetched_at, settings.adsb_stale_ms):
-            return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "STALE"})
-        raise HTTPException(status_code=503, detail="ADS-B upstream unavailable")
+    # All upstreams failed — serve stale data if still within the stale window
+    if row and is_within_stale(row.fetched_at, settings.adsb_stale_ms):
+        return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "STALE"})
+    raise HTTPException(status_code=503, detail="ADS-B upstream unavailable")
 
 
 # ── Notification messages ──────────────────────────────────────────────────────

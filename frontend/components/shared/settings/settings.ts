@@ -46,6 +46,14 @@ window._SettingsPanel = (function () {
             desc:          'Set a fixed latitude / longitude for your position',
             renderControl: _renderLocationControl,
         },
+        {
+            section:       'app',
+            sectionLabel:  'App Settings',
+            id:            'app-connectivity-probe',
+            label:         'Connectivity Probe URL',
+            desc:          'URL polled every 2 s to detect internet access',
+            renderControl: function () { return _renderConnectivityProbeControl(); },
+        },
         // AIR
         {
             section:       'air',
@@ -245,6 +253,72 @@ window._SettingsPanel = (function () {
     }
 
     // ── Controls ─────────────────────────────────────────────
+
+    function _renderConnectivityProbeControl(): HTMLElement {
+        const LS_KEY = 'sentinel_app_connectivityProbeUrl';
+        const SETTING_ID = 'app-connectivity-probe';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-datasource-wrap';
+
+        const urlRow = document.createElement('div');
+        urlRow.className = 'settings-datasource-row';
+
+        const urlLabel = document.createElement('span');
+        urlLabel.className = 'settings-datasource-label';
+        urlLabel.textContent = 'URL';
+
+        const urlInput = document.createElement('input');
+        urlInput.type = 'url';
+        urlInput.className = 'settings-datasource-input';
+        urlInput.placeholder = 'https://';
+        urlInput.spellcheck = false;
+        urlInput.autocomplete = 'off';
+
+        urlRow.appendChild(urlLabel);
+        urlRow.appendChild(urlInput);
+        wrap.appendChild(urlRow);
+
+        // Load saved value
+        try {
+            const saved = localStorage.getItem(LS_KEY);
+            if (saved) urlInput.value = saved;
+        } catch (e) {}
+
+        // Reconcile with backend
+        if (window._SettingsAPI) {
+            window._SettingsAPI.getNamespace('app').then(function (data) {
+                if (!data || !data['connectivityProbeUrl']) return;
+                const backendVal = data['connectivityProbeUrl'] as string;
+                if (backendVal && !urlInput.value) {
+                    urlInput.value = backendVal;
+                    try { localStorage.setItem(LS_KEY, backendVal); } catch (e) {}
+                }
+            });
+        }
+
+        urlInput.addEventListener('input', function () {
+            _stagePending(SETTING_ID, function () {
+                const val = urlInput.value.trim();
+                if (val) {
+                    try { new URL(val); } catch (e) {
+                        throw new Error('INVALID URL');
+                    }
+                    try { localStorage.setItem(LS_KEY, val); } catch (e) {}
+                    if (window._SettingsAPI) window._SettingsAPI.put('app', 'connectivityProbeUrl', val);
+                } else {
+                    try { localStorage.removeItem(LS_KEY); } catch (e) {}
+                    if (window._SettingsAPI) window._SettingsAPI.put('app', 'connectivityProbeUrl', '');
+                }
+            });
+        });
+
+        urlInput.addEventListener('keydown', function (e: KeyboardEvent) {
+            if (e.key === 'Enter') _commitAll();
+        });
+
+        return wrap;
+    }
 
     function _renderOnlineSourceControl(ns: string): HTMLElement {
         const LS_KEY = 'sentinel_' + ns + '_onlineUrl';
