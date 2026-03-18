@@ -270,6 +270,9 @@ const setUserLocation = (function (): SetUserLocationFn {
         rangeRingCenter = [longitude, latitude];
         if (rangeRingsControl) rangeRingsControl.updateCenter(longitude, latitude);
 
+        const _footerLocEl = document.getElementById('footer-location');
+        if (_footerLocEl) _footerLocEl.textContent = latitude.toFixed(4) + ',  ' + longitude.toFixed(4);
+
         if (!position._manual) {
             try {
                 const existing = JSON.parse(localStorage.getItem('userLocation') || 'null') as { manual?: boolean } | null;
@@ -324,15 +327,18 @@ if (_cachedLocation) {
         const menu = document.createElement('div');
         menu.style.cssText = [
             'position:absolute',
-            'background:#1a1a2e',
-            'border:1px solid #444',
-            'border-radius:4px',
+            'background:#000',
+            'border:1px solid rgba(255,255,255,0.12)',
+            'border-radius:3px',
             'padding:4px 0',
-            'font-family:monospace',
-            'font-size:12px',
-            'color:#fff',
+            'font-family:\'Barlow\',\'Helvetica Neue\',Arial,sans-serif',
+            'font-size:10px',
+            'font-weight:600',
+            'letter-spacing:0.16em',
+            'text-transform:uppercase',
+            'color:rgba(255,255,255,0.75)',
             'z-index:9999',
-            'box-shadow:0 2px 8px rgba(0,0,0,.6)',
+            'box-shadow:0 4px 16px rgba(0,0,0,0.8)',
             'min-width:180px',
             'cursor:default',
         ].join(';');
@@ -342,8 +348,8 @@ if (_cachedLocation) {
 
         const item = document.createElement('div');
         item.textContent = 'Set my location here';
-        item.style.cssText = 'padding:6px 14px;cursor:pointer;white-space:nowrap;';
-        item.addEventListener('mouseenter', () => { item.style.background = '#2a2a4e'; });
+        item.style.cssText = 'padding:8px 16px;cursor:pointer;white-space:nowrap;';
+        item.addEventListener('mouseenter', () => { item.style.background = 'rgba(255,255,255,0.06)'; });
         item.addEventListener('mouseleave', () => { item.style.background = ''; });
         item.addEventListener('click', () => {
             removeContextMenu();

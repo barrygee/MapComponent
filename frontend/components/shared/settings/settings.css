@@ -103,7 +103,7 @@
     outline: none;
     color: rgba(255, 255, 255, 0.9);
     font-family: 'Barlow Condensed', 'Barlow', sans-serif;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 400;
     letter-spacing: 0.08em;
     caret-color: #c8ff00;
@@ -112,7 +112,7 @@
 
 #settings-search-input::placeholder {
     color: rgba(255, 255, 255, 0.4);
-    font-size: 11px;
+    font-size: 13px;
     letter-spacing: 0.14em;
 }
 
@@ -151,7 +151,7 @@
 /* ---- Section labels ---- */
 .settings-section-label {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.18em;
     color: rgba(255, 255, 255, 0.3);
@@ -177,7 +177,7 @@
 
 .settings-item-label {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.1em;
     color: rgba(255, 255, 255, 0.75);
@@ -186,7 +186,7 @@
 
 .settings-item-desc {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 400;
     letter-spacing: 0.05em;
     color: rgba(255, 255, 255, 0.3);
@@ -195,7 +195,7 @@
 /* ---- Search result breadcrumb ---- */
 .settings-result-breadcrumb {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 400;
     letter-spacing: 0.1em;
     color: rgba(255, 255, 255, 0.2);
@@ -207,69 +207,114 @@
 .settings-empty {
     padding: 32px 24px;
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.18em;
     color: rgba(255, 255, 255, 0.15);
     text-transform: uppercase;
 }
 
-/* ---- Theme toggle switch ---- */
-.settings-theme-switch {
+
+/* ---- Location control ---- */
+.settings-location-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 320px;
+}
+
+.settings-location-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-}
-
-.settings-theme-label {
-    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    color: rgba(255, 255, 255, 0.35);
-    text-transform: uppercase;
-    user-select: none;
-}
-
-.settings-theme-track {
-    position: relative;
-    width: 44px;
-    height: 24px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.1);
+    gap: 0;
+    background: rgba(255, 255, 255, 0.07);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    cursor: pointer;
-    padding: 0;
-    transition: background 0.2s, border-color 0.2s;
+    border-radius: 3px;
+}
+
+.settings-location-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.3);
+    text-transform: uppercase;
+    padding: 0 10px;
     flex-shrink: 0;
+    user-select: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.settings-theme-track.is-dark {
-    background: #c8ff00;
-    border-color: #c8ff00;
+.settings-location-input {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 9px 12px;
+    color: rgba(255, 255, 255, 0.9);
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    outline: none;
+    caret-color: #c8ff00;
+    min-width: 0;
 }
 
-.settings-theme-track:focus-visible {
-    outline: 2px solid #c8ff00;
-    outline-offset: 2px;
+.settings-location-row:focus-within {
+    border-color: rgba(200, 255, 0, 0.4);
 }
 
-.settings-theme-thumb {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.5);
-    transition: transform 0.2s, background 0.2s;
-    pointer-events: none;
+.settings-location-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 11px;
+    letter-spacing: 0.14em;
 }
 
-.settings-theme-track.is-dark .settings-theme-thumb {
-    transform: translateX(20px);
-    background: #000;
+.settings-location-action-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.settings-location-status {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: transparent;
+    transition: color 0.2s;
+}
+
+.settings-location-status--ok {
+    color: #c8ff00;
+}
+
+.settings-location-status--error {
+    color: rgba(255, 80, 80, 0.9);
+}
+
+.settings-location-apply {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    padding: 7px 16px;
+    color: rgba(255, 255, 255, 0.6);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.settings-location-apply:hover {
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.35);
 }
 
 /* ---- Footer settings button active state ---- */

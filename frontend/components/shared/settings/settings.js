@@ -12,10 +12,10 @@ window._SettingsPanel = (function () {
         {
             section: 'app',
             sectionLabel: 'App Settings',
-            id: 'theme',
-            label: 'Theme',
-            desc: 'Switch between light and dark mode',
-            renderControl: _renderThemeToggle,
+            id: 'location',
+            label: 'My Location',
+            desc: 'Set your latitude and longitude. Overrides GPS and persists across reloads.',
+            renderControl: _renderLocationControl,
         },
     ];
     const _NAV_SECTIONS = [
@@ -71,78 +71,110 @@ window._SettingsPanel = (function () {
         panel.appendChild(content);
         document.body.appendChild(panel);
     })();
-    // ── Controls ─────────────────────────────────────────────
-    function _renderThemeToggle() {
-        const STORAGE_KEY = 'sentinel_theme';
-        let saved = 'dark';
+    // ── Location helpers ─────────────────────────────────────
+    function _readStoredLocation() {
         try {
-            saved = localStorage.getItem(STORAGE_KEY) || 'dark';
-        }
-        catch (e) { }
-        let isDark = saved !== 'light';
+            const raw = localStorage.getItem('userLocation');
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') return parsed;
+        } catch (e) {}
+        return null;
+    }
+
+    function _dispatchLocation(lat, lng) {
+        const payload = { longitude: lng, latitude: lat, ts: Date.now(), manual: true };
+        localStorage.setItem('userLocation', JSON.stringify(payload));
+        const pos = { coords: { longitude: lng, latitude: lat }, _fromCache: false, _manual: true };
+        if (typeof setUserLocation === 'function') setUserLocation(pos);
+        if (typeof setSpaceUserLocation === 'function') setSpaceUserLocation(pos);
+        _updateFooterLocation(lat, lng);
+    }
+
+    function _updateFooterLocation(lat, lng) {
+        const el = document.getElementById('footer-location');
+        if (!el) return;
+        el.textContent = lat.toFixed(4) + ',  ' + lng.toFixed(4);
+    }
+
+    function _renderLocationControl() {
+        const stored = _readStoredLocation();
+
         const wrap = document.createElement('div');
-        wrap.className = 'settings-theme-switch';
-        const labelDark = document.createElement('span');
-        labelDark.className = 'settings-theme-label';
-        labelDark.textContent = 'DARK';
-        const track = document.createElement('button');
-        track.className = 'settings-theme-track' + (isDark ? ' is-dark' : '');
-        track.setAttribute('role', 'switch');
-        track.setAttribute('aria-checked', isDark ? 'true' : 'false');
-        track.setAttribute('aria-label', 'Toggle dark mode');
-        const thumb = document.createElement('span');
-        thumb.className = 'settings-theme-thumb';
-        track.appendChild(thumb);
-        const labelLight = document.createElement('span');
-        labelLight.className = 'settings-theme-label';
-        labelLight.textContent = 'LIGHT';
-        track.addEventListener('click', function () {
-            isDark = !isDark;
-            track.classList.toggle('is-dark', isDark);
-            track.setAttribute('aria-checked', isDark ? 'true' : 'false');
-            const mode = isDark ? 'dark' : 'light';
-            try {
-                localStorage.setItem(STORAGE_KEY, mode);
-            }
-            catch (e) { }
-            if (window._SettingsAPI) {
-                window._SettingsAPI.put('app', 'theme', mode);
-            }
-        });
-        // Phase 2: sync theme from backend (migration + restore)
-        (function _syncThemeFromBackend() {
-            if (!window._SettingsAPI)
-                return;
-            const MIGRATED_FLAG = 'sentinel_settings_migrated_theme';
-            if (!localStorage.getItem(MIGRATED_FLAG)) {
-                // One-time migration: push existing localStorage value to backend
-                const existingMode = saved;
-                window._SettingsAPI.put('app', 'theme', existingMode);
-                localStorage.setItem(MIGRATED_FLAG, '1');
-                return;
-            }
-            // Fetch from backend and reconcile
-            window._SettingsAPI.getNamespace('app').then(function (ns) {
-                if (!ns || !ns['theme'])
-                    return;
-                const backendMode = ns['theme'];
-                const localMode = isDark ? 'dark' : 'light';
-                if (backendMode !== localMode) {
-                    isDark = backendMode === 'dark';
-                    track.classList.toggle('is-dark', isDark);
-                    track.setAttribute('aria-checked', isDark ? 'true' : 'false');
-                    try {
-                        localStorage.setItem(STORAGE_KEY, backendMode);
-                    }
-                    catch (e) { }
-                }
+        wrap.className = 'settings-location-wrap';
+
+        // Lat row
+        const latRow = document.createElement('div');
+        latRow.className = 'settings-location-row';
+        const latLabel = document.createElement('label');
+        latLabel.className = 'settings-location-label';
+        latLabel.textContent = 'LAT';
+        const latInput = document.createElement('input');
+        latInput.type = 'text';
+        latInput.className = 'settings-location-input';
+        latInput.placeholder = '0.0000';
+        latInput.setAttribute('inputmode', 'decimal');
+        latInput.value = stored ? stored.latitude.toFixed(4) : '';
+        latRow.appendChild(latLabel);
+        latRow.appendChild(latInput);
+
+        // Lng row
+        const lngRow = document.createElement('div');
+        lngRow.className = 'settings-location-row';
+        const lngLabel = document.createElement('label');
+        lngLabel.className = 'settings-location-label';
+        lngLabel.textContent = 'LON';
+        const lngInput = document.createElement('input');
+        lngInput.type = 'text';
+        lngInput.className = 'settings-location-input';
+        lngInput.placeholder = '0.0000';
+        lngInput.setAttribute('inputmode', 'decimal');
+        lngInput.value = stored ? stored.longitude.toFixed(4) : '';
+        lngRow.appendChild(lngLabel);
+        lngRow.appendChild(lngInput);
+
+        // Status / apply row
+        const actionRow = document.createElement('div');
+        actionRow.className = 'settings-location-action-row';
+        const statusEl = document.createElement('span');
+        statusEl.className = 'settings-location-status';
+        const applyBtn = document.createElement('button');
+        applyBtn.className = 'settings-location-apply';
+        applyBtn.textContent = 'APPLY';
+        actionRow.appendChild(statusEl);
+        actionRow.appendChild(applyBtn);
+
+        function _setStatus(msg, isError) {
+            statusEl.textContent = msg;
+            statusEl.classList.toggle('settings-location-status--error', !!isError);
+            statusEl.classList.toggle('settings-location-status--ok', !isError && !!msg);
+        }
+
+        function _apply() {
+            const lat = parseFloat(latInput.value);
+            const lng = parseFloat(lngInput.value);
+            if (isNaN(lat) || lat < -90 || lat > 90) { _setStatus('Latitude must be −90 to 90', true); return; }
+            if (isNaN(lng) || lng < -180 || lng > 180) { _setStatus('Longitude must be −180 to 180', true); return; }
+            _dispatchLocation(lat, lng);
+            latInput.value = lat.toFixed(4);
+            lngInput.value = lng.toFixed(4);
+            _setStatus('Saved', false);
+            setTimeout(function () { _setStatus('', false); }, 2000);
+        }
+
+        applyBtn.addEventListener('click', _apply);
+        [latInput, lngInput].forEach(function (inp) {
+            inp.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') _apply();
             });
-        })();
-        wrap.appendChild(labelDark);
-        wrap.appendChild(track);
-        wrap.appendChild(labelLight);
+        });
+
+        wrap.appendChild(latRow);
+        wrap.appendChild(lngRow);
+        wrap.appendChild(actionRow);
         return wrap;
     }
+
     // ── Rendering ────────────────────────────────────────────
     function _makeSettingRow(item) {
         const row = document.createElement('div');
@@ -271,6 +303,19 @@ window._SettingsPanel = (function () {
     }
     // ── Init ────────────────────────────────────────────────
     function init() {
+        // Populate footer location from stored value on load
+        (function () {
+            const stored = _readStoredLocation();
+            if (stored) _updateFooterLocation(stored.latitude, stored.longitude);
+        })();
+
+        // Keep footer in sync when location is set by map right-click in any domain
+        window.addEventListener('storage', function (e) {
+            if (e.key !== 'userLocation') return;
+            const stored = _readStoredLocation();
+            if (stored) _updateFooterLocation(stored.latitude, stored.longitude);
+        });
+
         const settingsBtn = document.getElementById('settings-btn');
         if (settingsBtn) {
             settingsBtn.addEventListener('click', toggle);
