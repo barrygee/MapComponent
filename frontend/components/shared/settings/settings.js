@@ -383,9 +383,9 @@ window._SettingsPanel = (function () {
                 if (window._SettingsAPI) {
                     window._SettingsAPI.put('app', 'location', { latitude: lat, longitude: lon });
                 }
-                if (typeof setUserLocation === 'function') {
-                    setUserLocation({ coords: { longitude: lon, latitude: lat }, _fromCache: false, _manual: true });
-                }
+                window.dispatchEvent(new CustomEvent('sentinel:setUserLocation', {
+                    detail: { longitude: lon, latitude: lat }
+                }));
             });
         }
         latInput.addEventListener('input', _stageLocation);
@@ -622,6 +622,17 @@ window._SettingsPanel = (function () {
         if (applyBtn) {
             applyBtn.addEventListener('click', _commitAll);
         }
+
+        // Sync location inputs when user pins a location via right-click on map
+        window.addEventListener('sentinel:locationChanged', function (e) {
+            if (!_open || _activeSection !== 'app') return;
+            const { longitude, latitude } = e.detail;
+            const rows = document.querySelectorAll('#settings-body .settings-location-row');
+            if (rows[0]) rows[0].querySelector('input').value = latitude.toFixed(5);
+            if (rows[1]) rows[1].querySelector('input').value = longitude.toFixed(5);
+            // Map action already saved to localStorage — clear any staged pending
+            _pending.delete('location');
+        });
     }
     return { open, close, toggle, init };
 })();

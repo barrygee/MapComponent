@@ -43,4 +43,5 @@ interface Window {
     _FilterPanel:    FilterPanelAPI;
     _SettingsPanel:  SettingsPanelAPI;
     _is3DActive?:    () => boolean;
+    setUserLocation?: (position: { coords: { longitude: number; latitude: number }; _fromCache?: boolean; _manual?: boolean }) => void;
 }

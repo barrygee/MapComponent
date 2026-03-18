@@ -340,6 +340,9 @@ function setSpaceUserLocation(position: SpaceUserPosition): void {
                 longitude: lng, latitude: lat, ts: Date.now(), manual: true,
             }));
             setSpaceUserLocation({ coords: { longitude: lng, latitude: lat }, _fromCache: false, _manual: true });
+            window.dispatchEvent(new CustomEvent('sentinel:locationChanged', {
+                detail: { longitude: lng, latitude: lat }
+            }));
         });
 
         menu.appendChild(item);

@@ -289,6 +289,11 @@ const setUserLocation = (function (): SetUserLocationFn {
     }
     return fn as SetUserLocationFn;
 })();
+(window as any).setUserLocation = setUserLocation;
+window.addEventListener('sentinel:setUserLocation', function (e: Event) {
+    const detail = (e as CustomEvent).detail as { longitude: number; latitude: number };
+    setUserLocation({ coords: { longitude: detail.longitude, latitude: detail.latitude }, _fromCache: false, _manual: true });
+});
 
 // ============================================================
 // CACHED LOCATION RESTORE
@@ -356,6 +361,9 @@ if (_cachedLocation) {
                 longitude: lng, latitude: lat, ts: Date.now(), manual: true,
             }));
             setUserLocation({ coords: { longitude: lng, latitude: lat }, _fromCache: false, _manual: true });
+            window.dispatchEvent(new CustomEvent('sentinel:locationChanged', {
+                detail: { longitude: lng, latitude: lat }
+            }));
         });
 
         menu.appendChild(item);
