@@ -20,4 +20,7 @@ window.MapComponent.onStyleLoad(function () {
             issControl._startPolling();
         }
     }
+    if (spaceNamesControl) {
+        spaceNamesControl.applyNamesVisibility();
+    }
 });
