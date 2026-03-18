@@ -1630,21 +1630,23 @@ class AdsbLiveControl {
             const tracked = rows.find(r => r.follow);
             if (tracked)
                 localStorage.setItem('adsbTracking', JSON.stringify({ hex: tracked.hex }));
-            this._doRestoreTracking();
+            if (!this._doRestoreTracking())
+                this._trackingRestored = false;
         })
-            .catch(() => this._doRestoreTracking());
+            .catch(() => { if (!this._doRestoreTracking())
+            this._trackingRestored = false; });
     }
     _doRestoreTracking() {
         try {
             const saved = localStorage.getItem('adsbTracking');
             if (!saved)
-                return;
+                return true; // nothing to restore, consider done
             const { hex } = JSON.parse(saved);
             if (!hex)
-                return;
+                return true;
             const f = this._geojson.features.find(f => f.properties.hex === hex);
             if (!f)
-                return;
+                return false; // aircraft not yet in data — retry next fetch
             this._selectedHex = hex;
             this._applySelection();
             this._followEnabled = true;
@@ -1684,11 +1686,15 @@ class AdsbLiveControl {
             }
             this._tagMarker = new maplibregl.Marker({ element: newEl, anchor: 'left', offset: [14, 0] })
                 .setLngLat(coords).addTo(this.map);
+            this._tagHex = hex;
             this._showStatusBar(f.properties);
             const is3D = typeof window._is3DActive === 'function' && window._is3DActive();
             this.map.easeTo({ center: f.geometry.coordinates, zoom: 16, ...(is3D ? { pitch: 45 } : {}), duration: 600 });
+            return true;
         }
-        catch (e) { }
+        catch (e) {
+            return false;
+        }
     }
     // ---- Polling control ----
     _startPolling() {

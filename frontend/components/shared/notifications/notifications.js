@@ -230,7 +230,7 @@ window._Notifications = (() => {
                 panel.prepend(_buildNotifElement(item));
             }
         }
-        // Sort DOM children newest-first by ts so order is consistent across sections
+        // Sort DOM children newest-first by ts so order is consistent
         const sorted = [...panel.querySelectorAll('.notif-item')]
             .sort((a, b) => Number(b.dataset['ts'] ?? 0) - Number(a.dataset['ts'] ?? 0));
         sorted.forEach(el => panel.appendChild(el));
@@ -417,7 +417,8 @@ window._Notifications = (() => {
         const isActive = (i) => !!_actions[i.id] || i.type === 'tracking' || i.type === 'track';
         const toClear = items.filter(i => !isActive(i));
         const toKeep = items.filter(i => isActive(i));
-        if (!toClear.length) return;
+        if (!toClear.length)
+            return;
         toClear.forEach(i => { delete _actions[i.id]; delete _clickActions[i.id]; });
         _save(toKeep);
         toClear.forEach(i => {
@@ -435,7 +436,8 @@ window._Notifications = (() => {
             });
         }
         _refreshBadge();
-        if (!toKeep.length) _stopBellPulse();
+        if (!toKeep.length)
+            _stopBellPulse();
         setTimeout(_repositionBar, 230);
     }
     function toggle() {

@@ -72,6 +72,7 @@ class IssControl extends SentinelControlBase {
     _trackGeojson:    GeoJSON.FeatureCollection;
     _footprintGeojson: GeoJSON.FeatureCollection;
     _passNotifEnabled:   boolean;
+    _trackingNotifId:    string | null;
     _passNotifTimeout:   ReturnType<typeof setTimeout> | null;
     _passRefreshInterval: ReturnType<typeof setInterval> | null;
     _lastFiredPassAos:   number;
@@ -90,6 +91,7 @@ class IssControl extends SentinelControlBase {
         this._trackingRestored  = false;
         this._hoverHideTimer    = null;
         // Pass notifications
+        this._trackingNotifId     = null;
         this._passNotifEnabled    = false;
         this._passNotifTimeout    = null;
         this._passRefreshInterval = null;
@@ -732,12 +734,12 @@ class IssControl extends SentinelControlBase {
         try {
             if (localStorage.getItem('issTracking') === '1' && this._lastPosition) {
                 localStorage.removeItem('issTracking');
-                this._startFollowing();
+                this._startFollowing(true);
             }
         } catch (e) {}
     }
 
-    private _startFollowing(): void {
+    private _startFollowing(restoring = false): void {
         if (!this._lastPosition) return;
         this._followEnabled = true;
         const pos = this._lastPosition;
@@ -760,6 +762,10 @@ class IssControl extends SentinelControlBase {
 
         // Show tracking info in footer panel
         this._showStatusBar(pos);
+        if (!restoring && window._Notifications) {
+            if (this._trackingNotifId) { window._Notifications.dismiss(this._trackingNotifId); this._trackingNotifId = null; }
+            this._trackingNotifId = window._Notifications.add({ type: 'track', title: 'ISS' });
+        }
         this._saveIssTracking();
     }
 
@@ -783,6 +789,7 @@ class IssControl extends SentinelControlBase {
                 .setLngLat([this._lastPosition.lon, this._lastPosition.lat])
                 .addTo(this.map);
         }
+        if (window._Notifications && this._trackingNotifId) { window._Notifications.dismiss(this._trackingNotifId); this._trackingNotifId = null; }
         this._hideStatusBar();
         this._saveIssTracking();
     }

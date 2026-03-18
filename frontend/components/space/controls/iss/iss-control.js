@@ -36,6 +36,7 @@ class IssControl extends SentinelControlBase {
         this._trackingRestored = false;
         this._hoverHideTimer = null;
         // Pass notifications
+        this._trackingNotifId = null;
         this._passNotifEnabled = false;
         this._passNotifTimeout = null;
         this._passRefreshInterval = null;
@@ -681,12 +682,12 @@ class IssControl extends SentinelControlBase {
         try {
             if (localStorage.getItem('issTracking') === '1' && this._lastPosition) {
                 localStorage.removeItem('issTracking');
-                this._startFollowing();
+                this._startFollowing(true);
             }
         }
         catch (e) { }
     }
-    _startFollowing() {
+    _startFollowing(restoring = false) {
         if (!this._lastPosition)
             return;
         this._followEnabled = true;
@@ -708,6 +709,13 @@ class IssControl extends SentinelControlBase {
         this.map.easeTo({ center: coords, duration: 600 });
         // Show tracking info in footer panel
         this._showStatusBar(pos);
+        if (!restoring && window._Notifications) {
+            if (this._trackingNotifId) {
+                window._Notifications.dismiss(this._trackingNotifId);
+                this._trackingNotifId = null;
+            }
+            this._trackingNotifId = window._Notifications.add({ type: 'track', title: 'ISS' });
+        }
         this._saveIssTracking();
     }
     _wireUntrackButton(el) {
@@ -729,6 +737,10 @@ class IssControl extends SentinelControlBase {
             this._labelMarker = new maplibregl.Marker({ element: newLabelEl, anchor: 'left', offset: [26, 0] })
                 .setLngLat([this._lastPosition.lon, this._lastPosition.lat])
                 .addTo(this.map);
+        }
+        if (window._Notifications && this._trackingNotifId) {
+            window._Notifications.dismiss(this._trackingNotifId);
+            this._trackingNotifId = null;
         }
         this._hideStatusBar();
         this._saveIssTracking();
