@@ -29,17 +29,19 @@ maplibregl.addProtocol('pmtiles', _pmtilesProtocol.tile.bind(_pmtilesProtocol) a
 // On change: updates the footer pill, switches map style, notifies.
 // ============================================================
 
-// Seed connectivity state from the browser's best guess on page load
-const _mapIsOnline  = navigator.onLine;
-let   _mapConnState = _mapIsOnline;
-
-// Viewport bounds used for the offline (PMTiles) style — covers UK/Ireland/Europe
-const _OFFLINE_BOUNDS: [[number, number], [number, number]] = [[-20, 44], [32, 67]];
-
 // 'auto' | 'online' | 'offline' — tracks whether the user has manually forced a mode
 let _connModeOverride: string = (function () {
     try { return localStorage.getItem('sentinel_app_connectivityMode') || 'auto'; } catch { return 'auto'; }
 })();
+
+// Seed connectivity state: honour a forced override, otherwise use the browser's best guess
+const _mapIsOnline  = _connModeOverride === 'online' ? true
+                    : _connModeOverride === 'offline' ? false
+                    : navigator.onLine;
+let   _mapConnState = _mapIsOnline;
+
+// Viewport bounds used for the offline (PMTiles) style — covers UK/Ireland/Europe
+const _OFFLINE_BOUNDS: [[number, number], [number, number]] = [[-20, 44], [32, 67]];
 
 /**
  * Update the footer connection-status pill text and colour class.
@@ -65,6 +67,14 @@ _updateConnStatusPill(_mapIsOnline); // set pill immediately on load
 window.addEventListener('sentinel:connectivityModeChanged', (e: Event) => {
     const { mode } = (e as CustomEvent).detail as { mode: string };
     _connModeOverride = mode; // 'online', 'offline', or 'auto'
+    if (mode === 'online') {
+        _mapConnState = true;
+        _switchMapStyle(true);
+    } else if (mode === 'offline') {
+        _mapConnState = false;
+        _switchMapStyle(false);
+    }
+    // 'auto' — let the next probe cycle determine the state
     _updateConnStatusPill(_mapConnState);
 });
 
@@ -114,8 +124,10 @@ fetch('/api/settings/app')
 
 /**
  * Poll the configured probe URL to detect real internet access.
+ * Skipped when the user has forced a specific mode via the settings toggle.
  */
 function _checkInternetConnection(): void {
+    if (_connModeOverride === 'online' || _connModeOverride === 'offline') return;
     fetch(_probeUrl, { method: 'HEAD', cache: 'no-store', mode: 'no-cors' })
         .then(() => {
             if (!_mapConnState) {
@@ -136,8 +148,8 @@ function _checkInternetConnection(): void {
 _checkInternetConnection();
 setInterval(_checkInternetConnection, 2000);
 
-window.addEventListener('online',  () => { _mapConnState = true;  _updateConnStatusPill(true);  _switchMapStyle(true); });
-window.addEventListener('offline', () => { _mapConnState = false; _updateConnStatusPill(false); _switchMapStyle(false); });
+window.addEventListener('online',  () => { if (_connModeOverride !== 'auto') return; _mapConnState = true;  _updateConnStatusPill(true);  _switchMapStyle(true); });
+window.addEventListener('offline', () => { if (_connModeOverride !== 'auto') return; _mapConnState = false; _updateConnStatusPill(false); _switchMapStyle(false); });
 
 
 // ============================================================
