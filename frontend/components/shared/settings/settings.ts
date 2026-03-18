@@ -33,6 +33,14 @@ window._SettingsPanel = (function () {
         {
             section:       'app',
             sectionLabel:  'App Settings',
+            id:            'connectivity-mode',
+            label:         'Connectivity Mode',
+            desc:          'Use online or offline data sources across the app',
+            renderControl: _renderConnectivityToggle,
+        },
+        {
+            section:       'app',
+            sectionLabel:  'App Settings',
             id:            'theme',
             label:         'Theme',
             desc:          'Switch between light and dark mode',
@@ -58,6 +66,14 @@ window._SettingsPanel = (function () {
         {
             section:       'air',
             sectionLabel:  'AIR',
+            id:            'air-source-override',
+            label:         'Source Override',
+            desc:          'Override the app-level connectivity mode for this domain',
+            renderControl: function () { return _renderSourceOverrideControl('air'); },
+        },
+        {
+            section:       'air',
+            sectionLabel:  'AIR',
             id:            'air-online-source',
             label:         'Online Data Source',
             desc:          'URL for live air data feed',
@@ -72,6 +88,14 @@ window._SettingsPanel = (function () {
             renderControl: function () { return _renderOfflineSourceControl('air'); },
         },
         // SPACE
+        {
+            section:       'space',
+            sectionLabel:  'SPACE',
+            id:            'space-source-override',
+            label:         'Source Override',
+            desc:          'Override the app-level connectivity mode for this domain',
+            renderControl: function () { return _renderSourceOverrideControl('space'); },
+        },
         {
             section:       'space',
             sectionLabel:  'SPACE',
@@ -92,6 +116,14 @@ window._SettingsPanel = (function () {
         {
             section:       'sea',
             sectionLabel:  'SEA',
+            id:            'sea-source-override',
+            label:         'Source Override',
+            desc:          'Override the app-level connectivity mode for this domain',
+            renderControl: function () { return _renderSourceOverrideControl('sea'); },
+        },
+        {
+            section:       'sea',
+            sectionLabel:  'SEA',
             id:            'sea-online-source',
             label:         'Online Data Source',
             desc:          'URL for live sea data feed',
@@ -106,6 +138,14 @@ window._SettingsPanel = (function () {
             renderControl: function () { return _renderOfflineSourceControl('sea'); },
         },
         // LAND
+        {
+            section:       'land',
+            sectionLabel:  'LAND',
+            id:            'land-source-override',
+            label:         'Source Override',
+            desc:          'Override the app-level connectivity mode for this domain',
+            renderControl: function () { return _renderSourceOverrideControl('land'); },
+        },
         {
             section:       'land',
             sectionLabel:  'LAND',
@@ -616,6 +656,208 @@ window._SettingsPanel = (function () {
         wrap.appendChild(track);
         wrap.appendChild(labelLight);
 
+        return wrap;
+    }
+
+    function _renderConnectivityToggle(): HTMLElement {
+        const LS_KEY = 'sentinel_app_connectivityMode';
+        const DOMAIN_NAMESPACES = ['air', 'space', 'sea', 'land'];
+
+        let saved = 'online';
+        try { saved = localStorage.getItem(LS_KEY) || 'online'; } catch (e) {}
+        let isOnline = saved !== 'offline';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-connectivity-wrap';
+
+        const switchRow = document.createElement('div');
+        switchRow.className = 'settings-connectivity-switch';
+
+        const labelOffline = document.createElement('span');
+        labelOffline.className = 'settings-connectivity-label';
+        labelOffline.textContent = 'OFFLINE';
+
+        const track = document.createElement('button');
+        track.className = 'settings-connectivity-track' + (isOnline ? ' is-online' : '');
+        track.setAttribute('role', 'switch');
+        track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
+        track.setAttribute('aria-label', 'Toggle connectivity mode');
+
+        const thumb = document.createElement('span');
+        thumb.className = 'settings-connectivity-thumb';
+        track.appendChild(thumb);
+
+        const labelOnline = document.createElement('span');
+        labelOnline.className = 'settings-connectivity-label';
+        labelOnline.textContent = 'ONLINE';
+
+        switchRow.appendChild(labelOffline);
+        switchRow.appendChild(track);
+        switchRow.appendChild(labelOnline);
+        wrap.appendChild(switchRow);
+
+        // Warning / confirm area (hidden until needed)
+        const warning = document.createElement('div');
+        warning.className = 'settings-connectivity-warning';
+        warning.style.display = 'none';
+        wrap.appendChild(warning);
+
+        function _hasOverrides(): boolean {
+            for (const ns of DOMAIN_NAMESPACES) {
+                try {
+                    const val = localStorage.getItem('sentinel_' + ns + '_sourceOverride');
+                    if (val && val !== 'auto') return true;
+                } catch (e) {}
+            }
+            return false;
+        }
+
+        function _applyMode(mode: string): void {
+            isOnline = mode === 'online';
+            track.classList.toggle('is-online', isOnline);
+            track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
+            try { localStorage.setItem(LS_KEY, mode); } catch (e) {}
+            if (window._SettingsAPI) window._SettingsAPI.put('app', 'connectivityMode', mode);
+        }
+
+        function _resetAllOverrides(): void {
+            for (const ns of DOMAIN_NAMESPACES) {
+                try { localStorage.setItem('sentinel_' + ns + '_sourceOverride', 'auto'); } catch (e) {}
+                if (window._SettingsAPI) window._SettingsAPI.put(ns, 'sourceOverride', 'auto');
+            }
+        }
+
+        function _showWarning(pendingMode: string): void {
+            warning.style.display = '';
+            warning.innerHTML = '';
+
+            const msg = document.createElement('span');
+            msg.className = 'settings-connectivity-warning-msg';
+            msg.textContent = 'Some domains have source overrides set. Switching to '
+                + pendingMode.toUpperCase()
+                + ' will reset all overrides to AUTO.';
+
+            const btnConfirm = document.createElement('button');
+            btnConfirm.className = 'settings-connectivity-warning-btn settings-connectivity-warning-btn--confirm';
+            btnConfirm.textContent = 'CONFIRM';
+
+            const btnCancel = document.createElement('button');
+            btnCancel.className = 'settings-connectivity-warning-btn settings-connectivity-warning-btn--cancel';
+            btnCancel.textContent = 'CANCEL';
+
+            btnConfirm.addEventListener('click', function () {
+                _applyMode(pendingMode);
+                _resetAllOverrides();
+                warning.style.display = 'none';
+                warning.innerHTML = '';
+            });
+
+            btnCancel.addEventListener('click', function () {
+                // Revert toggle visually — don't change the mode
+                isOnline = pendingMode !== 'online'; // pendingMode was not yet applied, so revert
+                track.classList.toggle('is-online', isOnline);
+                track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
+                warning.style.display = 'none';
+                warning.innerHTML = '';
+            });
+
+            warning.appendChild(msg);
+            warning.appendChild(btnConfirm);
+            warning.appendChild(btnCancel);
+        }
+
+        track.addEventListener('click', function () {
+            const newMode = isOnline ? 'offline' : 'online';
+
+            // Optimistically flip the toggle visually
+            isOnline = !isOnline;
+            track.classList.toggle('is-online', isOnline);
+            track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
+
+            if (_hasOverrides()) {
+                _showWarning(newMode);
+            } else {
+                _applyMode(newMode);
+            }
+        });
+
+        // Sync from backend on load
+        if (window._SettingsAPI) {
+            window._SettingsAPI.getNamespace('app').then(function (data) {
+                if (!data || !data['connectivityMode']) return;
+                const backendMode = data['connectivityMode'] as string;
+                const localMode = isOnline ? 'online' : 'offline';
+                if (backendMode !== localMode) {
+                    isOnline = backendMode === 'online';
+                    track.classList.toggle('is-online', isOnline);
+                    track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
+                    try { localStorage.setItem(LS_KEY, backendMode); } catch (e) {}
+                }
+            });
+        }
+
+        return wrap;
+    }
+
+    function _renderSourceOverrideControl(ns: string): HTMLElement {
+        const LS_KEY = 'sentinel_' + ns + '_sourceOverride';
+        const SETTING_ID = ns + '-source-override';
+        const OPTIONS: Array<'auto' | 'online' | 'offline'> = ['auto', 'online', 'offline'];
+
+        let current: string = 'auto';
+        try { current = localStorage.getItem(LS_KEY) || 'auto'; } catch (e) {}
+
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-source-override-wrap';
+
+        const group = document.createElement('div');
+        group.className = 'settings-source-override-group';
+
+        const note = document.createElement('div');
+        note.className = 'settings-source-override-note';
+        note.style.display = current !== 'auto' ? '' : 'none';
+        note.textContent = 'This overrides the app-level connectivity mode setting.';
+
+        function _setActive(val: string): void {
+            current = val;
+            group.querySelectorAll<HTMLButtonElement>('.settings-source-override-btn').forEach(function (btn) {
+                btn.classList.toggle('is-active', btn.dataset['value'] === val);
+            });
+            note.style.display = val !== 'auto' ? '' : 'none';
+        }
+
+        OPTIONS.forEach(function (opt) {
+            const btn = document.createElement('button');
+            btn.className = 'settings-source-override-btn' + (current === opt ? ' is-active' : '');
+            btn.textContent = opt.toUpperCase();
+            btn.dataset['value'] = opt;
+
+            btn.addEventListener('click', function () {
+                if (current === opt) return;
+                _setActive(opt);
+                _stagePending(SETTING_ID, function () {
+                    try { localStorage.setItem(LS_KEY, current); } catch (e) {}
+                    if (window._SettingsAPI) window._SettingsAPI.put(ns, 'sourceOverride', current);
+                });
+            });
+
+            group.appendChild(btn);
+        });
+
+        // Sync from backend
+        if (window._SettingsAPI) {
+            window._SettingsAPI.getNamespace(ns).then(function (data) {
+                if (!data || !data['sourceOverride']) return;
+                const backendVal = data['sourceOverride'] as string;
+                if (backendVal && backendVal !== current) {
+                    _setActive(backendVal);
+                    try { localStorage.setItem(LS_KEY, backendVal); } catch (e) {}
+                }
+            });
+        }
+
+        wrap.appendChild(group);
+        wrap.appendChild(note);
         return wrap;
     }
 

@@ -462,6 +462,172 @@
     color: rgba(255, 80, 80, 0.9);
 }
 
+/* ---- Connectivity mode toggle ---- */
+.settings-connectivity-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.settings-connectivity-switch {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-connectivity-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    user-select: none;
+}
+
+.settings-connectivity-track {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    padding: 0;
+}
+
+.settings-connectivity-track.is-online {
+    background: rgba(200, 255, 0, 0.15);
+    border-color: rgba(200, 255, 0, 0.4);
+}
+
+.settings-connectivity-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transition: transform 0.2s, background 0.2s;
+}
+
+.settings-connectivity-track.is-online .settings-connectivity-thumb {
+    transform: translateX(20px);
+    background: #c8ff00;
+}
+
+.settings-connectivity-warning {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(255, 160, 0, 0.08);
+    border: 1px solid rgba(255, 160, 0, 0.35);
+    border-radius: 3px;
+    max-width: 420px;
+}
+
+.settings-connectivity-warning-msg {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    color: rgba(255, 200, 80, 0.9);
+    line-height: 1.5;
+}
+
+.settings-connectivity-warning-btn {
+    align-self: flex-start;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    padding: 6px 16px;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    color: rgba(255, 255, 255, 0.6);
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.settings-connectivity-warning-btn--confirm {
+    border-color: rgba(200, 255, 0, 0.4);
+    color: #c8ff00;
+}
+
+.settings-connectivity-warning-btn--confirm:hover {
+    background: rgba(200, 255, 0, 0.08);
+    border-color: rgba(200, 255, 0, 0.7);
+}
+
+.settings-connectivity-warning-btn--cancel:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* ---- Source override control ---- */
+.settings-source-override-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settings-source-override-group {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    overflow: hidden;
+    width: fit-content;
+}
+
+.settings-source-override-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 7px 16px;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
+}
+
+.settings-source-override-btn:last-child {
+    border-right: none;
+}
+
+.settings-source-override-btn:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.settings-source-override-btn.is-active {
+    background: rgba(200, 255, 0, 0.12);
+    color: #c8ff00;
+}
+
+.settings-source-override-note {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    color: rgba(255, 200, 80, 0.75);
+    font-style: italic;
+}
+
 /* ---- Footer settings button active state ---- */
 #settings-btn.settings-btn-active {
     opacity: 1;

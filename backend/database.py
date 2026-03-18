@@ -46,14 +46,19 @@ _DEFAULT_SETTINGS: list[tuple[str, str, object]] = [
     # onlineUrl  — plain string, used directly as the upstream base URL
     # offlineSource — {url: string}, matches the frontend settings panel shape
     ("app",   "connectivityProbeUrl", "https://tile.openstreetmap.org/favicon.ico"),
+    ("app",   "connectivityMode",    "online"),
     ("air",   "onlineUrl",      settings.adsb_upstream_base),
     ("air",   "offlineSource",  {"url": "http://localhost"}),
+    ("air",   "sourceOverride", "auto"),
     ("space", "onlineUrl",      settings.celestrak_iss_url),
     ("space", "offlineSource",  {"url": "http://localhost"}),
+    ("space", "sourceOverride", "auto"),
     ("sea",   "onlineUrl",      "https://"),
     ("sea",   "offlineSource",  {"url": "http://localhost"}),
+    ("sea",   "sourceOverride", "auto"),
     ("land",  "onlineUrl",      "https://"),
     ("land",  "offlineSource",  {"url": "http://localhost"}),
+    ("land",  "sourceOverride", "auto"),
     ("sdr",   "onlineUrl",      "https://"),
     ("sdr",   "offlineSource",  {"url": "http://localhost"}),
 ]

@@ -2,13 +2,23 @@
 /* ============================================================
    SETTINGS PANEL — window._SettingsPanel
    ============================================================ */
+/// <reference path="../../globals.d.ts" />
+/// <reference path="../../types.ts" />
 window._SettingsPanel = (function () {
     // ── State ────────────────────────────────────────────────
     let _open = false;
     let _activeSection = 'app';
-    // Pending changes map: id → { commit: () => void }
+    // Pending changes map: key → { commit: () => void }
     const _pending = new Map();
     const _settings = [
+        {
+            section: 'app',
+            sectionLabel: 'App Settings',
+            id: 'connectivity-mode',
+            label: 'Connectivity Mode',
+            desc: 'Use online or offline data sources across the app',
+            renderControl: _renderConnectivityToggle,
+        },
         {
             section: 'app',
             sectionLabel: 'App Settings',
@@ -25,7 +35,23 @@ window._SettingsPanel = (function () {
             desc: 'Set a fixed latitude / longitude for your position',
             renderControl: _renderLocationControl,
         },
+        {
+            section: 'app',
+            sectionLabel: 'App Settings',
+            id: 'app-connectivity-probe',
+            label: 'Connectivity Probe URL',
+            desc: 'URL polled every 2 s to detect internet access',
+            renderControl: function () { return _renderConnectivityProbeControl(); },
+        },
         // AIR
+        {
+            section: 'air',
+            sectionLabel: 'AIR',
+            id: 'air-source-override',
+            label: 'Source Override',
+            desc: 'Override the app-level connectivity mode for this domain',
+            renderControl: function () { return _renderSourceOverrideControl('air'); },
+        },
         {
             section: 'air',
             sectionLabel: 'AIR',
@@ -46,6 +72,14 @@ window._SettingsPanel = (function () {
         {
             section: 'space',
             sectionLabel: 'SPACE',
+            id: 'space-source-override',
+            label: 'Source Override',
+            desc: 'Override the app-level connectivity mode for this domain',
+            renderControl: function () { return _renderSourceOverrideControl('space'); },
+        },
+        {
+            section: 'space',
+            sectionLabel: 'SPACE',
             id: 'space-online-source',
             label: 'Online Data Source',
             desc: 'URL for live space data feed',
@@ -63,6 +97,14 @@ window._SettingsPanel = (function () {
         {
             section: 'sea',
             sectionLabel: 'SEA',
+            id: 'sea-source-override',
+            label: 'Source Override',
+            desc: 'Override the app-level connectivity mode for this domain',
+            renderControl: function () { return _renderSourceOverrideControl('sea'); },
+        },
+        {
+            section: 'sea',
+            sectionLabel: 'SEA',
             id: 'sea-online-source',
             label: 'Online Data Source',
             desc: 'URL for live sea data feed',
@@ -77,6 +119,14 @@ window._SettingsPanel = (function () {
             renderControl: function () { return _renderOfflineSourceControl('sea'); },
         },
         // LAND
+        {
+            section: 'land',
+            sectionLabel: 'LAND',
+            id: 'land-source-override',
+            label: 'Source Override',
+            desc: 'Override the app-level connectivity mode for this domain',
+            renderControl: function () { return _renderSourceOverrideControl('land'); },
+        },
         {
             section: 'land',
             sectionLabel: 'LAND',
@@ -130,18 +180,18 @@ window._SettingsPanel = (function () {
         searchWrap.id = 'settings-search-wrap';
         searchWrap.innerHTML =
             '<div id="settings-search-inner">' +
-            '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-            '<circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.2"/>' +
-            '<line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>' +
-            '</svg>' +
-            '<input id="settings-search-input" type="text" placeholder="SEARCH SETTINGS" autocomplete="off" spellcheck="false">' +
-            '<button id="settings-search-clear" aria-label="Clear search">' +
-            '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-            '<line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
-            '<line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
-            '</svg>' +
-            '</button>' +
-            '</div>';
+                '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+                '<circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.2"/>' +
+                '<line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>' +
+                '</svg>' +
+                '<input id="settings-search-input" type="text" placeholder="SEARCH SETTINGS" autocomplete="off" spellcheck="false">' +
+                '<button id="settings-search-clear" aria-label="Clear search">' +
+                '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+                '<line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
+                '<line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
+                '</svg>' +
+                '</button>' +
+                '</div>';
         // Body
         const body = document.createElement('div');
         body.id = 'settings-body';
@@ -166,9 +216,12 @@ window._SettingsPanel = (function () {
     // ── Apply button logic ────────────────────────────────────
     function _showApplyStatus(msg, isError) {
         const status = document.getElementById('settings-apply-status');
-        if (!status) return;
+        if (!status)
+            return;
         status.textContent = msg;
-        status.className = isError ? 'settings-apply-status--error' : 'settings-apply-status--ok';
+        status.className = isError
+            ? 'settings-apply-status--error'
+            : 'settings-apply-status--ok';
         setTimeout(function () {
             status.textContent = '';
             status.className = '';
@@ -199,7 +252,87 @@ window._SettingsPanel = (function () {
     function _stagePending(id, commitFn) {
         _pending.set(id, { commit: commitFn });
     }
+    function _clearPendingForSection(sectionKey) {
+        const ids = _settings
+            .filter(function (s) { return s.section === sectionKey; })
+            .map(function (s) { return s.id; });
+        ids.forEach(function (id) { _pending.delete(id); });
+    }
     // ── Controls ─────────────────────────────────────────────
+    function _renderConnectivityProbeControl() {
+        const LS_KEY = 'sentinel_app_connectivityProbeUrl';
+        const SETTING_ID = 'app-connectivity-probe';
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-datasource-wrap';
+        const urlRow = document.createElement('div');
+        urlRow.className = 'settings-datasource-row';
+        const urlLabel = document.createElement('span');
+        urlLabel.className = 'settings-datasource-label';
+        urlLabel.textContent = 'URL';
+        const urlInput = document.createElement('input');
+        urlInput.type = 'url';
+        urlInput.className = 'settings-datasource-input';
+        urlInput.placeholder = 'https://';
+        urlInput.spellcheck = false;
+        urlInput.autocomplete = 'off';
+        urlRow.appendChild(urlLabel);
+        urlRow.appendChild(urlInput);
+        wrap.appendChild(urlRow);
+        // Load saved value
+        try {
+            const saved = localStorage.getItem(LS_KEY);
+            if (saved)
+                urlInput.value = saved;
+        }
+        catch (e) { }
+        // Reconcile with backend
+        if (window._SettingsAPI) {
+            window._SettingsAPI.getNamespace('app').then(function (data) {
+                if (!data || !data['connectivityProbeUrl'])
+                    return;
+                const backendVal = data['connectivityProbeUrl'];
+                if (backendVal && !urlInput.value) {
+                    urlInput.value = backendVal;
+                    try {
+                        localStorage.setItem(LS_KEY, backendVal);
+                    }
+                    catch (e) { }
+                }
+            });
+        }
+        urlInput.addEventListener('input', function () {
+            _stagePending(SETTING_ID, function () {
+                const val = urlInput.value.trim();
+                if (val) {
+                    try {
+                        new URL(val);
+                    }
+                    catch (e) {
+                        throw new Error('INVALID URL');
+                    }
+                    try {
+                        localStorage.setItem(LS_KEY, val);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put('app', 'connectivityProbeUrl', val);
+                }
+                else {
+                    try {
+                        localStorage.removeItem(LS_KEY);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put('app', 'connectivityProbeUrl', '');
+                }
+            });
+        });
+        urlInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter')
+                _commitAll();
+        });
+        return wrap;
+    }
     function _renderOnlineSourceControl(ns) {
         const LS_KEY = 'sentinel_' + ns + '_onlineUrl';
         const SETTING_ID = ns + '-online-source';
@@ -234,7 +367,10 @@ window._SettingsPanel = (function () {
                 const backendVal = data['onlineUrl'];
                 if (backendVal && !urlInput.value) {
                     urlInput.value = backendVal;
-                    try { localStorage.setItem(LS_KEY, backendVal); } catch (e) { }
+                    try {
+                        localStorage.setItem(LS_KEY, backendVal);
+                    }
+                    catch (e) { }
                 }
             });
         }
@@ -242,17 +378,32 @@ window._SettingsPanel = (function () {
             _stagePending(SETTING_ID, function () {
                 const val = urlInput.value.trim();
                 if (val) {
-                    try { new URL(val); } catch (e) { throw new Error('INVALID URL'); }
-                    try { localStorage.setItem(LS_KEY, val); } catch (e) { }
-                    if (window._SettingsAPI) window._SettingsAPI.put(ns, 'onlineUrl', val);
-                } else {
-                    try { localStorage.removeItem(LS_KEY); } catch (e) { }
-                    if (window._SettingsAPI) window._SettingsAPI.put(ns, 'onlineUrl', '');
+                    try {
+                        new URL(val);
+                    }
+                    catch (e) {
+                        throw new Error('INVALID URL');
+                    }
+                    try {
+                        localStorage.setItem(LS_KEY, val);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put(ns, 'onlineUrl', val);
+                }
+                else {
+                    try {
+                        localStorage.removeItem(LS_KEY);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put(ns, 'onlineUrl', '');
                 }
             });
         });
         urlInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') _commitAll();
+            if (e.key === 'Enter')
+                _commitAll();
         });
         return wrap;
     }
@@ -294,22 +445,35 @@ window._SettingsPanel = (function () {
                 const backendVal = data['offlineSource'];
                 if (!urlInput.value && backendVal.url)
                     urlInput.value = backendVal.url;
-                try { localStorage.setItem(LS_KEY, JSON.stringify(backendVal)); } catch (e) { }
+                try {
+                    localStorage.setItem(LS_KEY, JSON.stringify(backendVal));
+                }
+                catch (e) { }
             });
         }
         urlInput.addEventListener('input', function () {
             _stagePending(SETTING_ID, function () {
                 const url = urlInput.value.trim();
                 if (url) {
-                    try { new URL(url); } catch (e) { throw new Error('INVALID URL'); }
+                    try {
+                        new URL(url);
+                    }
+                    catch (e) {
+                        throw new Error('INVALID URL');
+                    }
                 }
                 const val = { url };
-                try { localStorage.setItem(LS_KEY, JSON.stringify(val)); } catch (e) { }
-                if (window._SettingsAPI) window._SettingsAPI.put(ns, 'offlineSource', val);
+                try {
+                    localStorage.setItem(LS_KEY, JSON.stringify(val));
+                }
+                catch (e) { }
+                if (window._SettingsAPI)
+                    window._SettingsAPI.put(ns, 'offlineSource', val);
             });
         });
         urlInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') _commitAll();
+            if (e.key === 'Enter')
+                _commitAll();
         });
         return wrap;
     }
@@ -318,10 +482,13 @@ window._SettingsPanel = (function () {
         function _loadSaved() {
             try {
                 const raw = localStorage.getItem(STORAGE_KEY);
-                if (!raw) return null;
+                if (!raw)
+                    return null;
                 return JSON.parse(raw);
             }
-            catch (e) { return null; }
+            catch (e) {
+                return null;
+            }
         }
         const wrap = document.createElement('div');
         wrap.className = 'settings-location-wrap';
@@ -362,18 +529,25 @@ window._SettingsPanel = (function () {
         // Reconcile with backend
         if (window._SettingsAPI) {
             window._SettingsAPI.getNamespace('app').then(function (data) {
-                if (!data || !data['location']) return;
+                if (!data || !data['location'])
+                    return;
                 const loc = data['location'];
-                if (!latInput.value && loc.latitude != null) latInput.value = loc.latitude.toFixed(5);
-                if (!lonInput.value && loc.longitude != null) lonInput.value = loc.longitude.toFixed(5);
+                if (!latInput.value && loc.latitude != null)
+                    latInput.value = loc.latitude.toFixed(5);
+                if (!lonInput.value && loc.longitude != null)
+                    lonInput.value = loc.longitude.toFixed(5);
             });
         }
         function _stageLocation() {
             _stagePending('location', function () {
                 const lat = parseFloat(latInput.value);
                 const lon = parseFloat(lonInput.value);
-                if (isNaN(lat) || lat < -90 || lat > 90) throw new Error('INVALID LAT');
-                if (isNaN(lon) || lon < -180 || lon > 180) throw new Error('INVALID LON');
+                if (isNaN(lat) || lat < -90 || lat > 90) {
+                    throw new Error('INVALID LAT');
+                }
+                if (isNaN(lon) || lon < -180 || lon > 180) {
+                    throw new Error('INVALID LON');
+                }
                 try {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify({
                         longitude: lon, latitude: lat, ts: Date.now(), manual: true,
@@ -390,8 +564,14 @@ window._SettingsPanel = (function () {
         }
         latInput.addEventListener('input', _stageLocation);
         lonInput.addEventListener('input', _stageLocation);
-        latInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') _commitAll(); });
-        lonInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') _commitAll(); });
+        latInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter')
+                _commitAll();
+        });
+        lonInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter')
+                _commitAll();
+        });
         return wrap;
     }
     function _renderThemeToggle() {
@@ -418,13 +598,16 @@ window._SettingsPanel = (function () {
         const labelLight = document.createElement('span');
         labelLight.className = 'settings-theme-label';
         labelLight.textContent = 'LIGHT';
-        // Theme applies immediately — no defer to Apply needed
         track.addEventListener('click', function () {
             isDark = !isDark;
             track.classList.toggle('is-dark', isDark);
             track.setAttribute('aria-checked', isDark ? 'true' : 'false');
             const mode = isDark ? 'dark' : 'light';
-            try { localStorage.setItem(STORAGE_KEY, mode); } catch (e) { }
+            // Theme applies immediately — no need to defer to Apply
+            try {
+                localStorage.setItem(STORAGE_KEY, mode);
+            }
+            catch (e) { }
             if (window._SettingsAPI) {
                 window._SettingsAPI.put('app', 'theme', mode);
             }
@@ -435,26 +618,228 @@ window._SettingsPanel = (function () {
                 return;
             const MIGRATED_FLAG = 'sentinel_settings_migrated_theme';
             if (!localStorage.getItem(MIGRATED_FLAG)) {
+                // One-time migration: push existing localStorage value to backend
                 const existingMode = saved;
                 window._SettingsAPI.put('app', 'theme', existingMode);
                 localStorage.setItem(MIGRATED_FLAG, '1');
                 return;
             }
+            // Fetch from backend and reconcile
             window._SettingsAPI.getNamespace('app').then(function (ns) {
-                if (!ns || !ns['theme']) return;
+                if (!ns || !ns['theme'])
+                    return;
                 const backendMode = ns['theme'];
                 const localMode = isDark ? 'dark' : 'light';
                 if (backendMode !== localMode) {
                     isDark = backendMode === 'dark';
                     track.classList.toggle('is-dark', isDark);
                     track.setAttribute('aria-checked', isDark ? 'true' : 'false');
-                    try { localStorage.setItem(STORAGE_KEY, backendMode); } catch (e) { }
+                    try {
+                        localStorage.setItem(STORAGE_KEY, backendMode);
+                    }
+                    catch (e) { }
                 }
             });
         })();
         wrap.appendChild(labelDark);
         wrap.appendChild(track);
         wrap.appendChild(labelLight);
+        return wrap;
+    }
+    function _renderConnectivityToggle() {
+        const LS_KEY = 'sentinel_app_connectivityMode';
+        const DOMAIN_NAMESPACES = ['air', 'space', 'sea', 'land'];
+        let saved = 'online';
+        try {
+            saved = localStorage.getItem(LS_KEY) || 'online';
+        }
+        catch (e) { }
+        let isOnline = saved !== 'offline';
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-connectivity-wrap';
+        const switchRow = document.createElement('div');
+        switchRow.className = 'settings-connectivity-switch';
+        const labelOffline = document.createElement('span');
+        labelOffline.className = 'settings-connectivity-label';
+        labelOffline.textContent = 'OFFLINE';
+        const track = document.createElement('button');
+        track.className = 'settings-connectivity-track' + (isOnline ? ' is-online' : '');
+        track.setAttribute('role', 'switch');
+        track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
+        track.setAttribute('aria-label', 'Toggle connectivity mode');
+        const thumb = document.createElement('span');
+        thumb.className = 'settings-connectivity-thumb';
+        track.appendChild(thumb);
+        const labelOnline = document.createElement('span');
+        labelOnline.className = 'settings-connectivity-label';
+        labelOnline.textContent = 'ONLINE';
+        switchRow.appendChild(labelOffline);
+        switchRow.appendChild(track);
+        switchRow.appendChild(labelOnline);
+        wrap.appendChild(switchRow);
+        // Warning / confirm area (hidden until needed)
+        const warning = document.createElement('div');
+        warning.className = 'settings-connectivity-warning';
+        warning.style.display = 'none';
+        wrap.appendChild(warning);
+        function _hasOverrides() {
+            for (const ns of DOMAIN_NAMESPACES) {
+                try {
+                    const val = localStorage.getItem('sentinel_' + ns + '_sourceOverride');
+                    if (val && val !== 'auto')
+                        return true;
+                }
+                catch (e) { }
+            }
+            return false;
+        }
+        function _applyMode(mode) {
+            isOnline = mode === 'online';
+            track.classList.toggle('is-online', isOnline);
+            track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
+            try {
+                localStorage.setItem(LS_KEY, mode);
+            }
+            catch (e) { }
+            if (window._SettingsAPI)
+                window._SettingsAPI.put('app', 'connectivityMode', mode);
+        }
+        function _resetAllOverrides() {
+            for (const ns of DOMAIN_NAMESPACES) {
+                try {
+                    localStorage.setItem('sentinel_' + ns + '_sourceOverride', 'auto');
+                }
+                catch (e) { }
+                if (window._SettingsAPI)
+                    window._SettingsAPI.put(ns, 'sourceOverride', 'auto');
+            }
+        }
+        function _showWarning(pendingMode) {
+            warning.style.display = '';
+            warning.innerHTML = '';
+            const msg = document.createElement('span');
+            msg.className = 'settings-connectivity-warning-msg';
+            msg.textContent = 'Some domains have source overrides set. Switching to '
+                + pendingMode.toUpperCase()
+                + ' will reset all overrides to AUTO.';
+            const btnConfirm = document.createElement('button');
+            btnConfirm.className = 'settings-connectivity-warning-btn settings-connectivity-warning-btn--confirm';
+            btnConfirm.textContent = 'CONFIRM';
+            const btnCancel = document.createElement('button');
+            btnCancel.className = 'settings-connectivity-warning-btn settings-connectivity-warning-btn--cancel';
+            btnCancel.textContent = 'CANCEL';
+            btnConfirm.addEventListener('click', function () {
+                _applyMode(pendingMode);
+                _resetAllOverrides();
+                warning.style.display = 'none';
+                warning.innerHTML = '';
+            });
+            btnCancel.addEventListener('click', function () {
+                // Revert toggle visually — don't change the mode
+                isOnline = pendingMode !== 'online'; // pendingMode was not yet applied, so revert
+                track.classList.toggle('is-online', isOnline);
+                track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
+                warning.style.display = 'none';
+                warning.innerHTML = '';
+            });
+            warning.appendChild(msg);
+            warning.appendChild(btnConfirm);
+            warning.appendChild(btnCancel);
+        }
+        track.addEventListener('click', function () {
+            const newMode = isOnline ? 'offline' : 'online';
+            // Optimistically flip the toggle visually
+            isOnline = !isOnline;
+            track.classList.toggle('is-online', isOnline);
+            track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
+            if (_hasOverrides()) {
+                _showWarning(newMode);
+            }
+            else {
+                _applyMode(newMode);
+            }
+        });
+        // Sync from backend on load
+        if (window._SettingsAPI) {
+            window._SettingsAPI.getNamespace('app').then(function (data) {
+                if (!data || !data['connectivityMode'])
+                    return;
+                const backendMode = data['connectivityMode'];
+                const localMode = isOnline ? 'online' : 'offline';
+                if (backendMode !== localMode) {
+                    isOnline = backendMode === 'online';
+                    track.classList.toggle('is-online', isOnline);
+                    track.setAttribute('aria-checked', isOnline ? 'true' : 'false');
+                    try {
+                        localStorage.setItem(LS_KEY, backendMode);
+                    }
+                    catch (e) { }
+                }
+            });
+        }
+        return wrap;
+    }
+    function _renderSourceOverrideControl(ns) {
+        const LS_KEY = 'sentinel_' + ns + '_sourceOverride';
+        const SETTING_ID = ns + '-source-override';
+        const OPTIONS = ['auto', 'online', 'offline'];
+        let current = 'auto';
+        try {
+            current = localStorage.getItem(LS_KEY) || 'auto';
+        }
+        catch (e) { }
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-source-override-wrap';
+        const group = document.createElement('div');
+        group.className = 'settings-source-override-group';
+        const note = document.createElement('div');
+        note.className = 'settings-source-override-note';
+        note.style.display = current !== 'auto' ? '' : 'none';
+        note.textContent = 'This overrides the app-level connectivity mode setting.';
+        function _setActive(val) {
+            current = val;
+            group.querySelectorAll('.settings-source-override-btn').forEach(function (btn) {
+                btn.classList.toggle('is-active', btn.dataset['value'] === val);
+            });
+            note.style.display = val !== 'auto' ? '' : 'none';
+        }
+        OPTIONS.forEach(function (opt) {
+            const btn = document.createElement('button');
+            btn.className = 'settings-source-override-btn' + (current === opt ? ' is-active' : '');
+            btn.textContent = opt.toUpperCase();
+            btn.dataset['value'] = opt;
+            btn.addEventListener('click', function () {
+                if (current === opt)
+                    return;
+                _setActive(opt);
+                _stagePending(SETTING_ID, function () {
+                    try {
+                        localStorage.setItem(LS_KEY, current);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put(ns, 'sourceOverride', current);
+                });
+            });
+            group.appendChild(btn);
+        });
+        // Sync from backend
+        if (window._SettingsAPI) {
+            window._SettingsAPI.getNamespace(ns).then(function (data) {
+                if (!data || !data['sourceOverride'])
+                    return;
+                const backendVal = data['sourceOverride'];
+                if (backendVal && backendVal !== current) {
+                    _setActive(backendVal);
+                    try {
+                        localStorage.setItem(LS_KEY, backendVal);
+                    }
+                    catch (e) { }
+                }
+            });
+        }
+        wrap.appendChild(group);
+        wrap.appendChild(note);
         return wrap;
     }
     // ── Rendering ────────────────────────────────────────────
@@ -482,8 +867,10 @@ window._SettingsPanel = (function () {
     }
     function _renderSection(sectionKey) {
         const body = document.getElementById('settings-body');
-        if (!body) return;
+        if (!body)
+            return;
         body.innerHTML = '';
+        // Clear pending changes from the previous section
         _pending.clear();
         const navSection = _NAV_SECTIONS.find(function (s) { return s.key === sectionKey; });
         const heading = document.getElementById('settings-section-heading');
@@ -506,7 +893,8 @@ window._SettingsPanel = (function () {
     }
     function _search(query) {
         const q = query.trim().toLowerCase();
-        if (!q) return null;
+        if (!q)
+            return null;
         return _settings.filter(function (s) {
             return s.label.toLowerCase().indexOf(q) !== -1 ||
                 s.desc.toLowerCase().indexOf(q) !== -1 ||
@@ -515,10 +903,12 @@ window._SettingsPanel = (function () {
     }
     function _renderSearchResults(results) {
         const body = document.getElementById('settings-body');
-        if (!body) return;
+        if (!body)
+            return;
         body.innerHTML = '';
         const heading = document.getElementById('settings-section-heading');
-        if (heading) heading.textContent = 'SEARCH RESULTS';
+        if (heading)
+            heading.textContent = 'SEARCH RESULTS';
         if (!results.length) {
             const empty = document.createElement('div');
             empty.className = 'settings-empty';
@@ -526,6 +916,7 @@ window._SettingsPanel = (function () {
             body.appendChild(empty);
             return;
         }
+        // Group by section
         const groups = {};
         const groupOrder = [];
         results.forEach(function (item) {
@@ -550,29 +941,40 @@ window._SettingsPanel = (function () {
     function open() {
         _open = true;
         const panel = document.getElementById('settings-panel');
-        if (panel) panel.classList.add('settings-panel-visible');
+        if (panel)
+            panel.classList.add('settings-panel-visible');
         const btn = document.getElementById('settings-btn');
-        if (btn) btn.classList.add('settings-btn-active');
+        if (btn)
+            btn.classList.add('settings-btn-active');
         _renderSection(_activeSection);
         const input = document.getElementById('settings-search-input');
-        if (input) input.focus();
+        if (input)
+            input.focus();
     }
     function close() {
         _open = false;
         _pending.clear();
         const panel = document.getElementById('settings-panel');
-        if (panel) panel.classList.remove('settings-panel-visible');
+        if (panel)
+            panel.classList.remove('settings-panel-visible');
         const btn = document.getElementById('settings-btn');
-        if (btn) btn.classList.remove('settings-btn-active');
+        if (btn)
+            btn.classList.remove('settings-btn-active');
         const input = document.getElementById('settings-search-input');
-        if (input) input.value = '';
+        if (input)
+            input.value = '';
         const clearBtn = document.getElementById('settings-search-clear');
-        if (clearBtn) clearBtn.classList.remove('settings-search-clear-visible');
+        if (clearBtn)
+            clearBtn.classList.remove('settings-search-clear-visible');
         const body = document.getElementById('settings-body');
-        if (body) body.innerHTML = '';
+        if (body)
+            body.innerHTML = '';
     }
     function toggle() {
-        if (_open) close(); else open();
+        if (_open)
+            close();
+        else
+            open();
     }
     // ── Init ────────────────────────────────────────────────
     function init() {
@@ -585,21 +987,27 @@ window._SettingsPanel = (function () {
         if (input) {
             input.addEventListener('input', function () {
                 const q = input.value;
-                if (clearBtn) clearBtn.classList.toggle('settings-search-clear-visible', q.length > 0);
+                if (clearBtn)
+                    clearBtn.classList.toggle('settings-search-clear-visible', q.length > 0);
                 const results = _search(q);
                 if (results === null) {
                     _renderSection(_activeSection);
-                } else {
+                }
+                else {
                     _renderSearchResults(results);
                 }
             });
             input.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape') close();
+                if (e.key === 'Escape')
+                    close();
             });
         }
         if (clearBtn) {
             clearBtn.addEventListener('click', function () {
-                if (input) { input.value = ''; input.focus(); }
+                if (input) {
+                    input.value = '';
+                    input.focus();
+                }
                 clearBtn.classList.remove('settings-search-clear-visible');
                 _renderSection(_activeSection);
             });
@@ -607,13 +1015,15 @@ window._SettingsPanel = (function () {
         // Sidebar nav
         document.querySelectorAll('.settings-nav-item').forEach(function (el) {
             el.addEventListener('click', function () {
-                _activeSection = el.dataset['section'] || 'app';
+                _activeSection = el.dataset['section'] ?? 'app';
                 document.querySelectorAll('.settings-nav-item').forEach(function (n) {
                     n.classList.remove('active');
                 });
                 el.classList.add('active');
-                if (input) input.value = '';
-                if (clearBtn) clearBtn.classList.remove('settings-search-clear-visible');
+                if (input)
+                    input.value = '';
+                if (clearBtn)
+                    clearBtn.classList.remove('settings-search-clear-visible');
                 _renderSection(_activeSection);
             });
         });
@@ -622,15 +1032,18 @@ window._SettingsPanel = (function () {
         if (applyBtn) {
             applyBtn.addEventListener('click', _commitAll);
         }
-
         // Sync location inputs when user pins a location via right-click on map
         window.addEventListener('sentinel:locationChanged', function (e) {
-            if (!_open || _activeSection !== 'app') return;
+            if (!_open || _activeSection !== 'app')
+                return;
             const { longitude, latitude } = e.detail;
             const rows = document.querySelectorAll('#settings-body .settings-location-row');
-            if (rows[0]) rows[0].querySelector('input').value = latitude.toFixed(5);
-            if (rows[1]) rows[1].querySelector('input').value = longitude.toFixed(5);
-            // Map action already saved to localStorage — clear any staged pending
+            const latInput = rows[0]?.querySelector('input');
+            const lonInput = rows[1]?.querySelector('input');
+            if (latInput)
+                latInput.value = latitude.toFixed(5);
+            if (lonInput)
+                lonInput.value = longitude.toFixed(5);
             _pending.delete('location');
         });
     }
