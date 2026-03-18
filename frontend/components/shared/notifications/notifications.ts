@@ -31,7 +31,7 @@ window._Notifications = ((): NotificationsAPI => {
     const PANEL_HTML =
         `<div id="notifications-panel">` +
             `<div id="notif-header">` +
-                `<button id="notif-clear-all-btn" aria-label="Clear all notifications">CLEAR ALL</button>` +
+                `<button id="notif-clear-all-btn" aria-label="Clear non-active notifications">CLEAR INACTIVE</button>` +
                 `<div id="notif-scroll-hint">MORE ` +
                     `<svg id="notif-scroll-arrow" width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">` +
                         `<polyline points="1,2.5 4,5.5 7,2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` +
@@ -137,17 +137,19 @@ window._Notifications = ((): NotificationsAPI => {
         el.className    = 'notif-item';
         el.dataset['id']   = item.id;
         el.dataset['type'] = item.type || 'system';
+        el.dataset['ts']   = String(item.ts);
 
-        const detail = item.detail || '';
-        const action = _actions[item.id];
+        const detail    = item.detail || '';
+        const action    = _actions[item.id];
+        const isActive  = !!action || item.type === 'tracking' || item.type === 'track';
 
         el.innerHTML =
             `<div class="notif-header">` +
-            (action
+            (isActive
                 ? `<span class="notif-label"><span class="notif-label-default">${_getLabelForType(item.type)}</span><span class="notif-label-disable">DISABLE NOTIFICATIONS</span></span>`
                 : `<span class="notif-label">${_getLabelForType(item.type)}</span>`) +
             `<div style="display:flex;align-items:center;gap:8px">` +
-            (action
+            (isActive
                 ? `<button class="notif-action" aria-label="Disable notifications">${_BELL_SLASH_SVG}</button>`
                 : `<button class="notif-dismiss" aria-label="Dismiss">✕</button>`) +
             `</div>` +
@@ -158,17 +160,17 @@ window._Notifications = ((): NotificationsAPI => {
             `<span class="notif-time">${_formatTimestamp(item.ts)}</span>` +
             `</div>`;
 
-        if (!action) {
+        if (!isActive) {
             el.querySelector('.notif-dismiss')!.addEventListener('click', (e: Event) => {
                 e.stopPropagation();
                 dismiss(item.id);
             });
         }
 
-        if (action) {
+        if (isActive) {
             el.querySelector('.notif-action')!.addEventListener('click', (e: Event) => {
                 e.stopPropagation();
-                action.callback();
+                if (action) action.callback();
                 dismiss(item.id);
             });
         }
@@ -205,7 +207,10 @@ window._Notifications = ((): NotificationsAPI => {
         }
 
         const clearBtn = document.getElementById('notif-clear-all-btn') as HTMLButtonElement | null;
-        if (clearBtn) clearBtn.style.display = (total > 0 && _isPanelOpen()) ? 'block' : 'none';
+        if (clearBtn) {
+            const hasInactive = _load().some(i => i.type !== 'tracking' && i.type !== 'track');
+            clearBtn.style.display = (hasInactive && _isPanelOpen()) ? 'block' : 'none';
+        }
 
         const toggleBtn = _getBtn() as HTMLButtonElement | null;
         if (toggleBtn) {
@@ -245,6 +250,11 @@ window._Notifications = ((): NotificationsAPI => {
                 panel.prepend(_buildNotifElement(item));
             }
         }
+
+        // Sort DOM children newest-first by ts so order is consistent across sections
+        const sorted = [...panel.querySelectorAll<HTMLElement>('.notif-item')]
+            .sort((a, b) => Number(b.dataset['ts'] ?? 0) - Number(a.dataset['ts'] ?? 0));
+        sorted.forEach(el => panel.appendChild(el));
 
         _refreshBadge();
         _updateScrollHint();
@@ -420,23 +430,33 @@ window._Notifications = ((): NotificationsAPI => {
         const items = _load();
         if (!items.length) return;
 
-        items.forEach(i => { delete _actions[i.id]; delete _clickActions[i.id]; });
-        _save([]);
+        const _isActive = (i: StoredNotificationItem) => !!_actions[i.id] || i.type === 'tracking' || i.type === 'track';
+        const toClear   = items.filter(i => !_isActive(i));
+        const toKeep    = items.filter(i =>  _isActive(i));
 
-        fetch('/api/air/messages', { method: 'DELETE' }).catch(() => {});
+        toClear.forEach(i => { delete _clickActions[i.id]; });
+        _save(toKeep);
+
+        // Delete only the cleared items from the backend
+        toClear.forEach(i => {
+            fetch(`/api/air/messages/${encodeURIComponent(i.id)}`, { method: 'DELETE' }).catch(() => {});
+        });
 
         _unreadCount = 0;
 
         const panel = _getList();
         if (panel) {
-            panel.querySelectorAll<HTMLElement>('.notif-item').forEach(el => {
-                el.classList.remove('notif-visible');
-                setTimeout(() => { el.remove(); _updateScrollHint(); }, 220);
+            toClear.forEach(i => {
+                const el = panel.querySelector<HTMLElement>(`.notif-item[data-id="${i.id}"]`);
+                if (el) {
+                    el.classList.remove('notif-visible');
+                    setTimeout(() => { el.remove(); _updateScrollHint(); }, 220);
+                }
             });
         }
 
         _refreshBadge();
-        _stopBellPulse();
+        if (!toKeep.length) _stopBellPulse();
         setTimeout(_repositionBar, 230);
     }
 
@@ -460,6 +480,27 @@ window._Notifications = ((): NotificationsAPI => {
         if (clearBtn) clearBtn.addEventListener('click', clearAll);
 
         window.addEventListener('resize', _repositionBar);
+
+        // Restore from backend so notifications persist across app restarts
+        fetch('/api/air/messages')
+            .then(r => r.json())
+            .then((rows: Array<{ msg_id: string; type: string; title: string; detail: string; ts: number }>) => {
+                if (!Array.isArray(rows) || !rows.length) return;
+                const fromBackend: StoredNotificationItem[] = rows.map(r => ({
+                    id:     r.msg_id,
+                    type:   r.type   as StoredNotificationItem['type'],
+                    title:  r.title,
+                    detail: r.detail ?? '',
+                    ts:     r.ts,
+                }));
+                // Merge: backend is authoritative — union with any local items not yet synced
+                const local = _load();
+                const backendIds = new Set(fromBackend.map(i => i.id));
+                const localOnly  = local.filter(i => !backendIds.has(i.id));
+                _save([...fromBackend, ...localOnly].sort((a, b) => a.ts - b.ts));
+                render();
+            })
+            .catch(() => {});
     }
 
     return { add, update, dismiss, clearAll, render, init, toggle, repositionBar: _repositionBar };

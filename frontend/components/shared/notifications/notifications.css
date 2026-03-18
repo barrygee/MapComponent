@@ -121,6 +121,7 @@
    area, telling the user there are more notifications to scroll to.
    Arrow rotates 180° when the user is at the bottom (#notif-arrow-up). */
 #notif-scroll-hint {
+    margin-left: auto;
     background: rgba(0, 0, 0, 0.25);
     color: rgba(255, 255, 255, 0.35);
     font-family: 'Barlow Condensed', 'Barlow', sans-serif;
@@ -284,7 +285,7 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 6px 10px 6px 4px;
+    padding: 0;
     color: rgba(255, 255, 255, 0.3);
     line-height: 1;
     display: flex;

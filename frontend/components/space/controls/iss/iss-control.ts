@@ -626,7 +626,13 @@ class IssControl extends SentinelControlBase {
             this._savePassNotifState();
             this._startPassNotifPolling();
             if (window._Notifications) {
-                window._Notifications.add({ type: 'tracking', title: 'ISS', detail: 'Pass notifications enabled' });
+                window._Notifications.add({
+                    type: 'tracking', title: 'ISS', detail: 'Pass notifications enabled',
+                    action: { label: 'DISABLE NOTIFICATIONS', callback: () => {
+                        this._passNotifEnabled = true; // ensure toggle turns it off
+                        this._togglePassNotif();
+                    }},
+                });
             }
         }
     }
