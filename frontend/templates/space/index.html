@@ -5,6 +5,14 @@
 {% endblock %}
 
 {% block content %}
+    <div id="no-url-overlay" class="no-url-overlay" style="display:none;">
+        <div class="no-url-overlay-box">
+            <div class="no-url-overlay-domain">SPACE</div>
+            <div class="no-url-overlay-title">No Data Source Configured</div>
+            <div class="no-url-overlay-msg" id="no-url-overlay-msg"></div>
+            <button class="no-url-overlay-btn" id="no-url-overlay-btn">Open Settings</button>
+        </div>
+    </div>
     <div id="map"></div>
 {% endblock %}
 
