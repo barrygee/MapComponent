@@ -241,10 +241,11 @@ async def get_tle_list(db: AsyncSession = Depends(get_db)):
         return JSONResponse({
             "satellites": [
                 {
-                    "norad_id":   r.norad_id,
-                    "name":       r.name,
-                    "category":   r.category,
-                    "updated_at": r.updated_at,
+                    "norad_id":    r.norad_id,
+                    "name":        r.name,
+                    "category":    r.category,
+                    "name_source": r.name_source,
+                    "updated_at":  r.updated_at,
                 }
                 for r in rows
             ]
@@ -425,6 +426,64 @@ async def patch_tle_category(
 
         await db.commit()
         return JSONResponse({"updated": updated, "skipped": skipped})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.patch("/tle/satellite")
+async def patch_tle_satellite(
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update name and/or category for a single satellite by NORAD ID.
+
+    Body: { "norad_id": str, "name": str | null, "category": str | null }
+
+    Name is stored with 'user' source so it persists across TLE updates.
+    Category follows the same priority rules as the bulk category endpoint.
+    """
+    _USER_ASSIGNABLE = _VALID_CATEGORIES - {"active"}
+
+    try:
+        norad_id = str(body.get("norad_id") or "").strip()
+        name     = (body.get("name") or "").strip() or None
+        category = (body.get("category") or "").strip() or None
+
+        if not norad_id:
+            return JSONResponse({"error": "norad_id is required"}, status_code=400)
+        if category and category not in _USER_ASSIGNABLE:
+            return JSONResponse(
+                {"error": f"Invalid category. Valid values: {sorted(_USER_ASSIGNABLE)}"},
+                status_code=400,
+            )
+
+        result = await db.execute(
+            select(SatelliteCatalogue).where(SatelliteCatalogue.norad_id == norad_id)
+        )
+        row = result.scalar_one_or_none()
+        if not row:
+            return JSONResponse({"error": "Satellite not found"}, status_code=404)
+
+        ts = now_ms()
+
+        if name:
+            row.name        = name
+            row.name_source = "user"
+
+        if category is not None:
+            if tle_service._category_beats(category, "user", row.category, row.category_source):
+                row.category        = category
+                row.category_source = "user"
+
+        row.updated_at = ts
+        await db.commit()
+
+        return JSONResponse({
+            "norad_id": row.norad_id,
+            "name":     row.name,
+            "category": row.category,
+        })
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)

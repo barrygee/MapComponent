@@ -1390,8 +1390,8 @@
     display: grid;
     grid-template-columns: 1fr 60px 130px 72px;
     align-items: center;
-    padding: 5px 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 7px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     background: rgba(255, 255, 255, 0.02);
 }
 .tle-satlist-row:last-child { border-bottom: none; }
@@ -1399,7 +1399,8 @@
 
 .tle-satlist-name {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 11px;
+    font-size: 12px;
+    font-weight: 500;
     color: rgba(255, 255, 255, 0.75);
     white-space: nowrap;
     overflow: hidden;
@@ -1408,15 +1409,15 @@
 }
 .tle-satlist-id {
     font-family: 'Courier New', monospace;
-    font-size: 10px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.25);
     text-align: left;
 }
 .tle-satlist-cat {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 600;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: rgba(200, 255, 0, 0.6);
 }
@@ -1428,6 +1429,7 @@
     font-size: 10px;
     color: rgba(255, 255, 255, 0.3);
     text-align: right;
+    letter-spacing: 0.04em;
 }
 
 .tle-satlist-count {
@@ -1444,4 +1446,8 @@
     font-size: 11px;
     color: rgba(255, 255, 255, 0.3);
     letter-spacing: 0.06em;
+}
+
+.tle-satlist-name--user {
+    color: rgba(200, 255, 0, 0.85);
 }

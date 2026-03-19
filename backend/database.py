@@ -31,6 +31,16 @@ async def create_tables():
     async with engine.begin() as conn:
         from backend import models  # noqa: F401 — import triggers model registration with Base
         await conn.run_sync(Base.metadata.create_all)
+        # Add name_source column to satellite_catalogue if it doesn't exist yet
+        # (SQLite create_all does not add new columns to existing tables)
+        try:
+            await conn.execute(
+                __import__("sqlalchemy").text(
+                    "ALTER TABLE satellite_catalogue ADD COLUMN name_source TEXT"
+                )
+            )
+        except Exception:
+            pass  # column already exists
 
 
 async def get_db():

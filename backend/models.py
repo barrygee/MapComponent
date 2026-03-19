@@ -56,6 +56,7 @@ class SatelliteCatalogue(Base):
                                                         # 'military'|'navigation'|'science'|
                                                         # 'cubesat'|'active'|'unknown'|NULL
     category_source = Column(Text, nullable=True)       # 'celestrak_group'|'user'|'active'|NULL
+    name_source     = Column(Text, nullable=True)       # NULL | 'user' — 'user' locks name against TLE updates
     updated_at      = Column(Integer, nullable=False)   # Unix ms of last TLE update for this sat
 
 

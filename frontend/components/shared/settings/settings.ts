@@ -858,6 +858,7 @@ window._SettingsPanel = (function () {
         function (c) { return c.value !== 'active'; }
     );
 
+
     const _CELESTRAK_URLS: Record<string, string> = {
         space_station: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle',
         amateur:       'https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=tle',
@@ -890,6 +891,7 @@ window._SettingsPanel = (function () {
     function _makeCategoryDropdown(list?: Array<{ value: string; label: string }>): {
         el: HTMLElement;
         getValue: () => string;
+        setValue: (val: string) => void;
         onChange: (cb: (val: string) => void) => void;
     } {
         const opts = list ?? _TLE_CATEGORIES;
@@ -973,9 +975,19 @@ window._SettingsPanel = (function () {
             }
         });
 
+        function _setValue(val: string): void {
+            const opt = opts.find(function (o) { return o.value === val; });
+            _value = val;
+            wrapper.dataset['selectedValue'] = _value;
+            selectedText.textContent = opt?.label ?? val;
+            if (_value) selectedText.classList.add('tle-dropdown-selected-text--chosen');
+            else selectedText.classList.remove('tle-dropdown-selected-text--chosen');
+        }
+
         return {
             el:       wrapper,
             getValue: function () { return _value; },
+            setValue: _setValue,
             onChange: function (cb) { _changeCallbacks.push(cb); },
         };
     }
@@ -1375,7 +1387,7 @@ window._SettingsPanel = (function () {
         countLine.textContent = '';
         body.appendChild(countLine);
 
-        type SatRow = { norad_id: string; name: string; category: string | null; updated_at: number };
+        type SatRow = { norad_id: string; name: string; category: string | null; name_source?: string | null; updated_at: number };
         let _allSats: SatRow[] = [];
 
         function _renderTable(sats: SatRow[]): void {
@@ -1387,6 +1399,7 @@ window._SettingsPanel = (function () {
                 const nameEl = document.createElement('span');
                 nameEl.className   = 'tle-satlist-name';
                 nameEl.textContent = sat.name;
+                if (sat.name_source === 'user') nameEl.classList.add('tle-satlist-name--user');
 
                 const idEl = document.createElement('span');
                 idEl.className   = 'tle-satlist-id';

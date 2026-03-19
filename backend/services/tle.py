@@ -195,7 +195,9 @@ async def store_tle_bulk(
         cat_row = result2.scalar_one_or_none()
 
         if cat_row:
-            cat_row.name       = name
+            # Preserve user-set names; only update name from TLE if not locked
+            if cat_row.name_source != "user":
+                cat_row.name = name
             cat_row.updated_at = ts
             if _category_beats(category, category_source, cat_row.category, cat_row.category_source):
                 cat_row.category        = category
