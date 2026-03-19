@@ -117,7 +117,7 @@ window._SettingsPanel = (function () {
             id: 'sea-online-source',
             label: 'Online Data Source',
             desc: 'URL for live sea data feed',
-            renderControl: function () { return _renderOnlineSourceControl('sea'); },
+            renderControl: function () { return _renderOnlineSourceControl('sea', ''); },
         },
         {
             section: 'sea',
@@ -125,7 +125,7 @@ window._SettingsPanel = (function () {
             id: 'sea-offline-source',
             label: 'Offline Data Source',
             desc: 'Local server URL and port for sea data',
-            renderControl: function () { return _renderOfflineSourceControl('sea'); },
+            renderControl: function () { return _renderOfflineSourceControl('sea', ''); },
         },
         // LAND
         {
@@ -142,7 +142,7 @@ window._SettingsPanel = (function () {
             id: 'land-online-source',
             label: 'Online Data Source',
             desc: 'URL for live land data feed',
-            renderControl: function () { return _renderOnlineSourceControl('land'); },
+            renderControl: function () { return _renderOnlineSourceControl('land', ''); },
         },
         {
             section: 'land',
@@ -150,7 +150,7 @@ window._SettingsPanel = (function () {
             id: 'land-offline-source',
             label: 'Offline Data Source',
             desc: 'Local server URL and port for land data',
-            renderControl: function () { return _renderOfflineSourceControl('land'); },
+            renderControl: function () { return _renderOfflineSourceControl('land', ''); },
         },
     ];
     const _NAV_SECTIONS = [
@@ -342,7 +342,7 @@ window._SettingsPanel = (function () {
         });
         return wrap;
     }
-    function _renderOnlineSourceControl(ns) {
+    function _renderOnlineSourceControl(ns, defaultUrl) {
         const LS_KEY = 'sentinel_' + ns + '_onlineUrl';
         const SETTING_ID = ns + '-online-source';
         const wrap = document.createElement('div');
@@ -355,33 +355,35 @@ window._SettingsPanel = (function () {
         const urlInput = document.createElement('input');
         urlInput.type = 'url';
         urlInput.className = 'settings-datasource-input';
-        urlInput.placeholder = 'https://';
+        urlInput.placeholder = defaultUrl !== undefined ? defaultUrl : 'https://';
         urlInput.spellcheck = false;
         urlInput.autocomplete = 'off';
         urlRow.appendChild(urlLabel);
         urlRow.appendChild(urlInput);
         wrap.appendChild(urlRow);
-        // Load saved value
-        try {
-            const saved = localStorage.getItem(LS_KEY);
-            if (saved)
-                urlInput.value = saved;
-        }
-        catch (e) { }
-        // Reconcile with backend
-        if (window._SettingsAPI) {
-            window._SettingsAPI.getNamespace(ns).then(function (data) {
-                if (!data || !data['onlineUrl'])
-                    return;
-                const backendVal = data['onlineUrl'];
-                if (backendVal && !urlInput.value) {
-                    urlInput.value = backendVal;
-                    try {
-                        localStorage.setItem(LS_KEY, backendVal);
+        // Load saved value (skip if no default URL has been configured yet)
+        if (defaultUrl !== '') {
+            try {
+                const saved = localStorage.getItem(LS_KEY);
+                if (saved)
+                    urlInput.value = saved;
+            }
+            catch (e) { }
+            // Reconcile with backend
+            if (window._SettingsAPI) {
+                window._SettingsAPI.getNamespace(ns).then(function (data) {
+                    if (!data || !data['onlineUrl'])
+                        return;
+                    const backendVal = data['onlineUrl'];
+                    if (backendVal && !urlInput.value) {
+                        urlInput.value = backendVal;
+                        try {
+                            localStorage.setItem(LS_KEY, backendVal);
+                        }
+                        catch (e) { }
                     }
-                    catch (e) { }
-                }
-            });
+                });
+            }
         }
         urlInput.addEventListener('input', function () {
             _stagePending(SETTING_ID, function () {
@@ -416,7 +418,7 @@ window._SettingsPanel = (function () {
         });
         return wrap;
     }
-    function _renderOfflineSourceControl(ns) {
+    function _renderOfflineSourceControl(ns, defaultUrl) {
         const LS_KEY = 'sentinel_' + ns + '_offlineSource';
         const SETTING_ID = ns + '-offline-source';
         const wrap = document.createElement('div');
@@ -430,35 +432,37 @@ window._SettingsPanel = (function () {
         const urlInput = document.createElement('input');
         urlInput.type = 'url';
         urlInput.className = 'settings-datasource-input';
-        urlInput.placeholder = 'http://localhost';
+        urlInput.placeholder = defaultUrl !== undefined ? defaultUrl : 'http://localhost';
         urlInput.spellcheck = false;
         urlInput.autocomplete = 'off';
         urlRow.appendChild(urlLabel);
         urlRow.appendChild(urlInput);
         wrap.appendChild(urlRow);
-        // Load saved value
-        try {
-            const raw = localStorage.getItem(LS_KEY);
-            if (raw) {
-                const saved = JSON.parse(raw);
-                if (saved.url)
-                    urlInput.value = saved.url;
-            }
-        }
-        catch (e) { }
-        // Reconcile with backend
-        if (window._SettingsAPI) {
-            window._SettingsAPI.getNamespace(ns).then(function (data) {
-                if (!data || !data['offlineSource'])
-                    return;
-                const backendVal = data['offlineSource'];
-                if (!urlInput.value && backendVal.url)
-                    urlInput.value = backendVal.url;
-                try {
-                    localStorage.setItem(LS_KEY, JSON.stringify(backendVal));
+        // Load saved value (skip if no default URL has been configured yet)
+        if (defaultUrl !== '') {
+            try {
+                const raw = localStorage.getItem(LS_KEY);
+                if (raw) {
+                    const saved = JSON.parse(raw);
+                    if (saved.url)
+                        urlInput.value = saved.url;
                 }
-                catch (e) { }
-            });
+            }
+            catch (e) { }
+            // Reconcile with backend
+            if (window._SettingsAPI) {
+                window._SettingsAPI.getNamespace(ns).then(function (data) {
+                    if (!data || !data['offlineSource'])
+                        return;
+                    const backendVal = data['offlineSource'];
+                    if (!urlInput.value && backendVal.url)
+                        urlInput.value = backendVal.url;
+                    try {
+                        localStorage.setItem(LS_KEY, JSON.stringify(backendVal));
+                    }
+                    catch (e) { }
+                });
+            }
         }
         urlInput.addEventListener('input', function () {
             _stagePending(SETTING_ID, function () {
