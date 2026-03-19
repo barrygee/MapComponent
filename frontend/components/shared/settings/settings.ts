@@ -95,7 +95,7 @@ window._SettingsPanel = (function () {
             sectionLabel:  'SPACE',
             id:            'space-manual-tle',
             label:         'TLE Import',
-            desc:          'Upload a .tle file or fetch from a local network URL',
+            desc:          'Upload a .txt file of TLE data',
             renderControl: _renderSpaceManualTleControl,
         },
         {
@@ -1199,48 +1199,6 @@ window._SettingsPanel = (function () {
         wrap.className = 'tle-manual-wrap';
         wrap.dataset['wide'] = 'true';
 
-        const urlRow = document.createElement('div');
-        urlRow.className = 'settings-datasource-row';
-        const urlLabel = document.createElement('span');
-        urlLabel.className   = 'settings-datasource-label';
-        urlLabel.textContent = 'URL';
-        const urlInput = document.createElement('input');
-        urlInput.type         = 'url';
-        urlInput.className    = 'settings-datasource-input';
-        urlInput.placeholder  = 'http://192.168.x.x/iss.tle';
-        urlInput.spellcheck   = false;
-        urlInput.autocomplete = 'off';
-        urlRow.appendChild(urlLabel);
-        urlRow.appendChild(urlInput);
-        wrap.appendChild(urlRow);
-
-        const urlCatRow = document.createElement('div');
-        urlCatRow.className = 'tle-cat-row-ctrl';
-        const urlCatLabel = document.createElement('span');
-        urlCatLabel.className   = 'settings-datasource-label tle-inline-label';
-        urlCatLabel.textContent = 'CATEGORY';
-        const urlCatDrop = _makeCategoryDropdown();
-        const fetchBtn = document.createElement('button');
-        fetchBtn.className   = 'tle-action-btn tle-action-btn--primary';
-        fetchBtn.textContent = 'UPDATE TLE';
-        fetchBtn.disabled    = true;
-        urlCatDrop.onChange(function (val) { fetchBtn.disabled = !val; });
-        urlCatRow.appendChild(urlCatLabel);
-        urlCatRow.appendChild(urlCatDrop.el);
-        urlCatRow.appendChild(fetchBtn);
-        wrap.appendChild(urlCatRow);
-
-        const urlStatus = document.createElement('div');
-        urlStatus.className = 'tle-status-line';
-        wrap.appendChild(urlStatus);
-
-
-        // ── Section: Paste / Upload ──────────────────────────────────────
-        const pasteHeading = document.createElement('div');
-        pasteHeading.className   = 'tle-section-heading';
-        pasteHeading.textContent = 'UPLOAD TLE FILE';
-        wrap.appendChild(pasteHeading);
-
         const fileRow = document.createElement('div');
         fileRow.className = 'tle-file-row';
         const fileInput = document.createElement('input');
@@ -1290,34 +1248,6 @@ window._SettingsPanel = (function () {
             const reader = new FileReader();
             reader.onload = function (e) { _fileText = (e.target?.result as string) ?? ''; };
             reader.readAsText(file);
-        });
-
-        fetchBtn.addEventListener('click', async function () {
-            const url = urlInput.value.trim();
-            if (!url) { urlStatus.innerHTML = ''; urlStatus.appendChild(_makeTleStatusBadge('Enter a URL first', 'error')); return; }
-            const category = urlCatDrop.getValue() || null;
-            fetchBtn.textContent = 'UPDATING\u2026';
-            fetchBtn.disabled    = true;
-            urlStatus.innerHTML  = '';
-            try {
-                const resp = await fetch('/api/space/tle/fetch', {
-                    method:  'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ url, category }),
-                });
-                const data = await resp.json() as { inserted?: number; updated?: number; error?: string };
-                if (!resp.ok) throw new Error(data.error || resp.statusText);
-                urlStatus.appendChild(_makeTleStatusBadge(
-                    `${(data.inserted ?? 0) + (data.updated ?? 0)} satellites loaded · ${data.inserted ?? 0} new · ${data.updated ?? 0} updated`,
-                    'ok',
-                ));
-                document.dispatchEvent(new CustomEvent('tle:refreshStatus'));
-            } catch (err) {
-                urlStatus.appendChild(_makeTleStatusBadge('Error: ' + (err as Error).message, 'error'));
-            } finally {
-                fetchBtn.textContent = 'UPDATE TLE';
-                fetchBtn.disabled    = false;
-            }
         });
 
         applyBtn.addEventListener('click', async function () {
