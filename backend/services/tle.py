@@ -232,7 +232,7 @@ async def fetch_tle(
 
     # Cache miss or expired online entry — try to fetch from upstream
     default_url = settings.celestrak_iss_url if norad_id == "25544" else (
-        f"https://celestrak.org/NORAD/elements/gp.php?CATNR={norad_id}&FORMAT=TLE"
+        f"https://celestrak.org/NORAD/elements/gp.php?CATNR={norad_id}&FORMAT=tle"
     )
     primary    = online_url if online_url else default_url
     candidates = [u for u in [primary, offline_url] if u]

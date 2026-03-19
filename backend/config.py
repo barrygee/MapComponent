@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # TTL for manually-entered TLE data — 30 days (user explicitly provided it)
     tle_manual_ttl_ms: int = 2_592_000_000
     # Celestrak TLE URL for the ISS (NORAD ID 25544)
-    celestrak_iss_url: str = "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE"
+    celestrak_iss_url: str = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle"
 
     class Config:
         env_file = ".env"

@@ -815,7 +815,7 @@ window._SettingsPanel = (function () {
     // ── Space TLE controls ───────────────────────────────────────────────────
     // Categories shown on import controls (URL fetch / file upload) — includes 'active'
     const _TLE_CATEGORIES = [
-        { value: '', label: 'Select category...' },
+        { value: 'active', label: 'All Active (no category)' },
         { value: 'space_station', label: 'Space Stations' },
         { value: 'amateur', label: 'Amateur Radio' },
         { value: 'weather', label: 'Weather' },
@@ -823,7 +823,6 @@ window._SettingsPanel = (function () {
         { value: 'navigation', label: 'Navigation (GNSS)' },
         { value: 'science', label: 'Science' },
         { value: 'cubesat', label: 'CubeSats' },
-        { value: 'active', label: 'All Active (no category)' },
         { value: 'unknown', label: 'Unknown' },
     ];
     // Categories available for manual assignment — 'active' excluded (not a meaningful choice)
@@ -855,17 +854,19 @@ window._SettingsPanel = (function () {
     // Custom flat dropdown (div-based) — menu is appended to body to avoid stacking/overflow clipping
     function _makeCategoryDropdown(list) {
         const opts = list ?? _TLE_CATEGORIES;
-        let _value = '';
+        let _value = opts[0]?.value ?? '';
         let _open = false;
         let _changeCallbacks = [];
         const wrapper = document.createElement('div');
         wrapper.className = 'tle-dropdown';
         wrapper.tabIndex = 0;
+        wrapper.dataset['selectedValue'] = _value;
         const selected = document.createElement('div');
         selected.className = 'tle-dropdown-selected';
         const selectedText = document.createElement('span');
         selectedText.className = 'tle-dropdown-selected-text';
         selectedText.textContent = opts[0]?.label ?? '';
+        if (_value) selectedText.classList.add('tle-dropdown-selected-text--chosen');
         const arrow = document.createElement('span');
         arrow.className = 'tle-dropdown-arrow';
         selected.appendChild(selectedText);
@@ -987,7 +988,7 @@ window._SettingsPanel = (function () {
         const updateBtn = document.createElement('button');
         updateBtn.className = 'tle-action-btn tle-action-btn--primary';
         updateBtn.textContent = 'UPDATE TLE';
-        updateBtn.disabled = true;
+        updateBtn.disabled = false;
         catDrop.onChange(function (val) { updateBtn.disabled = !val; });
         catRow.appendChild(catLabel);
         catRow.appendChild(catDrop.el);
@@ -1044,13 +1045,17 @@ window._SettingsPanel = (function () {
             infoPanel.hidden = visible;
             infoChevron.classList.toggle('tle-info-chevron--open', !visible);
         });
-        // Load saved URL
+        // Load saved URL, falling back to the default active URL
+        // Migrate any stale uppercase FORMAT=TLE URLs to lowercase
         try {
             const saved = localStorage.getItem(LS_KEY);
-            if (saved)
-                urlInput.value = saved;
+            const migrated = saved ? saved.replace(/FORMAT=TLE\b/, 'FORMAT=tle').replace(/CATNR=25544/, 'GROUP=active') : null;
+            if (migrated && migrated !== saved) localStorage.setItem(LS_KEY, migrated);
+            urlInput.value = migrated || _CELESTRAK_URLS['active'];
         }
-        catch (e) { }
+        catch (e) {
+            urlInput.value = _CELESTRAK_URLS['active'];
+        }
         // Reconcile with backend
         if (window._SettingsAPI) {
             window._SettingsAPI.getNamespace('space').then(function (data) {
