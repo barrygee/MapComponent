@@ -1,3 +1,4 @@
+"use strict";
 /* ============================================================
    SETTINGS PANEL — window._SettingsPanel
    ============================================================ */
@@ -964,6 +965,7 @@ window._SettingsPanel = (function () {
         const LS_KEY = 'sentinel_space_onlineUrl';
         const wrap = document.createElement('div');
         wrap.className = 'settings-datasource-wrap tle-online-wrap';
+        wrap.dataset['wide'] = 'true';
         // URL row — matches existing datasource-row pattern
         const urlRow = document.createElement('div');
         urlRow.className = 'settings-datasource-row';
@@ -1027,37 +1029,6 @@ window._SettingsPanel = (function () {
             if (preset)
                 urlInput.value = preset;
         });
-        urlInput.addEventListener('input', function () {
-            _stagePending('space-online-source', function () {
-                const val = urlInput.value.trim();
-                if (val) {
-                    try {
-                        new URL(val);
-                    }
-                    catch (e) {
-                        throw new Error('INVALID URL');
-                    }
-                    try {
-                        localStorage.setItem(LS_KEY, val);
-                    }
-                    catch (e) { }
-                    if (window._SettingsAPI)
-                        window._SettingsAPI.put('space', 'onlineUrl', val);
-                }
-                else {
-                    try {
-                        localStorage.removeItem(LS_KEY);
-                    }
-                    catch (e) { }
-                    if (window._SettingsAPI)
-                        window._SettingsAPI.put('space', 'onlineUrl', '');
-                }
-            });
-        });
-        urlInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter')
-                _commitAll();
-        });
         updateBtn.addEventListener('click', async function () {
             const url = urlInput.value.trim();
             if (!url) {
@@ -1065,6 +1036,13 @@ window._SettingsPanel = (function () {
                 statusLine.appendChild(_makeTleStatusBadge('Enter a URL first', 'error'));
                 return;
             }
+            // Persist URL on click
+            try {
+                localStorage.setItem(LS_KEY, url);
+            }
+            catch (e) { }
+            if (window._SettingsAPI)
+                window._SettingsAPI.put('space', 'onlineUrl', url);
             const category = catDrop.getValue() || null;
             updateBtn.textContent = 'UPDATING\u2026';
             updateBtn.disabled = true;
@@ -1716,6 +1694,11 @@ window._SettingsPanel = (function () {
         });
     }
     // ── Open / close / toggle ────────────────────────────────
+    function _updateFooterVisibility(sectionKey) {
+        const footer = document.getElementById('settings-footer');
+        if (footer)
+            footer.style.display = sectionKey === 'space' ? 'none' : '';
+    }
     function open() {
         _open = true;
         const panel = document.getElementById('settings-panel');
@@ -1724,6 +1707,7 @@ window._SettingsPanel = (function () {
         const btn = document.getElementById('settings-btn');
         if (btn)
             btn.classList.add('settings-btn-active');
+        _updateFooterVisibility(_activeSection);
         _renderSection(_activeSection);
         const input = document.getElementById('settings-search-input');
         if (input)
@@ -1805,6 +1789,7 @@ window._SettingsPanel = (function () {
                 const searchWrap = document.getElementById('settings-search-wrap');
                 if (searchWrap)
                     searchWrap.classList.toggle('settings-search-wrap--hidden', _activeSection !== 'app');
+                _updateFooterVisibility(_activeSection);
                 _renderSection(_activeSection);
             });
         });

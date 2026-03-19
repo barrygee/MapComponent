@@ -986,7 +986,7 @@
 
 /* ── Online source wrap — same max-width as datasource-wrap ────── */
 .tle-online-wrap {
-    max-width: 480px;
+    max-width: 860px;
 }
 
 /* ── Manual TLE — single column, stretches wide ─────────────────── */
@@ -1200,7 +1200,8 @@
 }
 /* Wide items still cap at a readable content width */
 .settings-item--wide .tle-manual-wrap,
-.settings-item--wide .tle-satlist-wrap {
+.settings-item--wide .tle-satlist-wrap,
+.settings-item--wide .tle-online-wrap {
     max-width: 860px;
 }
 
