@@ -64,14 +64,6 @@ window._SettingsPanel = (function () {
         {
             section: 'space',
             sectionLabel: 'SPACE',
-            id: 'space-source-override',
-            label: 'Source Override',
-            desc: 'Override the app-level connectivity mode for this domain',
-            renderControl: function () { return _renderSourceOverrideControl('space'); },
-        },
-        {
-            section: 'space',
-            sectionLabel: 'SPACE',
             id: 'space-online-source',
             label: 'Online Data Source',
             desc: 'URL to fetch TLE data from — select a category and click UPDATE TLE',
@@ -912,7 +904,7 @@ window._SettingsPanel = (function () {
         catLabel.textContent = 'CATEGORY';
         const catSel = _makeCategorySelect(true);
         const updateBtn = document.createElement('button');
-        updateBtn.className = 'tle-action-btn';
+        updateBtn.className = 'tle-action-btn tle-action-btn--primary';
         updateBtn.textContent = 'UPDATE TLE';
         catRow.appendChild(catLabel);
         catRow.appendChild(catSel);
@@ -1179,21 +1171,8 @@ window._SettingsPanel = (function () {
         const wrap = document.createElement('div');
         wrap.className = 'tle-satlist-wrap';
         wrap.dataset['wide'] = 'true';
-        // Toggle header — click to show/hide the list
-        const header = document.createElement('div');
-        header.className = 'tle-satlist-header';
-        const headerLabel = document.createElement('span');
-        headerLabel.className = 'tle-satlist-header-label';
-        headerLabel.textContent = 'VIEW ALL STORED SATELLITES';
-        const chevron = document.createElement('span');
-        chevron.className = 'tle-satlist-chevron';
-        chevron.textContent = '\u25b6'; // ▶
-        header.appendChild(headerLabel);
-        header.appendChild(chevron);
-        wrap.appendChild(header);
-        // Collapsible body
         const body = document.createElement('div');
-        body.className = 'tle-satlist-body tle-satlist-body--hidden';
+        body.className = 'tle-satlist-body';
         wrap.appendChild(body);
         // Search row
         const searchRow = document.createElement('div');
@@ -1262,19 +1241,10 @@ window._SettingsPanel = (function () {
                 table.innerHTML = `<div class="tle-satlist-loading">Failed to load: ${err.message}</div>`;
             }
         }
-        // Toggle show/hide
-        let _open = false;
-        header.addEventListener('click', function () {
-            _open = !_open;
-            body.classList.toggle('tle-satlist-body--hidden', !_open);
-            chevron.classList.toggle('tle-satlist-chevron--open', _open);
-            if (_open && _allSats.length === 0)
-                _load();
-        });
+        _load();
         // Refresh when TLE data changes
         document.addEventListener('tle:refreshStatus', function () {
-            if (_open)
-                _load();
+            _load();
         });
         // Live search filter
         searchInput.addEventListener('input', function () {
