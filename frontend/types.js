@@ -1,4 +1,3 @@
-"use strict";
 // ============================================================
 // SENTINEL — Shared TypeScript interfaces
 // Referenced by all .ts files via triple-slash or tsc's auto-include.

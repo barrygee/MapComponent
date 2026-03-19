@@ -226,6 +226,23 @@
     text-transform: uppercase;
 }
 
+/* ---- Group separators and labels (within a section) ---- */
+.settings-group-separator {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.07);
+    margin: 8px 48px 0;
+}
+
+.settings-group-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: rgba(255, 255, 255, 0.2);
+    text-transform: uppercase;
+    padding: 20px 48px 4px;
+}
+
 /* ---- Setting items ---- */
 .settings-item {
     display: flex;
@@ -756,8 +773,7 @@
     color: rgba(255, 180, 0, 0.9);
 }
 
-/* ── Category select — flat, matches datasource-row ─────────────── */
-.tle-category-select,
+/* ── Category select (native, used only in uncat-assign rows) ────── */
 .tle-uncat-select {
     flex: 1;
     min-width: 0;
@@ -780,14 +796,11 @@
     background-repeat: no-repeat;
     background-position: right 10px center;
 }
-.tle-category-select:focus,
 .tle-uncat-select:focus {
     background-color: rgba(255, 255, 255, 0.06);
     color: rgba(255, 255, 255, 0.9);
     outline: none;
 }
-/* Dropdown options — dark background matching panel */
-.tle-category-select option,
 .tle-uncat-select option {
     background-color: #222831;
     color: rgba(255, 255, 255, 0.85);
@@ -799,6 +812,101 @@
     padding: 6px 8px;
 }
 
+/* ── Custom flat dropdown (replaces native select in cat-row-ctrl) ── */
+.tle-dropdown {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 37px;
+    cursor: pointer;
+    outline: none;
+    user-select: none;
+}
+
+.tle-dropdown-selected {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+    padding: 0 10px 0 10px;
+    background-color: rgba(255, 255, 255, 0.04);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tle-dropdown-selected-text {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tle-dropdown-selected-text--chosen {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.tle-dropdown-arrow {
+    flex-shrink: 0;
+    width: 8px;
+    height: 5px;
+    margin-left: 8px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='rgba(255,255,255,0.2)'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    transition: transform 0.15s;
+}
+
+.tle-dropdown--open .tle-dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.tle-dropdown--open .tle-dropdown-selected {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.tle-dropdown-menu {
+    display: none;
+    position: absolute;
+    z-index: 99999;
+    background: #222831;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-top: none;
+    overflow-y: auto;
+    max-height: 240px;
+}
+
+.tle-dropdown-menu.tle-dropdown-menu--open {
+    display: block;
+}
+
+.tle-dropdown-item {
+    padding: 9px 12px;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s, color 0.1s;
+}
+
+.tle-dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+}
+
+.tle-dropdown-item--placeholder {
+    color: rgba(255, 255, 255, 0.3);
+}
+
 /* ── Row combining label + select + button (matches datasource-row) */
 .tle-cat-row-ctrl {
     display: flex;
@@ -808,7 +916,18 @@
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 3px;
     margin-top: 12px;
-    overflow: hidden;
+    overflow: visible;
+    /* clip corners of children without clipping dropdown menu */
+    clip-path: none;
+    /* keep child backgrounds contained */
+    isolation: isolate;
+}
+/* Round the label's left edge and button's right edge so the row looks contained */
+.tle-cat-row-ctrl > .tle-inline-label:first-child {
+    border-radius: 2px 0 0 2px;
+}
+.tle-cat-row-ctrl > .tle-action-btn:last-child {
+    border-radius: 0 2px 2px 0;
 }
 .tle-cat-row-ctrl:focus-within {
     border-color: rgba(200, 255, 0, 0.4);
@@ -1028,6 +1147,7 @@
     display: grid;
     grid-template-columns: 1fr 56px auto;
     align-items: center;
+    overflow: visible;
     gap: 0;
     padding: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -1059,16 +1179,17 @@
     padding-right: 8px;
     letter-spacing: 0.04em;
 }
-/* Select inside uncat row — inherits the flat row style */
-.tle-uncat-row .tle-uncat-select {
+/* Custom dropdown inside uncat row */
+.tle-uncat-row .tle-uncat-drop {
+    height: 34px;
+    min-width: 150px;
+}
+.tle-uncat-row .tle-uncat-drop .tle-dropdown-selected {
     height: 34px;
     border-left: 1px solid rgba(255, 255, 255, 0.08);
-    border-right: none;
-    border-top: none;
-    border-bottom: none;
-    border-radius: 0;
     background-color: rgba(255, 255, 255, 0.03);
-    min-width: 150px;
+}
+.tle-uncat-row .tle-uncat-drop .tle-dropdown-selected-text {
     font-size: 9px;
     letter-spacing: 0.1em;
 }

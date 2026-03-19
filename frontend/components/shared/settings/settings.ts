@@ -21,6 +21,7 @@ window._SettingsPanel = (function () {
         id:            string;
         label:         string;
         desc:          string;
+        groupLabel?:   string;
         renderControl: () => HTMLElement;
     }
 
@@ -86,6 +87,7 @@ window._SettingsPanel = (function () {
             id:            'space-online-source',
             label:         'Online Data Source',
             desc:          'URL to fetch TLE data from — select a category and click UPDATE TLE',
+            groupLabel:    'DATA SOURCES',
             renderControl: _renderSpaceOnlineSourceControl,
         },
         {
@@ -94,6 +96,7 @@ window._SettingsPanel = (function () {
             id:            'space-manual-tle',
             label:         'TLE Import',
             desc:          'Upload a .tle file or fetch from a local network URL',
+            groupLabel:    'DATA SOURCES',
             renderControl: _renderSpaceManualTleControl,
         },
         {
@@ -102,6 +105,7 @@ window._SettingsPanel = (function () {
             id:            'space-tle-database',
             label:         'TLE Database',
             desc:          'Satellite count, sources, and per-category last-updated times',
+            groupLabel:    'DATABASE',
             renderControl: _renderSpaceTleDatabaseControl,
         },
         {
@@ -110,6 +114,7 @@ window._SettingsPanel = (function () {
             id:            'space-tle-uncategorised',
             label:         'Uncategorised Satellites',
             desc:          'Assign categories to satellites imported without one',
+            groupLabel:    'DATABASE',
             renderControl: _renderSpaceTleUncategorisedControl,
         },
         {
@@ -118,6 +123,7 @@ window._SettingsPanel = (function () {
             id:            'space-tle-satlist',
             label:         'Satellite List',
             desc:          'Full list of all TLE records stored in the database',
+            groupLabel:    'DATABASE',
             renderControl: _renderSpaceTleSatListControl,
         },
         // SEA
@@ -884,6 +890,98 @@ window._SettingsPanel = (function () {
         return sel;
     }
 
+    // Custom flat dropdown (div-based) — menu is appended to body to avoid stacking/overflow clipping
+    function _makeCategoryDropdown(list?: Array<{ value: string; label: string }>): {
+        el: HTMLElement;
+        getValue: () => string;
+        onChange: (cb: (val: string) => void) => void;
+    } {
+        const opts = list ?? _TLE_CATEGORIES;
+        let _value = '';
+        let _open = false;
+        let _changeCallbacks: Array<(v: string) => void> = [];
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'tle-dropdown';
+        wrapper.tabIndex = 0;
+
+        const selected = document.createElement('div');
+        selected.className = 'tle-dropdown-selected';
+
+        const selectedText = document.createElement('span');
+        selectedText.className   = 'tle-dropdown-selected-text';
+        selectedText.textContent = opts[0]?.label ?? '';
+
+        const arrow = document.createElement('span');
+        arrow.className = 'tle-dropdown-arrow';
+
+        selected.appendChild(selectedText);
+        selected.appendChild(arrow);
+        wrapper.appendChild(selected);
+
+        // Menu lives on body to escape any overflow/stacking context
+        const menu = document.createElement('div');
+        menu.className = 'tle-dropdown-menu';
+        document.body.appendChild(menu);
+
+        opts.forEach(function (opt) {
+            const item = document.createElement('div');
+            item.className = 'tle-dropdown-item';
+            if (opt.value === '') item.classList.add('tle-dropdown-item--placeholder');
+            item.textContent = opt.label;
+            item.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                _value = opt.value;
+                wrapper.dataset['selectedValue'] = _value;
+                selectedText.textContent = opt.label;
+                if (_value) selectedText.classList.add('tle-dropdown-selected-text--chosen');
+                else selectedText.classList.remove('tle-dropdown-selected-text--chosen');
+                _closeMenu();
+                _changeCallbacks.forEach(function (cb) { cb(_value); });
+            });
+            menu.appendChild(item);
+        });
+
+        function _positionMenu(): void {
+            const rect = wrapper.getBoundingClientRect();
+            menu.style.top    = (rect.bottom + window.scrollY) + 'px';
+            menu.style.left   = (rect.left + window.scrollX) + 'px';
+            menu.style.width  = rect.width + 'px';
+        }
+
+        function _openMenu(): void {
+            _open = true;
+            wrapper.classList.add('tle-dropdown--open');
+            menu.classList.add('tle-dropdown-menu--open');
+            _positionMenu();
+        }
+
+        function _closeMenu(): void {
+            _open = false;
+            wrapper.classList.remove('tle-dropdown--open');
+            menu.classList.remove('tle-dropdown-menu--open');
+        }
+
+        selected.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            if (_open) _closeMenu(); else _openMenu();
+        });
+
+        wrapper.addEventListener('blur', _closeMenu);
+
+        document.addEventListener('mousedown', function (e) {
+            if (!wrapper.contains(e.target as Node) && !menu.contains(e.target as Node)) {
+                _closeMenu();
+            }
+        });
+
+        return {
+            el:       wrapper,
+            getValue: function () { return _value; },
+            onChange: function (cb) { _changeCallbacks.push(cb); },
+        };
+    }
+
     function _makeTleStatusBadge(text: string, type: 'ok' | 'error' | 'info'): HTMLElement {
         const badge = document.createElement('span');
         badge.className = 'tle-status-badge tle-status-badge--' + type;
@@ -944,14 +1042,17 @@ window._SettingsPanel = (function () {
         catLabel.className   = 'settings-datasource-label tle-inline-label';
         catLabel.textContent = 'CATEGORY';
 
-        const catSel = _makeCategorySelect(true);
+        const catDrop = _makeCategoryDropdown();
 
         const updateBtn = document.createElement('button');
         updateBtn.className   = 'tle-action-btn tle-action-btn--primary';
         updateBtn.textContent = 'UPDATE TLE';
+        updateBtn.disabled    = true;
+
+        catDrop.onChange(function (val) { updateBtn.disabled = !val; });
 
         catRow.appendChild(catLabel);
-        catRow.appendChild(catSel);
+        catRow.appendChild(catDrop.el);
         catRow.appendChild(updateBtn);
         wrap.appendChild(catRow);
 
@@ -979,8 +1080,8 @@ window._SettingsPanel = (function () {
         }
 
         // Auto-fill URL when category changes
-        catSel.addEventListener('change', function () {
-            const preset = _CELESTRAK_URLS[catSel.value];
+        catDrop.onChange(function (val) {
+            const preset = _CELESTRAK_URLS[val];
             if (preset) urlInput.value = preset;
         });
 
@@ -1005,7 +1106,7 @@ window._SettingsPanel = (function () {
         updateBtn.addEventListener('click', async function () {
             const url = urlInput.value.trim();
             if (!url) { statusLine.innerHTML = ''; statusLine.appendChild(_makeTleStatusBadge('Enter a URL first', 'error')); return; }
-            const category = catSel.value || null;
+            const category = catDrop.getValue() || null;
             updateBtn.textContent = 'UPDATING\u2026';
             updateBtn.disabled    = true;
             statusLine.innerHTML  = '';
@@ -1065,12 +1166,14 @@ window._SettingsPanel = (function () {
         const urlCatLabel = document.createElement('span');
         urlCatLabel.className   = 'settings-datasource-label tle-inline-label';
         urlCatLabel.textContent = 'CATEGORY';
-        const urlCatSel = _makeCategorySelect(true);
+        const urlCatDrop = _makeCategoryDropdown();
         const fetchBtn = document.createElement('button');
         fetchBtn.className   = 'tle-action-btn tle-action-btn--primary';
         fetchBtn.textContent = 'UPDATE TLE';
+        fetchBtn.disabled    = true;
+        urlCatDrop.onChange(function (val) { fetchBtn.disabled = !val; });
         urlCatRow.appendChild(urlCatLabel);
-        urlCatRow.appendChild(urlCatSel);
+        urlCatRow.appendChild(urlCatDrop.el);
         urlCatRow.appendChild(fetchBtn);
         wrap.appendChild(urlCatRow);
 
@@ -1113,12 +1216,14 @@ window._SettingsPanel = (function () {
         const pasteCatLabel = document.createElement('span');
         pasteCatLabel.className   = 'settings-datasource-label tle-inline-label';
         pasteCatLabel.textContent = 'CATEGORY';
-        const pasteCatSel = _makeCategorySelect(true);
+        const pasteCatDrop = _makeCategoryDropdown();
         const applyBtn = document.createElement('button');
         applyBtn.className   = 'tle-action-btn tle-action-btn--primary';
         applyBtn.textContent = 'UPDATE TLE';
+        applyBtn.disabled    = true;
+        pasteCatDrop.onChange(function (val) { applyBtn.disabled = !val; });
         pasteCatRow.appendChild(pasteCatLabel);
-        pasteCatRow.appendChild(pasteCatSel);
+        pasteCatRow.appendChild(pasteCatDrop.el);
         pasteCatRow.appendChild(applyBtn);
         wrap.appendChild(pasteCatRow);
 
@@ -1141,7 +1246,7 @@ window._SettingsPanel = (function () {
         fetchBtn.addEventListener('click', async function () {
             const url = urlInput.value.trim();
             if (!url) { urlStatus.innerHTML = ''; urlStatus.appendChild(_makeTleStatusBadge('Enter a URL first', 'error')); return; }
-            const category = urlCatSel.value || null;
+            const category = urlCatDrop.getValue() || null;
             fetchBtn.textContent = 'UPDATING\u2026';
             fetchBtn.disabled    = true;
             urlStatus.innerHTML  = '';
@@ -1168,7 +1273,7 @@ window._SettingsPanel = (function () {
 
         applyBtn.addEventListener('click', async function () {
             if (!_fileText) { pasteStatus.innerHTML = ''; pasteStatus.appendChild(_makeTleStatusBadge('Choose a file first', 'error')); return; }
-            const category = pasteCatSel.value || null;
+            const category = pasteCatDrop.getValue() || null;
             applyBtn.textContent  = 'UPDATING\u2026';
             applyBtn.disabled     = true;
             pasteStatus.innerHTML = '';
@@ -1447,12 +1552,13 @@ window._SettingsPanel = (function () {
                     idEl.className   = 'tle-uncat-id';
                     idEl.textContent = sat.norad_id;
 
-                    const sel = _makeCategorySelect(false, _TLE_ASSIGN_CATEGORIES);
-                    sel.className += ' tle-uncat-select';
+                    const uncatDrop = _makeCategoryDropdown(_TLE_ASSIGN_CATEGORIES);
+                    uncatDrop.el.classList.add('tle-uncat-drop');
+                    uncatDrop.el.dataset['selectedValue'] = '';
 
                     row.appendChild(nameEl);
                     row.appendChild(idEl);
-                    row.appendChild(sel);
+                    row.appendChild(uncatDrop.el);
                     list.appendChild(row);
                 });
             } catch (err) {
@@ -1467,9 +1573,10 @@ window._SettingsPanel = (function () {
             const rows = list.querySelectorAll<HTMLElement>('.tle-uncat-row');
             const assignments: Array<{ norad_id: string; category: string }> = [];
             rows.forEach(function (row) {
-                const sel = row.querySelector<HTMLSelectElement>('.tle-uncat-select');
-                if (sel && sel.value) {
-                    assignments.push({ norad_id: row.dataset['norad'] ?? '', category: sel.value });
+                const drop = row.querySelector<HTMLElement>('.tle-uncat-drop');
+                const val = drop?.dataset['selectedValue'];
+                if (val) {
+                    assignments.push({ norad_id: row.dataset['norad'] ?? '', category: val });
                 }
             });
             if (!assignments.length) return;
@@ -1639,7 +1746,20 @@ window._SettingsPanel = (function () {
             return;
         }
 
+        let lastGroup: string | undefined = undefined;
         items.forEach(function (item) {
+            if (item.groupLabel !== undefined && item.groupLabel !== lastGroup) {
+                if (lastGroup !== undefined) {
+                    const sep = document.createElement('div');
+                    sep.className = 'settings-group-separator';
+                    body.appendChild(sep);
+                }
+                const grpLabel = document.createElement('div');
+                grpLabel.className = 'settings-group-label';
+                grpLabel.textContent = item.groupLabel;
+                body.appendChild(grpLabel);
+                lastGroup = item.groupLabel;
+            }
             body.appendChild(_makeSettingRow(item));
         });
     }
