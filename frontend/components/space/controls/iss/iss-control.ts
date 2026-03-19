@@ -792,6 +792,7 @@ class IssControl extends SentinelControlBase {
         if (window._Notifications && this._trackingNotifId) { window._Notifications.dismiss(this._trackingNotifId); this._trackingNotifId = null; }
         this._hideStatusBar();
         this._saveIssTracking();
+        this.map.easeTo({ center: [12, 20], zoom: 2, duration: 600 });
     }
 
     // ---- Status bar ----

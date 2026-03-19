@@ -744,6 +744,7 @@ class IssControl extends SentinelControlBase {
         }
         this._hideStatusBar();
         this._saveIssTracking();
+        this.map.easeTo({ center: [12, 20], zoom: 2, duration: 600 });
     }
     // ---- Status bar ----
     _buildStatusBarHTML(p) {
