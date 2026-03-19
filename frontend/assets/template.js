@@ -42,12 +42,15 @@ window._Tracking.init();
     function _hasUrl(mode) {
         try {
             if (mode === 'online') {
-                return !!localStorage.getItem('sentinel_' + ns + '_onlineUrl');
+                const val = localStorage.getItem('sentinel_' + ns + '_onlineUrl') || '';
+                // Reject bare protocol placeholders like "https://" or "http://"
+                return val.length > 0 && !/^https?:\/\/?$/.test(val.trim());
             } else {
                 const raw = localStorage.getItem('sentinel_' + ns + '_offlineSource');
                 if (!raw) return false;
                 const obj = JSON.parse(raw);
-                return !!(obj && obj.url);
+                const url = (obj && obj.url) || '';
+                return url.length > 0 && !/^https?:\/\/?$/.test(url.trim());
             }
         } catch (e) {}
         return false;
