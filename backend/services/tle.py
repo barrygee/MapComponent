@@ -50,13 +50,28 @@ _SOURCE_PRIORITY = {
 
 def _category_beats(new_cat: str | None, new_src: str | None,
                     old_cat: str | None, old_src: str | None) -> bool:
-    """Return True if the new category/source should overwrite the existing one."""
+    """Return True if the new category/source should overwrite the existing one.
+
+    Category priority always takes precedence over source priority: a more
+    specific existing category (e.g. 'cubesat') is never replaced by a less
+    specific incoming one (e.g. 'active' or 'unknown'), regardless of source.
+    Only when categories are equally specific does source priority act as the
+    tiebreaker, and only a strictly higher source priority can then win.
+    """
+    new_cp = _CATEGORY_PRIORITY.get(new_cat, 0)
+    old_cp = _CATEGORY_PRIORITY.get(old_cat, 0)
+    # Never downgrade to a less specific category
+    if new_cp < old_cp:
+        return False
+    if new_cp > old_cp:
+        # Only upgrade if the new source is at least as authoritative
+        new_sp = _SOURCE_PRIORITY.get(new_src, 0)
+        old_sp = _SOURCE_PRIORITY.get(old_src, 0)
+        return new_sp >= old_sp
+    # Same category specificity — require strictly higher source priority to update
     new_sp = _SOURCE_PRIORITY.get(new_src, 0)
     old_sp = _SOURCE_PRIORITY.get(old_src, 0)
-    if new_sp != old_sp:
-        return new_sp > old_sp
-    # Same source priority — prefer more specific category
-    return _CATEGORY_PRIORITY.get(new_cat, 0) > _CATEGORY_PRIORITY.get(old_cat, 0)
+    return new_sp > old_sp
 
 
 # ── TLE validation ───────────────────────────────────────────────────────────
