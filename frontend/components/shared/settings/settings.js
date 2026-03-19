@@ -1001,6 +1001,51 @@ window._SettingsPanel = (function () {
         const statusLine = document.createElement('div');
         statusLine.className = 'tle-status-line';
         wrap.appendChild(statusLine);
+        // Info toggle — shows Celestrak URLs for each category
+        const infoRow = document.createElement('div');
+        infoRow.className = 'tle-info-row';
+        const infoHeader = document.createElement('div');
+        infoHeader.className = 'tle-info-row-header';
+        const infoToggle = document.createElement('button');
+        infoToggle.className = 'tle-info-toggle';
+        infoToggle.type = 'button';
+        infoToggle.title = 'Show Celestrak source URLs';
+        infoToggle.innerHTML = '<svg viewBox="0 0 10 14" width="9" height="12" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.25" y="4" width="3.5" height="9" rx="1" fill="currentColor"/><rect x="3.25" y="0.5" width="3.5" height="2.5" rx="1" fill="currentColor"/></svg>';
+        const infoLabel = document.createElement('span');
+        infoLabel.className = 'tle-info-label';
+        infoLabel.textContent = 'Celestrak source URLs';
+        const infoPanel = document.createElement('div');
+        infoPanel.className = 'tle-info-panel';
+        infoPanel.hidden = true;
+        const infoTable = document.createElement('div');
+        infoTable.className = 'tle-info-table';
+        _TLE_CATEGORIES.filter(function (c) { return c.value && _CELESTRAK_URLS[c.value]; }).forEach(function (cat) {
+            const row = document.createElement('div');
+            row.className = 'tle-info-table-row';
+            const labelEl = document.createElement('span');
+            labelEl.className = 'tle-info-table-label';
+            labelEl.textContent = cat.label;
+            const urlEl = document.createElement('a');
+            urlEl.className = 'tle-info-table-url';
+            urlEl.textContent = _CELESTRAK_URLS[cat.value];
+            urlEl.href = _CELESTRAK_URLS[cat.value];
+            urlEl.target = '_blank';
+            urlEl.rel = 'noopener noreferrer';
+            row.appendChild(labelEl);
+            row.appendChild(urlEl);
+            infoTable.appendChild(row);
+        });
+        infoPanel.appendChild(infoTable);
+        infoHeader.appendChild(infoToggle);
+        infoHeader.appendChild(infoLabel);
+        infoRow.appendChild(infoHeader);
+        infoRow.appendChild(infoPanel);
+        wrap.appendChild(infoRow);
+        infoHeader.addEventListener('click', function () {
+            const visible = !infoPanel.hidden;
+            infoPanel.hidden = visible;
+            infoToggle.classList.toggle('tle-info-toggle--active', !visible);
+        });
         // Load saved URL
         try {
             const saved = localStorage.getItem(LS_KEY);

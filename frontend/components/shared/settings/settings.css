@@ -815,8 +815,8 @@
 /* ── Custom flat dropdown (replaces native select in cat-row-ctrl) ── */
 .tle-dropdown {
     position: relative;
-    flex: 1;
-    min-width: 0;
+    width: 200px;
+    flex-shrink: 0;
     height: 37px;
     cursor: pointer;
     outline: none;
@@ -909,9 +909,10 @@
 
 /* ── Row combining label + select + button (matches datasource-row) */
 .tle-cat-row-ctrl {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0;
+    align-self: flex-start;
     background: rgba(255, 255, 255, 0.07);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 3px;
@@ -987,6 +988,94 @@
 /* ── Online source wrap — same max-width as datasource-wrap ────── */
 .tle-online-wrap {
     max-width: 860px;
+}
+
+/* ── Celestrak info toggle + panel ─────────────────────────────── */
+.tle-info-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-top: 6px;
+}
+.tle-info-row-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+.tle-info-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    transition: color 0.15s;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.tle-info-toggle:hover,
+.tle-info-toggle--active {
+    color: #c8ff00;
+}
+.tle-info-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+    user-select: none;
+    transition: color 0.15s;
+}
+.tle-info-row-header:hover .tle-info-label,
+.tle-info-toggle--active ~ .tle-info-label {
+    color: rgba(200, 255, 0, 0.6);
+}
+.tle-info-panel {
+    margin-top: 8px;
+    width: 100%;
+}
+.tle-info-table {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.tle-info-table-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 0 12px;
+    align-items: center;
+    padding: 5px 10px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.tle-info-table-row:last-child {
+    border-bottom: none;
+}
+.tle-info-table-row:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+}
+.tle-info-table-label {
+    color: rgba(255, 255, 255, 0.55);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+}
+.tle-info-table-url {
+    color: rgba(200, 255, 0, 0.7);
+    text-decoration: none;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, monospace;
+    word-break: break-all;
+}
+.tle-info-table-url:hover {
+    color: #c8ff00;
+    text-decoration: underline;
 }
 
 /* ── Manual TLE — single column, stretches wide ─────────────────── */
