@@ -840,6 +840,7 @@ window._SettingsPanel = (function () {
         science: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=science&FORMAT=tle',
         cubesat: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=cubesat&FORMAT=tle',
         active: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle',
+        unknown: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle',
     };
     function _makeCategorySelect(includeBlank, list) {
         const sel = document.createElement('select');
@@ -1071,9 +1072,7 @@ window._SettingsPanel = (function () {
         }
         // Auto-fill URL when category changes
         catDrop.onChange(function (val) {
-            const preset = _CELESTRAK_URLS[val];
-            if (preset)
-                urlInput.value = preset;
+            urlInput.value = _CELESTRAK_URLS[val] ?? '';
         });
         updateBtn.addEventListener('click', async function () {
             const url = urlInput.value.trim();
