@@ -230,13 +230,7 @@
     text-transform: uppercase;
 }
 
-/* ---- Group separators and labels (within a section) ---- */
-.settings-group-separator {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.07);
-    margin: 8px 48px 0;
-}
-
+/* ---- Group labels (within a section) ---- */
 .settings-group-label {
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 9px;
@@ -245,6 +239,10 @@
     color: rgba(255, 255, 255, 0.2);
     text-transform: uppercase;
     padding: 20px 48px 4px;
+}
+
+.settings-group-label--spaced {
+    padding-top: 48px;
 }
 
 /* ---- Setting items ---- */
@@ -981,7 +979,7 @@
     letter-spacing: 0.2em;
     color: rgba(255, 255, 255, 0.25);
     text-transform: uppercase;
-    margin-top: 24px;
+    margin-top: 40px;
     margin-bottom: 10px;
     user-select: none;
 }
@@ -1058,40 +1056,41 @@
     margin-top: 8px;
     width: 100%;
 }
-.tle-info-table {
+
+/* Simple list replacing the old bordered table */
+.tle-info-list {
     display: flex;
     flex-direction: column;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 3px;
-    overflow: hidden;
+    gap: 0;
 }
-.tle-info-table-row {
-    display: grid;
-    grid-template-columns: 160px 1fr;
-    gap: 0 12px;
-    align-items: center;
-    padding: 5px 10px;
+.tle-info-list-item {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px 0;
+}
+.tle-info-list-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 10px;
-    letter-spacing: 0.04em;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-.tle-info-table-row:last-child {
-    border-bottom: none;
-}
-.tle-info-table-row:nth-child(even) {
-    background: rgba(255, 255, 255, 0.02);
-}
-.tle-info-table-label {
-    color: rgba(255, 255, 255, 0.55);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    white-space: nowrap;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.45);
+    flex-shrink: 0;
+}
+.tle-info-list-sep {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.2);
+    flex-shrink: 0;
 }
 .tle-info-table-url {
     color: rgba(200, 255, 0, 0.7);
     text-decoration: none;
     font-family: 'Barlow', 'Helvetica Neue', Arial, monospace;
+    font-size: 11px;
     word-break: break-all;
 }
 .tle-info-table-url:hover {
@@ -1106,12 +1105,6 @@
     width: 100%;
 }
 
-/* Thin divider between URL fetch and paste sections */
-.tle-left-divider {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.07);
-    margin: 22px 0;
-}
 
 
 /* ── File upload row ────────────────────────────────────────────── */
@@ -1238,6 +1231,7 @@
     font-weight: 400;
     letter-spacing: 0.06em;
     color: rgba(255, 255, 255, 0.45);
+    text-decoration: none;
 }
 .tle-uncat-list {
     display: flex;

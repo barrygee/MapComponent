@@ -76,7 +76,7 @@ window._SettingsPanel = (function () {
             id: 'space-manual-tle',
             label: 'TLE Import',
             desc: 'Upload a .tle file or fetch from a local network URL',
-            groupLabel: 'TLE IMPORT',
+            groupLabel: '',
             renderControl: _renderSpaceManualTleControl,
         },
         {
@@ -85,7 +85,7 @@ window._SettingsPanel = (function () {
             id: 'space-tle-database',
             label: 'TLE Database',
             desc: 'Satellite count, sources, and per-category last-updated times',
-            groupLabel: 'DATABASE',
+            groupLabel: '',
             renderControl: _renderSpaceTleDatabaseControl,
         },
         {
@@ -94,7 +94,6 @@ window._SettingsPanel = (function () {
             id: 'space-tle-uncategorised',
             label: 'Uncategorised Satellites',
             desc: 'Assign categories to satellites imported without one',
-            groupLabel: 'DATABASE',
             renderControl: _renderSpaceTleUncategorisedControl,
         },
         {
@@ -103,7 +102,7 @@ window._SettingsPanel = (function () {
             id: 'space-tle-satlist',
             label: 'Satellite List',
             desc: 'Full list of all TLE records stored in the database',
-            groupLabel: 'DATABASE',
+            groupLabel: '',
             renderControl: _renderSpaceTleSatListControl,
         },
         // SEA
@@ -1009,49 +1008,46 @@ window._SettingsPanel = (function () {
         infoRow.className = 'tle-info-row';
         const infoHeader = document.createElement('div');
         infoHeader.className = 'tle-info-row-header';
-        const infoToggle = document.createElement('button');
-        infoToggle.className = 'tle-info-toggle';
-        infoToggle.type = 'button';
-        infoToggle.title = 'Show Celestrak source URLs';
-        infoToggle.innerHTML = '';
         const infoLabel = document.createElement('span');
         infoLabel.className = 'tle-info-label';
         infoLabel.textContent = 'View Celestrak source URLs';
+        const infoChevron = document.createElement('span');
+        infoChevron.className = 'tle-info-chevron';
+        infoChevron.innerHTML = '<svg width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="1,2.5 4,5.5 7,2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        infoHeader.appendChild(infoLabel);
+        infoHeader.appendChild(infoChevron);
         const infoPanel = document.createElement('div');
         infoPanel.className = 'tle-info-panel';
         infoPanel.hidden = true;
-        const infoTable = document.createElement('div');
-        infoTable.className = 'tle-info-table';
+        const infoList = document.createElement('div');
+        infoList.className = 'tle-info-list';
         _TLE_CATEGORIES.filter(function (c) { return c.value && _CELESTRAK_URLS[c.value]; }).forEach(function (cat) {
-            const row = document.createElement('div');
-            row.className = 'tle-info-table-row';
+            const item = document.createElement('div');
+            item.className = 'tle-info-list-item';
             const labelEl = document.createElement('span');
-            labelEl.className = 'tle-info-table-label';
+            labelEl.className = 'tle-info-list-label';
             labelEl.textContent = cat.label;
+            const sepEl = document.createElement('span');
+            sepEl.className = 'tle-info-list-sep';
+            sepEl.textContent = ':';
             const urlEl = document.createElement('a');
             urlEl.className = 'tle-info-table-url';
             urlEl.textContent = _CELESTRAK_URLS[cat.value];
             urlEl.href = _CELESTRAK_URLS[cat.value];
             urlEl.target = '_blank';
             urlEl.rel = 'noopener noreferrer';
-            row.appendChild(labelEl);
-            row.appendChild(urlEl);
-            infoTable.appendChild(row);
+            item.appendChild(labelEl);
+            item.appendChild(sepEl);
+            item.appendChild(urlEl);
+            infoList.appendChild(item);
         });
-        infoPanel.appendChild(infoTable);
-        const infoChevron = document.createElement('span');
-        infoChevron.className = 'tle-info-chevron';
-        infoChevron.innerHTML = '<svg width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="1,2.5 4,5.5 7,2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        infoHeader.appendChild(infoToggle);
-        infoHeader.appendChild(infoLabel);
-        infoHeader.appendChild(infoChevron);
+        infoPanel.appendChild(infoList);
         infoRow.appendChild(infoHeader);
         infoRow.appendChild(infoPanel);
         wrap.appendChild(infoRow);
         infoHeader.addEventListener('click', function () {
             const visible = !infoPanel.hidden;
             infoPanel.hidden = visible;
-            infoToggle.classList.toggle('tle-info-toggle--active', !visible);
             infoChevron.classList.toggle('tle-info-chevron--open', !visible);
         });
         // Load saved URL
@@ -1160,10 +1156,6 @@ window._SettingsPanel = (function () {
         const urlStatus = document.createElement('div');
         urlStatus.className = 'tle-status-line';
         wrap.appendChild(urlStatus);
-        // ── Divider ──────────────────────────────────────────────────────
-        const divider = document.createElement('div');
-        divider.className = 'tle-left-divider';
-        wrap.appendChild(divider);
         // ── Section: Paste / Upload ──────────────────────────────────────
         const pasteHeading = document.createElement('div');
         pasteHeading.className = 'tle-section-heading';
@@ -1481,6 +1473,7 @@ window._SettingsPanel = (function () {
                 list.innerHTML = '';
                 if (data.satellites.length === 0) {
                     countLine.textContent = 'All satellites are categorised';
+                    list.style.display = 'none';
                     saveAllBtn.style.display = 'none';
                     return;
                 }
@@ -1682,13 +1675,9 @@ window._SettingsPanel = (function () {
         let lastGroup = undefined;
         items.forEach(function (item) {
             if (item.groupLabel !== undefined && item.groupLabel !== lastGroup) {
-                if (lastGroup !== undefined) {
-                    const sep = document.createElement('div');
-                    sep.className = 'settings-group-separator';
-                    body.appendChild(sep);
-                }
                 const grpLabel = document.createElement('div');
                 grpLabel.className = 'settings-group-label';
+                if (lastGroup !== undefined) grpLabel.classList.add('settings-group-label--spaced');
                 grpLabel.textContent = item.groupLabel;
                 body.appendChild(grpLabel);
                 lastGroup = item.groupLabel;
