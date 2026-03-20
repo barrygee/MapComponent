@@ -65,7 +65,7 @@
 
 #space-side-menu-toggle:hover {
     background: #111;
-    color: rgba(255,255,255,0.75);
+    color: var(--color-text-muted);
 }
 
 #space-side-menu .sm-nav-btn {
@@ -177,7 +177,7 @@
     top: 50%;
     transform: translateY(-50%);
     background: #000;
-    color: rgba(255,255,255,0.75);
+    color: var(--color-text-muted);
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 9px;
     font-weight: 400;
@@ -212,7 +212,7 @@
     top: 50%;
     transform: translateY(-50%);
     background: #000;
-    color: rgba(255,255,255,0.75);
+    color: var(--color-text-muted);
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 9px;
     font-weight: 400;

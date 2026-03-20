@@ -1,0 +1,53 @@
+/* ============================================================
+   USER LOCATION MARKER
+   Shared styles for the GPS position marker used on air and
+   space domain maps. The inner SVG overflows its container so
+   the outer circle can extend past the 60×60 bounding box.
+   ============================================================ */
+
+.user-location-marker,
+.space-user-location-marker {
+    width: 60px;
+    height: 60px;
+    overflow: visible;
+    position: relative;
+}
+
+.user-location-marker svg,
+.space-user-location-marker svg {
+    overflow: visible;
+}
+
+
+/* ============================================================
+   RIGHT-CLICK CONTEXT MENU
+   Positioned absolutely over the MapLibre canvas. Styled to
+   match the dark tactical aesthetic of the rest of the UI.
+   ============================================================ */
+
+.sentinel-context-menu {
+    position: absolute;
+    background: #000;
+    border: none;
+    padding: 4px 0;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    z-index: 9999;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.9);
+    min-width: 180px;
+    cursor: default;
+}
+
+.sentinel-context-menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.sentinel-context-menu-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}

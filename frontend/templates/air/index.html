@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
 {% block head %}
+    <link rel="stylesheet" href="/frontend/components/air/overlay/side-menu.css">
     <link rel="stylesheet" href="/frontend/components/air/air-filter/air-filter.css">
 {% endblock %}
 
 {% block content %}
-    <div id="no-url-overlay" class="no-url-overlay" style="display:none;">
+    <div id="no-url-overlay" class="no-url-overlay hidden">
         <div class="no-url-overlay-box">
             <div class="no-url-overlay-domain">AIR</div>
             <div class="no-url-overlay-title">No Data Source Configured</div>
@@ -42,7 +43,9 @@
     <!-- Side panel, filter, user location, boot -->
     <script src="/frontend/components/air/overlay/side-menu.js"></script>
     <script src="/frontend/components/air/air-filter/air-filter.js"></script>
+    <script src="/frontend/components/shared/user-location/user-location-shared.js"></script>
     <script src="/frontend/components/air/user-location/user-location.js"></script>
+    <script src="/frontend/components/shared/init/logo-animation.js"></script>
     <script src="/frontend/components/air/init/boot.js"></script>
 
 {% endblock %}

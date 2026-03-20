@@ -14,7 +14,6 @@ Endpoints:
   DELETE /api/space/tle            — Clear all TLE data (requires confirm=true)
 """
 
-import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, Query
@@ -24,10 +23,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.cache import now_ms
 from backend.database import get_db
-from backend.models import SatelliteCatalogue, TleCache, UserSettings
+from backend.models import SatelliteCatalogue, TleCache
 from backend.services import daynight as dn_service
 from backend.services import satellite as sat_service
 from backend.services import tle as tle_service
+from backend.utils import resolve_domain_urls
 
 router = APIRouter(prefix="/api/space", tags=["space"])
 
@@ -39,57 +39,6 @@ _VALID_CATEGORIES = {
 
 _ISS_NORAD = "25544"
 
-
-async def _get_space_urls(db: AsyncSession) -> tuple[str | None, str | None]:
-    """Return (primary_url, fallback_url) for the space domain based on connectivity mode and override.
-
-    Resolves effective mode:
-      1. If space.sourceOverride is 'online' or 'offline', use that.
-      2. Otherwise, fall back to app.connectivityMode ('online' | 'offline', default 'online').
-
-    When effective mode is 'online':  primary = online URL,  fallback = offline URL
-    When effective mode is 'offline': primary = offline URL, fallback = online URL
-    """
-    result = await db.execute(
-        select(UserSettings).where(
-            (UserSettings.namespace == "space") |
-            ((UserSettings.namespace == "app") & (UserSettings.key == "connectivityMode"))
-        )
-    )
-    rows = result.scalars().all()
-
-    ns: dict[str, object] = {}
-    for row in rows:
-        compound_key = f"{row.namespace}.{row.key}"
-        try:
-            ns[compound_key] = json.loads(row.value)
-        except (json.JSONDecodeError, TypeError):
-            ns[compound_key] = row.value
-
-    # Resolve effective mode
-    override = ns.get("space.sourceOverride", "auto")
-    if override in ("online", "offline"):
-        effective_mode = override
-    else:
-        effective_mode = ns.get("app.connectivityMode", "online") or "online"
-
-    def _valid(url: object) -> str | None:
-        if url and isinstance(url, str) and url.strip() not in ("https://", "http://localhost", ""):
-            return url.strip().rstrip("/")
-        return None
-
-    online = _valid(ns.get("space.onlineUrl"))
-
-    # offlineSource is stored as {"url": "http://..."} by the frontend settings panel
-    offline_raw = ns.get("space.offlineSource")
-    if isinstance(offline_raw, dict):
-        offline = _valid(offline_raw.get("url"))
-    else:
-        offline = _valid(offline_raw)
-
-    if effective_mode == "offline":
-        return offline, online
-    return online, offline
 
 
 @router.get("/iss")
@@ -107,7 +56,7 @@ async def get_iss(db: AsyncSession = Depends(get_db)):
         if tle_count_result.scalar() == 0:
             return JSONResponse({"error": "No TLE data in database", "no_tle_data": True}, status_code=503)
 
-        online_url, offline_url = await _get_space_urls(db)
+        online_url, offline_url = await resolve_domain_urls("space", db)
         tle_text = await tle_service.fetch_tle(_ISS_NORAD, db, online_url, offline_url)
         _, line1, line2 = tle_service.parse_tle_lines(tle_text)
 
@@ -143,7 +92,7 @@ async def get_iss_passes(
     Results include AOS/LOS times, duration, and maximum elevation angle.
     """
     try:
-        online_url, offline_url = await _get_space_urls(db)
+        online_url, offline_url = await resolve_domain_urls("space", db)
         tle_text = await tle_service.fetch_tle(_ISS_NORAD, db, online_url, offline_url)
         _, line1, line2 = tle_service.parse_tle_lines(tle_text)
 

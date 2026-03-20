@@ -92,7 +92,7 @@
 
 #notif-clear-all-btn:hover {
     background: rgba(0, 0, 0, 0.7);
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
 }
 
 /* ---- Scrollable notification list ----
@@ -189,7 +189,7 @@
     justify-content: space-between;
     height: 38px;
     padding: 0 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--color-border);
     background: #000;
     position: relative;
     z-index: 1;
@@ -204,10 +204,10 @@
 }
 
 /* ---- Notification type label colours ---- */
-.notif-item[data-type="flight"]     .notif-label { color: #c8ff00; opacity: 0.75; }
-.notif-item[data-type="departure"]  .notif-label { color: #c8ff00; opacity: 0.75; }
-.notif-item[data-type="track"]      .notif-label { color: #c8ff00; opacity: 0.75; }
-.notif-item[data-type="tracking"]   .notif-label { color: #c8ff00; opacity: 0.75; }
+.notif-item[data-type="flight"]     .notif-label { color: var(--color-accent); opacity: 0.75; }
+.notif-item[data-type="departure"]  .notif-label { color: var(--color-accent); opacity: 0.75; }
+.notif-item[data-type="track"]      .notif-label { color: var(--color-accent); opacity: 0.75; }
+.notif-item[data-type="tracking"]   .notif-label { color: var(--color-accent); opacity: 0.75; }
 .notif-item[data-type="notif-off"]  .notif-label { color: rgba(255, 255, 255, 0.45); }
 .notif-item[data-type="system"]     .notif-label { color: rgba(255, 255, 255, 0.45); }
 .notif-item[data-type="message"]    .notif-label { color: rgba(100, 160, 255, 0.8); }
@@ -231,7 +231,7 @@
 }
 
 .notif-dismiss:hover {
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
 }
 
 /* Card body: title + detail text + timestamp */
@@ -294,7 +294,7 @@
 }
 
 .notif-action:hover {
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 /* Default state label (shown when not hovering action) */
@@ -325,7 +325,7 @@
     top: 50%;
     transform: translateY(-50%);
     background: #000;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 9px;
     font-weight: 400;
@@ -351,7 +351,7 @@
    the panel is closed. Pulses 3× white→lime→white to alert the user. */
 @keyframes notif-bell-pulse {
     0%   { opacity: 0.6; color: #fff; }
-    50%  { opacity: 1;   color: #c8ff00; }
+    50%  { opacity: 1;   color: var(--color-accent); }
     100% { opacity: 0.6; color: #fff; }
 }
 
@@ -379,7 +379,7 @@
 }
 
 #notif-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-border);
     border-radius: 6px;
     opacity: 1;
 }
@@ -434,5 +434,5 @@
 
 /* Unread state: lime count badge when there are unseen notifications */
 #notif-count.notif-count-unread {
-    color: #c8ff00;
+    color: var(--color-accent);
 }

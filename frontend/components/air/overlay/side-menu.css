@@ -96,7 +96,7 @@
 
 #side-menu-toggle:hover {
     background: #111;
-    color: rgba(255,255,255,0.75);
+    color: var(--color-text-muted);
 }
 
 /* ---- Zoom + location navigation buttons ----
@@ -127,7 +127,7 @@
 /* Active state: locate-me button lit lime when following user position */
 .sm-nav-btn.active {
     background: #111;
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 /* ---- Overlay toggle buttons ----
@@ -258,7 +258,7 @@
     top: 50%;
     transform: translateY(-50%);
     background: #000;
-    color: rgba(255,255,255,0.75);
+    color: var(--color-text-muted);
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 9px;
     font-weight: 400;
@@ -297,7 +297,7 @@
     top: 50%;
     transform: translateY(-50%);
     background: #000;
-    color: rgba(255,255,255,0.75);
+    color: var(--color-text-muted);
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 9px;
     font-weight: 400;
@@ -378,12 +378,12 @@
 
 .map-3d-btn:hover {
     background: #111;
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 .map-3d-btn:active {
     background: #1a1a1a;
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 /* Tooltip above each 3D widget button */
@@ -394,7 +394,7 @@
     left: 50%;
     transform: translateX(-50%);
     background: #000;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 9px;
     font-weight: 400;

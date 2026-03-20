@@ -75,7 +75,7 @@
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #c8ff00;
+    color: var(--color-accent);
     opacity: 0.75;
 }
 
@@ -96,7 +96,7 @@
 }
 
 .adsb-sb-untrack-btn:hover {
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
 }
 
 /* Aircraft callsign — primary identifier, displayed prominently */
@@ -171,7 +171,7 @@
 }
 
 #tracking-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-border);
     border-radius: 6px;
     opacity: 1;
 }
@@ -179,7 +179,7 @@
 /* Active: lime tint confirms tracking is open and an aircraft is followed */
 #tracking-toggle-btn.tracking-btn-active {
     opacity: 1;
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 /* Tracking crosshair / target SVG icon */
@@ -203,5 +203,5 @@
 
 /* Lime badge when at least one aircraft is being tracked */
 #tracking-count.tracking-count-active {
-    color: #c8ff00;
+    color: var(--color-accent);
 }

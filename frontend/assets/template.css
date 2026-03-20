@@ -1,4 +1,31 @@
 /* ============================================================
+   DESIGN TOKENS
+   Brand colours, typography, and layout constants shared
+   across all CSS files in the project.
+   ============================================================ */
+:root {
+    --color-accent:       #c8ff00;
+    --color-bg:           #000000;
+    --color-text:         rgba(255, 255, 255, 0.9);
+    --color-text-muted:   rgba(255, 255, 255, 0.75);
+    --color-border:       rgba(255, 255, 255, 0.08);
+    --color-border-mid:   rgba(255, 255, 255, 0.1);
+    --font-primary:       'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    --font-condensed:     'Barlow Condensed', 'Helvetica Neue', Arial, sans-serif;
+    --nav-height:         68px;
+    --footer-height:      44px;
+}
+
+
+/* ============================================================
+   UTILITY
+   ============================================================ */
+.hidden {
+    display: none !important;
+}
+
+
+/* ============================================================
    BASE RESET
    Ensures consistent box-model across all elements.
    Locks viewport to full screen, prevents scrollbars on the
@@ -37,7 +64,7 @@ html {
     right: 0;
     height: 68px;
     background: #000000;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -124,16 +151,16 @@ html {
 }
 
 .nav-link:hover {
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
 }
 
 /* Active domain link — always lime, never dims on hover */
 .nav-link--active {
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 .nav-link--active:hover {
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 
@@ -151,7 +178,7 @@ html {
     right: 0;
     height: 44px;
     background: #000000;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -220,7 +247,7 @@ html {
 }
 
 #settings-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-border);
     border-radius: 6px;
     opacity: 1;
 }
@@ -231,7 +258,7 @@ html {
     bottom: calc(100% + 6px);
     right: 0;
     background: #000;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 9px;
     font-weight: 400;
@@ -285,7 +312,7 @@ html {
     font-weight: 700;
     letter-spacing: 0.3em;
     text-transform: uppercase;
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 .no-url-overlay-title {
@@ -313,7 +340,7 @@ html {
     border: 1px solid rgba(200, 255, 0, 0.4);
     border-radius: 3px;
     padding: 9px 24px;
-    color: #c8ff00;
+    color: var(--color-accent);
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 10px;
     font-weight: 600;

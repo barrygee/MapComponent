@@ -8,7 +8,6 @@ Endpoints:
 """
 
 import json
-import time
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -17,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any
 
+from backend.cache import now_ms
 from backend.database import get_db
 from backend.models import UserSettings
 
@@ -32,10 +32,6 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
-
 
 def _rows_to_namespace_dict(rows) -> dict:
     """Convert a list of UserSettings rows to { key: parsed_value }."""
@@ -94,7 +90,7 @@ async def upsert_setting(
     )
     row = result.scalar_one_or_none()
     value_str = json.dumps(body.value)
-    ts = _now_ms()
+    ts = now_ms()
 
     if row:
         row.value = value_str

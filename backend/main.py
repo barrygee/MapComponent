@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from backend.database import create_tables, seed_default_settings
-from backend.routers import air, space, sea, land, sdr, settings as settings_router
+from backend.routers import air, space, sea, land, settings as settings_router
 
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -35,7 +35,6 @@ app.include_router(air.router)
 app.include_router(space.router)
 app.include_router(sea.router)
 app.include_router(land.router)
-app.include_router(sdr.router)
 app.include_router(settings_router.router)
 
 

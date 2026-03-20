@@ -27,7 +27,7 @@
 #settings-sidebar {
     width: 200px;
     flex-shrink: 0;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    border-right: 1px solid var(--color-border);
     background: rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
@@ -55,13 +55,13 @@
 }
 
 .settings-nav-item:hover {
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
     background: rgba(255, 255, 255, 0.04);
 }
 
 .settings-nav-item.active {
-    color: #c8ff00;
-    border-left-color: #c8ff00;
+    color: var(--color-accent);
+    border-left-color: var(--color-accent);
     background: rgba(200, 255, 0, 0.04);
 }
 
@@ -128,7 +128,7 @@
     font-size: 16px;
     font-weight: 400;
     letter-spacing: 0.08em;
-    caret-color: #c8ff00;
+    caret-color: var(--color-accent);
     min-width: 0;
 }
 
@@ -191,7 +191,7 @@
 }
 
 #settings-apply-status.settings-apply-status--ok {
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 #settings-apply-status.settings-apply-status--error {
@@ -203,7 +203,7 @@
     border: 1px solid rgba(200, 255, 0, 0.4);
     border-radius: 3px;
     padding: 9px 24px;
-    color: #c8ff00;
+    color: var(--color-accent);
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 10px;
     font-weight: 600;
@@ -216,7 +216,7 @@
 #settings-apply-btn:hover {
     background: rgba(200, 255, 0, 0.08);
     border-color: rgba(200, 255, 0, 0.7);
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 /* ---- Section labels ---- */
@@ -270,7 +270,7 @@
     font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.1em;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
     text-transform: uppercase;
 }
 
@@ -347,7 +347,7 @@
     font-weight: 400;
     letter-spacing: 0.08em;
     outline: none;
-    caret-color: #c8ff00;
+    caret-color: var(--color-accent);
     min-width: 0;
 }
 
@@ -409,7 +409,7 @@
 
 .settings-theme-track.is-dark .settings-theme-thumb {
     transform: translateX(20px);
-    background: #c8ff00;
+    background: var(--color-accent);
 }
 
 /* ---- Data source controls ---- */
@@ -458,7 +458,7 @@
     font-weight: 400;
     letter-spacing: 0.08em;
     outline: none;
-    caret-color: #c8ff00;
+    caret-color: var(--color-accent);
     min-width: 0;
 }
 
@@ -481,7 +481,7 @@
 }
 
 .settings-datasource-status--ok {
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 .settings-datasource-status--err {
@@ -541,7 +541,7 @@
 
 .settings-connectivity-track.is-online .settings-connectivity-thumb {
     transform: translateX(20px);
-    background: #c8ff00;
+    background: var(--color-accent);
 }
 
 /* ---- Connectivity override summary ---- */
@@ -596,7 +596,7 @@
     letter-spacing: 0.18em;
 }
 
-.settings-conn-override-val--online  { color: #c8ff00; }
+.settings-conn-override-val--online  { color: var(--color-accent); }
 .settings-conn-override-val--offline { color: rgba(255, 80, 80, 0.8); }
 
 .settings-connectivity-warning {
@@ -639,7 +639,7 @@
 
 .settings-connectivity-warning-btn--confirm {
     border-color: rgba(200, 255, 0, 0.4);
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 .settings-connectivity-warning-btn--confirm:hover {
@@ -692,12 +692,12 @@
 
 .settings-source-override-btn:hover {
     background: rgba(255, 255, 255, 0.09);
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
 }
 
 .settings-source-override-btn.is-active {
     background: rgba(200, 255, 0, 0.12);
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 
 .settings-source-override-note {
@@ -712,7 +712,7 @@
 /* ---- Footer settings button active state ---- */
 #settings-btn.settings-btn-active {
     opacity: 1;
-    color: #c8ff00;
+    color: var(--color-accent);
     background: rgba(200, 255, 0, 0.08);
     border-radius: 6px;
 }
@@ -754,12 +754,12 @@
 }
 .tle-action-btn--primary {
     background: rgba(200, 255, 0, 0.08);
-    color: #c8ff00;
+    color: var(--color-accent);
     border-left-color: rgba(200, 255, 0, 0.2);
 }
 .tle-action-btn--primary:hover:not(:disabled) {
     background: rgba(200, 255, 0, 0.15);
-    color: #c8ff00;
+    color: var(--color-accent);
 }
 .tle-action-btn--danger {
     background: rgba(255, 255, 255, 0.04);
@@ -854,7 +854,7 @@
 }
 
 .tle-dropdown-selected-text--chosen {
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
 }
 
 .tle-dropdown-arrow {
@@ -898,7 +898,7 @@
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
     cursor: pointer;
     white-space: nowrap;
     transition: background 0.1s, color 0.1s;
@@ -964,7 +964,7 @@
     border-radius: 2px;
 }
 .tle-status-badge--ok {
-    color: #c8ff00;
+    color: var(--color-accent);
     background: rgba(200, 255, 0, 0.07);
 }
 .tle-status-badge--error {
@@ -981,7 +981,7 @@
     font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.1em;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
     text-transform: uppercase;
     margin-top: 40px;
     margin-bottom: 10px;
@@ -1027,8 +1027,8 @@
 }
 .tle-info-toggle:hover,
 .tle-info-toggle--active {
-    color: #c8ff00;
-    border-color: #c8ff00;
+    color: var(--color-accent);
+    border-color: var(--color-accent);
 }
 .tle-info-chevron {
     display: inline-flex;
@@ -1098,7 +1098,7 @@
     word-break: break-all;
 }
 .tle-info-table-url:hover {
-    color: #c8ff00;
+    color: var(--color-accent);
     text-decoration: underline;
 }
 
@@ -1180,7 +1180,7 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--color-border);
     border-radius: 3px;
     overflow: hidden;
 }
@@ -1210,7 +1210,7 @@
     font-family: 'Barlow Condensed', 'Barlow', Arial, sans-serif;
     font-size: 13px;
     font-weight: 600;
-    color: #c8ff00;
+    color: var(--color-accent);
     text-align: right;
     padding-right: 16px;
 }
@@ -1243,7 +1243,7 @@
     gap: 0;
     max-height: 300px;
     overflow-y: auto;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--color-border);
     border-radius: 3px;
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.15) transparent;
@@ -1294,7 +1294,7 @@
 }
 .tle-uncat-row .tle-uncat-drop .tle-dropdown-selected {
     height: 34px;
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 1px solid var(--color-border);
     background-color: rgba(255, 255, 255, 0.03);
 }
 .tle-uncat-row .tle-uncat-drop .tle-dropdown-selected-text {
@@ -1334,7 +1334,7 @@
     max-width: 860px;
 }
 .tle-satlist-header:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-border);
 }
 
 .tle-satlist-header-label {
@@ -1378,7 +1378,7 @@
     gap: 0;
     max-height: 360px;
     overflow-y: auto;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--color-border);
     border-radius: 3px;
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.12) transparent;
@@ -1401,7 +1401,7 @@
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     font-size: 12px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

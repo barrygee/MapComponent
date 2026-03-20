@@ -24,66 +24,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.cache import is_fresh, is_within_stale, now_ms
 from backend.config import settings
 from backend.database import get_db
-from backend.models import AdsbCache, AirMessage, AirTracking, UserSettings
+from backend.models import AdsbCache, AirMessage, AirTracking
 from backend.services import adsb as adsb_service
-
-
-async def _get_air_urls(db: AsyncSession) -> tuple[str | None, str | None]:
-    """Return (primary_url, fallback_url) for ADS-B based on connectivity mode and domain override.
-
-    Resolves effective mode:
-      1. If air.sourceOverride is 'online' or 'offline', use that.
-      2. Otherwise, fall back to app.connectivityMode ('online' | 'offline', default 'online').
-
-    When effective mode is 'online':  primary = online URL,  fallback = offline URL
-    When effective mode is 'offline': primary = offline URL, fallback = online URL
-    """
-    result = await db.execute(
-        select(UserSettings).where(
-            (UserSettings.namespace == "air") |
-            ((UserSettings.namespace == "app") & (UserSettings.key == "connectivityMode"))
-        )
-    )
-    rows = result.scalars().all()
-
-    ns: dict[str, object] = {}
-    for row in rows:
-        compound_key = f"{row.namespace}.{row.key}"
-        try:
-            ns[compound_key] = json.loads(row.value)
-        except (json.JSONDecodeError, TypeError):
-            ns[compound_key] = row.value
-
-    # Resolve effective mode
-    override = ns.get("air.sourceOverride", "auto")
-    if override in ("online", "offline"):
-        effective_mode = override
-    else:
-        effective_mode = ns.get("app.connectivityMode", "online") or "online"
-
-    # Resolve online URL
-    online_raw = ns.get("air.onlineUrl")
-    online_url: str | None = None
-    if isinstance(online_raw, str) and online_raw.strip():
-        online_url = online_raw.strip().rstrip("/")
-    if not online_url:
-        online_url = settings.adsb_upstream_base
-
-    # Resolve offline URL
-    offline_url: str | None = None
-    offline_raw = ns.get("air.offlineSource")
-    if isinstance(offline_raw, dict):
-        raw_u = offline_raw.get("url")
-    elif isinstance(offline_raw, str):
-        raw_u = offline_raw
-    else:
-        raw_u = None
-    if raw_u and isinstance(raw_u, str) and raw_u.strip() not in ("http://localhost", "https://", ""):
-        offline_url = raw_u.strip().rstrip("/")
-
-    if effective_mode == "offline":
-        return offline_url, online_url
-    return online_url, offline_url
+from backend.utils import resolve_domain_urls
 
 
 # ── Request body schemas ───────────────────────────────────────────────────────
@@ -127,8 +70,16 @@ async def get_aircraft_near_point(
     # Build a deterministic cache key from the query parameters
     cache_key = f"{lat:.4f}_{lon:.4f}_{radius}"
 
-    # Resolve connectivity mode first so cache hits respect the current mode
-    primary_url, fallback_url = await _get_air_urls(db)
+    # Resolve connectivity mode first so cache hits respect the current mode.
+    # resolve_domain_urls returns None for online_url when no URL is stored;
+    # fall back to the application default (adsb_upstream_base) in that case.
+    primary_url, fallback_url = await resolve_domain_urls("air", db)
+    if primary_url is None and fallback_url is None:
+        # No offline source either — use the built-in default online URL
+        primary_url = settings.adsb_upstream_base
+    elif primary_url is None and fallback_url is not None:
+        # Offline mode requested but no offline source configured → 503 below
+        pass
 
     # Look up any existing cache row for this key
     result = await db.execute(select(AdsbCache).where(AdsbCache.cache_key == cache_key))

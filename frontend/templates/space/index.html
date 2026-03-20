@@ -5,7 +5,7 @@
 {% endblock %}
 
 {% block content %}
-    <div id="no-url-overlay" class="no-url-overlay" style="display:none;">
+    <div id="no-url-overlay" class="no-url-overlay hidden">
         <div class="no-url-overlay-box">
             <div class="no-url-overlay-domain">SPACE</div>
             <div class="no-url-overlay-title">No Data Source Configured</div>
@@ -13,7 +13,7 @@
             <button class="no-url-overlay-btn" id="no-url-overlay-btn">Open Settings</button>
         </div>
     </div>
-    <div id="no-tle-overlay" class="no-url-overlay" style="display:none;">
+    <div id="no-tle-overlay" class="no-url-overlay hidden">
         <div class="no-url-overlay-box">
             <div class="no-url-overlay-domain">SPACE</div>
             <div class="no-url-overlay-title">No TLE Data Available</div>
@@ -40,9 +40,11 @@
     <script src="/frontend/components/space/init/space-overlay-reinit.js"></script>
 
     <!-- User location marker (must follow map alias and globals) -->
+    <script src="/frontend/components/shared/user-location/user-location-shared.js"></script>
     <script src="/frontend/components/space/user-location/space-user-location.js"></script>
 
     <!-- Side menu and boot -->
     <script src="/frontend/components/space/overlay/space-side-menu.js"></script>
+    <script src="/frontend/components/shared/init/logo-animation.js"></script>
     <script src="/frontend/components/space/init/space-boot.js"></script>
 {% endblock %}

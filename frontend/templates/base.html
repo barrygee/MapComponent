@@ -20,10 +20,10 @@
     <link href='https://fonts.googleapis.com/css2?family=Barlow:wght@100;300;400;500;600;700;900&family=Barlow+Condensed:wght@400;500;600;700;900&display=swap' rel='stylesheet' />
     <link rel="stylesheet" href="/frontend/components/shared/map/map.css">
     <link rel="stylesheet" href="/frontend/assets/template.css">
+    <link rel="stylesheet" href="/frontend/components/shared/user-location/user-location.css">
     <link rel="stylesheet" href="/frontend/components/shared/notifications/notifications.css">
     <link rel="stylesheet" href="/frontend/components/shared/tracking/tracking.css">
     <link rel="stylesheet" href="/frontend/components/shared/settings/settings.css">
-    <link rel="stylesheet" href="/frontend/components/air/overlay/side-menu.css">
     {% block head %}{% endblock %}
 </head>
 
@@ -107,11 +107,7 @@
     <script src="/frontend/components/shared/notifications/notifications.js"></script>
     <script src="/frontend/components/shared/tracking/tracking.js"></script>
     <script src="/frontend/components/shared/settings/settings.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            if (window._SettingsPanel) window._SettingsPanel.init();
-        });
-    </script>
+    <script src="/frontend/components/shared/settings/settings-init.js"></script>
 
     <!-- Map component -->
     <script src="/frontend/components/shared/map/map.js"></script>
