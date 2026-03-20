@@ -1333,7 +1333,7 @@ window._SettingsPanel = (function () {
         const searchInput = document.createElement('input');
         searchInput.type        = 'text';
         searchInput.className   = 'settings-datasource-input';
-        searchInput.placeholder = 'Filter by name or NORAD ID\u2026';
+        searchInput.placeholder = 'Filter by name, NORAD ID or category\u2026';
         searchInput.spellcheck  = false;
         searchRow.appendChild(searchLabel);
         searchRow.appendChild(searchInput);
@@ -1385,6 +1385,15 @@ window._SettingsPanel = (function () {
             countLine.textContent = `${sats.length} of ${_allSats.length} satellites`;
         }
 
+        function _applyFilters(): void {
+            const q = searchInput.value.trim().toLowerCase();
+            _renderTable(_allSats.filter(function (s) {
+                if (!q) return true;
+                const catLabel = s.category ? (_CAT_LABELS[s.category] ?? s.category) : '';
+                return s.name.toLowerCase().includes(q) || s.norad_id.includes(q) || catLabel.toLowerCase().includes(q);
+            }));
+        }
+
         async function _load(): Promise<void> {
             table.innerHTML = '<div class="tle-satlist-loading">Loading\u2026</div>';
             try {
@@ -1392,10 +1401,7 @@ window._SettingsPanel = (function () {
                 if (!resp.ok) throw new Error(resp.statusText);
                 const data = await resp.json() as { satellites: SatRow[] };
                 _allSats = data.satellites;
-                const q = searchInput.value.trim().toLowerCase();
-                _renderTable(q ? _allSats.filter(function (s) {
-                    return s.name.toLowerCase().includes(q) || s.norad_id.includes(q);
-                }) : _allSats);
+                _applyFilters();
             } catch (err) {
                 table.innerHTML = `<div class="tle-satlist-loading">Failed to load: ${(err as Error).message}</div>`;
             }
@@ -1408,14 +1414,8 @@ window._SettingsPanel = (function () {
             _load();
         });
 
-        // Live search filter
-        searchInput.addEventListener('input', function () {
-            const q = searchInput.value.trim().toLowerCase();
-            if (!q) { _renderTable(_allSats); return; }
-            _renderTable(_allSats.filter(function (s) {
-                return s.name.toLowerCase().includes(q) || s.norad_id.includes(q);
-            }));
-        });
+        // Live search / category filter
+        searchInput.addEventListener('input', _applyFilters);
 
         return wrap;
     }

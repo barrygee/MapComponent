@@ -1333,7 +1333,8 @@ class AdsbLiveControl {
                     pos.prevLon + (pos.lon - pos.prevLon) * t,
                     pos.prevLat + (pos.lat - pos.prevLat) * t,
                 ];
-            } else {
+            }
+            else {
                 coords = pos ? [pos.lon, pos.lat] : f.geometry.coordinates;
             }
             const stale = ageSec >= DIM_SEC ? 1 : 0;
@@ -1456,7 +1457,8 @@ class AdsbLiveControl {
                     }
                     else {
                         // Advance the lerp window: current target becomes the new origin
-                        existing.prevLon = existing.lon; existing.prevLat = existing.lat;
+                        existing.prevLon = existing.lon;
+                        existing.prevLat = existing.lat;
                         existing.prevSeen = existing.lastSeen;
                         existing.lon = a.lon;
                         existing.lat = a.lat;

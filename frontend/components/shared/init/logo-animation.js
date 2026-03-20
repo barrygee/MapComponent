@@ -8,13 +8,13 @@
 // ============================================================
 /// <reference path="../globals.d.ts" />
 (function () {
-    const logoSvg    = document.getElementById('logo-img');
+    const logoSvg = document.getElementById('logo-img');
     const logoTextEl = document.getElementById('logo-text-el');
-    const logoPinEl  = document.getElementById('logo-pin');
-    const logoSEl    = document.getElementById('logo-s-el');
+    const logoPinEl = document.getElementById('logo-pin');
+    const logoSEl = document.getElementById('logo-s-el');
     if (!logoSvg || !logoTextEl || !logoPinEl || !logoSEl)
         return;
-    let typeTimer  = null;
+    let typeTimer = null;
     let blinkTimer = null;
     function playLogoAnimation() {
         if (typeTimer)
@@ -33,10 +33,12 @@
                 typeTimer = setTimeout(typeNextChar, 75);
             }
             else {
+                // Finish SENTINEL, reveal pin and S
                 logoTextEl.textContent = WORD;
                 logoPinEl.setAttribute('opacity', '1');
                 logoSEl.textContent = 'S';
                 logoSEl.setAttribute('opacity', '1');
+                // Blink cursor after S
                 let blinks = 0;
                 blinkTimer = setInterval(() => {
                     blinks++;

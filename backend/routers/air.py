@@ -93,7 +93,7 @@ async def get_aircraft_near_point(
         try:
             data = await adsb_service.fetch_aircraft(lat, lon, radius, base_url)
             break
-        except (httpx.HTTPError, Exception):
+        except httpx.HTTPError:
             continue
 
     if data is not None:

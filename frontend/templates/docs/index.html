@@ -1,0 +1,590 @@
+{% extends "base.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/frontend/components/docs/docs.css">
+{% endblock %}
+
+{% block content %}
+<div id="docs-panel">
+
+    <!-- ── Sidebar ───────────────────────────────────────────────────────────── -->
+    <div id="docs-sidebar">
+        <nav id="docs-nav">
+            <a href="#overview"       class="docs-nav-item active">Overview</a>
+            <a href="#architecture"   class="docs-nav-item">Architecture</a>
+            <a href="#domains"        class="docs-nav-item">Domains</a>
+            <a href="#api"            class="docs-nav-item">API Reference</a>
+            <a href="#settings-guide" class="docs-nav-item">Settings</a>
+            <a href="#configuration"  class="docs-nav-item">Configuration</a>
+            <a href="#deployment"     class="docs-nav-item">Deployment</a>
+        </nav>
+    </div>
+
+    <!-- ── Content ──────────────────────────────────────────────────────────── -->
+    <div id="docs-content">
+        <div id="docs-body">
+
+            <!-- Overview ─────────────────────────────────────────────────────── -->
+            <section class="docs-section" id="overview">
+                <span class="docs-section-label">Introduction</span>
+                <h1 class="docs-section-title">Overview</h1>
+
+                <div class="docs-item">
+                    <p class="docs-item-desc">
+                        Sentinel is a real-time multi-domain surveillance dashboard for tracking
+                        activity across Air, Space, Sea, Land, and SDR domains. It combines a
+                        FastAPI backend with a MapLibre GL browser client to display live data on
+                        interactive maps.
+                    </p>
+                    <p class="docs-item-desc">
+                        The application is designed for offline-first operation: every domain
+                        supports configurable online and offline data sources, with automatic
+                        fallback when connectivity changes. A global connectivity mode and
+                        per-domain source overrides allow fine-grained control.
+                    </p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Tech Stack</h2>
+                    <table class="docs-table">
+                        <thead>
+                            <tr><th>Layer</th><th>Technology</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Backend</td><td>Python 3.12+, FastAPI, SQLAlchemy (async), aiosqlite</td></tr>
+                            <tr><td>Frontend</td><td>TypeScript, Vanilla JS (compiled), Jinja2 templates</td></tr>
+                            <tr><td>Maps</td><td>MapLibre GL JS, PMTiles (offline vector tiles)</td></tr>
+                            <tr><td>Database</td><td>SQLite via aiosqlite</td></tr>
+                            <tr><td>Satellite</td><td>sgp4 (TLE propagation), Celestrak TLE feeds</td></tr>
+                            <tr><td>Reverse proxy</td><td>nginx (Docker deployment)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <hr class="docs-divider">
+
+            <!-- Architecture ─────────────────────────────────────────────────── -->
+            <section class="docs-section" id="architecture">
+                <span class="docs-section-label">Structure</span>
+                <h1 class="docs-section-title">Architecture</h1>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Directory Layout</h2>
+                    <pre class="docs-pre">Sentinel/
+├── backend/                 FastAPI application
+│   ├── main.py              App factory, lifespan, page routes
+│   ├── config.py            Pydantic settings (TTLs, upstream URLs)
+│   ├── database.py          SQLAlchemy engine, session factory, seed data
+│   ├── models.py            ORM models (AdsbCache, TleCache, UserSettings …)
+│   ├── cache.py             TTL helpers (now_ms, is_fresh, is_within_stale)
+│   ├── utils.py             resolve_domain_urls — online/offline URL logic
+│   ├── routers/
+│   │   ├── air.py           ADS-B proxy, messages, tracking
+│   │   ├── space.py         ISS, day/night, TLE management
+│   │   ├── settings.py      User preferences (namespace/key/value store)
+│   │   ├── sea.py           Stub (not yet implemented)
+│   │   └── land.py          Stub (not yet implemented)
+│   └── services/
+│       ├── adsb.py          httpx client → airplanes.live
+│       ├── geocode.py       httpx client → Nominatim reverse geocode
+│       ├── satellite.py     TLE parsing, satellite catalogue management
+│       ├── tle.py           TLE cache fetch and refresh logic
+│       └── daynight.py      Day/night terminator calculation
+│
+├── frontend/
+│   ├── templates/           Jinja2 HTML templates (extend base.html)
+│   │   ├── base.html        Shared nav, footer, script/CSS includes
+│   │   ├── air/index.html
+│   │   ├── space/index.html
+│   │   └── docs/index.html
+│   ├── assets/              Static assets (MapLibre, PMTiles, fonts, sprites)
+│   └── components/
+│       ├── shared/          Shared UI components (settings, map, notifications…)
+│       ├── air/             AIR-domain components (adsb controls, overlay, init)
+│       ├── space/           SPACE-domain components
+│       └── docs/            Docs page CSS + JS
+│
+├── docker-compose.yml       nginx + FastAPI services
+├── Dockerfile               FastAPI container
+└── nginx.conf               Reverse proxy config</pre>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Request Flow</h2>
+                    <p class="docs-item-desc">
+                        All HTTP traffic enters via nginx (port 80/443 in Docker) which proxies
+                        to uvicorn on port 8000. Static assets are served directly by nginx from
+                        the <code>/frontend/assets</code> and <code>/frontend/components</code>
+                        directories. Page requests hit FastAPI which renders Jinja2 templates.
+                        API requests are handled by domain routers.
+                    </p>
+                    <pre class="docs-pre">Browser → nginx → uvicorn (FastAPI)
+                  ↓
+            Page route → Jinja2 template → HTML
+            API route  → Router handler → JSON
+            /assets    → StaticFiles mount</pre>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Database</h2>
+                    <p class="docs-item-desc">
+                        SQLite is used for all persistence. Tables are created automatically on
+                        startup via <code>create_tables()</code>. Default settings are seeded on
+                        first run via <code>seed_default_settings()</code>.
+                    </p>
+                    <table class="docs-table">
+                        <thead>
+                            <tr><th>Table</th><th>Purpose</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>adsb_cache</td><td>Write-through cache for ADS-B API responses (keyed by lat/lon/radius)</td></tr>
+                            <tr><td>tle_cache</td><td>Cached TLE elements from Celestrak or manual uploads</td></tr>
+                            <tr><td>satellite_catalogue</td><td>Permanent satellite identity records (name, NORAD ID, category)</td></tr>
+                            <tr><td>air_messages</td><td>Notification messages (emergencies, squawks, system alerts)</td></tr>
+                            <tr><td>air_tracking</td><td>Currently tracked aircraft (ICAO hex, callsign, follow mode)</td></tr>
+                            <tr><td>user_settings</td><td>User preferences stored as namespace / key / JSON-value triples</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Connectivity Model</h2>
+                    <p class="docs-item-desc">
+                        Each domain has two data source slots — <em>online</em> and <em>offline</em>.
+                        A global <code>connectivityMode</code> setting (online/offline) selects which
+                        slot is active. Individual domains can override this with a per-domain
+                        <code>sourceOverride</code> (auto / online / offline).
+                        <code>resolve_domain_urls()</code> in <code>utils.py</code> encapsulates
+                        this logic and returns the effective <em>(primary_url, fallback_url)</em>
+                        pair for any request.
+                    </p>
+                </div>
+            </section>
+
+            <hr class="docs-divider">
+
+            <!-- Domains ──────────────────────────────────────────────────────── -->
+            <section class="docs-section" id="domains">
+                <span class="docs-section-label">Domains</span>
+                <h1 class="docs-section-title">Domains</h1>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">AIR</h2>
+                    <p class="docs-item-desc">
+                        Real-time ADS-B aircraft tracking powered by the
+                        <a href="https://airplanes.live" style="color: var(--color-accent);">airplanes.live</a>
+                        API. The backend proxies requests to the upstream and caches responses in
+                        SQLite to reduce upstream calls (5 s TTL, 30 s stale window).
+                    </p>
+                    <p class="docs-item-desc">
+                        Aircraft are rendered as icons on a MapLibre map. Clicking an aircraft opens
+                        a detail panel with callsign, altitude, speed, and heading. Aircraft can be
+                        added to the tracking list which persists across sessions.
+                    </p>
+                    <p class="docs-item-desc">
+                        Notification messages (emergencies, special squawks) are stored in
+                        <code>air_messages</code> and displayed in the notification panel.
+                    </p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">SPACE</h2>
+                    <p class="docs-item-desc">
+                        Satellite tracking using SGP4 propagation from Two-Line Element (TLE) data.
+                        The ISS is tracked by default. TLE data is fetched from Celestrak and cached
+                        for 6 hours (stale window: 12 hours).
+                    </p>
+                    <p class="docs-item-desc">
+                        The day/night terminator is rendered as a GeoJSON overlay. TLE data can be
+                        managed via the Settings panel: fetch from a URL, upload a .txt file, assign
+                        categories to satellites, and clear the database.
+                    </p>
+                    <p class="docs-item-desc">
+                        Satellite categories: <code>space_station</code>, <code>amateur</code>,
+                        <code>weather</code>, <code>military</code>, <code>navigation</code>,
+                        <code>science</code>, <code>cubesat</code>, <code>active</code>, <code>unknown</code>.
+                    </p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">SEA / LAND / SDR</h2>
+                    <p class="docs-item-desc">
+                        These domains are currently stubs — the routing, template, and settings
+                        infrastructure is in place but data source integration is not yet
+                        implemented. The source override and URL settings are available and will
+                        be respected when functionality is added.
+                    </p>
+                </div>
+            </section>
+
+            <hr class="docs-divider">
+
+            <!-- API Reference ────────────────────────────────────────────────── -->
+            <section class="docs-section" id="api">
+                <span class="docs-section-label">Backend</span>
+                <h1 class="docs-section-title">API Reference</h1>
+
+                <span class="docs-group-label">Health</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/health</code></td>
+                            <td>Liveness probe — returns <code>{"status":"ok","timestamp":…}</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <span class="docs-group-label">Settings</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/settings</code></td>
+                            <td>All settings grouped by namespace <code>{"app":{"connectivityMode":"online",…}}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/settings/{namespace}</code></td>
+                            <td>Settings for one namespace as <code>{"key": value}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--put">PUT</span></td>
+                            <td><code>/api/settings/{namespace}/{key}</code></td>
+                            <td>Upsert a setting. Body: <code>{"value": any}</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <span class="docs-group-label">AIR — ADS-B</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/air/adsb/point/{lat}/{lon}/{radius}</code></td>
+                            <td>Aircraft within <em>radius</em> nm of a point. Cached 5 s. Returns <code>X-Cache: HIT|MISS|STALE</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/air/geocode/reverse?lat=&lon=</code></td>
+                            <td>Reverse geocode a coordinate via Nominatim</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <span class="docs-group-label">AIR — Messages</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/air/messages</code></td>
+                            <td>List non-dismissed messages, newest first</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/air/messages</code></td>
+                            <td>Create a message. Body: <code>{"msg_id","type","title","detail","ts"}</code>. Idempotent.</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--delete">DELETE</span></td>
+                            <td><code>/api/air/messages/{msg_id}</code></td>
+                            <td>Soft-delete (dismiss) a single message</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--delete">DELETE</span></td>
+                            <td><code>/api/air/messages</code></td>
+                            <td>Dismiss all messages</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <span class="docs-group-label">AIR — Tracking</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/air/tracking</code></td>
+                            <td>List tracked aircraft, most recently added first</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/air/tracking</code></td>
+                            <td>Track aircraft. Body: <code>{"hex","callsign","follow"}</code>. Updates if already tracked.</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--delete">DELETE</span></td>
+                            <td><code>/api/air/tracking/{hex}</code></td>
+                            <td>Stop tracking an aircraft by ICAO hex</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <span class="docs-group-label">SPACE — ISS &amp; Day/Night</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/space/iss</code></td>
+                            <td>Current ISS position, ground track (±2 orbits), and visibility footprint</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/space/iss/passes?lat=&lon=</code></td>
+                            <td>Predicted ISS passes over an observer location</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/space/daynight</code></td>
+                            <td>Day/night terminator as GeoJSON polygon</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <span class="docs-group-label">SPACE — TLE Management</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/space/tle/status</code></td>
+                            <td>TLE database summary — counts, per-category last-updated times</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/space/tle/uncategorised</code></td>
+                            <td>Satellites with no assigned category</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/space/tle/fetch</code></td>
+                            <td>Fetch TLE data from a URL. Body: <code>{"url","category"}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/space/tle/manual</code></td>
+                            <td>Store TLE from raw text. Body: <code>{"tle_text","category"}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--put">PATCH</span></td>
+                            <td><code>/api/space/tle/category</code></td>
+                            <td>Assign category to NORAD IDs. Body: <code>{"norad_ids":[],"category":""}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--delete">DELETE</span></td>
+                            <td><code>/api/space/tle?confirm=true</code></td>
+                            <td>Clear all TLE data. Requires <code>confirm=true</code> query param.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <hr class="docs-divider">
+
+            <!-- Settings Guide ───────────────────────────────────────────────── -->
+            <section class="docs-section" id="settings-guide">
+                <span class="docs-section-label">User Interface</span>
+                <h1 class="docs-section-title">Settings</h1>
+
+                <p class="docs-item-desc" style="margin-bottom: 32px;">
+                    Open the Settings panel using the gear icon in the bottom-right footer.
+                    Settings are saved to the backend database and synchronised with
+                    <code>localStorage</code> for instant load on next visit.
+                    Changes in the panel are staged until you click <strong>APPLY CHANGES</strong>.
+                </p>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">App Settings</h2>
+                    <table class="docs-table">
+                        <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td>Connectivity Mode</td><td>Global toggle between <em>online</em> and <em>offline</em> data sources across all domains.</td></tr>
+                            <tr><td>Connectivity Probe URL</td><td>A URL polled every 2 seconds to detect internet access. A failed fetch switches the indicator to offline.</td></tr>
+                            <tr><td>My Location</td><td>Fixed latitude/longitude used as the map centre and for range queries. Dispatches a <code>sentinel:setUserLocation</code> event on change.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Domain Settings (AIR / SEA / LAND)</h2>
+                    <table class="docs-table">
+                        <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td>Source Override</td><td><em>Auto</em> — follow app-level connectivity mode. <em>Online</em> or <em>Offline</em> — force a specific source regardless of app mode.</td></tr>
+                            <tr><td>Online Data Source</td><td>Base URL for the live upstream data feed.</td></tr>
+                            <tr><td>Offline Data Source</td><td>Base URL for a local network server (e.g. a self-hosted feed on <code>http://192.168.1.x:port</code>).</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">SPACE Settings</h2>
+                    <table class="docs-table">
+                        <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td>Online Data Source</td><td>Celestrak TLE feed URL. Select a category and click <em>UPDATE TLE</em> to fetch.</td></tr>
+                            <tr><td>TLE Import</td><td>Upload a <code>.txt</code> file of TLE data (standard two-line or three-line format).</td></tr>
+                            <tr><td>TLE Database</td><td>Summary of all loaded TLE data — satellite counts and per-category last-updated timestamps. Includes a <em>CLEAR ALL</em> button.</td></tr>
+                            <tr><td>Uncategorised Satellites</td><td>List of satellites imported without a category. Assign categories individually or in bulk.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Settings Storage</h2>
+                    <p class="docs-item-desc">
+                        Settings are stored with a three-tier strategy:
+                    </p>
+                    <table class="docs-table">
+                        <thead><tr><th>Tier</th><th>When used</th></tr></thead>
+                        <tbody>
+                            <tr><td>localStorage</td><td>Instant read on page load — avoids a network round-trip for every render.</td></tr>
+                            <tr><td>Backend (SQLite)</td><td>Persisted server-side — survives browser cache clears and syncs across devices/tabs.</td></tr>
+                            <tr><td>Reconciliation</td><td>On panel open, backend values are fetched and used to fill empty local fields.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <hr class="docs-divider">
+
+            <!-- Configuration ────────────────────────────────────────────────── -->
+            <section class="docs-section" id="configuration">
+                <span class="docs-section-label">Backend</span>
+                <h1 class="docs-section-title">Configuration</h1>
+
+                <p class="docs-item-desc" style="margin-bottom: 32px;">
+                    Backend configuration is handled by Pydantic Settings in
+                    <code>backend/config.py</code>. All values can be overridden via environment
+                    variables or a <code>.env</code> file in the project root.
+                </p>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Config Options</h2>
+                    <table class="docs-table">
+                        <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td>db_path</td><td><code>backend/sentinel.db</code></td><td>Path to the SQLite database file</td></tr>
+                            <tr><td>adsb_ttl_ms</td><td><code>5000</code></td><td>ADS-B cache TTL — how long a cached response is considered fresh (ms)</td></tr>
+                            <tr><td>adsb_stale_ms</td><td><code>30000</code></td><td>How long a stale ADS-B response can still be served if upstream fails (ms)</td></tr>
+                            <tr><td>adsb_upstream_base</td><td><code>https://api.airplanes.live/v2</code></td><td>Default ADS-B upstream base URL</td></tr>
+                            <tr><td>tle_ttl_ms</td><td><code>21600000</code> (6 h)</td><td>TLE cache TTL — Celestrak updates daily so 6 h is sufficient</td></tr>
+                            <tr><td>tle_stale_ms</td><td><code>43200000</code> (12 h)</td><td>Stale TLE window — serve old data if Celestrak is unreachable</td></tr>
+                            <tr><td>tle_manual_ttl_ms</td><td><code>2592000000</code> (30 d)</td><td>TTL for manually-uploaded TLE data</td></tr>
+                            <tr><td>celestrak_iss_url</td><td><code>celestrak.org/NORAD/elements/gp.php?…</code></td><td>Default Celestrak TLE feed URL</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Default Settings (seeded on first run)</h2>
+                    <table class="docs-table">
+                        <thead><tr><th>Namespace</th><th>Key</th><th>Default value</th></tr></thead>
+                        <tbody>
+                            <tr><td>app</td><td>connectivityProbeUrl</td><td><code>https://tile.openstreetmap.org/favicon.ico</code></td></tr>
+                            <tr><td>app</td><td>connectivityMode</td><td><code>online</code></td></tr>
+                            <tr><td>air</td><td>sourceOverride</td><td><code>auto</code></td></tr>
+                            <tr><td>air</td><td>onlineUrl</td><td><code>https://api.airplanes.live/v2</code></td></tr>
+                            <tr><td>space</td><td>sourceOverride</td><td><code>auto</code></td></tr>
+                            <tr><td>space</td><td>onlineUrl</td><td>Celestrak active satellites TLE feed</td></tr>
+                            <tr><td>sea</td><td>sourceOverride</td><td><code>auto</code></td></tr>
+                            <tr><td>land</td><td>sourceOverride</td><td><code>auto</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <hr class="docs-divider">
+
+            <!-- Deployment ───────────────────────────────────────────────────── -->
+            <section class="docs-section" id="deployment">
+                <span class="docs-section-label">Infrastructure</span>
+                <h1 class="docs-section-title">Deployment</h1>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Docker (recommended)</h2>
+                    <p class="docs-item-desc">
+                        The project ships with a <code>docker-compose.yml</code> that runs nginx
+                        as a reverse proxy in front of the FastAPI container.
+                    </p>
+                    <pre class="docs-pre">docker compose up --build</pre>
+                    <p class="docs-item-desc">
+                        The app will be available at <code>http://localhost</code> (port 80).
+                        nginx serves static files directly and proxies all other requests to
+                        uvicorn on port 8000.
+                    </p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Local Development</h2>
+                    <p class="docs-item-desc">
+                        Run the FastAPI backend with hot-reload:
+                    </p>
+                    <pre class="docs-pre">cd /path/to/Sentinel
+python -m venv backend/.venv
+source backend/.venv/bin/activate
+pip install -e "backend[dev]"
+uvicorn backend.main:app --reload --port 8000</pre>
+                    <p class="docs-item-desc">
+                        The app will be available at <code>http://localhost:8000</code>.
+                        FastAPI's interactive API docs (Swagger UI) are at
+                        <code>http://localhost:8000/docs</code>.
+                    </p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Frontend Build</h2>
+                    <p class="docs-item-desc">
+                        TypeScript source files in <code>frontend/components/</code> are compiled
+                        to plain JavaScript. The compiled <code>.js</code> files are committed
+                        alongside the <code>.ts</code> sources.
+                    </p>
+                    <pre class="docs-pre"># One-time build
+npm run build
+
+# Watch mode (recompiles on save)
+npm run watch
+
+# Type-check only
+npm run typecheck</pre>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">nginx Config</h2>
+                    <p class="docs-item-desc">
+                        <code>nginx.conf</code> proxies all requests to uvicorn. Static files
+                        under <code>/assets/</code> are served directly with long cache headers.
+                        The proxy passes standard forwarding headers
+                        (<code>X-Real-IP</code>, <code>X-Forwarded-For</code>).
+                    </p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Environment Variables</h2>
+                    <p class="docs-item-desc">
+                        All <code>backend/config.py</code> settings can be overridden at runtime
+                        via environment variables (uppercase, same name) or a <code>.env</code>
+                        file. For Docker deployments, set them in <code>docker-compose.yml</code>
+                        under the <code>environment:</code> key.
+                    </p>
+                    <pre class="docs-pre"># Example .env
+ADSB_UPSTREAM_BASE=https://my-custom-feed.example.com/v2
+DB_PATH=/data/sentinel.db
+TLE_TTL_MS=3600000</pre>
+                </div>
+            </section>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/frontend/components/docs/docs.js"></script>
+{% endblock %}

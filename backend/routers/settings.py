@@ -52,16 +52,11 @@ async def get_all_settings(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(UserSettings))
     rows = result.scalars().all()
 
-    grouped: dict[str, dict] = {}
+    grouped: dict[str, list] = {}
     for row in rows:
-        if row.namespace not in grouped:
-            grouped[row.namespace] = {}
-        try:
-            grouped[row.namespace][row.key] = json.loads(row.value)
-        except (json.JSONDecodeError, TypeError):
-            grouped[row.namespace][row.key] = row.value
+        grouped.setdefault(row.namespace, []).append(row)
 
-    return JSONResponse(grouped)
+    return JSONResponse({ns: _rows_to_namespace_dict(ns_rows) for ns, ns_rows in grouped.items()})
 
 
 @router.get("/{namespace}")

@@ -39,8 +39,8 @@ async def create_tables():
                     "ALTER TABLE satellite_catalogue ADD COLUMN name_source TEXT"
                 )
             )
-        except Exception:
-            pass  # column already exists
+        except Exception:  # noqa: BLE001 — SQLite raises OperationalError if column exists
+            pass
 
 
 async def get_db():

@@ -58,29 +58,16 @@ async def root_redirect():
     return RedirectResponse(url="/air/", status_code=302)
 
 
-@app.get("/air/")
-async def air_page(request: Request):
-    return templates.TemplateResponse("air/index.html", {"request": request, "domain": "air"})
+def _make_page_handler(domain: str):
+    """Return a route handler that renders the template for the given domain."""
+    async def handler(request: Request):
+        return templates.TemplateResponse(f"{domain}/index.html", {"request": request, "domain": domain})
+    handler.__name__ = f"{domain}_page"
+    return handler
 
 
-@app.get("/sea/")
-async def sea_page(request: Request):
-    return templates.TemplateResponse("sea/index.html", {"request": request, "domain": "sea"})
-
-
-@app.get("/space/")
-async def space_page(request: Request):
-    return templates.TemplateResponse("space/index.html", {"request": request, "domain": "space"})
-
-
-@app.get("/land/")
-async def land_page(request: Request):
-    return templates.TemplateResponse("land/index.html", {"request": request, "domain": "land"})
-
-
-@app.get("/sdr/")
-async def sdr_page(request: Request):
-    return templates.TemplateResponse("sdr/index.html", {"request": request, "domain": "sdr"})
+for _domain in ("air", "sea", "space", "land", "sdr", "docs"):
+    app.add_api_route(f"/{_domain}/", _make_page_handler(_domain), methods=["GET"])
 
 
 # ── Static files ───────────────────────────────────────────────────────────────
