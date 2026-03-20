@@ -1322,8 +1322,20 @@ class AdsbLiveControl {
             const hex = f.properties.hex;
             const pos = this._lastPositions[hex];
             const ageSec = pos ? (now - pos.lastSeen) / 1000 : 0;
-            // Hold the plane at its last known position until new data arrives or REMOVE_SEC expires.
-            const coords = pos ? [pos.lon, pos.lat] : f.geometry.coordinates;
+            let coords;
+            if (pos && pos.prevSeen !== pos.lastSeen) {
+                // Lerp from previous fix toward current fix over the poll window.
+                // t is how far through the window we are since the new fix arrived.
+                const window = pos.lastSeen - pos.prevSeen;
+                const elapsed = now - pos.lastSeen;
+                const t = Math.min(elapsed / window, 1);
+                coords = [
+                    pos.prevLon + (pos.lon - pos.prevLon) * t,
+                    pos.prevLat + (pos.lat - pos.prevLat) * t,
+                ];
+            } else {
+                coords = pos ? [pos.lon, pos.lat] : f.geometry.coordinates;
+            }
             const stale = ageSec >= DIM_SEC ? 1 : 0;
             return { ...f, geometry: { type: 'Point', coordinates: coords }, properties: { ...f.properties, stale } };
         });
@@ -1440,13 +1452,14 @@ class AdsbLiveControl {
                     const lastSeen = Date.now();
                     const existing = this._lastPositions[hex];
                     if (!existing) {
-                        this._lastPositions[hex] = { lon: a.lon, lat: a.lat, gs: a.gs ?? 0, track: a.track ?? null, lastSeen, baseLon: a.lon, baseLat: a.lat };
+                        this._lastPositions[hex] = { lon: a.lon, lat: a.lat, gs: a.gs ?? 0, track: a.track ?? null, lastSeen, prevLon: a.lon, prevLat: a.lat, prevSeen: lastSeen };
                     }
                     else {
+                        // Advance the lerp window: current target becomes the new origin
+                        existing.prevLon = existing.lon; existing.prevLat = existing.lat;
+                        existing.prevSeen = existing.lastSeen;
                         existing.lon = a.lon;
                         existing.lat = a.lat;
-                        existing.baseLon = a.lon;
-                        existing.baseLat = a.lat;
                         existing.gs = a.gs ?? 0;
                         existing.track = a.track ?? null;
                         existing.lastSeen = lastSeen;
