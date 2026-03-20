@@ -2,7 +2,7 @@
 // ============================================================
 // ADS-B LIVE CONTROL
 // Polls airplanes.live API (via backend proxy) every 5s,
-// dead-reckons positions every 100ms, renders aircraft as
+// holds aircraft at last known position (removes after 60s no data), renders aircraft as
 // canvas sprites in MapLibre symbol layers, manages click/hover
 // data tags, trail history, tracking, squawk emergency detection,
 // and departure/landing notifications.
@@ -361,23 +361,25 @@ class AdsbLiveControl {
     }
     // ---- Sprite registration ----
     _registerIcons() {
-        const toRemove = ['adsb-bracket', 'adsb-bracket-mil', 'adsb-bracket-emerg',
-            'adsb-blip', 'adsb-blip-mil', 'adsb-blip-emerg', 'adsb-blip-uav',
-            'adsb-blip-gnd', 'adsb-blip-tower', 'adsb-blip-emerg-gnd',
-            'adsb-bracket-emerg-gnd'];
-        toRemove.forEach(name => { if (this.map.hasImage(name))
-            this.map.removeImage(name); });
-        this.map.addImage('adsb-bracket', this._createBracket(), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-bracket-mil', this._createMilBracket(), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-bracket-emerg', this._createBracket('#ff2222'), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-bracket-emerg-gnd', this._createBracket('#ff2222'), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip', this._createRadarBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-mil', this._createRadarBlip('#c8ff00', 1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-emerg', this._createRadarBlip('#ff2222', 1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-uav', this._createUAVBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-gnd', this._createGroundVehicleBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-emerg-gnd', this._createGroundVehicleBlip('#ff2222', 1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-tower', this._createTowerBlip(1.1), { pixelRatio: 2, sdf: false });
+        const _addOrUpdate = (name, data, options) => {
+            if (this.map.hasImage(name)) {
+                this.map.updateImage(name, data);
+            }
+            else {
+                this.map.addImage(name, data, options);
+            }
+        };
+        _addOrUpdate('adsb-bracket', this._createBracket(), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-bracket-mil', this._createMilBracket(), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-bracket-emerg', this._createBracket('#ff2222'), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-bracket-emerg-gnd', this._createBracket('#ff2222'), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip', this._createRadarBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-mil', this._createRadarBlip('#c8ff00', 1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-emerg', this._createRadarBlip('#ff2222', 1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-uav', this._createUAVBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-gnd', this._createGroundVehicleBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-emerg-gnd', this._createGroundVehicleBlip('#ff2222', 1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-tower', this._createTowerBlip(1.1), { pixelRatio: 2, sdf: false });
     }
     // ---- Map layer initialisation ----
     initLayers() {
@@ -412,8 +414,19 @@ class AdsbLiveControl {
             if (this.map.getSource(id))
                 this.map.removeSource(id);
         });
-        // Clear stale data so a style reload (e.g. online→offline with no offline URL)
-        // never re-renders old data from the previous source.
+        // Preserve aircraft data across style reloads — sources/layers must be re-added
+        // after setStyle() destroys them, but the data itself must survive so planes don't
+        // vanish. Deliberate data wipes (going offline) are handled by _clearAdsbAircraft().
+        const _savedGeojson = this._geojson;
+        const _savedTrailsGeojson = this._trailsGeojson;
+        const _savedTrails = this._trails;
+        const _savedLastPositions = this._lastPositions;
+        const _savedInterpolated = this._interpolatedFeatures;
+        const _savedPrevAlt = this._prevAlt;
+        const _savedHasDeparted = this._hasDeparted;
+        const _savedSeenOnGround = this._seenOnGround;
+        const _savedLandedAt = this._landedAt;
+        const _savedPrevSquawk = this._prevSquawk;
         this._geojson = { type: 'FeatureCollection', features: [] };
         this._trailsGeojson = { type: 'FeatureCollection', features: [] };
         this._trails = {};
@@ -492,6 +505,25 @@ class AdsbLiveControl {
                 'icon-opacity-transition': { duration: 0 },
             },
         });
+        // Restore aircraft data into the freshly re-created sources.
+        this._geojson = _savedGeojson;
+        this._trailsGeojson = _savedTrailsGeojson;
+        this._trails = _savedTrails;
+        this._lastPositions = _savedLastPositions;
+        this._interpolatedFeatures = _savedInterpolated;
+        this._prevAlt = _savedPrevAlt;
+        this._hasDeparted = _savedHasDeparted;
+        this._seenOnGround = _savedSeenOnGround;
+        this._landedAt = _savedLandedAt;
+        this._prevSquawk = _savedPrevSquawk;
+        try {
+            const renderData = (this._interpolatedFeatures && this._interpolatedFeatures.length)
+                ? { type: 'FeatureCollection', features: this._interpolatedFeatures }
+                : this._geojson;
+            this.map.getSource('adsb-live')?.setData(renderData);
+            this.map.getSource('adsb-trails-source')?.setData(this._trailsGeojson);
+        }
+        catch (e) { }
         if (!this._eventsAdded) {
             this._eventsAdded = true;
             let _clickHandled = false;
@@ -1129,19 +1161,18 @@ class AdsbLiveControl {
                 continue;
             }
             const lngLat = this._interpolatedCoords(hex) || f.geometry.coordinates;
-            const pos = this._lastPositions[hex];
-            const ageSec = pos ? (Date.now() - pos.lastSeen) / 1000 : 0;
-            const isStale = ageSec >= 30 && f.properties.alt_baro !== 0;
+            const pos2 = this._lastPositions[hex];
+            const isDim = pos2 ? (Date.now() - pos2.lastSeen) / 1000 >= 45 : false;
             if (this._callsignMarkers[hex]) {
                 this._callsignMarkers[hex].setLngLat(lngLat);
                 const labelEl = this._callsignMarkers[hex].getElement();
                 const raw = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || f.properties.hex || '';
                 const isEmerg = f.properties.squawkEmerg === 1;
                 labelEl.style.background = isEmerg ? 'rgba(180,0,0,0.85)' : 'rgba(0,0,0,0.5)';
-                labelEl.style.opacity = isStale ? '0.3' : '1';
+                labelEl.style.opacity = isDim ? '0.3' : '1';
                 const nameSpan = labelEl.querySelector('span:not(.sqk-badge):not(.mil-model-badge)') || labelEl;
                 nameSpan.textContent = raw || 'UNKNOWN';
-                nameSpan.style.cssText = isStale ? 'color:rgba(255,255,255,0.45) !important' : 'color:#ffffff !important';
+                nameSpan.style.cssText = isDim ? 'color:rgba(255,255,255,0.45) !important' : 'color:#ffffff !important';
                 if (f.properties.military) {
                     const isTracked = this._notifEnabled.has(hex);
                     const hasBadge = !!f.properties.t;
@@ -1205,7 +1236,7 @@ class AdsbLiveControl {
             }
             else {
                 const labelEl = this._buildCallsignLabelEl(f.properties);
-                if (isStale) {
+                if (isDim) {
                     labelEl.style.opacity = '0.3';
                     const nameSpan = labelEl.querySelector('span:not(.sqk-badge):not(.mil-model-badge)');
                     if (nameSpan)
@@ -1266,12 +1297,12 @@ class AdsbLiveControl {
             this.map.getSource('adsb-trails-source').setData(this._trailsGeojson);
         }
     }
-    // ---- Dead-reckoning interpolator ----
+    // ---- Position hold / stale removal ----
     _interpolate() {
         if (!this.map || !this._geojson.features.length)
             return;
         const now = Date.now();
-        const NM_DEG = 1 / 60, HR_SEC = 3600, STALE_SEC = 30, REMOVE_SEC = 60;
+        const DIM_SEC = 45, REMOVE_SEC = 60;
         this._geojson.features = this._geojson.features.filter(f => {
             const pos = this._lastPositions[f.properties.hex];
             if (!pos)
@@ -1291,31 +1322,14 @@ class AdsbLiveControl {
             const hex = f.properties.hex;
             const pos = this._lastPositions[hex];
             const ageSec = pos ? (now - pos.lastSeen) / 1000 : 0;
-            const onGround = f.properties.alt_baro === 0;
-            if (onGround) {
-                const groundStale = ageSec >= STALE_SEC;
-                if (!pos || pos.gs < 10 || groundStale || pos.track === null) {
-                    const coords = pos ? [pos.lon, pos.lat] : f.geometry.coordinates;
-                    return { ...f, geometry: { type: 'Point', coordinates: coords }, properties: { ...f.properties, stale: 0 } };
-                }
-            }
-            else {
-                const stale = ageSec >= STALE_SEC ? 1 : 0;
-                if (!pos || pos.gs < 10 || stale) {
-                    const coords = pos ? [pos.lon, pos.lat] : f.geometry.coordinates;
-                    return { ...f, geometry: { type: 'Point', coordinates: coords }, properties: { ...f.properties, stale } };
-                }
-            }
-            const trackRad = pos.track * Math.PI / 180;
-            const nmPerSec = pos.gs / HR_SEC;
-            const dLat = nmPerSec * ageSec * Math.cos(trackRad) * NM_DEG;
-            const dLon = nmPerSec * ageSec * Math.sin(trackRad) * NM_DEG / Math.cos(pos.lat * Math.PI / 180);
-            return { ...f, geometry: { type: 'Point', coordinates: [pos.lon + dLon, pos.lat + dLat] }, properties: { ...f.properties, stale: 0 } };
+            // Hold the plane at its last known position until new data arrives or REMOVE_SEC expires.
+            const coords = pos ? [pos.lon, pos.lat] : f.geometry.coordinates;
+            const stale = ageSec >= DIM_SEC ? 1 : 0;
+            return { ...f, geometry: { type: 'Point', coordinates: coords }, properties: { ...f.properties, stale } };
         });
         if (this.map.getSource('adsb-live')) {
             this.map.getSource('adsb-live')
                 .setData({ type: 'FeatureCollection', features: this._interpolatedFeatures });
-            this._applyTypeFilter();
         }
         if (this._tagMarker && this._tagHex) {
             const f = this._interpolatedFeatures.find(f => f.properties.hex === this._tagHex);
@@ -1377,14 +1391,20 @@ class AdsbLiveControl {
                         this._startPolling(); }, 30000);
                     return;
                 }
-                this._geojson = { type: 'FeatureCollection', features: [] };
-                this._lastPositions = {};
-                this._clearCallsignMarkers();
-                try {
-                    this.map.getSource('adsb-live')
-                        ?.setData(this._geojson);
+                // Transient error — don't clear planes immediately; interpolation will
+                // fade and remove stale aircraft naturally. Only clear after 3 failures.
+                this._fetchFailCount++;
+                if (this._fetchFailCount >= 3) {
+                    this._fetchFailCount = 0;
+                    this._geojson = { type: 'FeatureCollection', features: [] };
+                    this._lastPositions = {};
+                    this._clearCallsignMarkers();
+                    try {
+                        this.map.getSource('adsb-live')
+                            ?.setData(this._geojson);
+                    }
+                    catch (e) { }
                 }
-                catch (e) { }
                 this._isFetching = false;
                 return;
             }
@@ -1392,152 +1412,162 @@ class AdsbLiveControl {
             const data = await resp.json();
             const aircraft = (data.ac || []);
             const seen = new Set();
-            this._geojson = {
-                type: 'FeatureCollection',
-                features: aircraft
-                    .filter(a => a.lat != null && a.lon != null && !['A0', 'B0', 'C0'].includes((a.category || '').toUpperCase()))
-                    .map(a => {
-                    const alt = this._parseAlt(a.alt_baro ?? null);
-                    const hex = a.hex || '';
-                    seen.add(hex);
-                    if (hex) {
-                        if (!this._trails[hex])
-                            this._trails[hex] = [];
-                        const trail = this._trails[hex];
-                        const last = trail[trail.length - 1];
-                        if (!last || last.lon !== a.lon || last.lat !== a.lat) {
-                            trail.push({ lon: a.lon, lat: a.lat, alt });
-                            if (trail.length > this._MAX_TRAIL)
-                                trail.shift();
-                        }
+            // Build a lookup of existing features so we can merge rather than replace.
+            // Merging keeps aircraft visible between fetches (the API doesn't return every
+            // aircraft every cycle) and avoids snapping positions back to raw API coords.
+            const existingByHex = new Map();
+            for (const f of this._geojson.features) {
+                if (f.properties.hex)
+                    existingByHex.set(f.properties.hex, f);
+            }
+            const newFeatures = [];
+            for (const a of aircraft.filter(a => a.lat != null && a.lon != null && !['A0', 'B0', 'C0'].includes((a.category || '').toUpperCase()))) {
+                const alt = this._parseAlt(a.alt_baro ?? null);
+                const hex = a.hex || '';
+                seen.add(hex);
+                if (hex) {
+                    if (!this._trails[hex])
+                        this._trails[hex] = [];
+                    const trail = this._trails[hex];
+                    const last = trail[trail.length - 1];
+                    if (!last || last.lon !== a.lon || last.lat !== a.lat) {
+                        trail.push({ lon: a.lon, lat: a.lat, alt });
+                        if (trail.length > this._MAX_TRAIL)
+                            trail.shift();
                     }
-                    if (hex) {
-                        const lastSeen = Date.now() - (a.seen_pos ?? 0) * 1000;
-                        const existing = this._lastPositions[hex];
-                        if (!existing) {
-                            this._lastPositions[hex] = { lon: a.lon, lat: a.lat, gs: a.gs ?? 0, track: a.track ?? null, lastSeen };
-                        }
-                        else {
-                            existing.lon = a.lon;
-                            existing.lat = a.lat;
-                            existing.gs = a.gs ?? 0;
-                            existing.track = a.track ?? null;
-                            existing.lastSeen = lastSeen;
-                        }
+                }
+                if (hex) {
+                    const lastSeen = Date.now();
+                    const existing = this._lastPositions[hex];
+                    if (!existing) {
+                        this._lastPositions[hex] = { lon: a.lon, lat: a.lat, gs: a.gs ?? 0, track: a.track ?? null, lastSeen, baseLon: a.lon, baseLat: a.lat };
                     }
-                    if (hex) {
-                        const prevAlt = this._prevAlt[hex];
-                        const gs = a.gs ?? 0;
-                        const justLanded = (prevAlt !== undefined && prevAlt > 0 && alt === 0);
-                        if (justLanded)
-                            this._landedAt[hex] = Date.now();
-                        if (alt === 0 && this._notifEnabled.has(hex))
-                            this._seenOnGround[hex] = true;
-                        const justDeparted = (alt > 0 && gs > 0 &&
-                            !this._hasDeparted[hex] &&
-                            this._seenOnGround[hex] &&
-                            this._notifEnabled.has(hex));
-                        this._prevAlt[hex] = alt;
-                        if (alt === 0)
-                            this._hasDeparted[hex] = false;
-                        const _nearestAirport = (aLat, aLon) => {
-                            let best = null, bestDist = Infinity;
-                            for (const f of AIRPORTS_DATA.features) {
-                                const [fLon, fLat] = f.geometry.coordinates;
-                                const dLat = (aLat - fLat) * Math.PI / 180;
-                                const dLon = (aLon - fLon) * Math.PI / 180;
-                                const a2 = Math.sin(dLat / 2) ** 2 + Math.cos(fLat * Math.PI / 180) * Math.cos(aLat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-                                const dist = 2 * Math.atan2(Math.sqrt(a2), Math.sqrt(1 - a2));
-                                if (dist < bestDist) {
-                                    bestDist = dist;
-                                    best = f.properties;
-                                }
-                            }
-                            return best;
-                        };
-                        if (justDeparted) {
-                            this._hasDeparted[hex] = true;
-                            const callsign = (a.flight || '').trim() || (a.r || '').trim();
-                            const apt = _nearestAirport(a.lat, a.lon);
-                            window._Notifications.add({ type: 'departure', title: callsign, ...(apt ? { detail: `${apt.name} (${apt.icao})` } : {}) });
-                        }
-                        if (justLanded && this._notifEnabled.has(hex)) {
-                            const callsign = (a.flight || '').trim() || (a.r || '').trim();
-                            const apt = _nearestAirport(a.lat, a.lon);
-                            window._Notifications.add({ type: 'flight', title: callsign, ...(apt ? { detail: `${apt.name} (${apt.icao})` } : {}) });
-                            if (this._parkedTimers[hex])
-                                clearTimeout(this._parkedTimers[hex]);
-                            this._parkedTimers[hex] = setTimeout(() => {
-                                delete this._parkedTimers[hex];
-                                delete this._prevAlt[hex];
-                                delete this._hasDeparted[hex];
-                                delete this._trails[hex];
-                                delete this._lastPositions[hex];
-                                this._geojson = { type: 'FeatureCollection', features: this._geojson.features.filter(f => f.properties.hex !== hex) };
-                                if (this._interpolatedFeatures)
-                                    this._interpolatedFeatures = this._interpolatedFeatures.filter(f => f.properties.hex !== hex);
-                                if (this._callsignMarkers[hex]) {
-                                    this._callsignMarkers[hex].remove();
-                                    delete this._callsignMarkers[hex];
-                                }
-                                if (this._selectedHex === hex) {
-                                    this._selectedHex = null;
-                                    this._followEnabled = false;
-                                    this._hideSelectedTag();
-                                    this._hideStatusBar();
-                                }
-                                this._rebuildTrails();
-                                this._interpolate();
-                            }, 60 * 1000);
-                        }
-                        if (alt > 0 && this._parkedTimers[hex]) {
-                            clearTimeout(this._parkedTimers[hex]);
-                            delete this._parkedTimers[hex];
-                        }
+                    else {
+                        existing.lon = a.lon;
+                        existing.lat = a.lat;
+                        existing.baseLon = a.lon;
+                        existing.baseLat = a.lat;
+                        existing.gs = a.gs ?? 0;
+                        existing.track = a.track ?? null;
+                        existing.lastSeen = lastSeen;
                     }
+                }
+                if (hex) {
+                    const prevAlt = this._prevAlt[hex];
                     const gs = a.gs ?? 0;
-                    const hexInt = parseInt(hex, 16);
-                    const military = a.t !== 'LAAD'
-                        && (a.military === true
-                            || (hexInt >= 0x43C000 && hexInt <= 0x43FFFF)
-                            || (hexInt >= 0xAE0000 && hexInt <= 0xAFFFFF));
-                    return {
-                        type: 'Feature',
-                        geometry: { type: 'Point', coordinates: [a.lon, a.lat] },
-                        properties: {
-                            hex, flight: (a.flight || '').trim(), r: a.r || '', t: a.t || '',
-                            alt_baro: alt, alt_geom: a.alt_geom ?? null, gs,
-                            ias: a.ias ?? null, mach: a.mach ?? null,
-                            track: a.track ?? 0, baro_rate: a.baro_rate ?? 0,
-                            nav_altitude: a.nav_altitude_mcp ?? a.nav_altitude_fms ?? null,
-                            nav_heading: a.nav_heading ?? null,
-                            category: (a.category || '').toUpperCase(),
-                            emergency: a.emergency || '', squawk: a.squawk || '',
-                            squawkEmerg: this._emergencySquawks.has(a.squawk || '') ? 1 : 0,
-                            rssi: a.rssi ?? null, military,
-                            stale: 0,
-                        },
+                    const justLanded = (prevAlt !== undefined && prevAlt > 0 && alt === 0);
+                    if (justLanded)
+                        this._landedAt[hex] = Date.now();
+                    if (alt === 0 && this._notifEnabled.has(hex))
+                        this._seenOnGround[hex] = true;
+                    const justDeparted = (alt > 0 && gs > 0 &&
+                        !this._hasDeparted[hex] &&
+                        this._seenOnGround[hex] &&
+                        this._notifEnabled.has(hex));
+                    this._prevAlt[hex] = alt;
+                    if (alt === 0)
+                        this._hasDeparted[hex] = false;
+                    const _nearestAirport = (aLat, aLon) => {
+                        let best = null, bestDist = Infinity;
+                        for (const f of AIRPORTS_DATA.features) {
+                            const [fLon, fLat] = f.geometry.coordinates;
+                            const dLat = (aLat - fLat) * Math.PI / 180;
+                            const dLon = (aLon - fLon) * Math.PI / 180;
+                            const a2 = Math.sin(dLat / 2) ** 2 + Math.cos(fLat * Math.PI / 180) * Math.cos(aLat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+                            const dist = 2 * Math.atan2(Math.sqrt(a2), Math.sqrt(1 - a2));
+                            if (dist < bestDist) {
+                                bestDist = dist;
+                                best = f.properties;
+                            }
+                        }
+                        return best;
                     };
-                }),
-            };
-            for (const hex of Object.keys(this._trails)) {
-                if (!seen.has(hex))
-                    delete this._trails[hex];
+                    if (justDeparted) {
+                        this._hasDeparted[hex] = true;
+                        const callsign = (a.flight || '').trim() || (a.r || '').trim();
+                        const apt = _nearestAirport(a.lat, a.lon);
+                        window._Notifications.add({ type: 'departure', title: callsign, ...(apt ? { detail: `${apt.name} (${apt.icao})` } : {}) });
+                    }
+                    if (justLanded && this._notifEnabled.has(hex)) {
+                        const callsign = (a.flight || '').trim() || (a.r || '').trim();
+                        const apt = _nearestAirport(a.lat, a.lon);
+                        window._Notifications.add({ type: 'flight', title: callsign, ...(apt ? { detail: `${apt.name} (${apt.icao})` } : {}) });
+                        if (this._parkedTimers[hex])
+                            clearTimeout(this._parkedTimers[hex]);
+                        this._parkedTimers[hex] = setTimeout(() => {
+                            delete this._parkedTimers[hex];
+                            delete this._prevAlt[hex];
+                            delete this._hasDeparted[hex];
+                            delete this._trails[hex];
+                            delete this._lastPositions[hex];
+                            this._geojson = { type: 'FeatureCollection', features: this._geojson.features.filter(f => f.properties.hex !== hex) };
+                            if (this._interpolatedFeatures)
+                                this._interpolatedFeatures = this._interpolatedFeatures.filter(f => f.properties.hex !== hex);
+                            if (this._callsignMarkers[hex]) {
+                                this._callsignMarkers[hex].remove();
+                                delete this._callsignMarkers[hex];
+                            }
+                            if (this._selectedHex === hex) {
+                                this._selectedHex = null;
+                                this._followEnabled = false;
+                                this._hideSelectedTag();
+                                this._hideStatusBar();
+                            }
+                            this._rebuildTrails();
+                            this._interpolate();
+                        }, 60 * 1000);
+                    }
+                    if (alt > 0 && this._parkedTimers[hex]) {
+                        clearTimeout(this._parkedTimers[hex]);
+                        delete this._parkedTimers[hex];
+                    }
+                }
+                const gs = a.gs ?? 0;
+                const hexInt = parseInt(hex, 16);
+                const military = a.t !== 'LAAD'
+                    && (a.military === true
+                        || (hexInt >= 0x43C000 && hexInt <= 0x43FFFF)
+                        || (hexInt >= 0xAE0000 && hexInt <= 0xAFFFFF));
+                const coords = [a.lon, a.lat];
+                newFeatures.push({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: coords },
+                    properties: {
+                        hex, flight: (a.flight || '').trim(), r: a.r || '', t: a.t || '',
+                        alt_baro: alt, alt_geom: a.alt_geom ?? null, gs,
+                        ias: a.ias ?? null, mach: a.mach ?? null,
+                        track: a.track ?? 0, baro_rate: a.baro_rate ?? 0,
+                        nav_altitude: a.nav_altitude_mcp ?? a.nav_altitude_fms ?? null,
+                        nav_heading: a.nav_heading ?? null,
+                        category: (a.category || '').toUpperCase(),
+                        emergency: a.emergency || '', squawk: a.squawk || '',
+                        squawkEmerg: this._emergencySquawks.has(a.squawk || '') ? 1 : 0,
+                        rssi: a.rssi ?? null, military,
+                        stale: 0,
+                    },
+                });
+                existingByHex.delete(hex);
             }
-            for (const hex of Object.keys(this._lastPositions)) {
-                if (!seen.has(hex))
-                    delete this._lastPositions[hex];
+            // Keep aircraft that weren't in this response — _interpolate() will age them out
+            // after REMOVE_SEC (60s). Don't delete them just because one fetch missed them.
+            for (const [, f] of existingByHex) {
+                if (this._lastPositions[f.properties.hex])
+                    newFeatures.push(f);
             }
+            this._geojson = { type: 'FeatureCollection', features: newFeatures };
+            // Only clean up state for aircraft whose _lastPositions have fully expired
+            // (i.e. already removed by _interpolate). Don't wipe data for aircraft that
+            // simply weren't in this particular response.
             for (const hex of Object.keys(this._prevAlt)) {
-                if (!seen.has(hex) && !this._parkedTimers[hex])
+                if (!seen.has(hex) && !this._parkedTimers[hex] && !this._lastPositions[hex])
                     delete this._prevAlt[hex];
             }
             for (const hex of Object.keys(this._hasDeparted)) {
-                if (!seen.has(hex))
+                if (!seen.has(hex) && !this._lastPositions[hex])
                     delete this._hasDeparted[hex];
             }
             for (const hex of Object.keys(this._prevSquawk)) {
-                if (!seen.has(hex))
+                if (!seen.has(hex) && !this._lastPositions[hex])
                     delete this._prevSquawk[hex];
             }
             for (const f of this._geojson.features) {

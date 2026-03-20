@@ -1,4 +1,3 @@
-s too
 // ============================================================
 // ADS-B LIVE CONTROL
 // Polls airplanes.live API (via backend proxy) every 5s,
@@ -357,23 +356,25 @@ class AdsbLiveControl implements maplibregl.IControl {
     // ---- Sprite registration ----
 
     _registerIcons(): void {
-        const toRemove = ['adsb-bracket', 'adsb-bracket-mil', 'adsb-bracket-emerg',
-                          'adsb-blip', 'adsb-blip-mil', 'adsb-blip-emerg', 'adsb-blip-uav',
-                          'adsb-blip-gnd', 'adsb-blip-tower', 'adsb-blip-emerg-gnd',
-                          'adsb-bracket-emerg-gnd'];
-        toRemove.forEach(name => { if (this.map.hasImage(name)) this.map.removeImage(name); });
+        const _addOrUpdate = (name: string, data: ImageData, options: { pixelRatio: number; sdf: boolean }) => {
+            if (this.map.hasImage(name)) {
+                this.map.updateImage(name, data);
+            } else {
+                this.map.addImage(name, data, options);
+            }
+        };
 
-        this.map.addImage('adsb-bracket',           this._createBracket(),                         { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-bracket-mil',        this._createMilBracket(),                      { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-bracket-emerg',      this._createBracket('#ff2222'),                { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-bracket-emerg-gnd',  this._createBracket('#ff2222'),                { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip',               this._createRadarBlip('#ffffff',         1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-mil',           this._createRadarBlip('#c8ff00',         1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-emerg',         this._createRadarBlip('#ff2222',         1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-uav',           this._createUAVBlip('#ffffff',           1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-gnd',           this._createGroundVehicleBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-emerg-gnd',     this._createGroundVehicleBlip('#ff2222', 1.1), { pixelRatio: 2, sdf: false });
-        this.map.addImage('adsb-blip-tower',         this._createTowerBlip(1.1),                    { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-bracket',          this._createBracket(),                         { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-bracket-mil',       this._createMilBracket(),                      { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-bracket-emerg',     this._createBracket('#ff2222'),                { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-bracket-emerg-gnd', this._createBracket('#ff2222'),                { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip',              this._createRadarBlip('#ffffff',         1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-mil',          this._createRadarBlip('#c8ff00',         1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-emerg',        this._createRadarBlip('#ff2222',         1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-uav',          this._createUAVBlip('#ffffff',           1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-gnd',          this._createGroundVehicleBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-emerg-gnd',    this._createGroundVehicleBlip('#ff2222', 1.1), { pixelRatio: 2, sdf: false });
+        _addOrUpdate('adsb-blip-tower',        this._createTowerBlip(1.1),                    { pixelRatio: 2, sdf: false });
     }
 
     // ---- Map layer initialisation ----
@@ -1146,7 +1147,7 @@ class AdsbLiveControl implements maplibregl.IControl {
                 }
             } else {
                 const labelEl = this._buildCallsignLabelEl(f.properties);
-                if (isStale) {
+                if (isDim) {
                     labelEl.style.opacity = '0.3';
                     const nameSpan = labelEl.querySelector('span:not(.sqk-badge):not(.mil-model-badge)') as HTMLElement | null;
                     if (nameSpan) nameSpan.style.color = 'rgba(255,255,255,0.45)';
