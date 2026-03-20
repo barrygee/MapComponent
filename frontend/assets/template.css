@@ -236,6 +236,17 @@ html {
     opacity: 1;
 }
 
+#docs-btn.docs-btn-active {
+    opacity: 1;
+    color: var(--color-accent);
+    background: rgba(200, 255, 0, 0.08);
+    border-radius: 6px;
+}
+
+#docs-btn.docs-btn-active[data-tooltip]::before {
+    opacity: 0 !important;
+}
+
 /* ---- Settings button (footer-right) ---- */
 #settings-btn {
     height: 36px;

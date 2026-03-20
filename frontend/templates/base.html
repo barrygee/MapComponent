@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="/frontend/components/shared/notifications/notifications.css">
     <link rel="stylesheet" href="/frontend/components/shared/tracking/tracking.css">
     <link rel="stylesheet" href="/frontend/components/shared/settings/settings.css">
+    <link rel="stylesheet" href="/frontend/components/docs/docs.css">
     {% block head %}{% endblock %}
 </head>
 
@@ -57,6 +58,30 @@
         <div id="adsb-status-bar"></div>
     </div>
 
+    <!-- ── Docs panel (overlay, same layer as settings) ────────────────────── -->
+    <div id="docs-panel">
+
+        <!-- Sidebar -->
+        <div id="docs-sidebar">
+            <nav id="docs-nav">
+                <a href="#overview"       class="docs-nav-item active">Overview</a>
+                <a href="#architecture"   class="docs-nav-item">Architecture</a>
+                <a href="#domains"        class="docs-nav-item">Domains</a>
+                <a href="#api"            class="docs-nav-item">API Reference</a>
+                <a href="#settings-guide" class="docs-nav-item">Settings</a>
+                <a href="#configuration"  class="docs-nav-item">Configuration</a>
+                <a href="#deployment"     class="docs-nav-item">Deployment</a>
+            </nav>
+        </div>
+
+        <!-- Content -->
+        <div id="docs-content">
+            <div id="docs-body">
+                {% include "docs/content.html" %}
+            </div>
+        </div>
+    </div>
+
     <footer id="footer">
         <div id="footer-left">
             <button id="notif-toggle-btn" aria-label="Toggle notifications" data-tooltip="NOTIFICATIONS">
@@ -79,14 +104,14 @@
             </button>
         </div>
         <div id="footer-right">
-            <a id="docs-btn" href="/docs/" aria-label="Documentation" data-tooltip="DOCUMENTATION">
+            <button id="docs-btn" aria-label="Documentation" data-tooltip="DOCUMENTATION">
                 <svg width="17" height="17" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <rect x="2.5" y="1.5" width="10" height="12" rx="1" stroke="currentColor" stroke-width="1.1"/>
                     <line x1="5" y1="5" x2="10" y2="5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
                     <line x1="5" y1="7.5" x2="10" y2="7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
                     <line x1="5" y1="10" x2="8" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
                 </svg>
-            </a>
+            </button>
             <button id="settings-btn" aria-label="Settings" data-tooltip="SETTINGS">
                 <svg width="18" height="18" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <path d="M6.18 1.5h2.64l.38 1.52a5 5 0 0 1 1.1.64l1.5-.5 1.32 2.28-1.16 1.03a5.06 5.06 0 0 1 0 1.26l1.16 1.03-1.32 2.28-1.5-.5a5 5 0 0 1-1.1.64l-.38 1.52H6.18l-.38-1.52a5 5 0 0 1-1.1-.64l-1.5.5L1.88 9.26l1.16-1.03a5.06 5.06 0 0 1 0-1.26L1.88 5.94 3.2 3.66l1.5.5a5 5 0 0 1 1.1-.64L6.18 1.5Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
@@ -106,6 +131,21 @@
     <script src="/frontend/components/shared/tracking/tracking.js"></script>
     <script src="/frontend/components/shared/settings/settings.js"></script>
     <script src="/frontend/components/shared/settings/settings-init.js"></script>
+    <script src="/frontend/components/docs/docs.js"></script>
+    <script>
+    (function () {
+        "use strict";
+        document.addEventListener('DOMContentLoaded', function () {
+            var btn = document.getElementById('docs-btn');
+            var panel = document.getElementById('docs-panel');
+            if (!btn || !panel) return;
+            btn.addEventListener('click', function () {
+                var isOpen = panel.classList.toggle('docs-panel-visible');
+                btn.classList.toggle('docs-btn-active', isOpen);
+            });
+        });
+    })();
+    </script>
 
     <!-- Map component -->
     <script src="/frontend/components/shared/map/map.js"></script>

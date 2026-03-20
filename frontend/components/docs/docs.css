@@ -12,10 +12,15 @@
     bottom: var(--footer-height);
     left: 0;
     right: 0;
-    display: flex;
+    z-index: 10000;
+    display: none;
     flex-direction: row;
     background: #38435c;
     overflow: hidden;
+}
+
+#docs-panel.docs-panel-visible {
+    display: flex;
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────────── */

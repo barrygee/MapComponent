@@ -66,8 +66,13 @@ def _make_page_handler(domain: str):
     return handler
 
 
-for _domain in ("air", "sea", "space", "land", "sdr", "docs"):
+for _domain in ("air", "sea", "space", "land", "sdr"):
     app.add_api_route(f"/{_domain}/", _make_page_handler(_domain), methods=["GET"])
+
+
+@app.get("/docs/")
+async def docs_redirect():
+    return RedirectResponse(url="/air/", status_code=302)
 
 
 # ── Static files ───────────────────────────────────────────────────────────────
