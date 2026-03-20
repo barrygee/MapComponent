@@ -1,8 +1,6 @@
-![Sentinel logo](frontend/assets/apple-touch-icon.png) 
+![Sentinel logo](frontend/assets/logo-readme.png)
 
-# SENTINEL
-
-Interactive dark-themed situational awareness map for the UK and surrounding airspace, built with [MapLibre GL JS](https://maplibre.org/) and [PMTiles](https://protomaps.com/docs/pmtiles).
+Interactive dark-themed situational awareness OS for the UK and surrounding airspace, built with [MapLibre GL JS](https://maplibre.org/) and [PMTiles](https://protomaps.com/docs/pmtiles).
 
 ---
 

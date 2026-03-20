@@ -1,10 +1,8 @@
-<svg width="410" height="60" viewBox="0 0 410 60" xmlns="http://www.w3.org/2000/svg">
-  <svg x="0" y="10" width="40" height="40" viewBox="14 15 32 30">
-    <polyline points="21,17 16,17 16,22" fill="none" stroke="white" stroke-width="3" stroke-linecap="square"/>
-    <polyline points="39,17 44,17 44,22" fill="none" stroke="white" stroke-width="3" stroke-linecap="square"/>
-    <polyline points="21,43 16,43 16,38" fill="none" stroke="white" stroke-width="3" stroke-linecap="square"/>
-    <polyline points="39,43 44,43 44,38" fill="none" stroke="white" stroke-width="3" stroke-linecap="square"/>
-    <rect x="28" y="28" width="4" height="4" fill="white"/>
+<svg width="302" height="60" viewBox="0 0 302 60" xmlns="http://www.w3.org/2000/svg">
+  <text x="12" y="43" font-family="'Barlow', 'Helvetica Neue', Arial, sans-serif" font-weight="400" font-size="36" letter-spacing="4" fill="white">SENTINEL </text>
+  <svg x="227" y="12" width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="18" cy="18" r="16" fill="none" stroke="#c8ff00" stroke-width="3"/>
+    <circle cx="18" cy="18" r="5.5" fill="white"/>
   </svg>
-  <text x="68" y="43" font-family="'Barlow', 'Helvetica Neue', Arial, sans-serif" font-weight="400" font-size="36" letter-spacing="4" fill="white">SENTINEL</text>
+  <text x="267" y="43" font-family="'Barlow', 'Helvetica Neue', Arial, sans-serif" font-weight="400" font-size="36" letter-spacing="4" fill="white">S</text>
 </svg>

@@ -79,55 +79,11 @@ html {
     height: 100%;
 }
 
-/* The SVG logo image itself; height constrained to 24px */
+/* The logo image; height constrained to 24px */
 #logo-img {
     height: 24px;
     width: auto;
     display: block;
-}
-
-/* ---- Logo load animation ----
-   Four bracket corner paths draw in via stroke-dashoffset,
-   staggered 70ms apart. After the corners finish (~0.43 s),
-   the centre dot fades in and the background rectangle pulses
-   twice. The SENTINEL typewriter text is driven by JS after
-   the CSS animations complete.
-   ------------------------------------------------------------ */
-
-/* Each bracket corner path: strokes from 0 to full length */
-.logo-corner {
-    stroke-dasharray: 10;
-    stroke-dashoffset: 10;
-    animation: logo-draw 0.22s ease-out forwards;
-}
-.logo-corner:nth-child(1) { animation-delay: 0.00s; }
-.logo-corner:nth-child(2) { animation-delay: 0.07s; }
-.logo-corner:nth-child(3) { animation-delay: 0.14s; }
-.logo-corner:nth-child(4) { animation-delay: 0.21s; }
-
-@keyframes logo-draw {
-    to { stroke-dashoffset: 0; }
-}
-
-/* Centre dot fades in after all corners are drawn (0.38 s) */
-.logo-dot {
-    opacity: 0;
-    animation: logo-dot-in 0.15s ease-out 0.38s forwards;
-}
-
-@keyframes logo-dot-in {
-    to { opacity: 1; }
-}
-
-/* Background rectangle pulses lime-ish twice after dot appears */
-.logo-bg {
-    animation: logo-bg-pulse 0.4s ease-in-out 0.43s 2 both;
-}
-
-@keyframes logo-bg-pulse {
-    0%   { fill-opacity: 0; }
-    50%  { fill-opacity: 0.18; }
-    100% { fill-opacity: 0; }
 }
 
 /* Right side of the nav bar — flex row containing nav links */

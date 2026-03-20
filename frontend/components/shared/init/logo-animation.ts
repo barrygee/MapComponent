@@ -1,8 +1,9 @@
 // ============================================================
 // LOGO ANIMATION
-// Types the "SENTINEL" wordmark into the SVG text element
-// with a cursor blink effect. Plays once on load and replays
-// on click. Shared across all domains.
+// Types "SENTINEL " into the SVG text element, then reveals
+// the location-pin O and the trailing "S" for "SENTINEL OS".
+// Plays once on load and replays on click.
+// Shared across all domains.
 // ============================================================
 
 /// <reference path="../globals.d.ts" />
@@ -10,7 +11,9 @@
 (function () {
     const logoSvg    = document.getElementById('logo-img');
     const logoTextEl = document.getElementById('logo-text-el');
-    if (!logoSvg || !logoTextEl) return;
+    const logoPinEl  = document.getElementById('logo-pin');
+    const logoSEl    = document.getElementById('logo-s-el');
+    if (!logoSvg || !logoTextEl || !logoPinEl || !logoSEl) return;
 
     let typeTimer:  ReturnType<typeof setTimeout>  | null = null;
     let blinkTimer: ReturnType<typeof setInterval> | null = null;
@@ -19,18 +22,11 @@
         if (typeTimer)  clearTimeout(typeTimer);
         if (blinkTimer) clearInterval(blinkTimer);
         logoTextEl!.textContent = '';
+        (logoPinEl as SVGElement).setAttribute('opacity', '0');
+        (logoSEl as SVGElement).setAttribute('opacity', '0');
+        logoSEl!.textContent = '';
 
-        const corners = logoSvg!.querySelectorAll('.logo-corner');
-        const bg      = logoSvg!.querySelector('.logo-bg');
-        const dot     = logoSvg!.querySelector('.logo-dot');
-        [...Array.from(corners), bg, dot].forEach(el => {
-            if (!el) return;
-            (el as HTMLElement).style.animation = 'none';
-            (el as HTMLElement).getBoundingClientRect();
-            (el as HTMLElement).style.animation = '';
-        });
-
-        const WORD = 'SENTINEL';
+        const WORD = 'SENTINEL ';
         let i = 0;
 
         function typeNextChar(): void {
@@ -38,13 +34,20 @@
                 logoTextEl!.textContent = WORD.slice(0, ++i) + '|';
                 typeTimer = setTimeout(typeNextChar, 75);
             } else {
+                // Finish SENTINEL, reveal pin and S
+                logoTextEl!.textContent = WORD;
+                (logoPinEl as SVGElement).setAttribute('opacity', '1');
+                logoSEl!.textContent = 'S';
+                (logoSEl as SVGElement).setAttribute('opacity', '1');
+
+                // Blink cursor after S
                 let blinks = 0;
                 blinkTimer = setInterval(() => {
                     blinks++;
-                    logoTextEl!.textContent = WORD + (blinks % 2 === 0 ? '|' : ' ');
+                    logoSEl!.textContent = blinks % 2 === 0 ? 'S|' : 'S ';
                     if (blinks >= 6) {
                         clearInterval(blinkTimer!);
-                        logoTextEl!.textContent = WORD;
+                        logoSEl!.textContent = 'S';
                     }
                 }, 300);
             }
