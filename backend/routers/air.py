@@ -70,16 +70,7 @@ async def get_aircraft_near_point(
     # Build a deterministic cache key from the query parameters
     cache_key = f"{lat:.4f}_{lon:.4f}_{radius}"
 
-    # Resolve connectivity mode first so cache hits respect the current mode.
-    # resolve_domain_urls returns None for online_url when no URL is stored;
-    # fall back to the application default (adsb_upstream_base) in that case.
     primary_url, fallback_url = await resolve_domain_urls("air", db)
-    if primary_url is None and fallback_url is None:
-        # No offline source either — use the built-in default online URL
-        primary_url = settings.adsb_upstream_base
-    elif primary_url is None and fallback_url is not None:
-        # Offline mode requested but no offline source configured → 503 below
-        pass
 
     # Look up any existing cache row for this key
     result = await db.execute(select(AdsbCache).where(AdsbCache.cache_key == cache_key))

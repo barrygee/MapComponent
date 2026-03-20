@@ -57,8 +57,6 @@ _DEFAULT_SETTINGS: list[tuple[str, str, object]] = [
     # offlineSource — {url: string}, matches the frontend settings panel shape
     ("app",   "connectivityProbeUrl", "https://tile.openstreetmap.org/favicon.ico"),
     ("app",   "connectivityMode",    "online"),
-    ("air",   "onlineUrl",      settings.adsb_upstream_base),
-    ("air",   "offlineSource",  {"url": "http://localhost"}),
     ("air",   "sourceOverride", "auto"),
     ("space", "onlineUrl",      settings.celestrak_iss_url),
     ("space", "offlineSource",  {"url": "http://localhost"}),
@@ -73,6 +71,29 @@ _DEFAULT_SETTINGS: list[tuple[str, str, object]] = [
 async def seed_default_settings() -> None:
     """Insert default URL settings on startup — only if a row does not already exist."""
     from backend.models import UserSettings  # avoid circular import
+
+    # Remove stale placeholder URL rows that were seeded in earlier versions.
+    # air/sea/land have no built-in default URLs; users must configure them.
+    _OBSOLETE_KEYS = [
+        ("air",  "onlineUrl"),
+        ("air",  "offlineSource"),
+        ("sea",  "onlineUrl"),
+        ("sea",  "offlineSource"),
+        ("land", "onlineUrl"),
+        ("land", "offlineSource"),
+    ]
+    async with AsyncSessionLocal() as session:
+        for namespace, key in _OBSOLETE_KEYS:
+            result = await session.execute(
+                select(UserSettings).where(
+                    UserSettings.namespace == namespace,
+                    UserSettings.key == key,
+                )
+            )
+            row = result.scalar_one_or_none()
+            if row is not None:
+                await session.delete(row)
+        await session.commit()
 
     ts = int(time.time() * 1000)
     async with AsyncSessionLocal() as session:
