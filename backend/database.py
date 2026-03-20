@@ -58,6 +58,7 @@ _DEFAULT_SETTINGS: list[tuple[str, str, object]] = [
     ("app",   "connectivityProbeUrl", "https://tile.openstreetmap.org/favicon.ico"),
     ("app",   "connectivityMode",    "online"),
     ("air",   "sourceOverride", "auto"),
+    ("air",   "onlineUrl",      settings.adsb_upstream_base),
     ("space", "onlineUrl",      settings.celestrak_iss_url),
     ("space", "offlineSource",  {"url": "http://localhost"}),
     ("space", "sourceOverride", "auto"),
@@ -73,9 +74,8 @@ async def seed_default_settings() -> None:
     from backend.models import UserSettings  # avoid circular import
 
     # Remove stale placeholder URL rows that were seeded in earlier versions.
-    # air/sea/land have no built-in default URLs; users must configure them.
+    # sea/land have no built-in default URLs; users must configure them.
     _OBSOLETE_KEYS = [
-        ("air",  "onlineUrl"),
         ("air",  "offlineSource"),
         ("sea",  "onlineUrl"),
         ("sea",  "offlineSource"),

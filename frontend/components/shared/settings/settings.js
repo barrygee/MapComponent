@@ -50,7 +50,7 @@ window._SettingsPanel = (function () {
             id: 'air-online-source',
             label: 'Online Data Source',
             desc: 'URL for live air data feed',
-            renderControl: function () { return _renderOnlineSourceControl('air', ''); },
+            renderControl: function () { return _renderOnlineSourceControl('air', 'https://api.airplanes.live/v2'); },
         },
         {
             section: 'air',
@@ -370,8 +370,12 @@ window._SettingsPanel = (function () {
             const saved = localStorage.getItem(LS_KEY);
             if (saved && !(noDefault && _isOnlinePlaceholder(saved))) {
                 urlInput.value = saved;
-            } else if (noDefault && saved && _isOnlinePlaceholder(saved)) {
-                try { localStorage.removeItem(LS_KEY); } catch (e) {}
+            }
+            else if (noDefault && saved && _isOnlinePlaceholder(saved)) {
+                try {
+                    localStorage.removeItem(LS_KEY);
+                }
+                catch (e) { }
             }
         }
         catch (e) { }
@@ -383,10 +387,18 @@ window._SettingsPanel = (function () {
                 const backendVal = data['onlineUrl'];
                 if (backendVal && !_isOnlinePlaceholder(backendVal) && !urlInput.value) {
                     urlInput.value = backendVal;
-                    try { localStorage.setItem(LS_KEY, backendVal); } catch (e) {}
-                } else if (noDefault && backendVal && _isOnlinePlaceholder(backendVal)) {
-                    try { localStorage.removeItem(LS_KEY); } catch (e) {}
-                    if (window._SettingsAPI) window._SettingsAPI.put(ns, 'onlineUrl', '');
+                    try {
+                        localStorage.setItem(LS_KEY, backendVal);
+                    }
+                    catch (e) { }
+                }
+                else if (noDefault && backendVal && _isOnlinePlaceholder(backendVal)) {
+                    try {
+                        localStorage.removeItem(LS_KEY);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put(ns, 'onlineUrl', '');
                 }
             });
         }
@@ -457,8 +469,12 @@ window._SettingsPanel = (function () {
                 const saved = JSON.parse(raw);
                 if (saved.url && !(noDefault && _isOfflinePlaceholder(saved.url))) {
                     urlInput.value = saved.url;
-                } else if (noDefault && saved.url && _isOfflinePlaceholder(saved.url)) {
-                    try { localStorage.removeItem(LS_KEY); } catch (e) {}
+                }
+                else if (noDefault && saved.url && _isOfflinePlaceholder(saved.url)) {
+                    try {
+                        localStorage.removeItem(LS_KEY);
+                    }
+                    catch (e) { }
                 }
             }
         }
@@ -471,12 +487,25 @@ window._SettingsPanel = (function () {
                 const backendVal = data['offlineSource'];
                 if (backendVal.url && !_isOfflinePlaceholder(backendVal.url) && !urlInput.value) {
                     urlInput.value = backendVal.url;
-                    try { localStorage.setItem(LS_KEY, JSON.stringify(backendVal)); } catch (e) {}
-                } else if (noDefault && backendVal.url && _isOfflinePlaceholder(backendVal.url)) {
-                    try { localStorage.removeItem(LS_KEY); } catch (e) {}
-                    if (window._SettingsAPI) window._SettingsAPI.put(ns, 'offlineSource', { url: '' });
-                } else if (!noDefault) {
-                    try { localStorage.setItem(LS_KEY, JSON.stringify(backendVal)); } catch (e) {}
+                    try {
+                        localStorage.setItem(LS_KEY, JSON.stringify(backendVal));
+                    }
+                    catch (e) { }
+                }
+                else if (noDefault && backendVal.url && _isOfflinePlaceholder(backendVal.url)) {
+                    // Stale placeholder in DB — clear it
+                    try {
+                        localStorage.removeItem(LS_KEY);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put(ns, 'offlineSource', { url: '' });
+                }
+                else if (!noDefault) {
+                    try {
+                        localStorage.setItem(LS_KEY, JSON.stringify(backendVal));
+                    }
+                    catch (e) { }
                 }
             });
         }

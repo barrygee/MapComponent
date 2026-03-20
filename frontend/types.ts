@@ -102,13 +102,16 @@ interface AircraftProperties {
     icon?:        string;
 }
 
-/** Per-hex dead-reckoning state stored in _lastPositions. */
+/** Per-hex lerp state stored in _lastPositions. */
 interface LastPosition {
-    lon:      number;
-    lat:      number;
+    lon:      number;   // current target longitude (latest API fix)
+    lat:      number;   // current target latitude
     gs:       number;
     track:    number | null;
-    lastSeen: number;
+    lastSeen: number;   // timestamp of current API fix
+    prevLon:  number;   // previous API fix — lerp origin
+    prevLat:  number;
+    prevSeen: number;   // timestamp of previous API fix — lerp start
 }
 
 // ----- Notification system -----
