@@ -50,7 +50,7 @@ window._SettingsPanel = (function () {
             id: 'air-online-source',
             label: 'Online Data Source',
             desc: 'URL for live air data feed',
-            renderControl: function () { return _renderOnlineSourceControl('air', ''); },
+            renderControl: function () { return _renderOnlineSourceControl('air', 'https://api.airplanes.live/v2'); },
         },
         {
             section: 'air',

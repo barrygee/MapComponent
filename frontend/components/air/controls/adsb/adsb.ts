@@ -1280,6 +1280,7 @@ class AdsbLiveControl implements maplibregl.IControl {
                 }
                 this._geojson = { type: 'FeatureCollection', features: [] };
                 this._lastPositions = {};
+                this._clearCallsignMarkers();
                 try { (this.map.getSource('adsb-live') as maplibregl.GeoJSONSource)
                     ?.setData(this._geojson as GeoJSON.GeoJSON); } catch(e) {}
                 this._isFetching = false; return;
@@ -1571,6 +1572,7 @@ class AdsbLiveControl implements maplibregl.IControl {
     // ---- Polling control ----
 
     private _startPolling(): void {
+        if (this._pollInterval) return;
         if (Date.now() - this._lastFetchTime > 4000) this._fetch();
         this._pollInterval = setInterval(() => this._fetch(), 5000);
         if (!this._interpolateInterval) {
@@ -1668,6 +1670,7 @@ function _handleAirConnectivityChange(): void {
     if (mode === 'offline') {
         _clearAdsbAircraft();
     } else if (adsbControl.visible) {
+        adsbControl['_stopPolling']();
         adsbControl['_startPolling']();
     }
 }

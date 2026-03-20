@@ -1379,6 +1379,7 @@ class AdsbLiveControl {
                 }
                 this._geojson = { type: 'FeatureCollection', features: [] };
                 this._lastPositions = {};
+                this._clearCallsignMarkers();
                 try {
                     this.map.getSource('adsb-live')
                         ?.setData(this._geojson);
@@ -1736,6 +1737,8 @@ class AdsbLiveControl {
     }
     // ---- Polling control ----
     _startPolling() {
+        if (this._pollInterval)
+            return;
         if (Date.now() - this._lastFetchTime > 4000)
             this._fetch();
         this._pollInterval = setInterval(() => this._fetch(), 5000);
@@ -1862,6 +1865,7 @@ function _handleAirConnectivityChange() {
         _clearAdsbAircraft();
     }
     else if (adsbControl.visible) {
+        adsbControl['_stopPolling']();
         adsbControl['_startPolling']();
     }
 }
