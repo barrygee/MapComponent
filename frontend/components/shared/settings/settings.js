@@ -261,10 +261,16 @@ window._SettingsPanel = (function () {
     function _stagePending(id, commitFn) {
         _pending.set(id, { commit: commitFn });
     }
+    function _clearPendingForSection(sectionKey) {
+        const ids = _settings
+            .filter(function (s) { return s.section === sectionKey; })
+            .map(function (s) { return s.id; });
+        ids.forEach(function (id) { _pending.delete(id); });
+    }
     // ── Controls ─────────────────────────────────────────────
-    // Shared DOM builder for all URL input controls.
-    // Returns { wrap, urlInput } — callers attach their own load/reconcile/commit logic.
-    function _makeUrlInputWrap(placeholder) {
+    function _renderConnectivityProbeControl() {
+        const LS_KEY = 'sentinel_app_connectivityProbeUrl';
+        const SETTING_ID = 'app-connectivity-probe';
         const wrap = document.createElement('div');
         wrap.className = 'settings-datasource-wrap';
         const urlRow = document.createElement('div');
@@ -275,18 +281,12 @@ window._SettingsPanel = (function () {
         const urlInput = document.createElement('input');
         urlInput.type = 'url';
         urlInput.className = 'settings-datasource-input';
-        urlInput.placeholder = placeholder;
+        urlInput.placeholder = 'https://';
         urlInput.spellcheck = false;
         urlInput.autocomplete = 'off';
         urlRow.appendChild(urlLabel);
         urlRow.appendChild(urlInput);
         wrap.appendChild(urlRow);
-        return { wrap, urlInput };
-    }
-    function _renderConnectivityProbeControl() {
-        const LS_KEY = 'sentinel_app_connectivityProbeUrl';
-        const SETTING_ID = 'app-connectivity-probe';
-        const { wrap, urlInput } = _makeUrlInputWrap('https://');
         // Load saved value
         try {
             const saved = localStorage.getItem(LS_KEY);
@@ -302,7 +302,10 @@ window._SettingsPanel = (function () {
                 const backendVal = data['connectivityProbeUrl'];
                 if (backendVal && !urlInput.value) {
                     urlInput.value = backendVal;
-                    try { localStorage.setItem(LS_KEY, backendVal); } catch (e) { }
+                    try {
+                        localStorage.setItem(LS_KEY, backendVal);
+                    }
+                    catch (e) { }
                 }
             });
         }
@@ -310,50 +313,92 @@ window._SettingsPanel = (function () {
             _stagePending(SETTING_ID, function () {
                 const val = urlInput.value.trim();
                 if (val) {
-                    try { new URL(val); } catch (e) { throw new Error('INVALID URL'); }
-                    try { localStorage.setItem(LS_KEY, val); } catch (e) { }
+                    try {
+                        new URL(val);
+                    }
+                    catch (e) {
+                        throw new Error('INVALID URL');
+                    }
+                    try {
+                        localStorage.setItem(LS_KEY, val);
+                    }
+                    catch (e) { }
                     if (window._SettingsAPI)
                         window._SettingsAPI.put('app', 'connectivityProbeUrl', val);
                 }
                 else {
-                    try { localStorage.removeItem(LS_KEY); } catch (e) { }
+                    try {
+                        localStorage.removeItem(LS_KEY);
+                    }
+                    catch (e) { }
                     if (window._SettingsAPI)
                         window._SettingsAPI.put('app', 'connectivityProbeUrl', '');
                 }
             });
         });
-        urlInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') _commitAll(); });
+        urlInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter')
+                _commitAll();
+        });
         return wrap;
     }
     function _renderOnlineSourceControl(ns, defaultUrl) {
         const LS_KEY = 'sentinel_' + ns + '_onlineUrl';
         const SETTING_ID = ns + '-online-source';
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-datasource-wrap';
+        const urlRow = document.createElement('div');
+        urlRow.className = 'settings-datasource-row';
+        const urlLabel = document.createElement('span');
+        urlLabel.className = 'settings-datasource-label';
+        urlLabel.textContent = 'URL';
+        const urlInput = document.createElement('input');
+        urlInput.type = 'url';
+        urlInput.className = 'settings-datasource-input';
+        urlInput.placeholder = defaultUrl !== undefined ? defaultUrl : 'https://';
+        urlInput.spellcheck = false;
+        urlInput.autocomplete = 'off';
+        urlRow.appendChild(urlLabel);
+        urlRow.appendChild(urlInput);
+        wrap.appendChild(urlRow);
         const noDefault = defaultUrl === '';
-        const { wrap, urlInput } = _makeUrlInputWrap(defaultUrl !== undefined ? defaultUrl : 'https://');
-        function _isPlaceholder(url) {
+        function _isOnlinePlaceholder(url) {
             return !url.trim() || /^https?:\/\/?$/.test(url.trim());
         }
         // Load saved value
         try {
             const saved = localStorage.getItem(LS_KEY);
-            if (saved && !(noDefault && _isPlaceholder(saved)))
+            if (saved && !(noDefault && _isOnlinePlaceholder(saved))) {
                 urlInput.value = saved;
-            else if (noDefault && saved && _isPlaceholder(saved))
-                try { localStorage.removeItem(LS_KEY); } catch (e) { }
+            }
+            else if (noDefault && saved && _isOnlinePlaceholder(saved)) {
+                try {
+                    localStorage.removeItem(LS_KEY);
+                }
+                catch (e) { }
+            }
         }
         catch (e) { }
-        // Reconcile with backend
+        // Reconcile with backend (skip placeholder values like "https://")
         if (window._SettingsAPI) {
             window._SettingsAPI.getNamespace(ns).then(function (data) {
-                if (!data || !data['onlineUrl']) return;
+                if (!data || !data['onlineUrl'])
+                    return;
                 const backendVal = data['onlineUrl'];
-                if (backendVal && !_isPlaceholder(backendVal) && !urlInput.value) {
+                if (backendVal && !_isOnlinePlaceholder(backendVal) && !urlInput.value) {
                     urlInput.value = backendVal;
-                    try { localStorage.setItem(LS_KEY, backendVal); } catch (e) { }
+                    try {
+                        localStorage.setItem(LS_KEY, backendVal);
+                    }
+                    catch (e) { }
                 }
-                else if (noDefault && backendVal && _isPlaceholder(backendVal)) {
-                    try { localStorage.removeItem(LS_KEY); } catch (e) { }
-                    if (window._SettingsAPI) window._SettingsAPI.put(ns, 'onlineUrl', '');
+                else if (noDefault && backendVal && _isOnlinePlaceholder(backendVal)) {
+                    try {
+                        localStorage.removeItem(LS_KEY);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put(ns, 'onlineUrl', '');
                 }
             });
         }
@@ -361,27 +406,59 @@ window._SettingsPanel = (function () {
             _stagePending(SETTING_ID, function () {
                 const val = urlInput.value.trim();
                 if (val) {
-                    try { new URL(val); } catch (e) { throw new Error('INVALID URL'); }
-                    try { localStorage.setItem(LS_KEY, val); } catch (e) { }
-                    if (window._SettingsAPI) window._SettingsAPI.put(ns, 'onlineUrl', val);
+                    try {
+                        new URL(val);
+                    }
+                    catch (e) {
+                        throw new Error('INVALID URL');
+                    }
+                    try {
+                        localStorage.setItem(LS_KEY, val);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put(ns, 'onlineUrl', val);
                 }
                 else {
-                    try { localStorage.removeItem(LS_KEY); } catch (e) { }
-                    if (window._SettingsAPI) window._SettingsAPI.put(ns, 'onlineUrl', '');
+                    try {
+                        localStorage.removeItem(LS_KEY);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put(ns, 'onlineUrl', '');
                 }
             });
         });
-        urlInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') _commitAll(); });
+        urlInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter')
+                _commitAll();
+        });
         return wrap;
     }
     function _renderOfflineSourceControl(ns, defaultUrl) {
         const LS_KEY = 'sentinel_' + ns + '_offlineSource';
         const SETTING_ID = ns + '-offline-source';
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-datasource-wrap';
+        // URL row
+        const urlRow = document.createElement('div');
+        urlRow.className = 'settings-datasource-row';
+        const urlLabel = document.createElement('span');
+        urlLabel.className = 'settings-datasource-label';
+        urlLabel.textContent = 'URL';
+        const urlInput = document.createElement('input');
+        urlInput.type = 'url';
+        urlInput.className = 'settings-datasource-input';
+        urlInput.placeholder = defaultUrl !== undefined ? defaultUrl : 'http://localhost';
+        urlInput.spellcheck = false;
+        urlInput.autocomplete = 'off';
+        urlRow.appendChild(urlLabel);
+        urlRow.appendChild(urlInput);
+        wrap.appendChild(urlRow);
         // When defaultUrl is '' the field has no built-in default, so treat
         // placeholder-like values (http://localhost) as empty rather than real URLs.
         const noDefault = defaultUrl === '';
-        const { wrap, urlInput } = _makeUrlInputWrap(defaultUrl !== undefined ? defaultUrl : 'http://localhost');
-        function _isPlaceholder(url) {
+        function _isOfflinePlaceholder(url) {
             const t = url.trim();
             return !t || /^http:\/\/localhost\/?$/.test(t);
         }
@@ -390,29 +467,45 @@ window._SettingsPanel = (function () {
             const raw = localStorage.getItem(LS_KEY);
             if (raw) {
                 const saved = JSON.parse(raw);
-                if (saved.url && !(noDefault && _isPlaceholder(saved.url)))
+                if (saved.url && !(noDefault && _isOfflinePlaceholder(saved.url))) {
                     urlInput.value = saved.url;
-                else if (noDefault && saved.url && _isPlaceholder(saved.url))
-                    try { localStorage.removeItem(LS_KEY); } catch (e) { }
+                }
+                else if (noDefault && saved.url && _isOfflinePlaceholder(saved.url)) {
+                    try {
+                        localStorage.removeItem(LS_KEY);
+                    }
+                    catch (e) { }
+                }
             }
         }
         catch (e) { }
-        // Reconcile with backend
+        // Reconcile with backend (skip placeholder values like "http://localhost")
         if (window._SettingsAPI) {
             window._SettingsAPI.getNamespace(ns).then(function (data) {
-                if (!data || !data['offlineSource']) return;
+                if (!data || !data['offlineSource'])
+                    return;
                 const backendVal = data['offlineSource'];
-                if (backendVal.url && !_isPlaceholder(backendVal.url) && !urlInput.value) {
+                if (backendVal.url && !_isOfflinePlaceholder(backendVal.url) && !urlInput.value) {
                     urlInput.value = backendVal.url;
-                    try { localStorage.setItem(LS_KEY, JSON.stringify(backendVal)); } catch (e) { }
+                    try {
+                        localStorage.setItem(LS_KEY, JSON.stringify(backendVal));
+                    }
+                    catch (e) { }
                 }
-                else if (noDefault && backendVal.url && _isPlaceholder(backendVal.url)) {
+                else if (noDefault && backendVal.url && _isOfflinePlaceholder(backendVal.url)) {
                     // Stale placeholder in DB — clear it
-                    try { localStorage.removeItem(LS_KEY); } catch (e) { }
-                    if (window._SettingsAPI) window._SettingsAPI.put(ns, 'offlineSource', { url: '' });
+                    try {
+                        localStorage.removeItem(LS_KEY);
+                    }
+                    catch (e) { }
+                    if (window._SettingsAPI)
+                        window._SettingsAPI.put(ns, 'offlineSource', { url: '' });
                 }
                 else if (!noDefault) {
-                    try { localStorage.setItem(LS_KEY, JSON.stringify(backendVal)); } catch (e) { }
+                    try {
+                        localStorage.setItem(LS_KEY, JSON.stringify(backendVal));
+                    }
+                    catch (e) { }
                 }
             });
         }
@@ -420,14 +513,26 @@ window._SettingsPanel = (function () {
             _stagePending(SETTING_ID, function () {
                 const url = urlInput.value.trim();
                 if (url) {
-                    try { new URL(url); } catch (e) { throw new Error('INVALID URL'); }
+                    try {
+                        new URL(url);
+                    }
+                    catch (e) {
+                        throw new Error('INVALID URL');
+                    }
                 }
                 const val = { url };
-                try { localStorage.setItem(LS_KEY, JSON.stringify(val)); } catch (e) { }
-                if (window._SettingsAPI) window._SettingsAPI.put(ns, 'offlineSource', val);
+                try {
+                    localStorage.setItem(LS_KEY, JSON.stringify(val));
+                }
+                catch (e) { }
+                if (window._SettingsAPI)
+                    window._SettingsAPI.put(ns, 'offlineSource', val);
             });
         });
-        urlInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') _commitAll(); });
+        urlInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter')
+                _commitAll();
+        });
         return wrap;
     }
     function _renderLocationControl() {
@@ -529,6 +634,78 @@ window._SettingsPanel = (function () {
             if (e.key === 'Enter')
                 _commitAll();
         });
+        return wrap;
+    }
+    function _renderThemeToggle() {
+        const STORAGE_KEY = 'sentinel_theme';
+        let saved = 'dark';
+        try {
+            saved = localStorage.getItem(STORAGE_KEY) || 'dark';
+        }
+        catch (e) { }
+        let isDark = saved !== 'light';
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-theme-switch';
+        const labelDark = document.createElement('span');
+        labelDark.className = 'settings-theme-label';
+        labelDark.textContent = 'DARK';
+        const track = document.createElement('button');
+        track.className = 'settings-theme-track' + (isDark ? ' is-dark' : '');
+        track.setAttribute('role', 'switch');
+        track.setAttribute('aria-checked', isDark ? 'true' : 'false');
+        track.setAttribute('aria-label', 'Toggle dark mode');
+        const thumb = document.createElement('span');
+        thumb.className = 'settings-theme-thumb';
+        track.appendChild(thumb);
+        const labelLight = document.createElement('span');
+        labelLight.className = 'settings-theme-label';
+        labelLight.textContent = 'LIGHT';
+        track.addEventListener('click', function () {
+            isDark = !isDark;
+            track.classList.toggle('is-dark', isDark);
+            track.setAttribute('aria-checked', isDark ? 'true' : 'false');
+            const mode = isDark ? 'dark' : 'light';
+            // Theme applies immediately — no need to defer to Apply
+            try {
+                localStorage.setItem(STORAGE_KEY, mode);
+            }
+            catch (e) { }
+            if (window._SettingsAPI) {
+                window._SettingsAPI.put('app', 'theme', mode);
+            }
+        });
+        // Phase 2: sync theme from backend (migration + restore)
+        (function _syncThemeFromBackend() {
+            if (!window._SettingsAPI)
+                return;
+            const MIGRATED_FLAG = 'sentinel_settings_migrated_theme';
+            if (!localStorage.getItem(MIGRATED_FLAG)) {
+                // One-time migration: push existing localStorage value to backend
+                const existingMode = saved;
+                window._SettingsAPI.put('app', 'theme', existingMode);
+                localStorage.setItem(MIGRATED_FLAG, '1');
+                return;
+            }
+            // Fetch from backend and reconcile
+            window._SettingsAPI.getNamespace('app').then(function (ns) {
+                if (!ns || !ns['theme'])
+                    return;
+                const backendMode = ns['theme'];
+                const localMode = isDark ? 'dark' : 'light';
+                if (backendMode !== localMode) {
+                    isDark = backendMode === 'dark';
+                    track.classList.toggle('is-dark', isDark);
+                    track.setAttribute('aria-checked', isDark ? 'true' : 'false');
+                    try {
+                        localStorage.setItem(STORAGE_KEY, backendMode);
+                    }
+                    catch (e) { }
+                }
+            });
+        })();
+        wrap.appendChild(labelDark);
+        wrap.appendChild(track);
+        wrap.appendChild(labelLight);
         return wrap;
     }
     function _renderConnectivityToggle() {
@@ -1557,7 +1734,8 @@ window._SettingsPanel = (function () {
         if (docsPanel && docsPanel.classList.contains('docs-panel-visible')) {
             docsPanel.classList.remove('docs-panel-visible');
             const docsBtn = document.getElementById('docs-btn');
-            if (docsBtn) docsBtn.classList.remove('docs-btn-active');
+            if (docsBtn)
+                docsBtn.classList.remove('docs-btn-active');
         }
         const panel = document.getElementById('settings-panel');
         if (panel)

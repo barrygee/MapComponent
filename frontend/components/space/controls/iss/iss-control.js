@@ -35,6 +35,8 @@ class IssControl extends SentinelControlBase {
         this._followEnabled = false;
         this._trackingRestored = false;
         this._hoverHideTimer = null;
+        this._activeNoradId = '25544';
+        this._activeSatName = 'ISS';
         // Pass notifications
         this._trackingNotifId = null;
         this._passNotifEnabled = false;
@@ -247,7 +249,10 @@ class IssControl extends SentinelControlBase {
     // ---- Data fetch ----
     async _fetch() {
         try {
-            const resp = await fetch('/api/space/iss');
+            const url = this._activeNoradId === '25544'
+                ? '/api/space/iss'
+                : `/api/space/satellite/${this._activeNoradId}`;
+            const resp = await fetch(url);
             if (!resp.ok) {
                 const body = await resp.json().catch(() => ({}));
                 if (body.no_tle_data)
@@ -354,7 +359,7 @@ class IssControl extends SentinelControlBase {
             isTracking ? 'cursor:pointer' : '',
         ].join(';');
         const nameSpan = document.createElement('span');
-        nameSpan.textContent = 'ISS';
+        nameSpan.textContent = this._activeSatName;
         el.appendChild(nameSpan);
         if (isTracking) {
             const trkSpan = document.createElement('span');
@@ -408,7 +413,7 @@ class IssControl extends SentinelControlBase {
             `<span class="iss-tag-val" data-field="${lbl}">${val}</span></div>`).join('');
         return `<div style="background:rgba(0,0,0,0.7);color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;padding:6px 14px 9px;white-space:nowrap;user-select:none">` +
             `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;font-size:15px;letter-spacing:.12em;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
-            `<span style="font-size:13px;font-weight:400;pointer-events:none;color:#c8ff00;letter-spacing:.12em">ISS</span>` +
+            `<span style="font-size:13px;font-weight:400;pointer-events:none;color:#c8ff00;letter-spacing:.12em">${this._activeSatName}</span>` +
             `<div style="display:flex;align-items:center;gap:0">${bellBtn}${trkBtn}</div></div>` +
             `<div style="pointer-events:none">` + rowsHTML + `</div></div>`;
     }
@@ -730,7 +735,7 @@ class IssControl extends SentinelControlBase {
                 window._Notifications.dismiss(this._trackingNotifId);
                 this._trackingNotifId = null;
             }
-            this._trackingNotifId = window._Notifications.add({ type: 'track', title: 'ISS' });
+            this._trackingNotifId = window._Notifications.add({ type: 'track', title: this._activeSatName });
         }
         this._saveIssTracking();
     }
@@ -780,7 +785,7 @@ class IssControl extends SentinelControlBase {
             `<button class="adsb-sb-untrack-btn">UNTRACK</button>` +
             `</div>` +
             `<div class="adsb-sb-header" style="border-top:none;height:auto;padding:8px 14px 9px">` +
-            `<span class="adsb-sb-callsign" style="color:#c8ff00">ISS</span>` +
+            `<span class="adsb-sb-callsign" style="color:#c8ff00">${this._activeSatName}</span>` +
             `</div>` +
             `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
     }
@@ -836,6 +841,50 @@ class IssControl extends SentinelControlBase {
             });
         }
     }
+    // ---- Satellite switching ----
+    switchSatellite(noradId, name) {
+        // Stop follow and clear markers for the previous satellite
+        if (this._followEnabled)
+            this._stopFollowing();
+        this._hideHoverTagNow();
+        this._hideLabel();
+        this._activeNoradId = noradId;
+        this._activeSatName = name;
+        this._lastPosition = null;
+        this._trackingRestored = true; // prevent restore of old tracking state
+        // Ensure the satellite layer is visible
+        if (!this.issVisible) {
+            this.issVisible = true;
+            const issVis = 'visible';
+            const trackVis = this.trackVisible ? 'visible' : 'none';
+            const fpVis = this.footprintVisible ? 'visible' : 'none';
+            ['iss-icon', 'iss-bracket'].forEach(id => {
+                try {
+                    this.map.setLayoutProperty(id, 'visibility', issVis);
+                }
+                catch (e) { }
+            });
+            ['iss-track-orbit1', 'iss-track-orbit2'].forEach(id => {
+                try {
+                    this.map.setLayoutProperty(id, 'visibility', trackVis);
+                }
+                catch (e) { }
+            });
+            ['iss-footprint-fill', 'iss-footprint'].forEach(id => {
+                try {
+                    this.map.setLayoutProperty(id, 'visibility', fpVis);
+                }
+                catch (e) { }
+            });
+            this.setButtonActive(true);
+            if (typeof _spaceSyncSideMenu === 'function')
+                _spaceSyncSideMenu();
+        }
+        // Restart polling against the new satellite
+        this._stopPolling();
+        this._fetch();
+        this._startPolling();
+    }
     // ---- Visibility toggles ----
     toggleIss() {
         this.issVisible = !this.issVisible;
@@ -866,6 +915,9 @@ class IssControl extends SentinelControlBase {
             this._stopFollowing();
             this._hideHoverTagNow();
             this._hideLabel();
+            // Reset to ISS when toggling off
+            this._activeNoradId = '25544';
+            this._activeSatName = 'ISS';
         }
         else {
             this._fetch();

@@ -1,0 +1,240 @@
+/* ============================================================
+   SPACE FILTER PANEL
+   Floating search panel that appears below the nav bar,
+   horizontally centred within the space left of the side menu.
+   Allows searching satellites by name or NORAD ID.
+
+   Positioning mirrors the air filter panel, adapted for the
+   space side menu IDs.
+   ============================================================ */
+
+#space-filter-panel {
+    position: fixed;
+    top: calc(68px + 12px);
+    --side-menu-width: calc((148px - 8px) / 3 + 14px);
+    left: calc((100vw - var(--side-menu-width)) / 2);
+    transform: translateX(-50%);
+    width: 460px;
+    max-width: calc(100vw - 28px);
+    background: rgba(0, 0, 0, 0.92);
+    color: #fff;
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    z-index: 1001;
+    display: none;
+    pointer-events: auto;
+    user-select: none;
+    box-sizing: border-box;
+}
+
+#space-filter-panel.space-filter-panel-visible {
+    display: block;
+}
+
+/* When space side menu is expanded */
+body:has(#space-side-menu.expanded) #space-filter-panel {
+    --menu-left: calc(100vw - 14px - 148px);
+    left: calc(var(--menu-left) / 2);
+    transform: translateX(-50%);
+    max-width: calc(var(--menu-left) - 28px);
+}
+
+/* ---- Search input row ---- */
+#space-filter-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#space-filter-icon {
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.35);
+    display: block;
+}
+
+#space-filter-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    caret-color: var(--color-accent);
+    min-width: 0;
+}
+
+#space-filter-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+}
+
+#space-filter-clear-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.3);
+    font-family: 'Barlow', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 0;
+    display: none;
+    transition: color 0.15s;
+    flex-shrink: 0;
+}
+
+#space-filter-clear-btn.space-filter-clear-visible {
+    display: block;
+}
+
+#space-filter-clear-btn:hover {
+    color: var(--color-text-muted);
+}
+
+/* ---- Results list ---- */
+#space-filter-results {
+    max-height: 340px;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+#space-filter-results::-webkit-scrollbar {
+    display: none;
+}
+
+.space-filter-section-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.3);
+    padding: 10px 18px 5px;
+    text-transform: uppercase;
+}
+
+.space-filter-result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px 8px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.12s;
+    cursor: pointer;
+}
+
+.space-filter-result-item:last-child {
+    border-bottom: none;
+}
+
+.space-filter-result-item:hover,
+.space-filter-result-item.keyboard-focused {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.space-filter-result-item.keyboard-focused {
+    outline: 1px solid rgba(200, 255, 0, 0.4);
+    outline-offset: -1px;
+}
+
+.space-filter-result-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.space-filter-result-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    color: var(--color-accent);
+}
+
+.space-filter-result-primary {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.space-filter-result-secondary {
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.4);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.space-filter-result-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.space-filter-action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 10px;
+    flex-shrink: 0;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+}
+
+.space-filter-action-btn:hover {
+    color: #fff !important;
+}
+
+.space-filter-select-btn {
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.3);
+    white-space: nowrap;
+}
+
+.space-filter-no-results {
+    padding: 20px 18px;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.25);
+    text-align: center;
+    text-transform: uppercase;
+}
+
+@media (max-width: 600px) {
+    #space-filter-panel {
+        left: 50%;
+        transform: translateX(-50%);
+        width: calc(100vw - 200px);
+        max-width: calc(100vw - 200px);
+    }
+
+    body:has(#space-side-menu.expanded) #space-filter-panel {
+        --menu-left: calc(100vw - 14px - 148px);
+        left: calc(var(--menu-left) / 2);
+        transform: translateX(-50%);
+        width: calc(var(--menu-left) - 28px);
+        max-width: calc(var(--menu-left) - 28px);
+    }
+}

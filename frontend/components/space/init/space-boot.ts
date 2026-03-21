@@ -42,6 +42,9 @@ if (typeof window._Notifications !== 'undefined') {
 if (typeof window._Tracking !== 'undefined') {
     window._Tracking.init();
 }
+if (typeof window._SpaceFilterPanel !== 'undefined') {
+    window._SpaceFilterPanel.init();
+}
 
 // ---- 2b. Sync space overlay states from backend (after controls are ready) ----
 map.once('load', function () {

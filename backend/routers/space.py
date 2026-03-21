@@ -78,6 +78,43 @@ async def get_iss(db: AsyncSession = Depends(get_db)):
         return JSONResponse({"error": f"Unexpected error: {e}"}, status_code=500)
 
 
+@router.get("/satellite/{norad_id}")
+async def get_satellite(norad_id: str, db: AsyncSession = Depends(get_db)):
+    """Return current position, ground track, and footprint for any satellite by NORAD ID.
+
+    The satellite must exist in the TLE cache. Returns 404 if the NORAD ID is not found,
+    or 503 if the TLE database is empty.
+    """
+    try:
+        tle_count_result = await db.execute(select(func.count()).select_from(TleCache))
+        if tle_count_result.scalar() == 0:
+            return JSONResponse({"error": "No TLE data in database", "no_tle_data": True}, status_code=503)
+
+        online_url, offline_url = await resolve_domain_urls("space", db)
+        tle_text = await tle_service.fetch_tle(norad_id, db, online_url, offline_url)
+        _, line1, line2 = tle_service.parse_tle_lines(tle_text)
+
+        position = sat_service.compute_position(line1, line2)
+        ground_track = sat_service.compute_ground_track(line1, line2)
+        footprint = sat_service.compute_footprint(
+            position["lat"], position["lon"], position["alt_km"]
+        )
+
+        return JSONResponse({
+            "position":     position,
+            "ground_track": ground_track,
+            "footprint":    footprint,
+        })
+
+    except RuntimeError as e:
+        msg = str(e)
+        if "not found" in msg.lower() or "no tle" in msg.lower():
+            return JSONResponse({"error": msg}, status_code=404)
+        return JSONResponse({"error": msg}, status_code=503)
+    except Exception as e:
+        return JSONResponse({"error": f"Unexpected error: {e}"}, status_code=500)
+
+
 @router.get("/iss/passes")
 async def get_iss_passes(
     lat: float = Query(..., description="Observer latitude in degrees"),

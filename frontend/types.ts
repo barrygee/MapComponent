@@ -177,6 +177,14 @@ interface FilterPanelAPI {
     reposition(): void;
 }
 
+// ----- Space filter panel -----
+interface SpaceFilterPanelAPI {
+    init(): void;
+    toggle(): void;
+    open(): void;
+    close(): void;
+}
+
 // ----- Map component -----
 interface RingsGeoJSON {
     lines:  GeoJSON.FeatureCollection<GeoJSON.LineString>;
