@@ -19,6 +19,24 @@
                 </div>
 
                 <div class="docs-item">
+                    <h2 class="docs-item-label">System Overview</h2>
+                    <div class="docs-diagram" style="max-width: 773px;">
+                        <span class="docs-diagram-label">High-level — domains and data sources</span>
+                        <div class="mermaid">
+flowchart LR
+    Browser([Browser]) --> App[Sentinel App]
+    App --> AIR[AIR Domain]
+    App --> SPC[SPACE Domain]
+    App --> SEA[SEA Domain - stub]
+    App --> LND[LAND Domain - stub]
+    App --> SDR[SDR Domain - stub]
+    AIR -->|ADS-B feed| AL[(airplanes.live)]
+    SPC -->|TLE data| CT[(Celestrak)]
+                        </div>
+                    </div>
+                </div>
+
+                <div class="docs-item">
                     <h2 class="docs-item-label">Tech Stack</h2>
                     <table class="docs-table">
                         <thead>
@@ -39,11 +57,53 @@
             <hr class="docs-divider">
 
             <!-- Architecture ─────────────────────────────────────────────────── -->
-            <section class="docs-section" id="architecture">
+            <section class="docs-section" id="architecture" style="max-width: none;">
                 <span class="docs-section-label">Structure</span>
                 <h1 class="docs-section-title">Architecture</h1>
 
                 <div class="docs-item">
+                    <h2 class="docs-item-label">Request Flow</h2>
+                    <div class="docs-diagram" style="max-width: 70vw;">
+                        <span class="docs-diagram-label">High-level — traffic routing</span>
+                        <div class="mermaid">
+flowchart LR
+    Browser([Browser]) -->|HTTP port 80| nginx[nginx]
+    nginx -->|assets path| Static[Static Files]
+    nginx -->|all other| uvicorn[uvicorn port 8000]
+    uvicorn --> FastAPI[FastAPI]
+    FastAPI -->|page route| Jinja2[Jinja2 Template]
+    FastAPI -->|API route| Router[Domain Router]
+    Router --> DB[(SQLite)]
+    Router --> Ext[External API]
+                        </div>
+                    </div>
+                    <div class="docs-diagram" style="max-width: 576px;">
+                        <span class="docs-diagram-label">Low-level — FastAPI application layers</span>
+                        <div class="mermaid">
+flowchart TD
+    REQ[Incoming Request] --> MW[FastAPI Middleware]
+    MW --> PG[Page Routes - main.py]
+    MW --> RT[API Routers - routers/]
+    PG --> JN[Jinja2 render HTML]
+    RT --> SVC[Services Layer - services/]
+    RT --> MDL[Models - models.py]
+    SVC --> CACHE[Cache - cache.py]
+    SVC --> UTILS[Utils - utils.py]
+    CACHE --> DB[(SQLite aiosqlite)]
+    MDL --> DB
+    SVC --> EXT[(External APIs)]
+                        </div>
+                    </div>
+                    <p class="docs-item-desc">
+                        All HTTP traffic enters via nginx (port 80/443 in Docker) which proxies
+                        to uvicorn on port 8000. Static assets are served directly by nginx from
+                        the <code>/frontend/assets</code> and <code>/frontend/components</code>
+                        directories. Page requests hit FastAPI which renders Jinja2 templates.
+                        API requests are handled by domain routers.
+                    </p>
+                </div>
+
+                <div class="docs-item" style="width: max-content;">
                     <h2 class="docs-item-label">Directory Layout</h2>
                     <pre class="docs-pre">Sentinel/
 ├── backend/                 FastAPI application
@@ -85,23 +145,53 @@
                 </div>
 
                 <div class="docs-item">
-                    <h2 class="docs-item-label">Request Flow</h2>
-                    <p class="docs-item-desc">
-                        All HTTP traffic enters via nginx (port 80/443 in Docker) which proxies
-                        to uvicorn on port 8000. Static assets are served directly by nginx from
-                        the <code>/frontend/assets</code> and <code>/frontend/components</code>
-                        directories. Page requests hit FastAPI which renders Jinja2 templates.
-                        API requests are handled by domain routers.
-                    </p>
-                    <pre class="docs-pre">Browser → nginx → uvicorn (FastAPI)
-                  ↓
-            Page route → Jinja2 template → HTML
-            API route  → Router handler → JSON
-            /assets    → StaticFiles mount</pre>
-                </div>
-
-                <div class="docs-item">
                     <h2 class="docs-item-label">Database</h2>
+                    <div class="docs-diagram" style="max-width: 70vw;">
+                        <span class="docs-diagram-label">Low-level — database schema</span>
+                        <div class="mermaid">
+erDiagram
+    adsb_cache {
+        string cache_key PK
+        text response_json
+        bigint fetched_at_ms
+    }
+    tle_cache {
+        string norad_id PK
+        text line1
+        text line2
+        string name
+        string category
+        bigint fetched_at_ms
+        string source
+    }
+    satellite_catalogue {
+        string norad_id PK
+        string name
+        string category
+    }
+    air_messages {
+        string msg_id PK
+        string type
+        string title
+        text detail
+        bigint ts
+        boolean dismissed
+    }
+    air_tracking {
+        string hex PK
+        string callsign
+        boolean follow
+        bigint added_at
+    }
+    user_settings {
+        integer id PK
+        string namespace
+        string key
+        text value
+    }
+    tle_cache }o--|| satellite_catalogue : "norad_id ref"
+                        </div>
+                    </div>
                     <p class="docs-item-desc">
                         SQLite is used for all persistence. Tables are created automatically on
                         startup via <code>create_tables()</code>. Default settings are seeded on
@@ -124,6 +214,23 @@
 
                 <div class="docs-item">
                     <h2 class="docs-item-label">Connectivity Model</h2>
+                    <div class="docs-diagram" style="max-width: 504px;">
+                        <span class="docs-diagram-label">High-level — source resolution logic</span>
+                        <div class="mermaid">
+flowchart TD
+    A[Request for domain data] --> B{Domain sourceOverride?}
+    B -->|online| ON[Use online URL]
+    B -->|offline| OF[Use offline URL]
+    B -->|auto| C{Global connectivityMode?}
+    C -->|online| ON
+    C -->|offline| OF
+    ON --> D{Upstream reachable?}
+    D -->|yes| E[Return fresh data]
+    D -->|stale window ok| F[Return stale cache]
+    D -->|stale expired| G[Return error]
+    OF --> H[Use local network URL]
+                        </div>
+                    </div>
                     <p class="docs-item-desc">
                         Each domain has two data source slots — <em>online</em> and <em>offline</em>.
                         A global <code>connectivityMode</code> setting (online/offline) selects which
@@ -139,12 +246,39 @@
             <hr class="docs-divider">
 
             <!-- Domains ──────────────────────────────────────────────────────── -->
-            <section class="docs-section" id="domains">
+            <section class="docs-section" id="domains" style="max-width: none;">
                 <span class="docs-section-label">Domains</span>
                 <h1 class="docs-section-title">Domains</h1>
 
                 <div class="docs-item">
                     <h2 class="docs-item-label">AIR</h2>
+                    <div class="docs-diagram" style="max-width: 70vw;">
+                        <span class="docs-diagram-label">High-level — AIR domain data flow</span>
+                        <div class="mermaid">
+flowchart LR
+    FE[Browser MapLibre] -->|GET adsb point| BE[FastAPI air router]
+    BE --> CK{Cache fresh?}
+    CK -->|HIT| CR[Return cached JSON]
+    CK -->|STALE| ST[Return stale JSON]
+    CK -->|MISS| UP[airplanes.live API]
+    UP --> WR[Write to adsb_cache]
+    WR --> RS[Return fresh JSON]
+    FE -->|squawk events| MSG[air_messages]
+    FE -->|add or remove| TRK[air_tracking]
+                        </div>
+                    </div>
+                    <div class="docs-diagram" style="max-width: 528px;">
+                        <span class="docs-diagram-label">Low-level — ADS-B cache TTL state machine</span>
+                        <div class="mermaid">
+stateDiagram-v2
+    [*] --> MISS : No entry in adsb_cache
+    MISS --> FRESH : Upstream fetched and written
+    FRESH --> STALE : age exceeds adsb_ttl_ms 5s
+    STALE --> FRESH : Upstream fetched and refreshed
+    STALE --> EXPIRED : age exceeds adsb_stale_ms 30s
+    EXPIRED --> MISS : Entry removed or ignored
+                        </div>
+                    </div>
                     <p class="docs-item-desc">
                         Real-time ADS-B aircraft tracking powered by the
                         <a href="https://airplanes.live" style="color: var(--color-accent);">airplanes.live</a>
@@ -164,6 +298,38 @@
 
                 <div class="docs-item">
                     <h2 class="docs-item-label">SPACE</h2>
+                    <div class="docs-diagram" style="max-width: 70vw;">
+                        <span class="docs-diagram-label">High-level — SPACE domain data flow</span>
+                        <div class="mermaid">
+flowchart LR
+    FE[Browser MapLibre] -->|GET space iss| Router[FastAPI space router]
+    Router --> SAT[satellite.py SGP4]
+    SAT --> TLEC[tle_cache SQLite]
+    TLEC -->|stale or empty| CTK[Celestrak API]
+    CTK --> TLEC
+    SAT --> POS[ISS position and ground track]
+    Router -->|GET space daynight| DN[daynight.py GeoJSON]
+    FE -->|upload or fetch URL| TM[TLE management API]
+    TM --> TLEC
+                        </div>
+                    </div>
+                    <div class="docs-diagram" style="max-width: 648px;">
+                        <span class="docs-diagram-label">Low-level — TLE ingest and propagation lifecycle</span>
+                        <div class="mermaid">
+flowchart TD
+    A[POST tle/fetch or tle/manual] --> B[Parse TLE text and validate lines]
+    B --> C{NORAD ID already in DB?}
+    C -->|yes| D[Update record and reset fetched_at_ms]
+    C -->|no| E[Insert new record]
+    D --> F[satellite_catalogue upsert]
+    E --> F
+    G[GET space/iss] --> H{tle_cache for ISS fresh?}
+    H -->|yes| I[Propagate with sgp4]
+    H -->|no| J[Fetch from Celestrak and update tle_cache]
+    J --> I
+    I --> K[Return position ground track and footprint GeoJSON]
+                        </div>
+                    </div>
                     <p class="docs-item-desc">
                         Satellite tracking using SGP4 propagation from Two-Line Element (TLE) data.
                         The ISS is tracked by default. TLE data is fetched from Celestrak and cached
@@ -183,6 +349,22 @@
 
                 <div class="docs-item">
                     <h2 class="docs-item-label">SEA / LAND / SDR</h2>
+                    <div class="docs-diagram" style="max-width: 70vw;">
+                        <span class="docs-diagram-label">High-level — stub domain readiness</span>
+                        <div class="mermaid">
+flowchart LR
+    subgraph Ready ["Infrastructure Ready"]
+        RT[Router stub]
+        TP[Jinja2 template]
+        ST[Settings online and offline URLs]
+    end
+    subgraph Todo ["Not Yet Implemented"]
+        DS[Data source integration]
+        MP[Map rendering component]
+    end
+    Ready --> Todo
+                        </div>
+                    </div>
                     <p class="docs-item-desc">
                         These domains are currently stubs — the routing, template, and settings
                         infrastructure is in place but data source integration is not yet
@@ -195,9 +377,34 @@
             <hr class="docs-divider">
 
             <!-- API Reference ────────────────────────────────────────────────── -->
-            <section class="docs-section" id="api">
+            <section class="docs-section" id="api" style="max-width: none;">
                 <span class="docs-section-label">Backend</span>
                 <h1 class="docs-section-title">API Reference</h1>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">API Surface</h2>
+                    <div class="docs-diagram" style="max-width: 70vw;">
+                        <span class="docs-diagram-label">High-level — API route groups</span>
+                        <div class="mermaid">
+flowchart TD
+    API[REST API] --> H["GET /health"]
+    API --> S["/api/settings"]
+    API --> AIR["/api/air"]
+    API --> SPC["/api/space"]
+    S --> S1[GET all namespaces]
+    S --> S2[GET by namespace]
+    S --> S3[PUT upsert key]
+    AIR --> A1[GET adsb point]
+    AIR --> A2[GET geocode reverse]
+    AIR --> A3[messages CRUD]
+    AIR --> A4[tracking CRUD]
+    SPC --> P1[GET iss position]
+    SPC --> P2[GET iss passes]
+    SPC --> P3["GET daynight GeoJSON"]
+    SPC --> P4[tle status and management]
+                        </div>
+                    </div>
+                </div>
 
                 <span class="docs-group-label">Health</span>
                 <table class="docs-table">
@@ -218,7 +425,7 @@
                         <tr>
                             <td><span class="docs-method docs-method--get">GET</span></td>
                             <td><code>/api/settings</code></td>
-                            <td>All settings grouped by namespace <code>{"app":{"connectivityMode":"online",…}}</code></td>
+                            <td>All settings grouped by namespace <code>{"app":{"connectivityMode":"online",…} }</code></td>
                         </tr>
                         <tr>
                             <td><span class="docs-method docs-method--get">GET</span></td>
@@ -374,6 +581,31 @@
                 </p>
 
                 <div class="docs-item">
+                    <h2 class="docs-item-label">Settings Storage Architecture</h2>
+                    <div class="docs-diagram" style="max-width: 718px;">
+                        <span class="docs-diagram-label">High-level — settings read/write flow</span>
+                        <div class="mermaid">
+sequenceDiagram
+    participant Panel as Settings Panel
+    participant LS as localStorage
+    participant API as Backend API
+    participant DB as SQLite
+
+    Panel->>LS: read on page load (instant)
+    Panel->>API: GET /api/settings
+    API->>DB: SELECT user_settings
+    DB-->>API: rows
+    API-->>Panel: namespace key value map
+    Note over Panel: fill empty local fields from backend
+    Panel->>Panel: stage changes
+    Panel->>API: PUT /api/settings/ns/key
+    API->>DB: UPSERT user_settings
+    Panel->>LS: write updated values
+                        </div>
+                    </div>
+                </div>
+
+                <div class="docs-item">
                     <h2 class="docs-item-label">App Settings</h2>
                     <table class="docs-table">
                         <thead><tr><th>Setting</th><th>Description</th></tr></thead>
@@ -480,6 +712,22 @@
             <section class="docs-section" id="deployment">
                 <span class="docs-section-label">Infrastructure</span>
                 <h1 class="docs-section-title">Deployment</h1>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Deployment Architecture</h2>
+                    <div class="docs-diagram" style="max-width: 607px;">
+                        <span class="docs-diagram-label">High-level — Docker deployment topology</span>
+                        <div class="mermaid">
+flowchart TD
+    Browser([Browser]) -->|HTTP port 80| nginx
+    subgraph Compose ["docker-compose"]
+        nginx[nginx container] -->|proxy_pass port 8000| FastAPI[FastAPI uvicorn]
+        nginx -->|serve direct| Static[frontend/assets]
+        FastAPI --- Volume[(sentinel.db volume)]
+    end
+                        </div>
+                    </div>
+                </div>
 
                 <div class="docs-item">
                     <h2 class="docs-item-label">Docker (recommended)</h2>
