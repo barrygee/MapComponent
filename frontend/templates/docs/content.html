@@ -345,6 +345,16 @@ flowchart TD
                         <code>weather</code>, <code>military</code>, <code>navigation</code>,
                         <code>science</code>, <code>cubesat</code>, <code>active</code>, <code>unknown</code>.
                     </p>
+                    <p class="docs-item-desc">
+                        The <strong>Satellite Filter</strong> panel (opened via the filter button in
+                        the space side menu) provides real-time search across all satellites stored in
+                        the TLE database. Typing in the panel searches by satellite name, NORAD ID, or
+                        category — including human-readable aliases (e.g. <em>gps</em> matches
+                        <code>navigation</code>, <em>ham</em> matches <code>amateur</code>). Selecting
+                        a result switches the active satellite on the map. Results are capped at 50 for
+                        performance; the panel pre-loads the satellite list on init and refreshes it on
+                        each open. Keyboard navigation (↑ ↓ Enter Escape) is supported.
+                    </p>
                 </div>
 
                 <div class="docs-item">
@@ -402,6 +412,8 @@ flowchart TD
     SPC --> P2[GET iss passes]
     SPC --> P3["GET daynight GeoJSON"]
     SPC --> P4[tle status and management]
+    SPC --> P5[GET satellite by NORAD ID]
+    SPC --> P6[GET tle/list catalogue]
                         </div>
                     </div>
                 </div>
@@ -506,7 +518,7 @@ flowchart TD
                     </tbody>
                 </table>
 
-                <span class="docs-group-label">SPACE — ISS &amp; Day/Night</span>
+                <span class="docs-group-label">SPACE — Satellites &amp; Day/Night</span>
                 <table class="docs-table">
                     <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
                     <tbody>
@@ -519,6 +531,11 @@ flowchart TD
                             <td><span class="docs-method docs-method--get">GET</span></td>
                             <td><code>/api/space/iss/passes?lat=&lon=</code></td>
                             <td>Predicted ISS passes over an observer location</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/space/satellite/{norad_id}</code></td>
+                            <td>Current position, ground track, and footprint for any satellite by NORAD ID. Returns 404 if not in TLE cache, 503 if TLE database is empty.</td>
                         </tr>
                         <tr>
                             <td><span class="docs-method docs-method--get">GET</span></td>
@@ -536,6 +553,11 @@ flowchart TD
                             <td><span class="docs-method docs-method--get">GET</span></td>
                             <td><code>/api/space/tle/status</code></td>
                             <td>TLE database summary — counts, per-category last-updated times</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/space/tle/list</code></td>
+                            <td>All satellites in the catalogue ordered by name — <code>{"satellites":[{"norad_id","name","category","updated_at"}]}</code>. Used by the Satellite Filter panel.</td>
                         </tr>
                         <tr>
                             <td><span class="docs-method docs-method--get">GET</span></td>
