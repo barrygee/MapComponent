@@ -177,6 +177,10 @@
             btn.addEventListener('click', function () {
                 var isOpen = panel.classList.toggle('docs-panel-visible');
                 btn.classList.toggle('docs-btn-active', isOpen);
+                // Close settings panel if docs is opening
+                if (isOpen && window._SettingsPanel && typeof window._SettingsPanel.close === 'function') {
+                    window._SettingsPanel.close();
+                }
                 if (isOpen && !mermaidRendered && typeof window.__mermaidRun === 'function') {
                     mermaidRendered = true;
                     // Small delay to ensure panel is visible before rendering
