@@ -109,6 +109,7 @@
     padding-bottom: 72px;
 }
 
+
 .docs-section:last-child {
     padding-bottom: 0;
 }
@@ -152,7 +153,7 @@
 
 .docs-item-desc {
     font-family: var(--font-primary);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 400;
     letter-spacing: 0.03em;
     color: rgba(255, 255, 255, 0.55);
@@ -168,7 +169,7 @@
 
 .docs-pre {
     font-family: var(--font-condensed);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 400;
     letter-spacing: 0.04em;
     line-height: 1.6;
@@ -195,7 +196,7 @@
 
 code {
     font-family: var(--font-condensed);
-    font-size: 12px;
+    font-size: 13px;
     background: rgba(255, 255, 255, 0.07);
     border: 1px solid var(--color-border);
     border-radius: 2px;
@@ -210,11 +211,11 @@ code {
     border-collapse: collapse;
     margin-bottom: 16px;
     font-family: var(--font-primary);
-    font-size: 12px;
+    font-size: 13px;
 }
 
 .docs-table th {
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.18em;
     text-transform: uppercase;
@@ -247,7 +248,7 @@ code {
 .docs-method {
     display: inline-block;
     font-family: var(--font-condensed);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.1em;
     padding: 2px 7px;
@@ -265,7 +266,7 @@ code {
 
 .docs-group-label {
     font-family: var(--font-primary);
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.2em;
     text-transform: uppercase;
@@ -284,4 +285,37 @@ code {
     border: none;
     border-top: 1px solid var(--color-border);
     margin: 0 0 48px 0;
+}
+
+/* ── Mermaid diagrams ────────────────────────────────────────────────────────── */
+
+.docs-diagram {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    padding: 24px 20px;
+    margin: 0 0 16px 0;
+    overflow-x: auto;
+}
+
+.docs-diagram .mermaid {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.docs-diagram svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.docs-diagram-label {
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.2);
+    margin: 0 0 12px 0;
+    display: block;
 }

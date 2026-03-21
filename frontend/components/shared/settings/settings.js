@@ -1552,6 +1552,13 @@ window._SettingsPanel = (function () {
     }
     function open() {
         _open = true;
+        // Close docs panel if open
+        const docsPanel = document.getElementById('docs-panel');
+        if (docsPanel && docsPanel.classList.contains('docs-panel-visible')) {
+            docsPanel.classList.remove('docs-panel-visible');
+            const docsBtn = document.getElementById('docs-btn');
+            if (docsBtn) docsBtn.classList.remove('docs-btn-active');
+        }
         const panel = document.getElementById('settings-panel');
         if (panel)
             panel.classList.add('settings-panel-visible');

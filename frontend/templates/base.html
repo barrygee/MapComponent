@@ -121,6 +121,40 @@
         </div>
     </footer>
 
+    <!-- Mermaid diagrams -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        const mermaidConfig = {
+            startOnLoad: false,
+            theme: 'base',
+            themeVariables: {
+                background: '#38435c',
+                primaryColor: '#2a3247',
+                primaryTextColor: '#ffffff',
+                primaryBorderColor: '#c8ff00',
+                lineColor: '#c8ff00',
+                secondaryColor: '#1e2638',
+                tertiaryColor: '#38435c',
+                edgeLabelBackground: '#38435c',
+                clusterBkg: '#1e2638',
+                clusterBorder: 'rgba(255,255,255,0.12)',
+                titleColor: '#c8ff00',
+                fontFamily: 'Barlow, sans-serif',
+                fontSize: '13px',
+                nodeBorder: 'rgba(255,255,255,0.15)',
+                nodeTextColor: 'rgba(255,255,255,0.85)',
+                labelTextColor: 'rgba(255,255,255,0.85)',
+                attributeBackgroundColorEven: '#2a3247',
+                attributeBackgroundColorOdd: '#1e2638',
+            },
+            flowchart: { curve: 'basis', padding: 20 },
+            sequence: { actorFontFamily: 'Barlow, sans-serif', noteFontFamily: 'Barlow, sans-serif' },
+        };
+        mermaid.initialize(mermaidConfig);
+        // Expose run function for the docs panel toggle
+        window.__mermaidRun = () => mermaid.run({ querySelector: '#docs-body .mermaid' });
+    </script>
+
     <!-- Core libraries -->
     <script src="/assets/pmtiles.js"></script>
     <script src='/assets/maplibre-gl.js'></script>
@@ -139,9 +173,19 @@
             var btn = document.getElementById('docs-btn');
             var panel = document.getElementById('docs-panel');
             if (!btn || !panel) return;
+            var mermaidRendered = false;
             btn.addEventListener('click', function () {
                 var isOpen = panel.classList.toggle('docs-panel-visible');
                 btn.classList.toggle('docs-btn-active', isOpen);
+                // Close settings panel if docs is opening
+                if (isOpen && window._SettingsPanel && typeof window._SettingsPanel.close === 'function') {
+                    window._SettingsPanel.close();
+                }
+                if (isOpen && !mermaidRendered && typeof window.__mermaidRun === 'function') {
+                    mermaidRendered = true;
+                    // Small delay to ensure panel is visible before rendering
+                    setTimeout(window.__mermaidRun, 50);
+                }
             });
         });
     })();
