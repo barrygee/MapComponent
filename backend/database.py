@@ -1,11 +1,15 @@
 import json
 import time
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from backend.config import settings
+
+# Path to the bundled default config — used to seed the DB on first startup.
+_CONFIG_PATH = Path(__file__).parent / "default_config.json"
 
 # Async SQLAlchemy engine backed by SQLite via aiosqlite
 engine = create_async_engine(
@@ -49,24 +53,38 @@ async def get_db():
         yield session
 
 
+def _load_config_as_settings(path: Path) -> list[tuple[str, str, object]]:
+    """
+    Parse a config JSON file (namespace → {key: value}) into a flat list of
+    (namespace, key, value) tuples suitable for seeding the database.
+    Reserved keys starting with '_' (e.g. _comment) are ignored.
+    """
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    result = []
+    for namespace, entries in raw.items():
+        if namespace.startswith("_") or not isinstance(entries, dict):
+            continue
+        for key, value in entries.items():
+            result.append((namespace, key, value))
+    return result
+
+
 # Default URL settings seeded into the database on first startup.
-# These are the canonical values previously hardcoded throughout the app.
-_DEFAULT_SETTINGS: list[tuple[str, str, object]] = [
-    # namespace, key, value
-    # onlineUrl  — plain string, used directly as the upstream base URL
-    # offlineSource — {url: string}, matches the frontend settings panel shape
-    ("app",   "connectivityProbeUrl", "https://tile.openstreetmap.org/favicon.ico"),
-    ("app",   "connectivityMode",    "online"),
-    ("air",   "sourceOverride", "auto"),
-    ("air",   "onlineUrl",      settings.adsb_upstream_base),
-    ("space", "onlineUrl",      settings.celestrak_iss_url),
-    ("space", "offlineSource",  {"url": "http://localhost"}),
-    ("space", "sourceOverride", "auto"),
-    ("sea",   "sourceOverride", "auto"),
-    ("land",  "sourceOverride", "auto"),
-    ("sdr",   "onlineUrl",      "https://"),
-    ("sdr",   "offlineSource",  {"url": "http://localhost"}),
-]
+# Loaded from default_config.json; env-derived values override specific keys.
+def _build_default_settings() -> list[tuple[str, str, object]]:
+    rows = _load_config_as_settings(_CONFIG_PATH)
+    # Allow env/config.py values to override the JSON file for API URLs
+    overrides = {
+        ("air",   "onlineUrl"): settings.adsb_upstream_base,
+        ("space", "onlineUrl"): settings.celestrak_iss_url,
+    }
+    result = []
+    for ns, key, value in rows:
+        result.append((ns, key, overrides.get((ns, key), value)))
+    return result
 
 
 async def seed_default_settings() -> None:
@@ -97,7 +115,7 @@ async def seed_default_settings() -> None:
 
     ts = int(time.time() * 1000)
     async with AsyncSessionLocal() as session:
-        for namespace, key, value in _DEFAULT_SETTINGS:
+        for namespace, key, value in _build_default_settings():
             result = await session.execute(
                 select(UserSettings).where(
                     UserSettings.namespace == namespace,

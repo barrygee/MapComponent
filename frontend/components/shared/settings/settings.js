@@ -152,6 +152,23 @@ window._SettingsPanel = (function () {
             desc: 'Local server URL and port for land data',
             renderControl: function () { return _renderOfflineSourceControl('land', ''); },
         },
+        // CONFIG
+        {
+            section: 'config',
+            sectionLabel: 'Config',
+            id: 'config-current',
+            label: 'Current Config',
+            desc: 'Settings currently stored in the database',
+            renderControl: _renderConfigCurrentControl,
+        },
+        {
+            section: 'config',
+            sectionLabel: 'Config',
+            id: 'config-upload',
+            label: 'Upload Config',
+            desc: 'Upload a JSON config file — preview its contents, then apply to replace all current settings',
+            renderControl: _renderConfigUploadControl,
+        },
     ];
     const _NAV_SECTIONS = [
         { key: 'app', label: 'App Settings' },
@@ -160,6 +177,7 @@ window._SettingsPanel = (function () {
         { key: 'sea', label: 'SEA' },
         { key: 'land', label: 'LAND' },
         { key: 'sdr', label: 'SDR' },
+        { key: 'config', label: 'Config' },
     ];
     // ── DOM injection ────────────────────────────────────────
     (function _injectHTML() {
@@ -706,6 +724,130 @@ window._SettingsPanel = (function () {
         wrap.appendChild(labelDark);
         wrap.appendChild(track);
         wrap.appendChild(labelLight);
+        return wrap;
+    }
+    // ── Config controls ───────────────────────────────────────
+    function _renderConfigCurrentControl() {
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-config-wrap';
+        wrap.dataset['wide'] = 'true';
+        const textarea = document.createElement('textarea');
+        textarea.className = 'settings-config-preview settings-config-preview--textarea';
+        textarea.value = 'Loading…';
+        textarea.spellcheck = false;
+        textarea.autocomplete = 'off';
+        const actionRow = document.createElement('div');
+        actionRow.className = 'settings-config-action-row';
+        const exportBtn = document.createElement('button');
+        exportBtn.className = 'settings-config-btn';
+        exportBtn.textContent = 'EXPORT';
+        wrap.appendChild(textarea);
+        wrap.appendChild(actionRow);
+        actionRow.appendChild(exportBtn);
+        // Export: download the current textarea content as JSON
+        exportBtn.addEventListener('click', function () {
+            const blob = new Blob([textarea.value], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sentinel_config.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+        fetch('/api/settings/config/preview')
+            .then(function (res) { return res.json(); })
+            .then(function (data) { textarea.value = JSON.stringify(data, null, 2); })
+            .catch(function () { textarea.value = 'Failed to load config.'; });
+        return wrap;
+    }
+    function _renderConfigUploadControl() {
+        const wrap = document.createElement('div');
+        wrap.className = 'settings-config-wrap';
+        // File picker row
+        const pickerRow = document.createElement('div');
+        pickerRow.className = 'settings-config-picker-row';
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.json,application/json';
+        fileInput.className = 'settings-config-file-input';
+        fileInput.id = 'settings-config-file-input';
+        const chooseLabel = document.createElement('label');
+        chooseLabel.htmlFor = 'settings-config-file-input';
+        chooseLabel.className = 'settings-config-btn';
+        chooseLabel.textContent = 'CHOOSE FILE';
+        const filenameSpan = document.createElement('span');
+        filenameSpan.className = 'settings-config-filename';
+        filenameSpan.textContent = 'No file selected';
+        pickerRow.appendChild(fileInput);
+        pickerRow.appendChild(chooseLabel);
+        pickerRow.appendChild(filenameSpan);
+        // Preview box — hidden until a file is chosen
+        const pre = document.createElement('pre');
+        pre.className = 'settings-config-preview settings-config-preview--hidden';
+        // Action row
+        const actionRow = document.createElement('div');
+        actionRow.className = 'settings-config-action-row settings-config-action-row--hidden';
+        const applyBtn = document.createElement('button');
+        applyBtn.className = 'settings-config-btn settings-config-upload-btn';
+        applyBtn.textContent = 'APPLY CONFIG';
+        const statusMsg = document.createElement('span');
+        statusMsg.className = 'settings-config-status';
+        actionRow.appendChild(applyBtn);
+        actionRow.appendChild(statusMsg);
+        wrap.appendChild(pickerRow);
+        wrap.appendChild(pre);
+        wrap.appendChild(actionRow);
+        // Read and preview the chosen file locally (no upload yet)
+        fileInput.addEventListener('change', function () {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file)
+                return;
+            filenameSpan.textContent = file.name;
+            statusMsg.textContent = '';
+            statusMsg.className = 'settings-config-status';
+            const reader = new FileReader();
+            reader.onload = function () {
+                try {
+                    const parsed = JSON.parse(reader.result);
+                    pre.textContent = JSON.stringify(parsed, null, 2);
+                    pre.classList.remove('settings-config-preview--hidden');
+                    actionRow.classList.remove('settings-config-action-row--hidden');
+                }
+                catch (e) {
+                    pre.textContent = 'Invalid JSON — cannot preview.';
+                    pre.classList.remove('settings-config-preview--hidden');
+                    actionRow.classList.add('settings-config-action-row--hidden');
+                }
+            };
+            reader.readAsText(file);
+        });
+        // Apply the previewed config to the backend
+        applyBtn.addEventListener('click', function () {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file)
+                return;
+            applyBtn.disabled = true;
+            statusMsg.textContent = 'Applying…';
+            statusMsg.className = 'settings-config-status';
+            const formData = new FormData();
+            formData.append('file', file);
+            fetch('/api/settings/config/upload', { method: 'POST', body: formData })
+                .then(function (res) {
+                if (!res.ok)
+                    return res.json().then(function (e) { throw new Error(e.detail || 'Upload failed'); });
+                return res.json();
+            })
+                .then(function (data) {
+                statusMsg.textContent = 'APPLIED — ' + (data.imported ?? '?') + ' SETTINGS IMPORTED';
+                statusMsg.className = 'settings-config-status settings-config-status--ok';
+                applyBtn.disabled = false;
+            })
+                .catch(function (err) {
+                statusMsg.textContent = err.message.toUpperCase();
+                statusMsg.className = 'settings-config-status settings-config-status--error';
+                applyBtn.disabled = false;
+            });
+        });
         return wrap;
     }
     function _renderConnectivityToggle() {

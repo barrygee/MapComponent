@@ -13,4 +13,5 @@ dependencies = [
     "jinja2>=3.1",
     "greenlet>=3.3.2",
     "sgp4>=2.23",
+    "python-multipart>=0.0.9",
 ]

@@ -1451,3 +1451,141 @@
 .tle-satlist-name--user {
     color: rgba(200, 255, 0, 0.85);
 }
+
+
+/* ---- Config section ---- */
+.settings-config-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: min(1120px, 100%);
+}
+
+.settings-config-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.settings-config-action-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.settings-config-action-row--hidden,
+.settings-config-preview--hidden {
+    display: none;
+}
+
+.settings-config-preview--textarea {
+    resize: vertical;
+    width: 75%;
+    height: 600px;
+    box-sizing: border-box;
+    outline: none;
+    caret-color: var(--color-accent);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+}
+
+.settings-config-preview--textarea:focus {
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.settings-config-preview {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    padding: 16px;
+    font-family: 'Barlow Condensed', 'Barlow', monospace;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.6);
+    white-space: pre;
+    overflow: auto;
+    max-height: 600px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.settings-config-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.settings-config-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    padding: 9px 20px;
+    color: rgba(255, 255, 255, 0.6);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    user-select: none;
+    align-self: flex-start;
+}
+
+.settings-config-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.settings-config-upload-btn {
+    border-color: rgba(200, 255, 0, 0.4);
+    color: var(--color-accent);
+}
+
+.settings-config-upload-btn:hover:not(:disabled) {
+    background: rgba(200, 255, 0, 0.08);
+    border-color: rgba(200, 255, 0, 0.7);
+    color: var(--color-accent);
+}
+
+.settings-config-upload-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.settings-config-filename {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.settings-config-status {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: transparent;
+    min-height: 1em;
+}
+
+.settings-config-status--ok {
+    color: var(--color-accent);
+}
+
+.settings-config-status--error {
+    color: rgba(255, 80, 80, 0.9);
+}
