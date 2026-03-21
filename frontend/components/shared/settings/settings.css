@@ -1480,7 +1480,7 @@
 
 .settings-config-preview--textarea {
     resize: vertical;
-    width: 75%;
+    width: 100%;
     box-sizing: border-box;
     outline: none;
     caret-color: var(--color-accent);
@@ -1489,6 +1489,7 @@
     font-weight: 400;
     letter-spacing: 0.05em;
 }
+
 
 .settings-config-preview--textarea:focus {
     border-color: rgba(255, 255, 255, 0.25);

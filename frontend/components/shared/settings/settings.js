@@ -743,10 +743,15 @@ window._SettingsPanel = (function () {
         const exportBtn = document.createElement('button');
         exportBtn.className = 'settings-config-btn';
         exportBtn.textContent = 'EXPORT';
+        function autoSize() {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }
         toggleBtn.addEventListener('click', function () {
             const hidden = textarea.classList.toggle('settings-config-preview--hidden');
             toggleBtn.textContent = hidden ? 'SHOW' : 'HIDE';
-            if (!hidden) autoSize();
+            if (!hidden)
+                autoSize();
         });
         wrap.appendChild(actionRow);
         actionRow.appendChild(toggleBtn);
@@ -765,8 +770,10 @@ window._SettingsPanel = (function () {
                     await writable.write(content);
                     await writable.close();
                     return;
-                } catch (err) {
-                    if (err.name === 'AbortError') return; // user cancelled
+                }
+                catch (err) {
+                    if (err.name === 'AbortError')
+                        return; // user cancelled
                 }
             }
             // Fallback for browsers without File System Access API
@@ -778,11 +785,6 @@ window._SettingsPanel = (function () {
             a.click();
             URL.revokeObjectURL(url);
         });
-        function autoSize() {
-            textarea.style.height = 'auto';
-            textarea.style.height = textarea.scrollHeight + 'px';
-        }
-
         fetch('/api/settings/config/preview')
             .then(function (res) { return res.json(); })
             .then(function (data) { textarea.value = JSON.stringify(data, null, 2); autoSize(); })
@@ -1246,28 +1248,35 @@ window._SettingsPanel = (function () {
         const infoPanel = document.createElement('div');
         infoPanel.className = 'tle-info-panel';
         infoPanel.hidden = true;
+        // Per-category URLs — starts as a copy of the hardcoded defaults,
+        // then overridden by space.onlineUrls from the backend config.
+        const effectiveUrls = Object.assign({}, _CELESTRAK_URLS);
+        function _buildInfoList() {
+            infoList.innerHTML = '';
+            _TLE_CATEGORIES.filter(function (c) { return c.value && effectiveUrls[c.value]; }).forEach(function (cat) {
+                const item = document.createElement('div');
+                item.className = 'tle-info-list-item';
+                const labelEl = document.createElement('span');
+                labelEl.className = 'tle-info-list-label';
+                labelEl.textContent = cat.label;
+                const sepEl = document.createElement('span');
+                sepEl.className = 'tle-info-list-sep';
+                sepEl.textContent = ':';
+                const urlEl = document.createElement('a');
+                urlEl.className = 'tle-info-table-url';
+                urlEl.textContent = effectiveUrls[cat.value];
+                urlEl.href = effectiveUrls[cat.value];
+                urlEl.target = '_blank';
+                urlEl.rel = 'noopener noreferrer';
+                item.appendChild(labelEl);
+                item.appendChild(sepEl);
+                item.appendChild(urlEl);
+                infoList.appendChild(item);
+            });
+        }
         const infoList = document.createElement('div');
         infoList.className = 'tle-info-list';
-        _TLE_CATEGORIES.filter(function (c) { return c.value && _CELESTRAK_URLS[c.value]; }).forEach(function (cat) {
-            const item = document.createElement('div');
-            item.className = 'tle-info-list-item';
-            const labelEl = document.createElement('span');
-            labelEl.className = 'tle-info-list-label';
-            labelEl.textContent = cat.label;
-            const sepEl = document.createElement('span');
-            sepEl.className = 'tle-info-list-sep';
-            sepEl.textContent = ':';
-            const urlEl = document.createElement('a');
-            urlEl.className = 'tle-info-table-url';
-            urlEl.textContent = _CELESTRAK_URLS[cat.value];
-            urlEl.href = _CELESTRAK_URLS[cat.value];
-            urlEl.target = '_blank';
-            urlEl.rel = 'noopener noreferrer';
-            item.appendChild(labelEl);
-            item.appendChild(sepEl);
-            item.appendChild(urlEl);
-            infoList.appendChild(item);
-        });
+        _buildInfoList();
         infoPanel.appendChild(infoList);
         infoRow.appendChild(infoHeader);
         infoRow.appendChild(infoPanel);
@@ -1284,16 +1293,32 @@ window._SettingsPanel = (function () {
             const migrated = saved ? saved.replace(/FORMAT=TLE\b/, 'FORMAT=tle').replace(/CATNR=25544/, 'GROUP=active') : null;
             if (migrated && migrated !== saved)
                 localStorage.setItem(LS_KEY, migrated);
-            urlInput.value = migrated || _CELESTRAK_URLS['active'];
+            urlInput.value = migrated || effectiveUrls['active'];
         }
         catch (e) {
-            urlInput.value = _CELESTRAK_URLS['active'];
+            urlInput.value = effectiveUrls['active'];
         }
-        // Reconcile with backend
+        // Reconcile with backend — apply onlineUrls overrides and onlineUrl fallback
         if (window._SettingsAPI) {
             window._SettingsAPI.getNamespace('space').then(function (data) {
-                if (!data || !data['onlineUrl'])
+                if (!data)
                     return;
+                // Merge per-category URL overrides from config
+                const configUrls = data['onlineUrls'];
+                if (configUrls && typeof configUrls === 'object') {
+                    Object.assign(effectiveUrls, configUrls);
+                    _buildInfoList();
+                    // Re-fill URL input if the current category is now overridden
+                    const currentCat = catDrop.getValue();
+                    if (currentCat && effectiveUrls[currentCat]) {
+                        urlInput.value = effectiveUrls[currentCat];
+                        try {
+                            localStorage.setItem(LS_KEY, urlInput.value);
+                        }
+                        catch (e) { }
+                    }
+                }
+                // Fall back to legacy single onlineUrl if input is still empty
                 const backendVal = data['onlineUrl'];
                 if (backendVal && !urlInput.value) {
                     urlInput.value = backendVal;
@@ -1306,7 +1331,7 @@ window._SettingsPanel = (function () {
         }
         // Auto-fill URL when category changes
         catDrop.onChange(function (val) {
-            urlInput.value = _CELESTRAK_URLS[val] ?? '';
+            urlInput.value = effectiveUrls[val] ?? '';
         });
         updateBtn.addEventListener('click', async function () {
             const url = urlInput.value.trim();
