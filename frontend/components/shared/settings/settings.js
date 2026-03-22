@@ -2066,6 +2066,7 @@ window._SettingsPanel = (function () {
             const docsBtn = document.getElementById('docs-btn');
             if (docsBtn)
                 docsBtn.classList.remove('docs-btn-active');
+            try { sessionStorage.removeItem('sentinel_panel'); } catch (e) { }
         }
         const panel = document.getElementById('settings-panel');
         if (panel)
@@ -2073,6 +2074,7 @@ window._SettingsPanel = (function () {
         const btn = document.getElementById('settings-btn');
         if (btn)
             btn.classList.add('settings-btn-active');
+        try { sessionStorage.setItem('sentinel_panel', 'settings'); } catch (e) { }
         _updateFooterVisibility(_activeSection);
         _renderSection(_activeSection);
         const input = document.getElementById('settings-search-input');
@@ -2097,6 +2099,7 @@ window._SettingsPanel = (function () {
         const body = document.getElementById('settings-body');
         if (body)
             body.innerHTML = '';
+        try { sessionStorage.removeItem('sentinel_panel'); } catch (e) { }
     }
     function toggle() {
         if (_open)
@@ -2157,6 +2160,7 @@ window._SettingsPanel = (function () {
                     searchWrap.classList.toggle('settings-search-wrap--hidden', _activeSection !== 'app');
                 _updateFooterVisibility(_activeSection);
                 _renderSection(_activeSection);
+                try { sessionStorage.setItem('sentinel_settings_section', _activeSection); } catch (e) { }
             });
         });
         // Apply Changes button

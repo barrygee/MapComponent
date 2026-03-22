@@ -184,12 +184,24 @@
                 if (isOpen && window._SettingsPanel && typeof window._SettingsPanel.close === 'function') {
                     window._SettingsPanel.close();
                 }
+                try { isOpen ? sessionStorage.setItem('sentinel_panel', 'docs') : sessionStorage.removeItem('sentinel_panel'); } catch (e) { }
                 if (isOpen && !mermaidRendered && typeof window.__mermaidRun === 'function') {
                     mermaidRendered = true;
                     // Small delay to ensure panel is visible before rendering
                     setTimeout(window.__mermaidRun, 50);
                 }
             });
+            // Restore docs panel if it was open before the page reload
+            try {
+                if (sessionStorage.getItem('sentinel_panel') === 'docs') {
+                    panel.classList.add('docs-panel-visible');
+                    btn.classList.add('docs-btn-active');
+                    if (!mermaidRendered && typeof window.__mermaidRun === 'function') {
+                        mermaidRendered = true;
+                        setTimeout(window.__mermaidRun, 50);
+                    }
+                }
+            } catch (e) { }
         });
     })();
     </script>
