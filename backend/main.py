@@ -1,19 +1,46 @@
+import json
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.database import create_tables, seed_default_settings
+from backend.database import create_tables, get_db, seed_default_settings
+from backend.models import UserSettings
 from backend.routers import air, space, sea, land, settings as settings_router
 
 
 ROOT_DIR = Path(__file__).parent.parent
 TEMPLATES_DIR = ROOT_DIR / "frontend" / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+_DOMAIN_ORDER = ("air", "space", "sea", "land", "sdr")
+
+
+async def _get_enabled_domains(db: AsyncSession) -> list[str]:
+    """Return an ordered list of domain names whose 'enabled' setting is truthy."""
+    result = await db.execute(
+        select(UserSettings).where(
+            UserSettings.namespace.in_(_DOMAIN_ORDER),
+            UserSettings.key == "enabled",
+        )
+    )
+    rows = result.scalars().all()
+    enabled_set: set[str] = set()
+    for row in rows:
+        try:
+            if json.loads(row.value):
+                enabled_set.add(row.namespace)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    # Preserve display order; fall back to all domains if DB has no data yet
+    ordered = [d for d in _DOMAIN_ORDER if d in enabled_set]
+    return ordered if ordered else list(_DOMAIN_ORDER)
 
 
 @asynccontextmanager
@@ -54,14 +81,23 @@ async def favicon_ico():
 # ── Page routes ────────────────────────────────────────────────────────────────
 
 @app.get("/")
-async def root_redirect():
-    return RedirectResponse(url="/air/", status_code=302)
+async def root_redirect(db: AsyncSession = Depends(get_db)):
+    enabled = await _get_enabled_domains(db)
+    target = enabled[0] if enabled else "air"
+    return RedirectResponse(url=f"/{target}/", status_code=302)
 
 
 def _make_page_handler(domain: str):
     """Return a route handler that renders the template for the given domain."""
-    async def handler(request: Request):
-        return templates.TemplateResponse(f"{domain}/index.html", {"request": request, "domain": domain})
+    async def handler(request: Request, db: AsyncSession = Depends(get_db)):
+        enabled = await _get_enabled_domains(db)
+        if domain not in enabled:
+            target = enabled[0] if enabled else "air"
+            return RedirectResponse(url=f"/{target}/", status_code=302)
+        return templates.TemplateResponse(
+            f"{domain}/index.html",
+            {"request": request, "domain": domain, "enabled_domains": enabled},
+        )
     handler.__name__ = f"{domain}_page"
     return handler
 

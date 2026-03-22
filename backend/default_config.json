@@ -5,10 +5,12 @@
     "connectivityProbeUrl": "https://tile.openstreetmap.org/favicon.ico"
   },
   "air": {
+    "enabled": true,
     "sourceOverride": "auto",
     "onlineUrl": "https://api.airplanes.live/v2"
   },
   "space": {
+    "enabled": true,
     "sourceOverride": "auto",
     "onlineUrl": "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",
     "onlineUrls": {
@@ -24,12 +26,15 @@
     }
   },
   "sea": {
+    "enabled": true,
     "sourceOverride": "auto"
   },
   "land": {
+    "enabled": true,
     "sourceOverride": "auto"
   },
   "sdr": {
+    "enabled": true,
     "onlineUrl": "https://",
     "offlineSource": { "url": "http://localhost" }
   }
