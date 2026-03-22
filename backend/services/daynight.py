@@ -2,7 +2,7 @@
 Day/night terminator computation.
 
 Computes the solar terminator (day/night boundary) for the current UTC time
-and returns a GeoJSON Polygon covering the night side of the Earth.
+and returns a GeoJSON MultiPolygon covering the night side of the Earth.
 
 Uses only the Python standard library (math, datetime) — no extra dependencies.
 """
@@ -17,97 +17,158 @@ def _solar_position(dt: datetime) -> tuple[float, float]:
     Returns (latitude_deg, longitude_deg) of the point on Earth's surface
     directly beneath the Sun.
 
-    Algorithm: simplified VSOP87 / Spencer (1971) approximation.
-    Accurate to within ~0.01° for display purposes.
+    Algorithm: Spencer (1971) approximation, accurate to ~0.01° for display.
     """
-    # Day of year and fractional hour
     doy = dt.timetuple().tm_yday
     hour_utc = dt.hour + dt.minute / 60.0 + dt.second / 3600.0
 
-    # Solar declination (Spencer 1971)
-    B = math.radians((360 / 365.0) * (doy - 81))
+    B = math.radians((360.0 / 365.0) * (doy - 81))
     declination_deg = (
         23.45 * math.sin(B)
         - 0.39 * math.sin(2 * B)
         + 0.07 * math.sin(4 * B)
     )
-
-    # Equation of time in minutes (Spencer 1971)
     eot_minutes = (
         9.87 * math.sin(2 * B)
         - 7.53 * math.cos(B)
-        - 1.5 * math.sin(B)
+        - 1.5  * math.sin(B)
     )
-
-    # Solar noon in UTC hours at the Greenwich meridian
     solar_noon_utc = 12.0 - eot_minutes / 60.0
-
-    # Subsolar longitude: 15° per hour from solar noon
     subsolar_lon = (solar_noon_utc - hour_utc) * 15.0
-    # Normalise to -180..180
-    while subsolar_lon > 180:
+    while subsolar_lon >  180:
         subsolar_lon -= 360
     while subsolar_lon < -180:
         subsolar_lon += 360
-
     return declination_deg, subsolar_lon
 
 
-def _terminator_lat(lon_deg: float, sun_lat_rad: float, sun_lon_rad: float) -> float:
-    """Return the terminator latitude at a given longitude.
-
-    The terminator satisfies: sin(sun_lat)*sin(lat) + cos(sun_lat)*cos(lat)*cos(lon-sun_lon) = 0
-    Solving: tan(lat) = -cos(lon - sun_lon) / tan(sun_lat)
-    """
-    delta_lon = math.radians(lon_deg) - sun_lon_rad
-    # When sun is near equator tan(sun_lat) ~ 0; clamp to avoid division issues
-    tan_sun = math.tan(sun_lat_rad)
-    if abs(tan_sun) < 1e-10:
-        # Sun on equator: terminator is a meridian, lat undefined — return 0
-        return 0.0
-    lat_rad = math.atan(-math.cos(delta_lon) / tan_sun)
-    return math.degrees(lat_rad)
-
-
 def compute_terminator() -> dict:
-    """Return a GeoJSON FeatureCollection with two Polygons covering the night side.
+    """Return a GeoJSON Feature covering the night side of the Earth.
 
-    Strategy: for each integer longitude -180..180 compute the terminator latitude,
-    then build two polygons (one capping at +90, one at -90) so the night hemisphere
-    is always correctly filled regardless of antimeridian crossings.
+    Algorithm
+    ---------
+    The terminator at longitude λ satisfies:
 
-    The night side is the hemisphere opposite the subsolar point.  A point (lat, lon)
-    is in night if:
-        sin(sun_lat)*sin(lat) + cos(sun_lat)*cos(lat)*cos(lon-sun_lon) < 0
+        sin(δ)·sin(φ) + cos(δ)·cos(φ)·cos(λ − λ☉) = 0
+
+    Solving for φ:
+
+        tan(φ) = −cos(λ − λ☉) / tan(δ)          [1]
+
+    This is valid when δ ≠ 0.  When δ = 0 (equinox) the terminator degenerates
+    to the two meridians λ = λ☉ ± 90°; we handle that as a special case.
+
+    Polygon construction
+    --------------------
+    We evaluate [1] at each integer longitude from −180 to 180 to get a smooth
+    curve (term_lat[lon]).  We then build a closed polygon that covers the night
+    side by capping the curve at the night pole:
+
+      • Sort the terminator points by longitude so the body never crosses ±180°.
+      • The night pole (±90°) is determined by the sign of δ:
+          δ > 0  → sun is north  → night pole is south (−90°)
+          δ < 0  → sun is south  → night pole is north (+90°)
+      • Build:
+            sorted terminator (left → right)
+          + [lon_max, pole_lat]   right descent to pole
+          + [lon_min, pole_lat]   pole strip back left (via 0° midpoint if needed)
+          + sorted_pts[0]         close ring
+
+    Equinox special case (δ ≈ 0)
+    ------------------------------
+    The terminator is a meridian pair at λ☉ ± 90°.  The night hemisphere spans
+    the 180° band centred on the anti-solar point (λ☉ + 180°).  We construct it
+    as a simple rectangle in lon/lat space:
+
+        [anti − 90, −90] → [anti + 90, −90] → [anti + 90, 90]
+        → [anti − 90, 90] → close
+
+    clamped to ±180° and split at the antimeridian if needed.
     """
     now = datetime.now(timezone.utc)
     sun_lat, sun_lon = _solar_position(now)
 
+    EQUINOX_THRESH = 0.01   # degrees — treat as equinox below this declination
+
+    # ------------------------------------------------------------------ #
+    # EQUINOX CASE                                                         #
+    # ------------------------------------------------------------------ #
+    if abs(sun_lat) < EQUINOX_THRESH:
+        # Night hemisphere is centred on the anti-solar longitude
+        anti_lon = sun_lon + 180.0
+        if anti_lon > 180:
+            anti_lon -= 360.0
+
+        lo = anti_lon - 90.0   # left edge of night band
+        hi = anti_lon + 90.0   # right edge of night band
+
+        def _norm(lon: float) -> float:
+            while lon >  180: lon -= 360
+            while lon < -180: lon += 360
+            return lon
+
+        lo = _norm(lo)
+        hi = _norm(hi)
+
+        if lo < hi:
+            # No antimeridian split needed
+            ring = [[lo, -90.0], [hi, -90.0], [hi, 90.0], [lo, 90.0], [lo, -90.0]]
+            polys = [[ring]]
+        else:
+            # Night band crosses the antimeridian — split into two rectangles
+            ring1 = [[-180.0, -90.0], [hi, -90.0], [hi, 90.0], [-180.0, 90.0], [-180.0, -90.0]]
+            ring2 = [[lo, -90.0], [180.0, -90.0], [180.0, 90.0], [lo, 90.0], [lo, -90.0]]
+            polys = [[ring1], [ring2]]
+
+        return {
+            "type": "Feature",
+            "geometry": {"type": "MultiPolygon", "coordinates": polys},
+            "properties": {"sun_lat": round(sun_lat, 3), "sun_lon": round(sun_lon, 3)},
+        }
+
+    # ------------------------------------------------------------------ #
+    # GENERAL CASE (non-equinox)                                           #
+    # ------------------------------------------------------------------ #
     sun_lat_rad = math.radians(sun_lat)
     sun_lon_rad = math.radians(sun_lon)
+    tan_sun = math.tan(sun_lat_rad)
 
-    # Build terminator curve: one (lon, term_lat) per degree of longitude
-    lons = list(range(-180, 181))
-    term_lats = [_terminator_lat(lon, sun_lat_rad, sun_lon_rad) for lon in lons]
+    # Evaluate terminator latitude at each integer longitude
+    lons_deg = list(range(-180, 181))
+    term_pts = []
+    for lon_deg in lons_deg:
+        delta_lon = math.radians(lon_deg) - sun_lon_rad
+        lat_rad = math.atan(-math.cos(delta_lon) / tan_sun)
+        term_pts.append([float(lon_deg), math.degrees(lat_rad)])
 
-    # Determine which pole is on the night side.
-    # North pole is night if sun declination < 0 (sun in southern hemisphere).
-    night_pole_lat = 90.0 if sun_lat < 0 else -90.0
+    # Night pole: south if sun is north, north if sun is south
+    pole_lat = -90.0 if sun_lat > 0 else 90.0
 
-    # Build a single polygon:
-    #   - top edge along night_pole_lat from lon=-180 to lon=180
-    #   - right edge down to terminator at lon=180
-    #   - terminator curve from lon=180 back to lon=-180
-    #   - left edge back up to night_pole_lat at lon=-180
-    top = [[-180.0, night_pole_lat], [180.0, night_pole_lat]]
-    terminator_rtol = [[lons[i], term_lats[i]] for i in range(len(lons) - 1, -1, -1)]
-    coords = top + terminator_rtol + [[-180.0, night_pole_lat]]
+    # The terminator points already run from lon -180 to +180 in order.
+    # Build polygon: terminator (left → right) + pole cap (right → left)
+    #
+    # The pole cap goes from lon=+180 back to lon=-180 at pole_lat.
+    # Insert a midpoint at lon=0 to avoid any 360° jump being interpreted
+    # as an antimeridian crossing by renderers.
+
+    ring = (
+        term_pts
+        + [[180.0, pole_lat], [0.0, pole_lat], [-180.0, pole_lat]]
+        + [term_pts[0]]
+    )
+
+    # Verify no antimeridian crossings (should never happen with this construction)
+    crossings = [i for i in range(1, len(ring))
+                 if abs(ring[i][0] - ring[i - 1][0]) > 180]
+    assert not crossings, f"Unexpected antimeridian crossing: {crossings}"
 
     return {
         "type": "Feature",
         "geometry": {
-            "type": "Polygon",
-            "coordinates": [coords],
+            "type": "MultiPolygon",
+            "coordinates": [[[  # MultiPolygon > Polygon > ring
+                pt for pt in ring
+            ]]],
         },
         "properties": {
             "sun_lat": round(sun_lat, 3),
