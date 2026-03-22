@@ -508,18 +508,21 @@ class IssControl extends SentinelControlBase {
         });
     }
     // ---- Pass notifications ----
+    _passNotifKey() {
+        return `passNotifEnabled_${this._activeNoradId}`;
+    }
     _restorePassNotifState() {
         try {
-            this._passNotifEnabled = localStorage.getItem('issPassNotifEnabled') === '1';
+            this._passNotifEnabled = localStorage.getItem(this._passNotifKey()) === '1';
         }
         catch (e) { }
     }
     _savePassNotifState() {
         try {
             if (this._passNotifEnabled)
-                localStorage.setItem('issPassNotifEnabled', '1');
+                localStorage.setItem(this._passNotifKey(), '1');
             else
-                localStorage.removeItem('issPassNotifEnabled');
+                localStorage.removeItem(this._passNotifKey());
         }
         catch (e) { }
     }
@@ -567,7 +570,7 @@ class IssControl extends SentinelControlBase {
             }
             this._savePassNotifState();
             if (window._Notifications) {
-                window._Notifications.add({ type: 'notif-off', title: 'ISS', detail: 'Pass notifications disabled' });
+                window._Notifications.add({ type: 'notif-off', title: this._activeSatName, detail: 'Pass notifications disabled' });
             }
         }
         else {
@@ -592,7 +595,7 @@ class IssControl extends SentinelControlBase {
             this._startPassNotifPolling();
             if (window._Notifications) {
                 window._Notifications.add({
-                    type: 'tracking', title: 'ISS', detail: 'Pass notifications enabled',
+                    type: 'tracking', title: this._activeSatName, detail: 'Pass notifications enabled',
                     action: { label: 'DISABLE NOTIFICATIONS', callback: () => {
                             this._passNotifEnabled = true; // ensure toggle turns it off
                             this._togglePassNotif();
@@ -612,7 +615,10 @@ class IssControl extends SentinelControlBase {
             return;
         const [lon, lat] = spaceUserLocationCenter;
         try {
-            const resp = await fetch(`/api/space/iss/passes?lat=${lat}&lon=${lon}&hours=24`);
+            const endpoint = this._activeNoradId === '25544'
+                ? `/api/space/iss/passes?lat=${lat}&lon=${lon}&hours=24`
+                : `/api/space/satellite/${this._activeNoradId}/passes?lat=${lat}&lon=${lon}&hours=24`;
+            const resp = await fetch(endpoint);
             if (!resp.ok)
                 return;
             const data = await resp.json();
@@ -673,15 +679,13 @@ class IssControl extends SentinelControlBase {
         const aosTime = aosDate.toUTCString().slice(17, 22) + ' UTC';
         window._Notifications.add({
             type: 'tracking',
-            title: 'ISS PASS',
+            title: `${this._activeSatName} PASS`,
             detail: `AOS ~10 min — max ${pass.max_elevation_deg}° elev at ${aosTime}`,
             action: {
                 label: 'DISABLE',
                 callback: () => {
-                    if (issControl) {
-                        issControl._passNotifEnabled = true; // ensure toggle turns it off
-                        issControl._togglePassNotif();
-                    }
+                    this._passNotifEnabled = true; // ensure toggle turns it off
+                    this._togglePassNotif();
                 },
             },
         });
@@ -848,6 +852,11 @@ class IssControl extends SentinelControlBase {
             this._stopFollowing();
         this._hideHoverTagNow();
         this._hideLabel();
+        // Stop pass notification polling for the outgoing satellite
+        if (this._passNotifTimeout) { clearTimeout(this._passNotifTimeout); this._passNotifTimeout = null; }
+        if (this._passRefreshInterval) { clearInterval(this._passRefreshInterval); this._passRefreshInterval = null; }
+        this._passNotifEnabled = false;
+        this._lastFiredPassAos = 0;
         this._activeNoradId = noradId;
         this._activeSatName = name;
         this._lastPosition = null;
@@ -880,6 +889,10 @@ class IssControl extends SentinelControlBase {
             if (typeof _spaceSyncSideMenu === 'function')
                 _spaceSyncSideMenu();
         }
+        // Restore per-satellite pass notification preference and resume polling if enabled
+        this._restorePassNotifState();
+        if (this._passNotifEnabled)
+            this._startPassNotifPolling();
         // Restart polling against the new satellite
         this._stopPolling();
         this._fetch();

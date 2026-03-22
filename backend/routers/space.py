@@ -4,6 +4,7 @@ Space domain router — ISS tracking, ground track, day/night terminator, and TL
 Endpoints:
   GET  /api/space/iss              — ISS current position, ground track, and footprint
   GET  /api/space/iss/passes       — Predicted passes over a given observer location
+  GET  /api/space/satellite/{norad_id}/passes — Predicted passes for any satellite by NORAD ID
   GET  /api/space/daynight         — Day/night terminator as GeoJSON polygon
 
   GET  /api/space/tle/status       — TLE database summary (counts, per-category last-updated)
@@ -131,6 +132,43 @@ async def get_iss_passes(
     try:
         online_url, _ = await resolve_domain_urls("space", db)
         tle_text = await tle_service.fetch_tle(_ISS_NORAD, db, online_url)
+        _, line1, line2 = tle_service.parse_tle_lines(tle_text)
+
+        passes = sat_service.compute_passes(
+            line1, line2,
+            obs_lat=lat,
+            obs_lon=lon,
+            lookahead_hours=hours,
+            min_elevation_deg=min_el,
+        )
+
+        return JSONResponse({
+            "passes":          passes,
+            "obs_lat":         lat,
+            "obs_lon":         lon,
+            "lookahead_hours": hours,
+            "computed_at":     datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        })
+
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=503)
+    except Exception as e:
+        return JSONResponse({"error": f"Unexpected error: {e}"}, status_code=500)
+
+
+@router.get("/satellite/{norad_id}/passes")
+async def get_satellite_passes(
+    norad_id: str,
+    lat: float = Query(..., description="Observer latitude in degrees"),
+    lon: float = Query(..., description="Observer longitude in degrees"),
+    hours: int = Query(24, ge=1, le=48, description="Lookahead window in hours"),
+    min_el: float = Query(0.0, ge=0.0, le=90.0, description="Minimum max-elevation filter (degrees)"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Predict passes for any satellite visible from an observer location within the next N hours."""
+    try:
+        online_url, _ = await resolve_domain_urls("space", db)
+        tle_text = await tle_service.fetch_tle(norad_id, db, online_url)
         _, line1, line2 = tle_service.parse_tle_lines(tle_text)
 
         passes = sat_service.compute_passes(
