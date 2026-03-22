@@ -498,6 +498,205 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Config File (<code>default_config.json</code>)</h2>
+                    <p class="docs-item-desc">
+                        <code>backend/default_config.json</code> is the seed file loaded on first
+                        startup to populate the database with default settings. You can download
+                        the current live settings at any time via
+                        <strong>Settings &rsaquo; Config &rsaquo; Download</strong>, modify it, then
+                        re-upload via <strong>Settings &rsaquo; Config &rsaquo; Upload</strong> to
+                        replace all settings at once.
+                    </p>
+                    <p class="docs-item-desc">
+                        The file is a JSON object whose top-level keys are <em>namespaces</em> —
+                        one per domain plus a global <code>app</code> section. Each namespace
+                        contains key/value pairs that map directly to the settings stored in the
+                        database.
+                    </p>
+
+                    <span class="docs-group-label"><code>app</code> — Global application settings</span>
+                    <table class="docs-table">
+                        <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td><code>connectivityMode</code></td>
+                                <td><code>"online"</code> | <code>"offline"</code></td>
+                                <td>Global data-source selector. <em>online</em> uses upstream internet feeds; <em>offline</em> routes all domains to their configured local/offline source URL. Individual domains can override this with <code>sourceOverride</code>.</td>
+                            </tr>
+                            <tr>
+                                <td><code>connectivityProbeUrl</code></td>
+                                <td>URL string</td>
+                                <td>A lightweight URL polled every 2 seconds to detect internet connectivity. A failed request turns the connectivity indicator red. Defaults to the OpenStreetMap tile favicon — any reliably reachable URL works.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <span class="docs-group-label"><code>air</code> — ADS-B aircraft tracking</span>
+                    <table class="docs-table">
+                        <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td><code>enabled</code></td>
+                                <td>boolean</td>
+                                <td>Whether the AIR domain is active. When <code>false</code> the domain is skipped entirely — no data is fetched and the map layer is not rendered.</td>
+                            </tr>
+                            <tr>
+                                <td><code>sourceOverride</code></td>
+                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offline"</code></td>
+                                <td>Per-domain source selector. <em>auto</em> follows the global <code>connectivityMode</code>. <em>online</em> or <em>offline</em> force this domain to use a specific source regardless of the app-level mode.</td>
+                            </tr>
+                            <tr>
+                                <td><code>onlineUrl</code></td>
+                                <td>URL string</td>
+                                <td>Base URL for the live ADS-B upstream API. The backend appends <code>/point/{lat}/{lon}/{radius}</code> to this URL when fetching aircraft. Defaults to <code>https://api.airplanes.live/v2</code>.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <span class="docs-group-label"><code>space</code> — Satellite tracking</span>
+                    <table class="docs-table">
+                        <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td><code>enabled</code></td>
+                                <td>boolean</td>
+                                <td>Whether the SPACE domain is active.</td>
+                            </tr>
+                            <tr>
+                                <td><code>sourceOverride</code></td>
+                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offline"</code></td>
+                                <td>Per-domain source selector — same behaviour as the AIR domain override.</td>
+                            </tr>
+                            <tr>
+                                <td><code>onlineUrl</code></td>
+                                <td>URL string</td>
+                                <td>Default Celestrak TLE feed URL used when fetching satellite data. This is the fallback URL; per-category URLs in <code>onlineUrls</code> take precedence when a specific category is requested.</td>
+                            </tr>
+                            <tr>
+                                <td><code>onlineUrls</code></td>
+                                <td>object</td>
+                                <td>
+                                    Per-category Celestrak TLE feed URLs. Each key is a satellite
+                                    category name and the value is the full Celestrak URL for that
+                                    group. When TLE data is fetched for a category, the matching URL
+                                    here is used. Supported categories:
+                                    <code>space_station</code>, <code>amateur</code>,
+                                    <code>weather</code>, <code>military</code>,
+                                    <code>navigation</code>, <code>science</code>,
+                                    <code>cubesat</code>, <code>active</code>, <code>unknown</code>.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <span class="docs-group-label"><code>sea</code> — Maritime tracking (stub)</span>
+                    <table class="docs-table">
+                        <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td><code>enabled</code></td>
+                                <td>boolean</td>
+                                <td>Whether the SEA domain is active. Infrastructure is in place but data source integration is not yet implemented.</td>
+                            </tr>
+                            <tr>
+                                <td><code>sourceOverride</code></td>
+                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offline"</code></td>
+                                <td>Per-domain source selector — will be respected when SEA functionality is implemented.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <span class="docs-group-label"><code>land</code> — Land tracking (stub)</span>
+                    <table class="docs-table">
+                        <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td><code>enabled</code></td>
+                                <td>boolean</td>
+                                <td>Whether the LAND domain is active. Infrastructure is in place but data source integration is not yet implemented.</td>
+                            </tr>
+                            <tr>
+                                <td><code>sourceOverride</code></td>
+                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offline"</code></td>
+                                <td>Per-domain source selector — will be respected when LAND functionality is implemented.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <span class="docs-group-label"><code>sdr</code> — Software-defined radio (stub)</span>
+                    <table class="docs-table">
+                        <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td><code>enabled</code></td>
+                                <td>boolean</td>
+                                <td>Whether the SDR domain is active.</td>
+                            </tr>
+                            <tr>
+                                <td><code>onlineUrl</code></td>
+                                <td>URL string</td>
+                                <td>Base URL for an online SDR data feed.</td>
+                            </tr>
+                            <tr>
+                                <td><code>offlineSource</code></td>
+                                <td>object — <code>{ "url": string }</code></td>
+                                <td>Configuration for a local/offline SDR source. The nested <code>url</code> field should point to a self-hosted SDR server (e.g. <code>http://192.168.1.x:port</code>).</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Complete Config Example</h2>
+                    <p class="docs-item-desc">
+                        The following example shows a fully-populated config file with all domains
+                        enabled. Copy, modify, and upload it via
+                        <strong>Settings &rsaquo; Config &rsaquo; Upload</strong> to reset the
+                        application to a known state.
+                    </p>
+                    <pre class="docs-pre">{
+  "app": {
+    "connectivityMode": "online",
+    "connectivityProbeUrl": "https://tile.openstreetmap.org/favicon.ico"
+  },
+  "air": {
+    "enabled": true,
+    "sourceOverride": "auto",
+    "onlineUrl": "https://api.airplanes.live/v2"
+  },
+  "space": {
+    "enabled": true,
+    "sourceOverride": "auto",
+    "onlineUrl": "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",
+    "onlineUrls": {
+      "space_station": "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle",
+      "amateur":       "https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=tle",
+      "weather":       "https://celestrak.org/NORAD/elements/gp.php?GROUP=weather&FORMAT=tle",
+      "military":      "https://celestrak.org/NORAD/elements/gp.php?GROUP=military&FORMAT=tle",
+      "navigation":    "https://celestrak.org/NORAD/elements/gp.php?GROUP=gnss&FORMAT=tle",
+      "science":       "https://celestrak.org/NORAD/elements/gp.php?GROUP=science&FORMAT=tle",
+      "cubesat":       "https://celestrak.org/NORAD/elements/gp.php?GROUP=cubesat&FORMAT=tle",
+      "active":        "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",
+      "unknown":       "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle"
+    }
+  },
+  "sea": {
+    "enabled": true,
+    "sourceOverride": "auto"
+  },
+  "land": {
+    "enabled": true,
+    "sourceOverride": "auto"
+  },
+  "sdr": {
+    "enabled": true,
+    "onlineUrl": "https://",
+    "offlineSource": { "url": "http://localhost" }
+  }
+}</pre>
+                </div>
             </section>
 
             <hr class="docs-divider">

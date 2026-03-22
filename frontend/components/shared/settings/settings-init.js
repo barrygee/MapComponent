@@ -6,6 +6,13 @@
 // ============================================================
 /// <reference path="../globals.d.ts" />
 document.addEventListener('DOMContentLoaded', function () {
-    if (window._SettingsPanel)
-        window._SettingsPanel.init();
+    if (!window._SettingsPanel)
+        return;
+    window._SettingsPanel.init();
+    try {
+        if (sessionStorage.getItem('sentinel_panel') === 'settings') {
+            var section = sessionStorage.getItem('sentinel_settings_section') || 'app';
+            window._SettingsPanel.openSection(section);
+        }
+    } catch (e) { }
 });
