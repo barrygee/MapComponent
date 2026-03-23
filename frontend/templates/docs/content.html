@@ -660,6 +660,7 @@ sequenceDiagram
                             <tr><td>TLE Import</td><td>Upload a <code>.txt</code> file of TLE data (standard two-line or three-line format).</td></tr>
                             <tr><td>TLE Database</td><td>Summary of all loaded TLE data — satellite counts and per-category last-updated timestamps. Includes a <em>CLEAR ALL</em> button.</td></tr>
                             <tr><td>Uncategorised Satellites</td><td>List of satellites imported without a category. Assign categories individually or in bulk.</td></tr>
+                            <tr><td>Filter Hover Behaviour</td><td>Controls map movement when hovering a result in the satellite search filter. <em>Stay in place</em> (default) — the map stays where it is and the hovered satellite's position and ground track appear without moving the view. <em>Fly to satellite</em> — the map flies to centre on the hovered satellite; on mouse-out the view returns to the previously active satellite.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -720,6 +721,7 @@ sequenceDiagram
                             <tr><td>air</td><td>sourceOverride</td><td><code>auto</code></td></tr>
                             <tr><td>air</td><td>onlineUrl</td><td><code>https://api.airplanes.live/v2</code></td></tr>
                             <tr><td>space</td><td>sourceOverride</td><td><code>auto</code></td></tr>
+                            <tr><td>space</td><td>filterHoverPreview</td><td><code>stay</code></td></tr>
                             <tr><td>space</td><td>onlineUrl</td><td>Celestrak active satellites TLE feed</td></tr>
                             <tr><td>sea</td><td>sourceOverride</td><td><code>auto</code></td></tr>
                             <tr><td>land</td><td>sourceOverride</td><td><code>auto</code></td></tr>
@@ -796,6 +798,11 @@ sequenceDiagram
                                 <td><code>sourceOverride</code></td>
                                 <td><code>"auto"</code> | <code>"online"</code> | <code>"offline"</code></td>
                                 <td>Per-domain source selector — same behaviour as the AIR domain override.</td>
+                            </tr>
+                            <tr>
+                                <td><code>filterHoverPreview</code></td>
+                                <td><code>"stay"</code> | <code>"fly"</code></td>
+                                <td>Controls map movement when hovering a result in the satellite search filter. <code>stay</code> (default) — the map stays in place and the hovered satellite's position and ground track are shown without moving the view. <code>fly</code> — the map flies to centre on the hovered satellite; when the cursor leaves, the view returns to the active satellite.</td>
                             </tr>
                             <tr>
                                 <td><code>onlineUrl</code></td>

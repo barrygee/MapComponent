@@ -12,6 +12,7 @@
   "space": {
     "enabled": true,
     "sourceOverride": "auto",
+    "filterHoverPreview": "stay",
     "onlineUrl": "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",
     "onlineUrls": {
       "space_station": "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle",

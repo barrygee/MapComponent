@@ -71,11 +71,19 @@ async function _syncSpaceOverlayStatesFromBackend(): Promise<void> {
 
     // Fetch from backend and apply if available
     const ns = await window._SettingsAPI.getNamespace('space');
-    if (!ns || !ns['spaceOverlayStates']) return;
+    if (!ns) return;
 
-    const backend = ns['spaceOverlayStates'] as Partial<SpaceOverlayStates>;
-    _spaceOverlayStates = Object.assign({}, _SPACE_OVERLAY_DEFAULTS, backend);
-    localStorage.setItem('spaceOverlayStates', JSON.stringify(_spaceOverlayStates));
+    // Sync overlay visibility states
+    if (ns['spaceOverlayStates']) {
+        const backend = ns['spaceOverlayStates'] as Partial<SpaceOverlayStates>;
+        _spaceOverlayStates = Object.assign({}, _SPACE_OVERLAY_DEFAULTS, backend);
+        localStorage.setItem('spaceOverlayStates', JSON.stringify(_spaceOverlayStates));
+    }
+
+    // Sync filter hover preview preference
+    if (ns['filterHoverPreview'] === 'fly' || ns['filterHoverPreview'] === 'stay') {
+        try { localStorage.setItem('sentinel_space_filterHoverPreview', ns['filterHoverPreview'] as string); } catch (e) {}
+    }
 
     // Apply the restored states to live controls
     if (issControl) {
