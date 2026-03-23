@@ -178,13 +178,17 @@ window._SettingsPanel = (function () {
             renderControl: _renderConfigUploadControl,
         },
     ];
-    const _NAV_SECTIONS = [
-        { key: 'app', label: 'App Settings' },
+    const _DOMAIN_SECTIONS = [
         { key: 'air', label: 'AIR' },
         { key: 'space', label: 'SPACE' },
         { key: 'sea', label: 'SEA' },
         { key: 'land', label: 'LAND' },
         { key: 'sdr', label: 'SDR' },
+    ];
+    const _enabledDomains = window._SENTINEL_ENABLED_DOMAINS || [];
+    const _NAV_SECTIONS = [
+        { key: 'app', label: 'App Settings' },
+        ..._DOMAIN_SECTIONS.filter(function (s) { return _enabledDomains.includes(s.key); }),
     ];
     // ── DOM injection ────────────────────────────────────────
     (function _injectHTML() {
