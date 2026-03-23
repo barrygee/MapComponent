@@ -39,14 +39,6 @@ window._SettingsPanel = (function () {
         {
             section: 'air',
             sectionLabel: 'AIR',
-            id: 'air-enabled',
-            label: 'Enable Domain',
-            desc: 'When disabled, this domain is hidden from the navigation and settings menu',
-            renderControl: function () { return _renderDomainEnabledToggle('air'); },
-        },
-        {
-            section: 'air',
-            sectionLabel: 'AIR',
             id: 'air-source-override',
             label: 'Source Override',
             desc: 'Override the app-level connectivity mode for this domain',
@@ -69,14 +61,6 @@ window._SettingsPanel = (function () {
             renderControl: function () { return _renderOfflineSourceControl('air', ''); },
         },
         // SPACE
-        {
-            section: 'space',
-            sectionLabel: 'SPACE',
-            id: 'space-enabled',
-            label: 'Enable Domain',
-            desc: 'When disabled, this domain is hidden from the navigation and settings menu',
-            renderControl: function () { return _renderDomainEnabledToggle('space'); },
-        },
         {
             section: 'space',
             sectionLabel: 'SPACE',
@@ -122,14 +106,6 @@ window._SettingsPanel = (function () {
         {
             section: 'sea',
             sectionLabel: 'SEA',
-            id: 'sea-enabled',
-            label: 'Enable Domain',
-            desc: 'When disabled, this domain is hidden from the navigation and settings menu',
-            renderControl: function () { return _renderDomainEnabledToggle('sea'); },
-        },
-        {
-            section: 'sea',
-            sectionLabel: 'SEA',
             id: 'sea-source-override',
             label: 'Source Override',
             desc: 'Override the app-level connectivity mode for this domain',
@@ -155,14 +131,6 @@ window._SettingsPanel = (function () {
         {
             section: 'land',
             sectionLabel: 'LAND',
-            id: 'land-enabled',
-            label: 'Enable Domain',
-            desc: 'When disabled, this domain is hidden from the navigation and settings menu',
-            renderControl: function () { return _renderDomainEnabledToggle('land'); },
-        },
-        {
-            section: 'land',
-            sectionLabel: 'LAND',
             id: 'land-source-override',
             label: 'Source Override',
             desc: 'Override the app-level connectivity mode for this domain',
@@ -183,15 +151,6 @@ window._SettingsPanel = (function () {
             label: 'Offline Data Source',
             desc: 'Local server URL and port for land data',
             renderControl: function () { return _renderOfflineSourceControl('land', ''); },
-        },
-        // SDR
-        {
-            section: 'sdr',
-            sectionLabel: 'SDR',
-            id: 'sdr-enabled',
-            label: 'Enable Domain',
-            desc: 'When disabled, this domain is hidden from the navigation and settings menu',
-            renderControl: function () { return _renderDomainEnabledToggle('sdr'); },
         },
         // CONFIG
         {
@@ -229,9 +188,6 @@ window._SettingsPanel = (function () {
         const sidebar = document.createElement('div');
         sidebar.id = 'settings-sidebar';
         _NAV_SECTIONS.forEach(function (s) {
-            const enabled = window._SENTINEL_ENABLED_DOMAINS;
-            if (s.key !== 'app' && enabled && !enabled.includes(s.key))
-                return;
             const item = document.createElement('div');
             item.className = 'settings-nav-item' + (s.key === 'app' ? ' active' : '');
             item.textContent = s.label;
@@ -798,11 +754,15 @@ window._SettingsPanel = (function () {
                 textarea.classList.remove('settings-config-preview--hidden');
                 toggleBtn.textContent = 'HIDE';
             }
-        } catch (e) {}
+        }
+        catch (e) { }
         toggleBtn.addEventListener('click', function () {
             const hidden = textarea.classList.toggle('settings-config-preview--hidden');
             toggleBtn.textContent = hidden ? 'EDIT' : 'HIDE';
-            try { sessionStorage.setItem(SS_KEY, hidden ? '0' : '1'); } catch (e) {}
+            try {
+                sessionStorage.setItem(SS_KEY, hidden ? '0' : '1');
+            }
+            catch (e) { }
             if (!hidden)
                 autoSize();
         });
@@ -810,13 +770,18 @@ window._SettingsPanel = (function () {
             autoSize();
             _stagePending('config-current', function () {
                 const content = textarea.value;
-                try { JSON.parse(content); } catch (e) { throw new Error('Invalid JSON'); }
+                try {
+                    JSON.parse(content);
+                }
+                catch (e) {
+                    throw new Error('Invalid JSON');
+                }
                 const blob = new Blob([content], { type: 'application/json' });
                 const file = new File([blob], 'sentinel_config.json', { type: 'application/json' });
                 const formData = new FormData();
                 formData.append('file', file);
                 fetch('/api/settings/config/upload', { method: 'POST', body: formData })
-                    .catch(function () {});
+                    .catch(function () { });
             });
         });
         wrap.appendChild(textarea);
@@ -855,30 +820,6 @@ window._SettingsPanel = (function () {
             .then(function (res) { return res.json(); })
             .then(function (data) { textarea.value = JSON.stringify(data, null, 2); autoSize(); })
             .catch(function () { textarea.value = 'Failed to load config.'; autoSize(); });
-        // Stage a pending save whenever the textarea content changes
-        textarea.addEventListener('input', function () {
-            autoSize();
-            _stagePending('config-current', function () {
-                let parsed;
-                try {
-                    parsed = JSON.parse(textarea.value);
-                }
-                catch (e) {
-                    throw new Error('INVALID JSON');
-                }
-                const blob = new Blob([JSON.stringify(parsed)], { type: 'application/json' });
-                const file = new File([blob], 'sentinel_config.json', { type: 'application/json' });
-                const form = new FormData();
-                form.append('file', file);
-                fetch('/api/settings/config/upload', { method: 'POST', body: form })
-                    .then(function (res) {
-                        if (!res.ok)
-                            throw new Error('Upload failed');
-                        window.location.reload();
-                    })
-                    .catch(function () { });
-            });
-        });
         return wrap;
     }
     function _renderConfigUploadControl() {
@@ -1814,72 +1755,6 @@ window._SettingsPanel = (function () {
         saveAllBtn.addEventListener('click', _saveAll);
         return wrap;
     }
-    function _renderDomainEnabledToggle(ns) {
-        const LS_KEY = 'sentinel_' + ns + '_enabled';
-        const SETTING_ID = ns + '-enabled';
-        let current = true;
-        let _userInteracted = false;
-        try {
-            const saved = localStorage.getItem(LS_KEY);
-            if (saved !== null)
-                current = JSON.parse(saved);
-        }
-        catch (e) { }
-        const wrap = document.createElement('div');
-        wrap.className = 'settings-connectivity-wrap';
-        const group = document.createElement('div');
-        group.className = 'settings-connectivity-group';
-        function _setActive(val) {
-            current = val;
-            group.querySelectorAll('.settings-connectivity-btn').forEach(function (btn) {
-                btn.classList.toggle('is-active', btn.dataset['value'] === String(val));
-            });
-        }
-        [true, false].forEach(function (val) {
-            const btn = document.createElement('button');
-            btn.className = 'settings-connectivity-btn' + (current === val ? ' is-active' : '');
-            btn.textContent = val ? 'ENABLED' : 'DISABLED';
-            btn.dataset['value'] = String(val);
-            btn.addEventListener('click', function () {
-                if (current === val)
-                    return;
-                _userInteracted = true;
-                _setActive(val);
-                _stagePending(SETTING_ID, function () {
-                    try {
-                        localStorage.setItem(LS_KEY, JSON.stringify(current));
-                    }
-                    catch (e) { }
-                    if (window._SettingsAPI)
-                        window._SettingsAPI.put(ns, 'enabled', current).then(function () {
-                            window.location.reload();
-                        });
-                    else
-                        window.location.reload();
-                });
-            });
-            group.appendChild(btn);
-        });
-        // Sync from backend — skip if user has already interacted to avoid overwriting their choice
-        if (window._SettingsAPI) {
-            window._SettingsAPI.getNamespace(ns).then(function (data) {
-                if (_userInteracted)
-                    return;
-                if (!data || data['enabled'] === undefined)
-                    return;
-                const backendVal = !!data['enabled'];
-                if (backendVal !== current) {
-                    _setActive(backendVal);
-                    try {
-                        localStorage.setItem(LS_KEY, JSON.stringify(backendVal));
-                    }
-                    catch (e) { }
-                }
-            });
-        }
-        wrap.appendChild(group);
-        return wrap;
-    }
     function _renderSourceOverrideControl(ns) {
         const LS_KEY = 'sentinel_' + ns + '_sourceOverride';
         const SETTING_ID = ns + '-source-override';
@@ -2088,7 +1963,6 @@ window._SettingsPanel = (function () {
             const docsBtn = document.getElementById('docs-btn');
             if (docsBtn)
                 docsBtn.classList.remove('docs-btn-active');
-            try { sessionStorage.removeItem('sentinel_panel'); } catch (e) { }
         }
         const panel = document.getElementById('settings-panel');
         if (panel)
@@ -2096,7 +1970,6 @@ window._SettingsPanel = (function () {
         const btn = document.getElementById('settings-btn');
         if (btn)
             btn.classList.add('settings-btn-active');
-        try { sessionStorage.setItem('sentinel_panel', 'settings'); } catch (e) { }
         _updateFooterVisibility(_activeSection);
         _renderSection(_activeSection);
         const input = document.getElementById('settings-search-input');
@@ -2121,7 +1994,6 @@ window._SettingsPanel = (function () {
         const body = document.getElementById('settings-body');
         if (body)
             body.innerHTML = '';
-        try { sessionStorage.removeItem('sentinel_panel'); } catch (e) { }
     }
     function toggle() {
         if (_open)
@@ -2182,7 +2054,6 @@ window._SettingsPanel = (function () {
                     searchWrap.classList.toggle('settings-search-wrap--hidden', _activeSection !== 'app');
                 _updateFooterVisibility(_activeSection);
                 _renderSection(_activeSection);
-                try { sessionStorage.setItem('sentinel_settings_section', _activeSection); } catch (e) { }
             });
         });
         // Apply Changes button

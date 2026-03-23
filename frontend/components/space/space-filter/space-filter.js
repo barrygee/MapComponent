@@ -148,6 +148,14 @@ window._SpaceFilterPanel = (() => {
             };
             selectBtn.addEventListener('mousedown', e => e.stopPropagation());
             selectBtn.addEventListener('click', (e) => { e.stopPropagation(); doSelect(); });
+            item.addEventListener('mouseenter', () => {
+                if (issControl)
+                    issControl.previewSatellite(sat.norad_id);
+            });
+            item.addEventListener('mouseleave', () => {
+                if (issControl)
+                    issControl.clearPreview();
+            });
             item.appendChild(icon);
             item.appendChild(info);
             item.appendChild(badge);
@@ -206,6 +214,9 @@ window._SpaceFilterPanel = (() => {
             btn.classList.remove('active');
             btn.classList.add('enabled');
         }
+        // Ensure any active preview is cleared when the panel closes
+        if (issControl)
+            issControl.clearPreview();
     }
     function toggle() {
         if (_open)

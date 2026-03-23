@@ -78,6 +78,8 @@ class IssControl extends SentinelControlBase {
     _passNotifTimeout:   ReturnType<typeof setTimeout> | null;
     _passRefreshInterval: ReturnType<typeof setInterval> | null;
     _lastFiredPassAos:   number;
+    _previewNoradId:     string | null;
+    _previewAbort:       AbortController | null;
 
     constructor() {
         super();
@@ -100,6 +102,8 @@ class IssControl extends SentinelControlBase {
         this._passNotifTimeout    = null;
         this._passRefreshInterval = null;
         this._lastFiredPassAos    = 0;
+        this._previewNoradId      = null;
+        this._previewAbort        = null;
         this._restorePassNotifState();
         // GeoJSON stores
         this._issGeojson       = { type: 'FeatureCollection', features: [] };
@@ -363,15 +367,17 @@ class IssControl extends SentinelControlBase {
                 ],
             };
 
-            // Push to map sources
-            const issSource = this.map && this.map.getSource('iss-live') as maplibregl.GeoJSONSource | undefined;
-            if (issSource) issSource.setData(this._issGeojson);
+            // Push to map sources (skip while a filter hover preview is active)
+            if (!this._previewNoradId) {
+                const issSource = this.map && this.map.getSource('iss-live') as maplibregl.GeoJSONSource | undefined;
+                if (issSource) issSource.setData(this._issGeojson);
 
-            const trackSource = this.map && this.map.getSource('iss-track-source') as maplibregl.GeoJSONSource | undefined;
-            if (trackSource) trackSource.setData(this._trackGeojson);
+                const trackSource = this.map && this.map.getSource('iss-track-source') as maplibregl.GeoJSONSource | undefined;
+                if (trackSource) trackSource.setData(this._trackGeojson);
 
-            const fpSource = this.map && this.map.getSource('iss-footprint-source') as maplibregl.GeoJSONSource | undefined;
-            if (fpSource) fpSource.setData(this._footprintGeojson);
+                const fpSource = this.map && this.map.getSource('iss-footprint-source') as maplibregl.GeoJSONSource | undefined;
+                if (fpSource) fpSource.setData(this._footprintGeojson);
+            }
 
             // Restore tracking state on first fetch after page load
             if (!this._trackingRestored) {
@@ -891,8 +897,94 @@ class IssControl extends SentinelControlBase {
         }
     }
 
+    // ---- Filter hover preview ----
+    // Temporarily shows a different satellite on the map while hovering a search result.
+    // Does not affect polling or the active satellite state.
+    async previewSatellite(noradId: string): Promise<void> {
+        // If already previewing this satellite, do nothing
+        if (this._previewNoradId === noradId) return;
+
+        // Cancel any in-flight preview fetch
+        if (this._previewAbort) { this._previewAbort.abort(); this._previewAbort = null; }
+
+        this._previewNoradId = noradId;
+        const abort = new AbortController();
+        this._previewAbort = abort;
+
+        try {
+            const endpoint = noradId === '25544'
+                ? '/api/space/iss'
+                : `/api/space/satellite/${noradId}`;
+            const resp = await fetch(endpoint, { signal: abort.signal });
+            if (!resp.ok || abort.signal.aborted) return;
+            const data = await resp.json() as IssApiResponse;
+            if (abort.signal.aborted || this._previewNoradId !== noradId) return;
+
+            const { position, ground_track, footprint } = data;
+
+            const issGeo: GeoJSON.FeatureCollection = {
+                type: 'FeatureCollection',
+                features: [{
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [position.lon, position.lat] },
+                    properties: {
+                        alt_km:       position.alt_km,
+                        velocity_kms: position.velocity_kms,
+                        track_deg:    position.track_deg,
+                    },
+                }],
+            };
+
+            const footprintGeo: GeoJSON.FeatureCollection = {
+                type: 'FeatureCollection',
+                features: [
+                    { type: 'Feature', geometry: { type: 'LineString', coordinates: footprint }, properties: {} },
+                    { type: 'Feature', geometry: { type: 'Polygon',    coordinates: [footprint] }, properties: {} },
+                ],
+            };
+
+            const issSource   = this.map.getSource('iss-live')             as maplibregl.GeoJSONSource | undefined;
+            const trackSource = this.map.getSource('iss-track-source')     as maplibregl.GeoJSONSource | undefined;
+            const fpSource    = this.map.getSource('iss-footprint-source') as maplibregl.GeoJSONSource | undefined;
+
+            if (issSource)   issSource.setData(issGeo);
+            if (trackSource) trackSource.setData(ground_track);
+            if (fpSource)    fpSource.setData(footprintGeo);
+
+            // Fly to the previewed satellite
+            this.map.flyTo({ center: [position.lon, position.lat], zoom: Math.max(this.map.getZoom(), 2), duration: 800 });
+
+        } catch (_e) {
+            // Fetch aborted or failed — ignore
+        }
+    }
+
+    clearPreview(): void {
+        if (!this._previewNoradId) return;
+        if (this._previewAbort) { this._previewAbort.abort(); this._previewAbort = null; }
+        this._previewNoradId = null;
+
+        // Restore active satellite's last known data to the map sources
+        const issSource   = this.map.getSource('iss-live')             as maplibregl.GeoJSONSource | undefined;
+        const trackSource = this.map.getSource('iss-track-source')     as maplibregl.GeoJSONSource | undefined;
+        const fpSource    = this.map.getSource('iss-footprint-source') as maplibregl.GeoJSONSource | undefined;
+
+        if (issSource)   issSource.setData(this._issGeojson);
+        if (trackSource) trackSource.setData(this._trackGeojson);
+        if (fpSource)    fpSource.setData(this._footprintGeojson);
+
+        // Return map view to active satellite
+        if (this._lastPosition) {
+            this.map.flyTo({ center: [this._lastPosition.lon, this._lastPosition.lat], zoom: Math.max(this.map.getZoom(), 2), duration: 800 });
+        }
+    }
+
     // ---- Satellite switching ----
     switchSatellite(noradId: string, name: string): void {
+        // Cancel any active filter preview
+        if (this._previewAbort) { this._previewAbort.abort(); this._previewAbort = null; }
+        this._previewNoradId = null;
+
         // Stop follow and clear markers for the previous satellite
         if (this._followEnabled) this._stopFollowing();
         this._hideHoverTagNow();

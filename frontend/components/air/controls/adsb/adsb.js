@@ -1299,19 +1299,14 @@ class AdsbLiveControl {
     }
     // ---- Position hold / stale removal ----
     _deadReckon(lon, lat, trackDeg, gs, elapsedSec) {
-        const distNm  = gs * (elapsedSec / 3600);
-        const angDist = distNm / 3440.065;
+        const distNm = gs * (elapsedSec / 3600); // knots × hours = nm
+        const angDist = distNm / 3440.065; // radians (Earth radius in nm)
         const bearRad = trackDeg * Math.PI / 180;
-        const lat1    = lat * Math.PI / 180;
-        const lon1    = lon * Math.PI / 180;
-        const lat2    = Math.asin(
-            Math.sin(lat1) * Math.cos(angDist) +
-            Math.cos(lat1) * Math.sin(angDist) * Math.cos(bearRad)
-        );
-        const lon2    = lon1 + Math.atan2(
-            Math.sin(bearRad) * Math.sin(angDist) * Math.cos(lat1),
-            Math.cos(angDist) - Math.sin(lat1) * Math.sin(lat2)
-        );
+        const lat1 = lat * Math.PI / 180;
+        const lon1 = lon * Math.PI / 180;
+        const lat2 = Math.asin(Math.sin(lat1) * Math.cos(angDist) +
+            Math.cos(lat1) * Math.sin(angDist) * Math.cos(bearRad));
+        const lon2 = lon1 + Math.atan2(Math.sin(bearRad) * Math.sin(angDist) * Math.cos(lat1), Math.cos(angDist) - Math.sin(lat1) * Math.sin(lat2));
         return [lon2 * 180 / Math.PI, lat2 * 180 / Math.PI];
     }
     _interpolate() {
@@ -1346,11 +1341,13 @@ class AdsbLiveControl {
                     // Dead-reckon forward from the last confirmed API fix on current heading.
                     // This runs continuously — no lerp window, no freeze, no backward jumps.
                     coords = this._deadReckon(pos.lon, pos.lat, pos.track, pos.gs, elapsedSec);
-                } else {
+                }
+                else {
                     // No speed/track data — hold at last known fix
                     coords = [pos.lon, pos.lat];
                 }
-            } else {
+            }
+            else {
                 coords = f.geometry.coordinates;
             }
             const stale = ageSec >= DIM_SEC ? 1 : 0;
@@ -1469,7 +1466,7 @@ class AdsbLiveControl {
                     const lastSeen = Date.now();
                     const existing = this._lastPositions[hex];
                     if (!existing) {
-                        this._lastPositions[hex] = { lon: a.lon, lat: a.lat, gs: a.gs ?? 0, track: a.track ?? null, lastSeen, prevLon: a.lon, prevLat: a.lat, prevSeen: lastSeen };
+                        this._lastPositions[hex] = { lon: a.lon, lat: a.lat, gs: a.gs ?? 0, track: a.track ?? null, lastSeen, prevLon: a.lon, prevLat: a.lat, prevSeen: lastSeen, interpLon: a.lon, interpLat: a.lat };
                     }
                     else {
                         // Compute where the plane visually is right now (before updating the fix)
@@ -1478,10 +1475,10 @@ class AdsbLiveControl {
                         const [curLon, curLat] = (existing.track != null && existing.gs > 0)
                             ? this._deadReckon(existing.lon, existing.lat, existing.track, existing.gs, prevElapsed)
                             : [existing.lon, existing.lat];
-                        existing.lon      = curLon;
-                        existing.lat      = curLat;
-                        existing.gs       = a.gs ?? 0;
-                        existing.track    = a.track ?? null;
+                        existing.lon = curLon;
+                        existing.lat = curLat;
+                        existing.gs = a.gs ?? 0;
+                        existing.track = a.track ?? null;
                         existing.lastSeen = lastSeen;
                     }
                 }
