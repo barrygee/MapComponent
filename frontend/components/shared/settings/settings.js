@@ -178,13 +178,17 @@ window._SettingsPanel = (function () {
             renderControl: _renderConfigUploadControl,
         },
     ];
-    const _NAV_SECTIONS = [
-        { key: 'app', label: 'App Settings' },
+    const _DOMAIN_SECTIONS = [
         { key: 'air', label: 'AIR' },
         { key: 'space', label: 'SPACE' },
         { key: 'sea', label: 'SEA' },
         { key: 'land', label: 'LAND' },
         { key: 'sdr', label: 'SDR' },
+    ];
+    const _enabledDomains = window._SENTINEL_ENABLED_DOMAINS || [];
+    const _NAV_SECTIONS = [
+        { key: 'app', label: 'App Settings' },
+        ..._DOMAIN_SECTIONS.filter(function (s) { return _enabledDomains.includes(s.key); }),
     ];
     // ── DOM injection ────────────────────────────────────────
     (function _injectHTML() {
@@ -278,6 +282,7 @@ window._SettingsPanel = (function () {
         if (!hasError) {
             _pending.clear();
             _showApplyStatus('SAVED', false);
+            setTimeout(function () { location.reload(); }, 800);
         }
         else {
             _showApplyStatus('ERROR', true);
@@ -911,6 +916,7 @@ window._SettingsPanel = (function () {
                 statusMsg.textContent = 'APPLIED — ' + (data.imported ?? '?') + ' SETTINGS IMPORTED';
                 statusMsg.className = 'settings-config-status settings-config-status--ok';
                 applyBtn.disabled = false;
+                setTimeout(function () { location.reload(); }, 1200);
             })
                 .catch(function (err) {
                 statusMsg.textContent = err.message.toUpperCase();
