@@ -124,27 +124,19 @@
         locFlying = true;
     };
     panel.appendChild(navGroup);
-    // ---- Group 3: airspace flyout ----
+    // ---- Group 3: airspace toggle + IFR charts flyout ----
     const chartsGroup = makeGroup('sm-group-charts');
-    // Airspace button — opens/closes a flyout sub-panel with per-type toggles
-    const airspaceBtn = makeOverlayBtn('AS', '8px', 'AIRSPACE', () => airspaceControl ? airspaceControl.visible : false, () => { });
+    // AS — plain toggle, no flyout
+    const airspaceBtn = makeOverlayBtn('AS', '8px', 'AIRSPACE', () => airspaceControl ? airspaceControl.visible : false, () => { if (airspaceControl)
+        airspaceControl.toggle(); });
     chartsGroup.appendChild(airspaceBtn);
+    // IFR — opens flyout with LOW / HIGH / NAV / APT sub-toggles
+    const ifrBtn = makeOverlayBtn('IFR', '8px', 'IFR CHARTS', () => aeroChartsControl ? aeroChartsControl.visible : false, () => { });
+    chartsGroup.appendChild(ifrBtn);
     panel.appendChild(chartsGroup);
-    // ---- Airspace flyout sub-panel ----
-    // Rendered as a separate fixed panel that slides in from the right
-    // when the AS button is clicked. Contains ALL + per-type toggles.
-    const AS_TYPES = [
-        { key: 'CTR', label: 'CTR', tooltip: 'CONTROL ZONE' },
-        { key: 'MATZ', label: 'MATZ', tooltip: 'MILITARY AERODROME TRAFFIC ZONE' },
-        { key: 'TMA', label: 'TMA', tooltip: 'TERMINAL MANOEUVRING AREA' },
-        { key: 'ATZ', label: 'ATZ', tooltip: 'AERODROME TRAFFIC ZONE' },
-        { key: 'DANGER', label: 'DGR', tooltip: 'DANGER AREA' },
-        { key: 'RESTRICTED', label: 'RES', tooltip: 'RESTRICTED AREA' },
-        { key: 'PROHIBITED', label: 'PRO', tooltip: 'PROHIBITED AREA' },
-        { key: 'RMZ', label: 'RMZ', tooltip: 'RADIO MANDATORY ZONE' },
-    ];
-    const asFlyout = document.createElement('div');
-    asFlyout.id = 'as-flyout';
+    // ---- IFR flyout sub-panel ----
+    const ifrFlyout = document.createElement('div');
+    ifrFlyout.id = 'as-flyout'; // reuse existing CSS
     function makeAsBtn(label, tooltip, onClick) {
         const btn = document.createElement('button');
         btn.className = 'as-btn';
@@ -153,78 +145,67 @@
         btn.addEventListener('click', onClick);
         return btn;
     }
-    // ALL toggle
-    const asAllBtn = makeAsBtn('ALL', 'ALL AIRSPACE', () => {
-        if (!airspaceControl)
-            return;
-        const allOn = airspaceControl.isAllActive();
-        airspaceControl.setAllTypes(!allOn);
-        syncAsFlyout();
-        airspaceBtn.classList.toggle('active', airspaceControl.visible);
-    });
-    asFlyout.appendChild(asAllBtn);
-    // Per-type buttons
-    const asTypeBtns = new Map();
-    AS_TYPES.forEach(({ key, label, tooltip }) => {
+    const IFR_GROUPS = [
+        { key: 'low', label: 'LOW', tooltip: 'LOW AIRWAYS  (BELOW FL245)' },
+        { key: 'high', label: 'HIGH', tooltip: 'HIGH AIRWAYS (FL245+)' },
+    ];
+    const ifrGroupBtns = new Map();
+    IFR_GROUPS.forEach(({ key, label, tooltip }) => {
         const btn = makeAsBtn(label, tooltip, () => {
-            if (!airspaceControl)
+            if (!aeroChartsControl)
                 return;
-            airspaceControl.toggleType(key);
-            syncAsFlyout();
-            airspaceBtn.classList.toggle('active', airspaceControl.visible);
+            aeroChartsControl.toggleGroup(key);
+            syncIfrFlyout();
+            ifrBtn.classList.toggle('active', aeroChartsControl.visible);
         });
-        asTypeBtns.set(key, btn);
-        asFlyout.appendChild(btn);
+        ifrGroupBtns.set(key, btn);
+        ifrFlyout.appendChild(btn);
     });
-    document.body.appendChild(asFlyout);
-    let asFlyoutOpen = false;
-    function syncAsFlyout() {
-        if (!airspaceControl)
+    document.body.appendChild(ifrFlyout);
+    let ifrFlyoutOpen = false;
+    function syncIfrFlyout() {
+        if (!aeroChartsControl)
             return;
-        const allActive = airspaceControl.isAllActive();
-        asAllBtn.classList.toggle('active', allActive);
-        AS_TYPES.forEach(({ key }) => {
-            const btn = asTypeBtns.get(key);
+        IFR_GROUPS.forEach(({ key }) => {
+            const btn = ifrGroupBtns.get(key);
             if (btn)
-                btn.classList.toggle('active', airspaceControl.isTypeActive(key) && airspaceControl.visible);
+                btn.classList.toggle('active', aeroChartsControl.isGroupActive(key));
         });
     }
-    function positionAsFlyout() {
-        const rect = airspaceBtn.getBoundingClientRect();
-        asFlyout.style.top = rect.top + 'px';
-        asFlyout.style.right = (window.innerWidth - rect.left + 4) + 'px';
+    function positionIfrFlyout() {
+        const rect = ifrBtn.getBoundingClientRect();
+        ifrFlyout.style.top = rect.top + 'px';
+        ifrFlyout.style.right = (window.innerWidth - rect.left + 4) + 'px';
     }
-    function openAsFlyout() {
-        positionAsFlyout();
-        asFlyout.classList.add('open');
-        asFlyoutOpen = true;
-        airspaceBtn.classList.add('flyout-open');
-        syncAsFlyout();
+    function openIfrFlyout() {
+        positionIfrFlyout();
+        ifrFlyout.classList.add('open');
+        ifrFlyoutOpen = true;
+        ifrBtn.classList.add('flyout-open');
+        syncIfrFlyout();
     }
-    function closeAsFlyout() {
-        asFlyout.classList.remove('open');
-        asFlyoutOpen = false;
-        airspaceBtn.classList.remove('flyout-open');
+    function closeIfrFlyout() {
+        ifrFlyout.classList.remove('open');
+        ifrFlyoutOpen = false;
+        ifrBtn.classList.remove('flyout-open');
     }
-    airspaceBtn.addEventListener('click', () => {
-        if (asFlyoutOpen) {
-            closeAsFlyout();
+    ifrBtn.addEventListener('click', () => {
+        if (ifrFlyoutOpen) {
+            closeIfrFlyout();
         }
         else {
-            openAsFlyout();
+            openIfrFlyout();
         }
     });
-    // Close flyout when clicking outside
     document.addEventListener('click', (e) => {
-        if (!asFlyoutOpen)
+        if (!ifrFlyoutOpen)
             return;
-        if (!asFlyout.contains(e.target) && e.target !== airspaceBtn && !airspaceBtn.contains(e.target)) {
-            closeAsFlyout();
+        if (!ifrFlyout.contains(e.target) && e.target !== ifrBtn && !ifrBtn.contains(e.target)) {
+            closeIfrFlyout();
         }
     });
-    // Reposition if menu scrolls or window resizes
-    window.addEventListener('resize', () => { if (asFlyoutOpen)
-        positionAsFlyout(); });
+    window.addEventListener('resize', () => { if (ifrFlyoutOpen)
+        positionIfrFlyout(); });
     // ---- Group 4: overlay toggles ----
     function toggleAdsb() {
         adsbControl.toggle();

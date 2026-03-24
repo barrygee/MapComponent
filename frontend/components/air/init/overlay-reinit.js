@@ -17,6 +17,8 @@ window.MapComponent.onStyleLoad(function () {
         rangeRingsControl.initRings();
     if (airspaceControl)
         airspaceControl.initLayers();
+    if (aeroChartsControl)
+        aeroChartsControl.initLayers();
     if (aarControl)
         aarControl.initLayers();
     if (awacsControl)

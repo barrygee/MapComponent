@@ -26,7 +26,8 @@ let airportsControl: AirportsToggleControl | null = null;
 let militaryBasesControl: MilitaryBasesToggleControl | null = null;
 let aarControl:          AARToggleControl      | null = null;
 let awacsControl:        AWACSToggleControl    | null = null;
-let airspaceControl: AirspaceControl | null = null;
+let airspaceControl:   AirspaceControl    | null = null;
+let aeroChartsControl: AeroChartsControl  | null = null;
 let adsbControl:         AdsbLiveControl       | null = null;
 let clearControl:        ClearOverlaysControl  | null = null;
 

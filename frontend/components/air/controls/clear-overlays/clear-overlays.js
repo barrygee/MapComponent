@@ -45,6 +45,7 @@ class ClearOverlaysControl extends SentinelControlBase {
             adsb: adsbControl ? adsbControl.visible : false,
             adsbLabels: adsbLabelsControl ? adsbLabelsControl.labelsVisible : false,
             airspace: airspaceControl ? airspaceControl.visible : false,
+            aeroCharts: aeroChartsControl ? aeroChartsControl.visible : false,
         };
         if (roadsControl && roadsControl.roadsVisible)
             roadsControl.toggleRoads();
@@ -58,6 +59,8 @@ class ClearOverlaysControl extends SentinelControlBase {
             awacsControl.toggle();
         if (airspaceControl && airspaceControl.visible)
             airspaceControl.setVisible(false);
+        if (aeroChartsControl && aeroChartsControl.visible)
+            aeroChartsControl.setVisible(false);
         if (airportsControl && airportsControl.visible)
             airportsControl.toggle();
         if (militaryBasesControl && militaryBasesControl.visible)
@@ -102,6 +105,8 @@ class ClearOverlaysControl extends SentinelControlBase {
             militaryBasesControl.toggle();
         if (airspaceControl && savedStates.airspace)
             airspaceControl.setVisible(true);
+        if (aeroChartsControl && savedStates.aeroCharts)
+            aeroChartsControl.setVisible(true);
         if (adsbControl && savedStates.adsb) {
             adsbControl.setAllHidden(false);
             try {

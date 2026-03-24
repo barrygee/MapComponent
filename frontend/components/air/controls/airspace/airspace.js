@@ -1,14 +1,12 @@
 "use strict";
 // ============================================================
 // UK AIRSPACE OVERLAY CONTROL
-// Renders 838 UK airspace zones from bundled OpenAIP GeoJSON.
-// Covers: CTR, TMA, ATZ, MATZ, DANGER, RESTRICTED, PROHIBITED, RMZ
+// Renders 1189 UK airspace zones from bundled OpenAIP GeoJSON.
+// Covers: CTR, TMA, ATZ, MATZ, RESTRICTED, PROHIBITED, RMZ
 // Styled by ICAO class and type.
 //
-// Per-type visibility is handled by updating the GeoJSON source
-// filter so only selected types are rendered.
-//
 // Data source: OpenAIP gb_airspace.geojson (bundled static asset)
+//   Regenerate with: python3 fetch-gb-airspace.py
 // Works online and offline.
 //
 // Depends on:
@@ -19,7 +17,7 @@
 /// <reference path="../sentinel-control-base/sentinel-control-base.ts" />
 const AIRSPACE_SOURCE = 'airspace-source';
 const AIRSPACE_LAYERS = ['airspace-fill', 'airspace-outline', 'airspace-labels'];
-const ALL_AIRSPACE_TYPES = ['CTR', 'TMA', 'ATZ', 'MATZ', 'DANGER', 'RESTRICTED', 'PROHIBITED', 'RMZ'];
+const AIRSPACE_FILTER = ['!=', ['get', 'type'], 'DANGER'];
 // Outline colours by type
 const AIRSPACE_LINE_COLOR = [
     'match', ['get', 'type'],
@@ -27,7 +25,6 @@ const AIRSPACE_LINE_COLOR = [
     'TMA', 'rgba( 80, 160, 255, 0.70)',
     'ATZ', 'rgba( 80, 200, 255, 0.80)',
     'MATZ', 'rgba(200, 255,   0, 0.75)',
-    'DANGER', 'rgba(255,  80,  80, 0.85)',
     'RESTRICTED', 'rgba(255,  80,  80, 0.85)',
     'PROHIBITED', 'rgba(255,  40,  40, 1.00)',
     'RMZ', 'rgba(200, 100, 255, 0.75)',
@@ -40,7 +37,6 @@ const AIRSPACE_FILL_COLOR = [
     'TMA', 'rgba( 80, 160, 255, 0.02)',
     'ATZ', 'rgba( 80, 200, 255, 0.03)',
     'MATZ', 'rgba(200, 255,   0, 0.02)',
-    'DANGER', 'rgba(255,  80,  80, 0.03)',
     'RESTRICTED', 'rgba(255,  80,  80, 0.03)',
     'PROHIBITED', 'rgba(255,  40,  40, 0.04)',
     'RMZ', 'rgba(200, 100, 255, 0.03)',
@@ -50,14 +46,12 @@ const AIRSPACE_DASH = [
     'match', ['get', 'type'],
     'MATZ', ['literal', [4, 3]],
     'ATZ', ['literal', [6, 2]],
-    'DANGER', ['literal', [3, 3]],
     ['literal', [1, 0]],
 ];
 class AirspaceControl extends SentinelControlBase {
     constructor() {
         super();
         this.visible = _overlayStates.airspace ?? false;
-        this.activeTypes = new Set(ALL_AIRSPACE_TYPES);
     }
     get buttonLabel() { return 'AS'; }
     get buttonTitle() { return 'Toggle UK airspace'; }
@@ -85,7 +79,7 @@ class AirspaceControl extends SentinelControlBase {
                 id: 'airspace-fill',
                 type: 'fill',
                 source: AIRSPACE_SOURCE,
-                filter: this._buildFilter(),
+                filter: AIRSPACE_FILTER,
                 layout: { visibility: vis },
                 paint: {
                     'fill-color': AIRSPACE_FILL_COLOR,
@@ -98,7 +92,7 @@ class AirspaceControl extends SentinelControlBase {
                 id: 'airspace-outline',
                 type: 'line',
                 source: AIRSPACE_SOURCE,
-                filter: this._buildFilter(),
+                filter: AIRSPACE_FILTER,
                 layout: { visibility: vis },
                 paint: {
                     'line-color': AIRSPACE_LINE_COLOR,
@@ -112,7 +106,7 @@ class AirspaceControl extends SentinelControlBase {
                 id: 'airspace-labels',
                 type: 'symbol',
                 source: AIRSPACE_SOURCE,
-                filter: this._buildFilter(),
+                filter: AIRSPACE_FILTER,
                 minzoom: 7,
                 layout: {
                     visibility: vis,
@@ -128,25 +122,6 @@ class AirspaceControl extends SentinelControlBase {
                 },
             }, beforeLayer);
         }
-    }
-    /** Build a MapLibre filter expression from the active type set. */
-    _buildFilter() {
-        const types = Array.from(this.activeTypes);
-        if (types.length === 0)
-            return ['==', ['get', 'type'], '__none__'];
-        if (types.length === ALL_AIRSPACE_TYPES.length)
-            return ['has', 'type'];
-        return ['in', ['get', 'type'], ['literal', types]];
-    }
-    /** Apply the current active-type filter to all layers. */
-    _applyFilter() {
-        const filter = this._buildFilter();
-        AIRSPACE_LAYERS.forEach(id => {
-            try {
-                this.map.setFilter(id, filter);
-            }
-            catch (_e) { }
-        });
     }
     toggle() {
         this.visible = !this.visible;
@@ -172,45 +147,6 @@ class AirspaceControl extends SentinelControlBase {
             catch (_e) { }
         });
         this.setButtonActive(v);
-    }
-    toggleType(type) {
-        if (this.activeTypes.has(type)) {
-            this.activeTypes.delete(type);
-        }
-        else {
-            this.activeTypes.add(type);
-        }
-        this._applyFilter();
-        // If any type is active and overall is hidden, show the layer
-        if (this.activeTypes.size > 0 && !this.visible) {
-            this.setVisible(true);
-            this.setButtonActive(true);
-            _saveOverlayStates();
-        }
-    }
-    setAllTypes(on) {
-        if (on) {
-            ALL_AIRSPACE_TYPES.forEach(t => this.activeTypes.add(t));
-        }
-        else {
-            this.activeTypes.clear();
-        }
-        this._applyFilter();
-        if (on && !this.visible) {
-            this.setVisible(true);
-            this.setButtonActive(true);
-        }
-        else if (!on && this.visible) {
-            this.setVisible(false);
-            this.setButtonActive(false);
-        }
-        _saveOverlayStates();
-    }
-    isTypeActive(type) {
-        return this.activeTypes.has(type);
-    }
-    isAllActive() {
-        return this.visible && this.activeTypes.size === ALL_AIRSPACE_TYPES.length;
     }
 }
 airspaceControl = new AirspaceControl();

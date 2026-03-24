@@ -22,6 +22,7 @@ interface OverlayStates {
     adsb:         boolean;
     adsbLabels:   boolean;
     airspace:     boolean;
+    aeroCharts:   boolean;
 }
 
 // ----- Airport / Military base data -----

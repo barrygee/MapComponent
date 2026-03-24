@@ -429,6 +429,15 @@
     opacity: 1;
 }
 
+/* Divider between type buttons and FL-band buttons in the AS flyout */
+.as-divider {
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 2px 0;
+    flex-shrink: 0;
+}
+
 /* AS button indicator: subtle accent border when flyout is open */
 .sm-btn.flyout-open {
     outline: 1px solid rgba(200, 255, 0, 0.3);

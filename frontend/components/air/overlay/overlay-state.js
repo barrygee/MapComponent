@@ -17,6 +17,7 @@ const _OVERLAY_DEFAULTS = {
     adsb: true,
     adsbLabels: true,
     airspace: false,
+    aeroCharts: false,
 };
 /**
  * Load saved overlay states from localStorage, merging over defaults.
@@ -49,6 +50,7 @@ function _saveOverlayStates() {
             adsb: adsbControl ? adsbControl.visible : _overlayStates.adsb,
             adsbLabels: adsbLabelsControl ? adsbLabelsControl.labelsVisible : _overlayStates.adsbLabels,
             airspace: airspaceControl ? airspaceControl.visible : _overlayStates.airspace,
+            aeroCharts: aeroChartsControl ? aeroChartsControl.visible : _overlayStates.aeroCharts,
         };
         localStorage.setItem('overlayStates', JSON.stringify(current));
         if (window._SettingsAPI) {
@@ -106,5 +108,8 @@ async function _syncOverlayStatesFromBackend() {
         adsbLabelsControl.toggle();
     if (airspaceControl && airspaceControl.visible !== _overlayStates.airspace) {
         airspaceControl.setVisible(_overlayStates.airspace);
+    }
+    if (aeroChartsControl && aeroChartsControl.visible !== _overlayStates.aeroCharts) {
+        aeroChartsControl.setVisible(_overlayStates.aeroCharts);
     }
 }
