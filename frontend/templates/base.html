@@ -145,6 +145,8 @@
             var btn = document.getElementById('docs-btn');
             var panel = document.getElementById('docs-panel');
             if (!btn || !panel) return;
+            var domain = document.body.getAttribute('data-domain') || 'app';
+            var SS_KEY = 'sentinel_docs_' + domain;
             btn.addEventListener('click', function () {
                 var isOpen = panel.classList.toggle('docs-panel-visible');
                 btn.classList.toggle('docs-btn-active', isOpen);
@@ -152,11 +154,11 @@
                 if (isOpen && window._SettingsPanel && typeof window._SettingsPanel.close === 'function') {
                     window._SettingsPanel.close();
                 }
-                try { isOpen ? sessionStorage.setItem('sentinel_panel', 'docs') : sessionStorage.removeItem('sentinel_panel'); } catch (e) { }
+                try { isOpen ? sessionStorage.setItem(SS_KEY, '1') : sessionStorage.removeItem(SS_KEY); } catch (e) { }
             });
             // Restore docs panel if it was open before the page reload
             try {
-                if (sessionStorage.getItem('sentinel_panel') === 'docs') {
+                if (sessionStorage.getItem(SS_KEY) === '1') {
                     panel.classList.add('docs-panel-visible');
                     btn.classList.add('docs-btn-active');
                 }
