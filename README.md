@@ -250,6 +250,76 @@ Backend configuration is handled by Pydantic Settings in `backend/config.py`. Al
 
 ---
 
+## Offline Maps
+
+Sentinel uses [PMTiles](https://protomaps.com) vector tile archives for offline map rendering. Two files are required, placed in `frontend/assets/tiles/`:
+
+| File | Coverage | Approx. size |
+|---|---|---|
+| `surroundings.pmtiles` | Global — zoom levels 0–6 (world overview) | ~44 MB |
+| `uk.pmtiles` | United Kingdom — zoom levels 0–14 (street level) | ~1.3 GB |
+
+### Prerequisites
+
+Install the `pmtiles` CLI:
+
+```bash
+brew install protomaps/homebrew-tap/pmtiles
+```
+
+Or download a binary from the [go-pmtiles releases page](https://github.com/protomaps/go-pmtiles/releases).
+
+### Downloading the Tiles
+
+Both files are extracted from the Protomaps daily planet build. Replace `YYYYMMDD` with the current date — builds are published at `https://build.protomaps.com/YYYYMMDD.pmtiles`.
+
+```bash
+mkdir -p frontend/assets/tiles
+```
+
+**Global overview (`surroundings.pmtiles`) — ~44 MB**
+
+Covers the entire world at zoom levels 0–6 for continent/country context when zoomed out.
+
+```bash
+pmtiles extract https://build.protomaps.com/YYYYMMDD.pmtiles \
+  frontend/assets/tiles/surroundings.pmtiles \
+  --maxzoom=6
+```
+
+**UK detail (`uk.pmtiles`) — ~1.3 GB**
+
+Covers the United Kingdom at zoom levels 0–14 (street level). Takes 5–15 minutes depending on connection speed.
+
+```bash
+pmtiles extract https://build.protomaps.com/YYYYMMDD.pmtiles \
+  frontend/assets/tiles/uk.pmtiles \
+  --bbox=-8.65,49.84,1.77,60.86 \
+  --maxzoom=14
+```
+
+The `--bbox` parameter is `west,south,east,north` in decimal degrees.
+
+### Custom Regions
+
+To cover a different region, adjust `--bbox` and `--maxzoom`. Common extracts at z0–z14:
+
+| Region | Bounding box | Approx. size |
+|---|---|---|
+| United Kingdom | `-8.65,49.84,1.77,60.86` | ~1.3 GB |
+| Ireland | `-10.56,51.39,-5.97,55.43` | ~150 MB |
+| France | `-5.14,41.33,9.56,51.09` | ~3–4 GB |
+| Germany | `5.87,47.27,15.04,55.06` | ~3–4 GB |
+| Northern Europe | `-25.0,44.0,35.0,72.0` | ~10–15 GB |
+
+Beyond the configured bounding box, only the global z0–z6 data from `surroundings.pmtiles` renders.
+
+### Switching to Offline Mode
+
+Once the tile files are in place, switch via **Settings → Connectivity Mode → Offline**, or Sentinel will switch automatically when it detects lost connectivity (probes every 2 seconds).
+
+---
+
 ## Deployment
 
 ### Docker (recommended)

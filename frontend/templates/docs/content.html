@@ -1028,3 +1028,134 @@ DB_PATH=/data/sentinel.db
 TLE_TTL_MS=3600000</pre>
                 </div>
             </section>
+
+            <hr class="docs-divider">
+
+            <!-- Offline Maps ─────────────────────────────────────────────────── -->
+            <section class="docs-section" id="offline-maps">
+                <span class="docs-section-label">Maps</span>
+                <h1 class="docs-section-title">Offline Maps</h1>
+
+                <div class="docs-item">
+                    <p class="docs-item-desc">
+                        Sentinel uses <a href="https://protomaps.com" style="color: var(--color-accent);">PMTiles</a>
+                        vector tile archives for offline map rendering. Two files are required,
+                        both placed in <code>frontend/assets/tiles/</code>:
+                    </p>
+                    <table class="docs-table">
+                        <thead>
+                            <tr><th>File</th><th>Coverage</th><th>Approx. size</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>surroundings.pmtiles</code></td>
+                                <td>Global — zoom levels 0–6 (world overview)</td>
+                                <td>~44 MB</td>
+                            </tr>
+                            <tr>
+                                <td><code>uk.pmtiles</code></td>
+                                <td>United Kingdom — zoom levels 0–14 (street level)</td>
+                                <td>~1.3 GB</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="docs-item-desc">
+                        The map style (<code>frontend/assets/fiord.json</code>) references both files.
+                        Tile data is raw geography — all colours and layer styling come from the style
+                        file, so the dark Fiord theme applies regardless of which PMTiles source is used.
+                    </p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Prerequisites</h2>
+                    <p class="docs-item-desc">Install the <code>pmtiles</code> CLI via Homebrew:</p>
+                    <pre class="docs-pre">brew install protomaps/homebrew-tap/pmtiles</pre>
+                    <p class="docs-item-desc">Or download a binary from the <a href="https://github.com/protomaps/go-pmtiles/releases" style="color: var(--color-accent);">go-pmtiles releases page</a>.</p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Downloading the Tiles</h2>
+                    <p class="docs-item-desc">
+                        Both files are extracted from the Protomaps daily planet build. Replace
+                        <code>YYYYMMDD</code> with today's date (e.g. <code>20260325</code>) — builds
+                        are published at <code>https://build.protomaps.com/YYYYMMDD.pmtiles</code>.
+                    </p>
+                    <p class="docs-item-desc">First create the tiles directory:</p>
+                    <pre class="docs-pre">mkdir -p frontend/assets/tiles</pre>
+
+                    <p class="docs-item-desc"><strong>Global overview (surroundings.pmtiles) — ~44 MB</strong></p>
+                    <p class="docs-item-desc">
+                        Covers the entire world at zoom levels 0–6. Used when zoomed out to
+                        show continents, coastlines, country borders, and major cities.
+                    </p>
+                    <pre class="docs-pre">pmtiles extract https://build.protomaps.com/YYYYMMDD.pmtiles \
+  frontend/assets/tiles/surroundings.pmtiles \
+  --maxzoom=6</pre>
+
+                    <p class="docs-item-desc"><strong>UK detail (uk.pmtiles) — ~1.3 GB</strong></p>
+                    <p class="docs-item-desc">
+                        Covers the United Kingdom bounding box at zoom levels 0–14, providing
+                        street-level detail for UK airspace operations.
+                    </p>
+                    <pre class="docs-pre">pmtiles extract https://build.protomaps.com/YYYYMMDD.pmtiles \
+  frontend/assets/tiles/uk.pmtiles \
+  --bbox=-8.65,49.84,1.77,60.86 \
+  --maxzoom=14</pre>
+                    <p class="docs-item-desc">
+                        The <code>--bbox</code> parameter is <code>west,south,east,north</code> in decimal degrees.
+                        The UK extract takes 5–15 minutes depending on connection speed.
+                    </p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Custom Regions</h2>
+                    <p class="docs-item-desc">
+                        To cover a different region, adjust the <code>--bbox</code> and <code>--maxzoom</code>
+                        values. Approximate sizes for common extracts at z0–z14:
+                    </p>
+                    <table class="docs-table">
+                        <thead>
+                            <tr><th>Region</th><th>Bounding box</th><th>Approx. size</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>United Kingdom</td><td><code>-8.65,49.84,1.77,60.86</code></td><td>~1.3 GB</td></tr>
+                            <tr><td>Ireland</td><td><code>-10.56,51.39,-5.97,55.43</code></td><td>~150 MB</td></tr>
+                            <tr><td>France</td><td><code>-5.14,41.33,9.56,51.09</code></td><td>~3–4 GB</td></tr>
+                            <tr><td>Germany</td><td><code>5.87,47.27,15.04,55.06</code></td><td>~3–4 GB</td></tr>
+                            <tr><td>Northern Europe</td><td><code>-25.0,44.0,35.0,72.0</code></td><td>~10–15 GB</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="docs-item-desc">
+                        Beyond the configured bounding box, only the global z0–z6 data from
+                        <code>surroundings.pmtiles</code> will render — sufficient for orientation
+                        but without street-level detail.
+                    </p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Zoom Level Reference</h2>
+                    <table class="docs-table">
+                        <thead>
+                            <tr><th>Zoom</th><th>Detail visible</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>0–3</td><td>World / continents</td></tr>
+                            <tr><td>4–6</td><td>Countries, large regions</td></tr>
+                            <tr><td>7–9</td><td>Counties, major cities</td></tr>
+                            <tr><td>10–12</td><td>Towns, main roads</td></tr>
+                            <tr><td>13–14</td><td>Streets, airfields</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Switching to Offline Mode</h2>
+                    <p class="docs-item-desc">
+                        Once the tile files are in place, switch to offline mode via
+                        <strong>Settings → Connectivity Mode → Offline</strong>, or let Sentinel
+                        detect the loss of connectivity automatically (it polls the configured
+                        probe URL every 2 seconds). The map style switches from the online
+                        OpenFreeMap tile server to the local PMTiles files automatically.
+                    </p>
+                </div>
+            </section>
