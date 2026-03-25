@@ -40,8 +40,6 @@ const _mapIsOnline  = _connModeOverride === 'online' ? true
                     : navigator.onLine;
 let   _mapConnState = _mapIsOnline;
 
-// Viewport bounds used for the offline (PMTiles) style — covers UK/Ireland/Europe
-const _OFFLINE_BOUNDS: [[number, number], [number, number]] = [[-20, 44], [32, 67]];
 
 /**
  * Update the footer connection-status pill text and colour class.
@@ -94,8 +92,8 @@ function _fixStylePaths(_prev: maplibregl.StyleSpecification | undefined, next: 
  */
 function _switchMapStyle(online: boolean): void {
     if (typeof _sentinelMap === 'undefined') return;
-    _sentinelMap.setMinZoom(online ? 2 : 5);
-    _sentinelMap.setMaxBounds(online ? null : _OFFLINE_BOUNDS);
+    _sentinelMap.setMinZoom(2);
+    _sentinelMap.setMaxBounds(null);
     _sentinelMap.setStyle(
         online
             ? `${window.location.origin}/assets/fiord-online.json`
@@ -286,8 +284,8 @@ const _sentinelMap = new maplibregl.Map({
     container: 'map',
     center: _mapIsOnline ? [-4.4815, 54.1453] : [-4.5481, 54.2361],
     zoom:     _mapIsOnline ? 6 : 5,
-    minZoom:  _mapIsOnline ? 2 : 5,
-    maxBounds: _mapIsOnline ? undefined : _OFFLINE_BOUNDS,
+    minZoom:  2,
+    maxBounds: undefined,
     attributionControl: false,
     fadeDuration: 0,
     cooperativeGestures: false,
@@ -301,8 +299,8 @@ const _styleLoadCallbacks: Array<() => void> = [];
 let   _styleHasLoadedOnce = false;
 
 _sentinelMap.on('style.load', () => {
-    _sentinelMap.setMinZoom(_mapConnState ? 2 : 5);
-    _sentinelMap.setMaxBounds(_mapConnState ? null : _OFFLINE_BOUNDS);
+    _sentinelMap.setMinZoom(2);
+    _sentinelMap.setMaxBounds(null);
 
     const majorCities = [
         'Newcastle upon Tyne', 'Sunderland', 'Scarborough', 'Carlisle',

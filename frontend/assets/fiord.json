@@ -3,11 +3,11 @@
   "sources": {
     "openmaptiles": {
       "type": "vector",
-      "url": "pmtiles://tiles/uk.pmtiles"
+      "url": "pmtiles:///assets/tiles/uk.pmtiles"
     },
     "surroundings": {
       "type": "vector",
-      "url": "pmtiles://tiles/surroundings.pmtiles"
+      "url": "pmtiles:///assets/tiles/surroundings.pmtiles"
     }
   },
   "sprite": "/assets/sprites/ofm",
