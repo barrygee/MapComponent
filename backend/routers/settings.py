@@ -78,11 +78,7 @@ async def config_preview(db: AsyncSession = Depends(get_db)):
         config.setdefault(row.namespace, {})[row.key] = value
 
     payload = json.dumps(config, indent=2, ensure_ascii=False)
-    return Response(
-        content=payload,
-        media_type="application/json",
-        headers={"Content-Disposition": 'attachment; filename="sentinel_config.json"'},
-    )
+    return Response(content=payload, media_type="application/json")
 
 
 @router.post("/config/upload", status_code=200)

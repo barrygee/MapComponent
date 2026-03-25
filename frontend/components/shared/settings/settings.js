@@ -830,9 +830,9 @@ window._SettingsPanel = (function () {
             URL.revokeObjectURL(url);
         });
         fetch('/api/settings/config/preview')
-            .then(function (res) { return res.json(); })
+            .then(function (res) { if (!res.ok) throw new Error(res.status.toString()); return res.json(); })
             .then(function (data) { textarea.value = JSON.stringify(data, null, 2); autoSize(); })
-            .catch(function () { textarea.value = 'Failed to load config.'; autoSize(); });
+            .catch(function (err) { textarea.value = 'Failed to load config: ' + err.message; autoSize(); });
         return wrap;
     }
     function _renderConfigUploadControl() {

@@ -20,6 +20,19 @@
         docsBody.addEventListener('scroll', _updateActive, { passive: true });
         _updateActive();
 
+        // Re-run when the panel becomes visible so offsetTops are valid
+        var docsPanel = document.getElementById('docs-panel');
+        if (docsPanel) {
+            new MutationObserver(function (mutations) {
+                mutations.forEach(function (m) {
+                    if (m.attributeName === 'class' &&
+                        docsPanel.classList.contains('docs-panel-visible')) {
+                        _updateActive();
+                    }
+                });
+            }).observe(docsPanel, { attributes: true });
+        }
+
         // Smooth scroll on nav click
         _navItems.forEach(function (a) {
             a.addEventListener('click', function (e) {
@@ -36,6 +49,15 @@
 
         var scrollTop = docsBody.scrollTop;
         var offset = 32; // px below the top to trigger the next section
+
+        // If the panel isn't laid out yet (all offsetTops are 0), default to first section
+        var hasLayout = _sections.some(function (s) { return s.offsetTop > 0; });
+        if (!hasLayout) {
+            _navItems.forEach(function (a, i) {
+                a.classList.toggle('active', i === 0);
+            });
+            return;
+        }
 
         // Find the last section whose top is at or above (scrollTop + offset)
         var active = _sections[0];

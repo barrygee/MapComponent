@@ -6,6 +6,33 @@ The application is designed for offline-first operation: every domain supports c
 
 ---
 
+## Quick Start
+
+**Docker (recommended)**
+
+```bash
+git clone <repo-url> Sentinel
+cd Sentinel
+docker compose up --build
+```
+
+Open `http://localhost`. The database is created and seeded with defaults on first run.
+
+**Local development**
+
+```bash
+python -m venv backend/.venv
+source backend/.venv/bin/activate
+pip install -e "backend[dev]"
+uvicorn backend.main:app --reload --port 8000
+```
+
+App: `http://localhost:8000` — Swagger UI: `http://localhost:8000/docs`
+
+Once running, open **Settings** (gear icon, bottom-right) and set *My Location* to your latitude/longitude.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
