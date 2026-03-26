@@ -729,7 +729,7 @@ class IssControl extends SentinelControlBase {
         newLabelEl.style.visibility = '';
         newLabelEl.addEventListener('click', (e) => {
             e.stopPropagation();
-            this._stopFollowing(true);
+            this._stopFollowing();
         });
         if (this._labelMarker)
             this._labelMarker.remove();
@@ -753,10 +753,10 @@ class IssControl extends SentinelControlBase {
         btn.addEventListener('mousedown', (e) => e.stopPropagation());
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            this._stopFollowing(true);
+            this._stopFollowing();
         });
     }
-    _stopFollowing(keepPanelOpen = false) {
+    _stopFollowing() {
         this._followEnabled = false;
         // Restore label to non-tracking state
         if (this._labelMarker && this._lastPosition) {
@@ -770,14 +770,7 @@ class IssControl extends SentinelControlBase {
             window._Notifications.dismiss(this._trackingNotifId);
             this._trackingNotifId = null;
         }
-        if (keepPanelOpen) {
-            const bar = document.getElementById('iss-status-bar');
-            if (bar) bar.style.display = 'none';
-            if (typeof window._Tracking !== 'undefined') window._Tracking.setCount(0);
-            if (typeof window._FilterPanel !== 'undefined') window._FilterPanel.reposition();
-        } else {
-            this._hideStatusBar();
-        }
+        this._hideStatusBar();
         this._saveIssTracking();
         this.map.easeTo({ center: [12, 20], zoom: 2, duration: 600 });
     }
@@ -824,7 +817,7 @@ class IssControl extends SentinelControlBase {
         if (untrackBtn) {
             untrackBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this._stopFollowing(true);
+                this._stopFollowing();
             });
         }
         if (typeof window._Tracking !== 'undefined') {
@@ -917,7 +910,8 @@ class IssControl extends SentinelControlBase {
                 this._labelMarker.setLngLat([position.lon, position.lat]);
                 if (name) {
                     const nameSpan = this._labelMarker.getElement().querySelector('span');
-                    if (nameSpan) nameSpan.textContent = name;
+                    if (nameSpan)
+                        nameSpan.textContent = name;
                 }
             }
             // Fly to the previewed satellite only if the user setting allows it
@@ -955,8 +949,10 @@ class IssControl extends SentinelControlBase {
         // Restore the callsign label to the active satellite's name and position
         if (this._labelMarker) {
             const nameSpan = this._labelMarker.getElement().querySelector('span');
-            if (nameSpan) nameSpan.textContent = this._activeSatName;
-            if (this._lastPosition) this._labelMarker.setLngLat([this._lastPosition.lon, this._lastPosition.lat]);
+            if (nameSpan)
+                nameSpan.textContent = this._activeSatName;
+            if (this._lastPosition)
+                this._labelMarker.setLngLat([this._lastPosition.lon, this._lastPosition.lat]);
         }
         // Return map view to active satellite (only if fly mode was active)
         let hoverPreference = 'stay';

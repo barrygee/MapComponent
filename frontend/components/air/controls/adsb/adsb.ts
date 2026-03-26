@@ -730,9 +730,11 @@ class AdsbLiveControl implements maplibregl.IControl {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             this._followEnabled = false;
-            if (this._tagHex && this._trackingNotifIds && this._trackingNotifIds[this._tagHex]) {
-                window._Notifications.dismiss(this._trackingNotifIds[this._tagHex]);
-                delete this._trackingNotifIds[this._tagHex];
+            if (this._tagHex) {
+                if (this._trackingNotifIds && this._trackingNotifIds[this._tagHex]) {
+                    window._Notifications.update({ id: this._trackingNotifIds[this._tagHex], type: 'untrack', action: null });
+                    delete this._trackingNotifIds[this._tagHex];
+                }
             }
             if (this._tagHex) this._notifEnabled.delete(this._tagHex);
             if (this._tagHex) {
@@ -845,7 +847,7 @@ class AdsbLiveControl implements maplibregl.IControl {
             if (!this._followEnabled && this._tagHex) {
                 this._notifEnabled.delete(this._tagHex);
                 if (this._trackingNotifIds && this._trackingNotifIds[this._tagHex]) {
-                    window._Notifications.dismiss(this._trackingNotifIds[this._tagHex]);
+                    window._Notifications.update({ id: this._trackingNotifIds[this._tagHex], type: 'untrack', action: null });
                     delete this._trackingNotifIds[this._tagHex];
                 }
             }

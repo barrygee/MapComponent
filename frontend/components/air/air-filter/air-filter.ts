@@ -280,12 +280,24 @@ window._FilterPanel = (() => {
             trkBtn.textContent = isTracked ? 'TRACKING' : 'TRACK';
             trkBtn.style.color = isTracked ? '#c8ff00' : 'rgba(255,255,255,0.3)';
 
+            if (isTracked) {
+                trkBtn.addEventListener('mouseenter', () => { trkBtn.textContent = 'UNTRACK'; });
+                trkBtn.addEventListener('mouseleave', () => { trkBtn.textContent = 'TRACKING'; });
+            }
+
             trkBtn.addEventListener('mousedown', e => e.stopPropagation());
             trkBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (!adsbControl) return;
                 const matchedFeature = (adsbControl._geojson.features as GeoJSON.Feature[]).find(f => (f.properties as AircraftProperties).hex === hex);
                 if (!matchedFeature) return;
+
+                // If already tracking this aircraft, untrack it via the status bar button
+                if (adsbControl._followEnabled && adsbControl._tagHex === hex) {
+                    const untrackBtn = document.querySelector('.adsb-sb-untrack-btn') as HTMLButtonElement | null;
+                    if (untrackBtn) untrackBtn.click();
+                    return;
+                }
 
                 if (adsbControl._selectedHex !== hex) {
                     adsbControl._selectedHex = hex;

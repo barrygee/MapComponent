@@ -272,7 +272,10 @@ window._SettingsPanel = (function () {
             _pending.clear();
             _showApplyStatus('SAVED', false);
             setTimeout(function () {
-                try { sessionStorage.setItem('sentinel_settings_reopen', _activeSection); } catch (_e) {}
+                try {
+                    sessionStorage.setItem('sentinel_settings_reopen', _activeSection);
+                }
+                catch (_e) { }
                 location.reload();
             }, 800);
         }
@@ -1993,7 +1996,7 @@ window._SettingsPanel = (function () {
                 openSection(reopenSection);
             }
         }
-        catch (_e) {}
+        catch (_e) { }
         const input = document.getElementById('settings-search-input');
         const clearBtn = document.getElementById('settings-search-clear');
         if (input) {

@@ -64,6 +64,8 @@ window._Notifications = (() => {
             return 'DEPARTED';
         if (type === 'track')
             return 'TRACKING';
+        if (type === 'untrack')
+            return 'UNTRACKED';
         if (type === 'tracking')
             return 'NOTIFICATIONS ON';
         if (type === 'notif-off')
@@ -202,10 +204,6 @@ window._Notifications = (() => {
             toggleBtn.disabled = false;
             toggleBtn.style.opacity = '';
             toggleBtn.style.pointerEvents = '';
-        }
-        // Update sidebar tab badge
-        if (typeof window._MapSidebar !== 'undefined') {
-            window._MapSidebar.setAlertCount(total);
         }
     }
     // ---- Render ----

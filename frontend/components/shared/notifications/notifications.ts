@@ -66,6 +66,7 @@ window._Notifications = ((): NotificationsAPI => {
         if (type === 'flight')     return 'LANDED';
         if (type === 'departure')  return 'DEPARTED';
         if (type === 'track')      return 'TRACKING';
+        if (type === 'untrack')    return 'UNTRACKED';
         if (type === 'tracking')   return 'NOTIFICATIONS ON';
         if (type === 'notif-off')  return 'NOTIFICATIONS OFF';
         if (type === 'system')     return 'SYSTEM';
@@ -217,10 +218,6 @@ window._Notifications = ((): NotificationsAPI => {
             toggleBtn.style.pointerEvents = '';
         }
 
-        // Update sidebar tab badge
-        if (typeof window._MapSidebar !== 'undefined') {
-            window._MapSidebar.setAlertCount(total);
-        }
     }
 
     // ---- Render ----

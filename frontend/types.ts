@@ -119,7 +119,7 @@ interface LastPosition {
 // ----- Notification system -----
 type NotificationType =
     | 'flight' | 'departure' | 'system' | 'message'
-    | 'tracking' | 'track' | 'notif-off' | 'emergency' | 'squawk-clr';
+    | 'tracking' | 'track' | 'untrack' | 'notif-off' | 'emergency' | 'squawk-clr';
 
 interface NotificationAction {
     label:    string;

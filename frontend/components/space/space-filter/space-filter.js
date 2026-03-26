@@ -103,14 +103,14 @@ window._SpaceFilterPanel = (() => {
     ];
     const _CATEGORY_SECTION_LABELS = {
         space_station: 'SPACE STATION',
-        amateur:       'AMATEUR',
-        weather:       'WEATHER',
-        military:      'MILITARY',
-        navigation:    'NAVIGATION',
-        science:       'SCIENCE',
-        cubesat:       'CUBESAT',
-        active:        'ACTIVE',
-        unknown:       'UNKNOWN',
+        amateur: 'AMATEUR',
+        weather: 'WEATHER',
+        military: 'MILITARY',
+        navigation: 'NAVIGATION',
+        science: 'SCIENCE',
+        cubesat: 'CUBESAT',
+        active: 'ACTIVE',
+        unknown: 'UNKNOWN',
     };
     function _renderSatItem(sat, container, doSelect) {
         const item = document.createElement('div');
@@ -136,8 +136,10 @@ window._SpaceFilterPanel = (() => {
         selectBtn.textContent = 'SELECT';
         selectBtn.addEventListener('mousedown', e => e.stopPropagation());
         selectBtn.addEventListener('click', (e) => { e.stopPropagation(); doSelect(); });
-        item.addEventListener('mouseenter', () => { if (issControl) issControl.previewSatellite(sat.norad_id, sat.name || sat.norad_id); });
-        item.addEventListener('mouseleave', () => { if (issControl) issControl.clearPreview(); });
+        item.addEventListener('mouseenter', () => { if (issControl)
+            issControl.previewSatellite(sat.norad_id, sat.name || sat.norad_id); });
+        item.addEventListener('mouseleave', () => { if (issControl)
+            issControl.clearPreview(); });
         item.appendChild(icon);
         item.appendChild(info);
         item.appendChild(badge);
@@ -174,15 +176,18 @@ window._SpaceFilterPanel = (() => {
         }
         // Group by category, preserving defined order then any extras
         const groups = new Map();
-        for (const cat of _CATEGORY_ORDER) groups.set(cat, []);
+        for (const cat of _CATEGORY_ORDER)
+            groups.set(cat, []);
         for (const sat of results) {
             const key = sat.category || 'unknown';
-            if (!groups.has(key)) groups.set(key, []);
+            if (!groups.has(key))
+                groups.set(key, []);
             groups.get(key).push(sat);
         }
         const CAP_PER_GROUP = 20;
         groups.forEach((sats, cat) => {
-            if (!sats.length) return;
+            if (!sats.length)
+                return;
             const display = sats.slice(0, CAP_PER_GROUP);
             const catLabel = _CATEGORY_SECTION_LABELS[cat] || cat.replace(/_/g, ' ').toUpperCase();
             const lbl = document.createElement('div');
@@ -191,7 +196,8 @@ window._SpaceFilterPanel = (() => {
             container.appendChild(lbl);
             display.forEach(sat => {
                 const doSelect = () => {
-                    if (issControl) issControl.switchSatellite(sat.norad_id, sat.name || sat.norad_id);
+                    if (issControl)
+                        issControl.switchSatellite(sat.norad_id, sat.name || sat.norad_id);
                     close();
                 };
                 _renderSatItem(sat, container, doSelect);

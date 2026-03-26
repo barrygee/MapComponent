@@ -40,10 +40,6 @@ window._Tracking = ((): TrackingAPI => {
             btn.style.pointerEvents = '';
         }
 
-        // Update sidebar tab badge
-        if (typeof window._MapSidebar !== 'undefined') {
-            window._MapSidebar.setTrackingCount(_count);
-        }
     }
 
     function setCount(n: number): void {
@@ -72,10 +68,13 @@ window._Tracking = ((): TrackingAPI => {
         const wasOpen = _isPanelOpen();
         const btn = _getBtn();
         if (btn) btn.classList.remove('tracking-btn-active');
-        // Only hide the sidebar if tracking actually had it open
-        if (wasOpen) {
+        // Only hide the sidebar if tracking actually had it open AND the sidebar
+        // is currently on the tracking tab (not search/alerts — those stay open)
+        if (wasOpen && typeof window._MapSidebar !== 'undefined') {
+            const trackingPane = document.getElementById('msb-pane-tracking');
+            const trackingTabActive = trackingPane ? trackingPane.classList.contains('msb-pane-active') : false;
             const notifOpen = typeof window._Notifications !== 'undefined' && window._Notifications.isPanelOpen();
-            if (!notifOpen && typeof window._MapSidebar !== 'undefined') window._MapSidebar.hide();
+            if (!notifOpen && trackingTabActive) window._MapSidebar.hide();
         }
         _refreshBadge();
     }
