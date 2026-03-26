@@ -22,16 +22,17 @@ def _solar_position(dt: datetime) -> tuple[float, float]:
     doy = dt.timetuple().tm_yday
     hour_utc = dt.hour + dt.minute / 60.0 + dt.second / 3600.0
 
-    B = math.radians((360.0 / 365.0) * (doy - 80))
+    # Day-angle in radians (Spencer 1971 approximation)
+    day_angle_rad = math.radians((360.0 / 365.0) * (doy - 80))
     declination_deg = (
-        23.45 * math.sin(B)
-        - 0.39 * math.sin(2 * B)
-        + 0.07 * math.sin(4 * B)
+        23.45 * math.sin(day_angle_rad)
+        - 0.39 * math.sin(2 * day_angle_rad)
+        + 0.07 * math.sin(4 * day_angle_rad)
     )
     eot_minutes = (
-        9.87 * math.sin(2 * B)
-        - 7.53 * math.cos(B)
-        - 1.5  * math.sin(B)
+        9.87 * math.sin(2 * day_angle_rad)
+        - 7.53 * math.cos(day_angle_rad)
+        - 1.5  * math.sin(day_angle_rad)
     )
     solar_noon_utc = 12.0 - eot_minutes / 60.0
     subsolar_lon = (solar_noon_utc - hour_utc) * 15.0
@@ -157,7 +158,8 @@ def compute_terminator() -> dict:
     # Verify no antimeridian crossings (should never happen with this construction)
     crossings = [i for i in range(1, len(ring))
                  if abs(ring[i][0] - ring[i - 1][0]) > 180]
-    assert not crossings, f"Unexpected antimeridian crossing: {crossings}"
+    if crossings:
+        raise RuntimeError(f"Unexpected antimeridian crossing at indices: {crossings}")
 
     return {
         "type": "Feature",

@@ -22,21 +22,34 @@ from backend.cache import is_fresh, is_within_stale, now_ms
 from backend.config import settings
 from backend.models import SatelliteCatalogue, TleCache
 
+# Well-known NORAD IDs → (category, category_source) for auto-classification
+# when a satellite is fetched individually rather than via a categorised group feed.
+_KNOWN_SATELLITE_CATEGORIES: dict[str, tuple[str, str]] = {
+    "25544": ("space_station", "inferred"),  # ISS (ZARYA)
+    "48274": ("space_station", "inferred"),  # CSS Tianhe
+}
+
 
 # ── Category priority ordering (higher index = higher priority) ──────────────
+# Keys are valid category *values* — 'user' is intentionally excluded because it
+# is a category_source sentinel, never a stored category value.
 _CATEGORY_PRIORITY = {
     None: 0,
     "unknown": 1,
     "active": 2,
-    "user": 3,          # used as category_source sentinel — not a category value
-    "cubesat": 4,
-    "science": 4,
-    "navigation": 4,
-    "military": 4,
-    "weather": 4,
-    "amateur": 4,
-    "space_station": 5,
+    "cubesat": 3,
+    "science": 3,
+    "navigation": 3,
+    "military": 3,
+    "weather": 3,
+    "amateur": 3,
+    "space_station": 4,
 }
+
+# Actual category values (excludes 'user', which is a category_source sentinel, and None)
+VALID_CATEGORIES: frozenset[str] = frozenset(
+    k for k in _CATEGORY_PRIORITY if k is not None and k != "user"
+)
 
 # category_source priority
 _SOURCE_PRIORITY = {
@@ -84,7 +97,7 @@ def validate_tle_text(tle_text: str) -> list[tuple[str, str, str]]:
     Raises ValueError if the text is completely unparseable.
     Silently skips malformed individual entries (logged via return count).
     """
-    lines = [l.strip() for l in tle_text.strip().splitlines() if l.strip()]
+    lines = [ln.strip() for ln in tle_text.strip().splitlines() if ln.strip()]
     if len(lines) < 3:
         raise ValueError("TLE text must contain at least one 3-line entry")
 
@@ -122,10 +135,10 @@ def validate_tle_text(tle_text: str) -> list[tuple[str, str, str]]:
 def parse_tle_lines(tle_text: str) -> tuple[str, str, str]:
     """Parse a single 3-line TLE into (name, line1, line2).
 
-    Used by the space router for the ISS position endpoint.
+    Used by the space router before propagating a satellite's position or passes.
     Raises ValueError if the text does not contain 3 lines.
     """
-    lines = [l.strip() for l in tle_text.strip().splitlines() if l.strip()]
+    lines = [ln.strip() for ln in tle_text.strip().splitlines() if ln.strip()]
     if len(lines) < 3:
         raise ValueError(f"Expected 3 TLE lines, got {len(lines)}")
     return lines[0], lines[1], lines[2]
@@ -161,17 +174,26 @@ async def store_tle_bulk(
     ttl = settings.tle_manual_ttl_ms if source != "online" else settings.tle_ttl_ms
     inserted = updated = 0
 
+    # Pre-fetch all existing rows in two bulk queries to avoid N+1 per entry.
+    norad_ids = [_norad_from_line1(line1) for _, line1, _ in entries]
+
+    tle_result = await db.execute(
+        select(TleCache).where(TleCache.cache_key.in_(norad_ids))
+    )
+    existing_tle: dict[str, TleCache] = {r.cache_key: r for r in tle_result.scalars().all()}
+
+    cat_result = await db.execute(
+        select(SatelliteCatalogue).where(SatelliteCatalogue.norad_id.in_(norad_ids))
+    )
+    existing_cat: dict[str, SatelliteCatalogue] = {r.norad_id: r for r in cat_result.scalars().all()}
+
     for name, line1, line2 in entries:
         norad_id = _norad_from_line1(line1)
         payload  = f"{name}\n{line1}\n{line2}"
         expires  = ts + ttl
 
         # ── tle_cache upsert ─────────────────────────────────────────────
-        result = await db.execute(
-            select(TleCache).where(TleCache.cache_key == norad_id)
-        )
-        tle_row = result.scalar_one_or_none()
-
+        tle_row = existing_tle.get(norad_id)
         if tle_row:
             tle_row.payload    = payload
             tle_row.source     = source
@@ -179,21 +201,19 @@ async def store_tle_bulk(
             tle_row.expires_at = expires
             updated += 1
         else:
-            db.add(TleCache(
+            new_row = TleCache(
                 cache_key  = norad_id,
                 payload    = payload,
                 source     = source,
                 fetched_at = ts,
                 expires_at = expires,
-            ))
+            )
+            db.add(new_row)
+            existing_tle[norad_id] = new_row  # prevent duplicates if same NORAD appears twice
             inserted += 1
 
         # ── satellite_catalogue upsert ───────────────────────────────────
-        result2 = await db.execute(
-            select(SatelliteCatalogue).where(SatelliteCatalogue.norad_id == norad_id)
-        )
-        cat_row = result2.scalar_one_or_none()
-
+        cat_row = existing_cat.get(norad_id)
         if cat_row:
             # Preserve user-set names; only update name from TLE if not locked
             if cat_row.name_source != "user":
@@ -203,13 +223,15 @@ async def store_tle_bulk(
                 cat_row.category        = category
                 cat_row.category_source = category_source
         else:
-            db.add(SatelliteCatalogue(
+            new_cat = SatelliteCatalogue(
                 norad_id        = norad_id,
                 name            = name,
                 category        = category,
                 category_source = category_source,
                 updated_at      = ts,
-            ))
+            )
+            db.add(new_cat)
+            existing_cat[norad_id] = new_cat  # prevent duplicates if same NORAD appears twice
 
     await db.commit()
     return {"inserted": inserted, "updated": updated}
@@ -251,10 +273,10 @@ async def fetch_tle(
     default_url = settings.celestrak_iss_url if norad_id == "25544" else (
         f"https://celestrak.org/NORAD/elements/gp.php?CATNR={norad_id}&FORMAT=tle"
     )
-    primary    = online_url if online_url else default_url
-    candidates = [u for u in [primary, offline_url] if u]
+    primary   = online_url if online_url else default_url
+    fetch_urls = [u for u in [primary, offline_url] if u]
 
-    for url in candidates:
+    for url in fetch_urls:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(url)
@@ -263,28 +285,25 @@ async def fetch_tle(
 
             # Validate before storing
             entries = validate_tle_text(text)
-            # Infer category from well-known NORAD IDs when fetching individually
-            _known_categories: dict[str, tuple[str, str]] = {
-                "25544": ("space_station", "inferred"),  # ISS
-                "48274": ("space_station", "inferred"),  # CSS Tianhe
-            }
-            inferred = _known_categories.get(norad_id)
-            auto_cat = inferred[0] if inferred else None
-            auto_src = inferred[1] if inferred else None
+            # Infer category for well-known satellites when fetching individually
+            inferred = _KNOWN_SATELLITE_CATEGORIES.get(norad_id)
+            inferred_category        = inferred[0] if inferred else None
+            inferred_category_source = inferred[1] if inferred else None
             await store_tle_bulk(entries, source="online",
-                                 category=auto_cat, category_source=auto_src, db=db)
+                                 category=inferred_category,
+                                 category_source=inferred_category_source, db=db)
             # Return the specific NORAD entry we need
             for name, line1, line2 in entries:
                 if _norad_from_line1(line1) == norad_id:
                     return f"{name}\n{line1}\n{line2}"
 
-            # Fallback: re-query the DB (store_tle_bulk committed it)
-            result2 = await db.execute(
+            # Fallback: re-query the DB after bulk store committed it
+            db_result = await db.execute(
                 select(TleCache).where(TleCache.cache_key == norad_id)
             )
-            row2 = result2.scalar_one_or_none()
-            if row2:
-                return row2.payload
+            refreshed_row = db_result.scalar_one_or_none()
+            if refreshed_row:
+                return refreshed_row.payload
 
         except Exception:
             continue

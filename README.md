@@ -67,7 +67,6 @@ Sentinel/
 │   │   └── land.py          Stub (not yet implemented)
 │   └── services/
 │       ├── adsb.py          httpx client → airplanes.live
-│       ├── geocode.py       httpx client → Nominatim reverse geocode
 │       ├── satellite.py     TLE parsing, satellite catalogue management
 │       ├── tle.py           TLE cache fetch and refresh logic
 │       └── daynight.py      Day/night terminator calculation
@@ -160,13 +159,13 @@ These domains are currently stubs — the routing, template, and settings infras
 | GET | `/api/settings` | All settings grouped by namespace `{"app":{"connectivityMode":"online",…}}` |
 | GET | `/api/settings/{namespace}` | Settings for one namespace as `{"key": value}` |
 | PUT | `/api/settings/{namespace}/{key}` | Upsert a setting. Body: `{"value": any}` |
+| GET | `/api/settings/config/preview` | Current settings as a downloadable JSON config file |
 
 ### AIR — ADS-B
 
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/air/adsb/point/{lat}/{lon}/{radius}` | Aircraft within *radius* nm of a point. Cached 5 s. Returns `X-Cache: HIT\|MISS\|STALE`. |
-| GET | `/api/air/geocode/reverse?lat=&lon=` | Reverse geocode a coordinate via Nominatim |
 
 ### AIR — Messages
 
@@ -185,12 +184,14 @@ These domains are currently stubs — the routing, template, and settings infras
 | POST | `/api/air/tracking` | Track aircraft. Body: `{"hex","callsign","follow"}`. Updates if already tracked. |
 | DELETE | `/api/air/tracking/{hex}` | Stop tracking an aircraft by ICAO hex |
 
-### SPACE — ISS & Day/Night
+### SPACE — Satellites & Day/Night
 
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/space/iss` | Current ISS position, ground track (±2 orbits), and visibility footprint |
 | GET | `/api/space/iss/passes?lat=&lon=` | Predicted ISS passes over an observer location |
+| GET | `/api/space/satellite/{norad_id}` | Position, ground track, and footprint for any satellite by NORAD ID |
+| GET | `/api/space/satellite/{norad_id}/passes?lat=&lon=` | Predicted passes for any satellite over an observer location |
 | GET | `/api/space/daynight` | Day/night terminator as GeoJSON polygon |
 
 ### SPACE — TLE Management
@@ -198,10 +199,12 @@ These domains are currently stubs — the routing, template, and settings infras
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/space/tle/status` | TLE database summary — counts, per-category last-updated times |
+| GET | `/api/space/tle/list` | Full satellite catalogue ordered by name |
 | GET | `/api/space/tle/uncategorised` | Satellites with no assigned category |
-| POST | `/api/space/tle/fetch` | Fetch TLE data from a URL. Body: `{"url","category"}` |
-| POST | `/api/space/tle/manual` | Store TLE from raw text. Body: `{"tle_text","category"}` |
-| PATCH | `/api/space/tle/category` | Assign category to NORAD IDs. Body: `{"norad_ids":[],"category":""}` |
+| POST | `/api/space/tle/fetch` | Fetch TLE data from a URL. Body: `{"url": str, "category": str\|null}` |
+| POST | `/api/space/tle/manual` | Store TLE from raw text. Body: `{"text": str, "category": str\|null}` |
+| PATCH | `/api/space/tle/category` | Assign categories in bulk. Body: `{"assignments": [{"norad_id": str, "category": str}]}` |
+| PATCH | `/api/space/tle/satellite` | Update name/category for one satellite. Body: `{"norad_id": str, "name": str\|null, "category": str\|null}` |
 | DELETE | `/api/space/tle?confirm=true` | Clear all TLE data. Requires `confirm=true` query param. |
 
 ---

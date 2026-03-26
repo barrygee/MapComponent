@@ -20,13 +20,7 @@ window._FilterPanel = (() => {
         const panel = document.createElement('div');
         panel.id = 'filter-panel';
         panel.innerHTML =
-            `<div id="filter-mode-bar">` +
-                `<button class="filter-mode-btn active" data-mode="all">ALL</button>` +
-                `<button class="filter-mode-btn" data-mode="civil">CIVIL</button>` +
-                `<button class="filter-mode-btn" data-mode="mil">MILITARY</button>` +
-                `<button class="filter-mode-btn" data-mode="none">HIDE ALL</button>` +
-                `</div>` +
-                `<div id="filter-input-wrap">` +
+            `<div id="filter-input-wrap">` +
                 `<svg id="filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
                 `<line x1="1" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
                 `<line x1="3" y1="6.5" x2="10" y2="6.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
@@ -99,28 +93,25 @@ window._FilterPanel = (() => {
         const coords = adsbControl._interpolatedCoords(hex) || feature.geometry.coordinates;
         map.easeTo({ center: coords, zoom: Math.max(map.getZoom(), 10), duration: 600 });
     }
-    function _selectAirport(feature) {
-        const props = feature.properties;
-        const bounds = props.bounds;
+    /** Fit the map to a bounding box, offsetting padding to account for the top-right control panel. */
+    function _fitBoundsWithControlPadding(bounds) {
         const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right');
         const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
         const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
         const pad = 80;
         const topExtra = Math.max(0, ctrlH / 2 - pad);
         map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 });
+    }
+    function _selectAirport(feature) {
+        const props = feature.properties;
+        _fitBoundsWithControlPadding(props.bounds);
         if (airportsControl) {
             airportsControl._showAirportPanel(props, feature.geometry.coordinates);
         }
     }
     function _selectMil(feature) {
         const props = feature.properties;
-        const bounds = props.bounds;
-        const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right');
-        const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
-        const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
-        const pad = 80;
-        const topExtra = Math.max(0, ctrlH / 2 - pad);
-        map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 });
+        _fitBoundsWithControlPadding(props.bounds);
         if (militaryBasesControl) {
             militaryBasesControl._showMilitaryBasesPanel(props, feature.geometry.coordinates);
         }
@@ -141,15 +132,14 @@ window._FilterPanel = (() => {
         }
         const planes = results.filter(r => r.kind === 'plane');
         const airports = results.filter(r => r.kind === 'airport');
-        const mil = results.filter(r => r.kind === 'mil');
-        const _container = container;
+        const militaryBases = results.filter(r => r.kind === 'mil');
         function addSection(label, items, renderFn) {
             if (!items.length)
                 return;
             const lbl = document.createElement('div');
             lbl.className = 'filter-section-label';
             lbl.textContent = label;
-            _container.appendChild(lbl);
+            container.appendChild(lbl);
             items.forEach(renderFn);
         }
         addSection('AIRCRAFT', planes, (r) => {
@@ -197,9 +187,9 @@ window._FilterPanel = (() => {
                     adsbControl._notifEnabled = new Set();
                 if (!adsbControl._trackingNotifIds)
                     adsbControl._trackingNotifIds = {};
-                const f = adsbControl._geojson.features.find(f => f.properties.hex === hex);
-                const fp = f ? f.properties : null;
-                const callsign = fp ? ((fp.flight || '').trim() || (fp.r || '').trim() || hex) : hex;
+                const matchedFeature = adsbControl._geojson.features.find(f => f.properties.hex === hex);
+                const matchedProps = matchedFeature ? matchedFeature.properties : null;
+                const callsign = matchedProps ? ((matchedProps.flight || '').trim() || (matchedProps.r || '').trim() || hex) : hex;
                 const wasOn = adsbControl._notifEnabled.has(hex);
                 if (wasOn) {
                     adsbControl._notifEnabled.delete(hex);
@@ -246,8 +236,8 @@ window._FilterPanel = (() => {
                 e.stopPropagation();
                 if (!adsbControl)
                     return;
-                const f = adsbControl._geojson.features.find(f => f.properties.hex === hex);
-                if (!f)
+                const matchedFeature = adsbControl._geojson.features.find(f => f.properties.hex === hex);
+                if (!matchedFeature)
                     return;
                 if (adsbControl._selectedHex !== hex) {
                     adsbControl._selectedHex = hex;
@@ -258,7 +248,7 @@ window._FilterPanel = (() => {
                     if (tagTrackBtn)
                         tagTrackBtn.click();
                 }
-                const coords = adsbControl._interpolatedCoords(hex) || f.geometry.coordinates;
+                const coords = adsbControl._interpolatedCoords(hex) || matchedFeature.geometry.coordinates;
                 map.easeTo({ center: coords, zoom: Math.max(map.getZoom(), 10), duration: 600 });
             });
             item.appendChild(icon);
@@ -297,7 +287,7 @@ window._FilterPanel = (() => {
             item._selectAction = () => _selectAirport(r.feature);
             container.appendChild(item);
         });
-        addSection('MILITARY', mil, (r) => {
+        addSection('MILITARY', militaryBases, (r) => {
             const item = document.createElement('div');
             item.className = 'filter-result-item';
             const icon = document.createElement('div');
@@ -440,81 +430,24 @@ window._FilterPanel = (() => {
                 input.focus();
             });
         }
-        const modeBar = document.getElementById('filter-mode-bar');
-        if (modeBar) {
-            modeBar.querySelectorAll('[data-mode]').forEach(btn => {
-                const modeBtn = btn;
-                if (modeBtn.dataset['mode'] === 'none') {
-                    modeBtn.addEventListener('click', () => {
-                        if (!adsbControl)
-                            return;
-                        const hiding = !adsbControl._allHidden;
-                        modeBtn.textContent = hiding ? 'SHOW ALL' : 'HIDE ALL';
-                        modeBtn.classList.toggle('active', hiding);
-                        if (!hiding) {
-                            adsbControl.setTypeFilter('all');
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
-                                b.classList.toggle('active', b.dataset['mode'] === 'all');
-                            });
-                        }
-                        else {
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
-                                b.classList.remove('active');
-                            });
-                        }
-                        adsbControl.setAllHidden(hiding);
-                        _saveAdsbFilter();
-                        if (_syncSideMenuForPlanes)
-                            _syncSideMenuForPlanes();
-                    });
-                }
-                else {
-                    modeBtn.addEventListener('click', () => {
-                        const mode = modeBtn.dataset['mode'];
-                        if (!adsbControl)
-                            return;
-                        if (adsbControl._allHidden) {
-                            adsbControl.setAllHidden(false);
-                            const hideBtn = modeBar.querySelector('[data-mode="none"]');
-                            if (hideBtn) {
-                                hideBtn.textContent = 'HIDE ALL';
-                                hideBtn.classList.remove('active');
-                            }
-                            if (_syncSideMenuForPlanes)
-                                _syncSideMenuForPlanes();
-                        }
-                        adsbControl.setTypeFilter(mode);
-                        _saveAdsbFilter();
-                        modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => b.classList.toggle('active', b === modeBtn));
-                    });
-                }
-            });
-            // ---- Restore persisted filter state ----
-            try {
-                const saved = localStorage.getItem('adsbFilter');
-                if (saved) {
-                    const { typeFilter, allHidden } = JSON.parse(saved);
-                    if (adsbControl) {
-                        if (allHidden) {
-                            adsbControl.setAllHidden(true);
-                            const hideBtn = modeBar.querySelector('[data-mode="none"]');
-                            if (hideBtn) {
-                                hideBtn.textContent = 'SHOW ALL';
-                                hideBtn.classList.add('active');
-                            }
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => b.classList.remove('active'));
-                        }
-                        else if (typeFilter && typeFilter !== 'all') {
-                            adsbControl.setTypeFilter(typeFilter);
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
-                                b.classList.toggle('active', b.dataset['mode'] === typeFilter);
-                            });
-                        }
+        // ---- Restore persisted filter state ----
+        try {
+            const saved = localStorage.getItem('adsbFilter');
+            if (saved) {
+                const { typeFilter, allHidden } = JSON.parse(saved);
+                if (adsbControl) {
+                    if (allHidden) {
+                        adsbControl.setAllHidden(true);
                     }
+                    else if (typeFilter && typeFilter !== 'all') {
+                        adsbControl.setTypeFilter(typeFilter);
+                    }
+                    if (_syncSideMenuForPlanes)
+                        _syncSideMenuForPlanes();
                 }
             }
-            catch (e) { }
         }
+        catch (e) { }
     }
-    return { open, close, toggle, init, reposition: _repositionPanel };
+    return { open, close, toggle, init, reposition: _repositionPanel, saveAdsbFilter: _saveAdsbFilter };
 })();

@@ -2,7 +2,8 @@ import json
 import time
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import select, text as sa_text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -39,11 +40,10 @@ async def create_tables():
         # (SQLite create_all does not add new columns to existing tables)
         try:
             await conn.execute(
-                __import__("sqlalchemy").text(
-                    "ALTER TABLE satellite_catalogue ADD COLUMN name_source TEXT"
-                )
+                sa_text("ALTER TABLE satellite_catalogue ADD COLUMN name_source TEXT")
             )
-        except Exception:  # noqa: BLE001 — SQLite raises OperationalError if column exists
+        except OperationalError:
+            # Column already exists — raised by SQLite on duplicate ALTER TABLE
             pass
 
 
@@ -53,9 +53,8 @@ async def get_db():
         yield session
 
 
-def _load_config_as_settings(path: Path) -> list[tuple[str, str, object]]:
-    """
-    Parse a config JSON file (namespace → {key: value}) into a flat list of
+def _parse_config_file(path: Path) -> list[tuple[str, str, object]]:
+    """Parse a config JSON file (namespace → {key: value}) into a flat list of
     (namespace, key, value) tuples suitable for seeding the database.
     Reserved keys starting with '_' (e.g. _comment) are ignored.
     """
@@ -63,19 +62,19 @@ def _load_config_as_settings(path: Path) -> list[tuple[str, str, object]]:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return []
-    result = []
+    config_entries = []
     for namespace, entries in raw.items():
         if namespace.startswith("_") or not isinstance(entries, dict):
             continue
         for key, value in entries.items():
-            result.append((namespace, key, value))
-    return result
+            config_entries.append((namespace, key, value))
+    return config_entries
 
 
 # Default URL settings seeded into the database on first startup.
 # Loaded from default_config.json; env-derived values override specific keys.
 def _build_default_settings() -> list[tuple[str, str, object]]:
-    rows = _load_config_as_settings(_CONFIG_PATH)
+    rows = _parse_config_file(_CONFIG_PATH)
     # Allow env/config.py values to override the JSON file for API URLs
     overrides = {
         ("air",   "onlineUrl"): settings.adsb_upstream_base,
@@ -94,12 +93,12 @@ async def seed_default_settings() -> None:
     # Remove stale placeholder URL rows that were seeded in earlier versions.
     # sea/land have no built-in default URLs; users must configure them.
     _OBSOLETE_KEYS = [
-        ("air",   "offlineSource"),
-        ("space", "offlineSource"),
+        ("air",   "offgridSource"),
+        ("space", "offgridSource"),
         ("sea",   "onlineUrl"),
-        ("sea",   "offlineSource"),
+        ("sea",   "offgridSource"),
         ("land",  "onlineUrl"),
-        ("land",  "offlineSource"),
+        ("land",  "offgridSource"),
     ]
     async with AsyncSessionLocal() as session:
         for namespace, key in _OBSOLETE_KEYS:

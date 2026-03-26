@@ -21,12 +21,6 @@ window._FilterPanel = (() => {
         const panel = document.createElement('div');
         panel.id = 'filter-panel';
         panel.innerHTML =
-            `<div id="filter-mode-bar">` +
-                `<button class="filter-mode-btn active" data-mode="all">ALL</button>` +
-                `<button class="filter-mode-btn" data-mode="civil">CIVIL</button>` +
-                `<button class="filter-mode-btn" data-mode="mil">MILITARY</button>` +
-                `<button class="filter-mode-btn" data-mode="none">HIDE ALL</button>` +
-            `</div>` +
             `<div id="filter-input-wrap">` +
                 `<svg id="filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
                     `<line x1="1" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
@@ -134,9 +128,8 @@ window._FilterPanel = (() => {
         map.easeTo({ center: coords as maplibregl.LngLatLike, zoom: Math.max(map.getZoom(), 10), duration: 600 });
     }
 
-    function _selectAirport(feature: GeoJSON.Feature): void {
-        const props = feature.properties as AirportProperties;
-        const bounds = props.bounds;
+    /** Fit the map to a bounding box, offsetting padding to account for the top-right control panel. */
+    function _fitBoundsWithControlPadding(bounds: number[]): void {
         const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right') as HTMLElement | null;
         const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
         const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
@@ -146,6 +139,11 @@ window._FilterPanel = (() => {
             [[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
             { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 }
         );
+    }
+
+    function _selectAirport(feature: GeoJSON.Feature): void {
+        const props = feature.properties as AirportProperties;
+        _fitBoundsWithControlPadding(props.bounds);
         if (airportsControl) {
             airportsControl._showAirportPanel(props, (feature.geometry as GeoJSON.Point).coordinates as LngLat);
         }
@@ -153,16 +151,7 @@ window._FilterPanel = (() => {
 
     function _selectMil(feature: GeoJSON.Feature): void {
         const props = feature.properties as MilitaryBaseProperties;
-        const bounds = props.bounds;
-        const ctrlPanel = document.querySelector('.maplibregl-ctrl-top-right') as HTMLElement | null;
-        const ctrlW = ctrlPanel ? ctrlPanel.offsetWidth : 0;
-        const ctrlH = ctrlPanel ? ctrlPanel.offsetHeight : 0;
-        const pad = 80;
-        const topExtra = Math.max(0, ctrlH / 2 - pad);
-        map.fitBounds(
-            [[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
-            { padding: { top: pad + topExtra, bottom: pad, left: pad, right: pad + ctrlW }, maxZoom: 13, duration: 800 }
-        );
+        _fitBoundsWithControlPadding(props.bounds);
         if (militaryBasesControl) {
             militaryBasesControl._showMilitaryBasesPanel(props, (feature.geometry as GeoJSON.Point).coordinates as LngLat);
         }
@@ -183,17 +172,16 @@ window._FilterPanel = (() => {
             return;
         }
 
-        const planes   = results.filter(r => r.kind === 'plane')   as PlaneResult[];
-        const airports = results.filter(r => r.kind === 'airport') as AirportResult[];
-        const mil      = results.filter(r => r.kind === 'mil')     as MilResult[];
+        const planes         = results.filter(r => r.kind === 'plane')   as PlaneResult[];
+        const airports       = results.filter(r => r.kind === 'airport') as AirportResult[];
+        const militaryBases  = results.filter(r => r.kind === 'mil')     as MilResult[];
 
-        const _container = container;
         function addSection<T>(label: string, items: T[], renderFn: (r: T) => void) {
             if (!items.length) return;
             const lbl = document.createElement('div');
             lbl.className = 'filter-section-label';
             lbl.textContent = label;
-            _container.appendChild(lbl);
+            container.appendChild(lbl);
             items.forEach(renderFn);
         }
 
@@ -243,9 +231,9 @@ window._FilterPanel = (() => {
                 if (!adsbControl) return;
                 if (!adsbControl._notifEnabled) adsbControl._notifEnabled = new Set();
                 if (!adsbControl._trackingNotifIds) adsbControl._trackingNotifIds = {};
-                const f = (adsbControl._geojson.features as GeoJSON.Feature[]).find(f => (f.properties as AircraftProperties).hex === hex);
-                const fp = f ? f.properties as AircraftProperties : null;
-                const callsign = fp ? ((fp.flight || '').trim() || (fp.r || '').trim() || hex) : hex;
+                const matchedFeature = (adsbControl._geojson.features as GeoJSON.Feature[]).find(f => (f.properties as AircraftProperties).hex === hex);
+                const matchedProps = matchedFeature ? matchedFeature.properties as AircraftProperties : null;
+                const callsign = matchedProps ? ((matchedProps.flight || '').trim() || (matchedProps.r || '').trim() || hex) : hex;
                 const wasOn = adsbControl._notifEnabled.has(hex);
                 if (wasOn) {
                     adsbControl._notifEnabled.delete(hex);
@@ -290,8 +278,8 @@ window._FilterPanel = (() => {
             trkBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (!adsbControl) return;
-                const f = (adsbControl._geojson.features as GeoJSON.Feature[]).find(f => (f.properties as AircraftProperties).hex === hex);
-                if (!f) return;
+                const matchedFeature = (adsbControl._geojson.features as GeoJSON.Feature[]).find(f => (f.properties as AircraftProperties).hex === hex);
+                if (!matchedFeature) return;
 
                 if (adsbControl._selectedHex !== hex) {
                     adsbControl._selectedHex = hex;
@@ -303,7 +291,7 @@ window._FilterPanel = (() => {
                     if (tagTrackBtn) tagTrackBtn.click();
                 }
 
-                const coords = adsbControl._interpolatedCoords(hex) || (f.geometry as GeoJSON.Point).coordinates;
+                const coords = adsbControl._interpolatedCoords(hex) || (matchedFeature.geometry as GeoJSON.Point).coordinates;
                 map.easeTo({ center: coords as maplibregl.LngLatLike, zoom: Math.max(map.getZoom(), 10), duration: 600 });
             });
 
@@ -353,7 +341,7 @@ window._FilterPanel = (() => {
             container.appendChild(item);
         });
 
-        addSection('MILITARY', mil, (r) => {
+        addSection('MILITARY', militaryBases, (r) => {
             const item = document.createElement('div') as HTMLDivElement & { _selectAction?: () => void };
             item.className = 'filter-result-item';
 
@@ -482,69 +470,22 @@ window._FilterPanel = (() => {
             });
         }
 
-        const modeBar = document.getElementById('filter-mode-bar');
-        if (modeBar) {
-            modeBar.querySelectorAll('[data-mode]').forEach(btn => {
-                const modeBtn = btn as HTMLElement;
-                if (modeBtn.dataset['mode'] === 'none') {
-                    modeBtn.addEventListener('click', () => {
-                        if (!adsbControl) return;
-                        const hiding = !adsbControl._allHidden;
-                        modeBtn.textContent = hiding ? 'SHOW ALL' : 'HIDE ALL';
-                        modeBtn.classList.toggle('active', hiding);
-                        if (!hiding) {
-                            adsbControl.setTypeFilter('all');
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
-                                (b as HTMLElement).classList.toggle('active', (b as HTMLElement).dataset['mode'] === 'all');
-                            });
-                        } else {
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
-                                (b as HTMLElement).classList.remove('active');
-                            });
-                        }
-                        adsbControl.setAllHidden(hiding);
-                        _saveAdsbFilter();
-                        if (_syncSideMenuForPlanes) _syncSideMenuForPlanes();
-                    });
-                } else {
-                    modeBtn.addEventListener('click', () => {
-                        const mode = modeBtn.dataset['mode']!;
-                        if (!adsbControl) return;
-                        if (adsbControl._allHidden) {
-                            adsbControl.setAllHidden(false);
-                            const hideBtn = modeBar.querySelector('[data-mode="none"]') as HTMLElement | null;
-                            if (hideBtn) { hideBtn.textContent = 'HIDE ALL'; hideBtn.classList.remove('active'); }
-                            if (_syncSideMenuForPlanes) _syncSideMenuForPlanes();
-                        }
-                        adsbControl.setTypeFilter(mode as 'all' | 'civil' | 'mil');
-                        _saveAdsbFilter();
-                        modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => (b as HTMLElement).classList.toggle('active', b === modeBtn));
-                    });
-                }
-            });
-
-            // ---- Restore persisted filter state ----
-            try {
-                const saved = localStorage.getItem('adsbFilter');
-                if (saved) {
-                    const { typeFilter, allHidden } = JSON.parse(saved) as { typeFilter: string; allHidden: boolean };
-                    if (adsbControl) {
-                        if (allHidden) {
-                            adsbControl.setAllHidden(true);
-                            const hideBtn = modeBar.querySelector('[data-mode="none"]') as HTMLElement | null;
-                            if (hideBtn) { hideBtn.textContent = 'SHOW ALL'; hideBtn.classList.add('active'); }
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => (b as HTMLElement).classList.remove('active'));
-                        } else if (typeFilter && typeFilter !== 'all') {
-                            adsbControl.setTypeFilter(typeFilter as 'civil' | 'mil');
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
-                                (b as HTMLElement).classList.toggle('active', (b as HTMLElement).dataset['mode'] === typeFilter);
-                            });
-                        }
+        // ---- Restore persisted filter state ----
+        try {
+            const saved = localStorage.getItem('adsbFilter');
+            if (saved) {
+                const { typeFilter, allHidden } = JSON.parse(saved) as { typeFilter: string; allHidden: boolean };
+                if (adsbControl) {
+                    if (allHidden) {
+                        adsbControl.setAllHidden(true);
+                    } else if (typeFilter && typeFilter !== 'all') {
+                        adsbControl.setTypeFilter(typeFilter as 'civil' | 'mil');
                     }
+                    if (_syncSideMenuForPlanes) _syncSideMenuForPlanes();
                 }
-            } catch (e) {}
-        }
+            }
+        } catch (e) {}
     }
 
-    return { open, close, toggle, init, reposition: _repositionPanel };
+    return { open, close, toggle, init, reposition: _repositionPanel, saveAdsbFilter: _saveAdsbFilter };
 })();

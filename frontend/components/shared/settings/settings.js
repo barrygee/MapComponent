@@ -16,7 +16,7 @@ window._SettingsPanel = (function () {
             sectionLabel: 'App Settings',
             id: 'connectivity-mode',
             label: 'Connectivity Mode',
-            desc: 'Use online or offline data sources across the app',
+            desc: 'Use online or off grid data sources across the app',
             renderControl: _renderConnectivityToggle,
         },
         {
@@ -56,7 +56,7 @@ window._SettingsPanel = (function () {
             section: 'air',
             sectionLabel: 'AIR',
             id: 'air-offline-source',
-            label: 'Offline Data Source',
+            label: 'Off Grid Data Source',
             desc: 'Local server URL and port for air data',
             renderControl: function () { return _renderOfflineSourceControl('air', ''); },
         },
@@ -108,6 +108,7 @@ window._SettingsPanel = (function () {
             id: 'space-filter-hover-preview',
             label: 'Filter Hover Behaviour',
             desc: 'When hovering a satellite in the search results, choose whether the map stays in place or flies to that satellite',
+            groupLabel: 'FILTER HOVER',
             renderControl: _renderSpaceHoverPreviewControl,
         },
         // SEA
@@ -131,7 +132,7 @@ window._SettingsPanel = (function () {
             section: 'sea',
             sectionLabel: 'SEA',
             id: 'sea-offline-source',
-            label: 'Offline Data Source',
+            label: 'Off Grid Data Source',
             desc: 'Local server URL and port for sea data',
             renderControl: function () { return _renderOfflineSourceControl('sea', ''); },
         },
@@ -156,7 +157,7 @@ window._SettingsPanel = (function () {
             section: 'land',
             sectionLabel: 'LAND',
             id: 'land-offline-source',
-            label: 'Offline Data Source',
+            label: 'Off Grid Data Source',
             desc: 'Local server URL and port for land data',
             renderControl: function () { return _renderOfflineSourceControl('land', ''); },
         },
@@ -170,17 +171,13 @@ window._SettingsPanel = (function () {
             renderControl: _renderConfigCurrentControl,
         },
     ];
-    const _DOMAIN_SECTIONS = [
+    const _NAV_SECTIONS = [
+        { key: 'app', label: 'App Settings' },
         { key: 'air', label: 'AIR' },
         { key: 'space', label: 'SPACE' },
         { key: 'sea', label: 'SEA' },
         { key: 'land', label: 'LAND' },
         { key: 'sdr', label: 'SDR' },
-    ];
-    const _enabledDomains = window._SENTINEL_ENABLED_DOMAINS || [];
-    const _NAV_SECTIONS = [
-        { key: 'app', label: 'App Settings' },
-        ..._DOMAIN_SECTIONS.filter(function (s) { return _enabledDomains.includes(s.key); }),
     ];
     // ── DOM injection ────────────────────────────────────────
     (function _injectHTML() {
@@ -458,7 +455,7 @@ window._SettingsPanel = (function () {
         return wrap;
     }
     function _renderOfflineSourceControl(ns, defaultUrl) {
-        const LS_KEY = 'sentinel_' + ns + '_offlineSource';
+        const LS_KEY = 'sentinel_' + ns + '_offgridSource';
         const SETTING_ID = ns + '-offline-source';
         const wrap = document.createElement('div');
         wrap.className = 'settings-datasource-wrap';
@@ -504,9 +501,9 @@ window._SettingsPanel = (function () {
         // Reconcile with backend (skip placeholder values like "http://localhost")
         if (window._SettingsAPI) {
             window._SettingsAPI.getNamespace(ns).then(function (data) {
-                if (!data || !data['offlineSource'])
+                if (!data || !data['offgridSource'])
                     return;
-                const backendVal = data['offlineSource'];
+                const backendVal = data['offgridSource'];
                 if (backendVal.url && !_isOfflinePlaceholder(backendVal.url) && !urlInput.value) {
                     urlInput.value = backendVal.url;
                     try {
@@ -521,7 +518,7 @@ window._SettingsPanel = (function () {
                     }
                     catch (e) { }
                     if (window._SettingsAPI)
-                        window._SettingsAPI.put(ns, 'offlineSource', { url: '' });
+                        window._SettingsAPI.put(ns, 'offgridSource', { url: '' });
                 }
                 else if (!noDefault) {
                     try {
@@ -548,7 +545,7 @@ window._SettingsPanel = (function () {
                 }
                 catch (e) { }
                 if (window._SettingsAPI)
-                    window._SettingsAPI.put(ns, 'offlineSource', val);
+                    window._SettingsAPI.put(ns, 'offgridSource', val);
             });
         });
         urlInput.addEventListener('keydown', function (e) {
@@ -709,10 +706,10 @@ window._SettingsPanel = (function () {
                 return;
             }
             // Fetch from backend and reconcile
-            window._SettingsAPI.getNamespace('app').then(function (ns) {
-                if (!ns || !ns['theme'])
+            window._SettingsAPI.getNamespace('app').then(function (appSettings) {
+                if (!appSettings || !appSettings['theme'])
                     return;
-                const backendMode = ns['theme'];
+                const backendMode = appSettings['theme'];
                 const localMode = isDark ? 'dark' : 'light';
                 if (backendMode !== localMode) {
                     isDark = backendMode === 'dark';
@@ -822,7 +819,8 @@ window._SettingsPanel = (function () {
             URL.revokeObjectURL(url);
         });
         fetch('/api/settings/config/preview')
-            .then(function (res) { if (!res.ok) throw new Error(res.status.toString()); return res.json(); })
+            .then(function (res) { if (!res.ok)
+            throw new Error(res.status.toString()); return res.json(); })
             .then(function (data) { textarea.value = JSON.stringify(data, null, 2); autoSize(); })
             .catch(function (err) { textarea.value = 'Failed to load config: ' + err.message; autoSize(); });
         return wrap;
@@ -835,14 +833,14 @@ window._SettingsPanel = (function () {
             saved = localStorage.getItem(LS_KEY) || 'online';
         }
         catch (e) { }
-        let isOnline = saved !== 'offline';
+        let isOnline = saved !== 'offgrid';
         const wrap = document.createElement('div');
         wrap.className = 'settings-connectivity-wrap';
         const switchRow = document.createElement('div');
         switchRow.className = 'settings-connectivity-switch';
         const labelOffline = document.createElement('span');
         labelOffline.className = 'settings-connectivity-label';
-        labelOffline.textContent = 'OFFLINE';
+        labelOffline.textContent = 'OFF GRID';
         const track = document.createElement('button');
         track.className = 'settings-connectivity-track' + (isOnline ? ' is-online' : '');
         track.setAttribute('role', 'switch');
@@ -864,7 +862,7 @@ window._SettingsPanel = (function () {
         overrideSummary.style.display = 'none';
         wrap.appendChild(overrideSummary);
         function _refreshOverrideSummary() {
-            const appMode = isOnline ? 'online' : 'offline';
+            const appMode = isOnline ? 'online' : 'offgrid';
             const conflicts = _getConflictingOverrides(appMode);
             if (conflicts.length === 0) {
                 overrideSummary.style.display = 'none';
@@ -946,7 +944,7 @@ window._SettingsPanel = (function () {
             warning.appendChild(msg);
         }
         track.addEventListener('click', function () {
-            const newMode = isOnline ? 'offline' : 'online';
+            const newMode = isOnline ? 'offgrid' : 'online';
             // Optimistically flip the toggle visually
             isOnline = !isOnline;
             track.classList.toggle('is-online', isOnline);
@@ -963,7 +961,7 @@ window._SettingsPanel = (function () {
                 if (!data || !data['connectivityMode'])
                     return;
                 const backendMode = data['connectivityMode'];
-                const localMode = isOnline ? 'online' : 'offline';
+                const localMode = isOnline ? 'online' : 'offgrid';
                 if (backendMode !== localMode) {
                     isOnline = backendMode === 'online';
                     track.classList.toggle('is-online', isOnline);
@@ -1735,7 +1733,7 @@ window._SettingsPanel = (function () {
     function _renderSourceOverrideControl(ns) {
         const LS_KEY = 'sentinel_' + ns + '_sourceOverride';
         const SETTING_ID = ns + '-source-override';
-        const OPTIONS = ['auto', 'online', 'offline'];
+        const OPTIONS = ['auto', 'online', 'offgrid'];
         let current = 'auto';
         try {
             current = localStorage.getItem(LS_KEY) || 'auto';
@@ -1759,7 +1757,7 @@ window._SettingsPanel = (function () {
         OPTIONS.forEach(function (opt) {
             const btn = document.createElement('button');
             btn.className = 'settings-source-override-btn' + (current === opt ? ' is-active' : '');
-            btn.textContent = opt.toUpperCase();
+            btn.textContent = opt === 'offgrid' ? 'OFF GRID' : opt.toUpperCase();
             btn.dataset['value'] = opt;
             btn.addEventListener('click', function () {
                 if (current === opt)

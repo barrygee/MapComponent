@@ -570,7 +570,7 @@ class AdsbLiveControl implements maplibregl.IControl {
         this._raiseLayers();
         this._applyTypeFilter();
         if (this._geojson.features.length) this._interpolate();
-        if (this.visible && !this._pollInterval && _airEffectiveMode() !== 'offline') this._startPolling();
+        if (this.visible && !this._pollInterval && _airEffectiveMode() !== 'offgrid') this._startPolling();
     }
 
     // ---- ADS-B category label ----
@@ -1745,7 +1745,7 @@ function _clearAdsbAircraft(): void {
 
 function _handleAirConnectivityChange(): void {
     const mode = _airEffectiveMode();
-    if (mode === 'offline') {
+    if (mode === 'offgrid') {
         _clearAdsbAircraft();
     } else if (adsbControl.visible) {
         adsbControl['_stopPolling']();

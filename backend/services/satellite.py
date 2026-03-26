@@ -30,10 +30,12 @@ def _eci_to_geodetic(r_km: list[float], t: datetime | None = None) -> tuple[floa
     """
     if t is None:
         t = datetime.now(timezone.utc)
-    # Greenwich Mean Sidereal Time (radians) — simple approximation
+    # Greenwich Mean Sidereal Time (radians) — simple approximation.
+    # tzinfo is stripped so both sides of the subtraction are naive UTC datetimes;
+    # the J2000.0 epoch (2000-01-01 12:00 UTC) is defined in UTC so no precision is lost.
     j2000 = (t.replace(tzinfo=None) - datetime(2000, 1, 1, 12, 0, 0)).total_seconds() / 86400.0
-    gmst = math.fmod(280.46061837 + 360.98564736629 * j2000, 360.0)
-    gmst_rad = math.radians(gmst)
+    gmst_deg = math.fmod(280.46061837 + 360.98564736629 * j2000, 360.0)
+    gmst_rad = math.radians(gmst_deg)
 
     x, y, z = r_km
     lon_rad = math.atan2(y, x) - gmst_rad
@@ -59,14 +61,14 @@ def _propagate_at(sat: Satrec, jd: int, fr: float) -> tuple[list[float], list[fl
 
 
 def compute_position(tle_line1: str, tle_line2: str) -> dict:
-    """Compute the current ISS position.
+    """Compute the current position of a satellite from its TLE lines.
 
     Returns:
-      lat        — latitude in degrees
-      lon        — longitude in degrees
-      alt_km     — altitude in kilometres
+      lat          — latitude in degrees
+      lon          — longitude in degrees
+      alt_km       — altitude in kilometres
       velocity_kms — speed in km/s
-      track_deg  — heading in degrees (0=north, clockwise)
+      track_deg    — heading in degrees (0=north, clockwise)
     """
     sat = Satrec.twoline2rv(tle_line1, tle_line2)
     jd, fr = _jday_now()
@@ -81,18 +83,18 @@ def compute_position(tle_line1: str, tle_line2: str) -> dict:
     velocity_kms = math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
 
     # Compute heading: propagate 10 seconds ahead for bearing estimate
-    fr2 = fr + 10.0 / 86400.0  # +10 seconds in fractional days
-    result2 = _propagate_at(sat, jd, fr2)
+    fr_ahead = fr + 10.0 / 86400.0  # +10 seconds in fractional days
+    result_ahead = _propagate_at(sat, jd, fr_ahead)
     track_deg = 0.0
-    if result2:
-        r2, _ = result2
-        lat2, lon2, _ = _eci_to_geodetic(r2, now + timedelta(seconds=10))
-        d_lat = math.radians(lat2 - lat)
-        d_lon = math.radians(lon2 - lon)
-        lat_r = math.radians(lat)
-        lat2_r = math.radians(lat2)
-        x = math.sin(d_lon) * math.cos(lat2_r)
-        y = math.cos(lat_r) * math.sin(lat2_r) - math.sin(lat_r) * math.cos(lat2_r) * math.cos(d_lon)
+    if result_ahead:
+        r_ahead, _ = result_ahead
+        lat_ahead, lon_ahead, _ = _eci_to_geodetic(r_ahead, now + timedelta(seconds=10))
+        dlat_rad = math.radians(lat_ahead - lat)
+        dlon_rad = math.radians(lon_ahead - lon)
+        lat_rad  = math.radians(lat)
+        lat_ahead_rad = math.radians(lat_ahead)
+        x = math.sin(dlon_rad) * math.cos(lat_ahead_rad)
+        y = math.cos(lat_rad) * math.sin(lat_ahead_rad) - math.sin(lat_rad) * math.cos(lat_ahead_rad) * math.cos(dlon_rad)
         track_deg = (math.degrees(math.atan2(x, y)) + 360) % 360
 
     return {
@@ -120,7 +122,7 @@ def compute_ground_track(tle_line1: str, tle_line2: str) -> dict:
     features = []
 
     # 10-second steps (~0.167 min) for smoother track lines
-    step = 1 / 6
+    time_step_min = 1 / 6
 
     for track_type, start_min, end_min in [
         ("orbit1",   0,  92),
@@ -132,21 +134,10 @@ def compute_ground_track(tle_line1: str, tle_line2: str) -> dict:
 
         t = start_min
         while t <= end_min + 1e-9:
-            offset_days = t / 1440.0
-            jd_t = jd
-            fr_t = fr + offset_days
-            # Handle fractional day overflow
-            if fr_t >= 1.0:
-                jd_t += int(fr_t)
-                fr_t = fr_t % 1.0
-            elif fr_t < 0.0:
-                extra = int(abs(fr_t)) + 1
-                jd_t -= extra
-                fr_t += extra
-
+            jd_t, fr_t = _jday_offset(jd, fr, t * 60.0)
             result = _propagate_at(sat, jd_t, fr_t)
             if result is None:
-                t += step
+                t += time_step_min
                 continue
 
             r, _ = result
@@ -161,7 +152,7 @@ def compute_ground_track(tle_line1: str, tle_line2: str) -> dict:
 
             current_segment.append([round(lon, 4), round(lat, 4)])
             prev_lon = lon
-            t += step
+            t += time_step_min
 
         if current_segment:
             segments.append(current_segment)
@@ -238,8 +229,8 @@ def compute_passes(
 
     # --- coarse scan at 1-minute resolution ---
     prev_visible = False
-    # Track (minute_offset, elevation) for the current pass window
-    pass_start_min: float | None = None
+    # Track start time and sample points for the current pass window
+    pass_start_s: float | None = None
     pass_samples: list[tuple[float, float]] = []  # (offset_seconds, elev_deg)
 
     def _vis_at(offset_s: float) -> tuple[bool, float, float]:
@@ -251,10 +242,10 @@ def compute_passes(
         r, _ = result
         t_prop = now + timedelta(seconds=offset_s)
         lat, lon, alt_km = _eci_to_geodetic(r, t_prop)
-        fp_rad = math.acos(max(-1.0, min(1.0, _RE_KM / (_RE_KM + alt_km))))
+        horizon_rad = math.acos(max(-1.0, min(1.0, _RE_KM / (_RE_KM + alt_km))))
         dist_rad = _angular_distance_rad(lat, lon, obs_lat, obs_lon)
         elev = _elevation_deg(dist_rad, alt_km)
-        return dist_rad <= fp_rad, elev, alt_km
+        return dist_rad <= horizon_rad, elev, alt_km
 
     def _refine_transition(t_before_s: float, t_after_s: float) -> float:
         """Binary-search to find the transition second within a 5-second resolution."""
@@ -275,31 +266,31 @@ def compute_passes(
         if visible and not prev_visible:
             # AOS transition
             aos_s = _refine_transition((minute - 1) * 60.0, offset_s) if minute > 0 else 0.0
-            pass_start_min = aos_s
+            pass_start_s = aos_s
             pass_samples = [(offset_s, elev)]
         elif visible and prev_visible:
             pass_samples.append((offset_s, elev))
-        elif not visible and prev_visible and pass_start_min is not None:
+        elif not visible and prev_visible and pass_start_s is not None:
             # LOS transition
             los_s = _refine_transition((minute - 1) * 60.0, offset_s)
 
             # Find max elevation within pass
             best_s, best_elev = max(pass_samples, key=lambda x: x[1])
             # Refine max elevation time at 5-second resolution
-            lo_s = max(pass_start_min, best_s - 60.0)
+            lo_s = max(pass_start_s, best_s - 60.0)
             hi_s = min(los_s, best_s + 60.0)
             max_elev = best_elev
             max_elev_s = best_s
-            step = lo_s
-            while step <= hi_s:
-                _, e, _ = _vis_at(step)
-                if e > max_elev:
-                    max_elev = e
-                    max_elev_s = step
-                step += 5.0
+            scan_s = lo_s
+            while scan_s <= hi_s:
+                _, elev_at_scan, _ = _vis_at(scan_s)
+                if elev_at_scan > max_elev:
+                    max_elev = elev_at_scan
+                    max_elev_s = scan_s
+                scan_s += 5.0
 
             if max_elev >= min_elevation_deg:
-                aos_dt = now + timedelta(seconds=pass_start_min)
+                aos_dt = now + timedelta(seconds=pass_start_s)
                 los_dt = now + timedelta(seconds=los_s)
                 max_el_dt = now + timedelta(seconds=max_elev_s)
                 passes.append({
@@ -307,14 +298,14 @@ def compute_passes(
                     "los_utc":           los_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "aos_unix_ms":       int(aos_dt.timestamp() * 1000),
                     "los_unix_ms":       int(los_dt.timestamp() * 1000),
-                    "duration_s":        int(los_s - pass_start_min),
+                    "duration_s":        int(los_s - pass_start_s),
                     "max_elevation_deg": round(max_elev, 1),
                     "max_el_utc":        max_el_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
                 if len(passes) >= 10:
                     break
 
-            pass_start_min = None
+            pass_start_s = None
             pass_samples = []
 
         prev_visible = visible

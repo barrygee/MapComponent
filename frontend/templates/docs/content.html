@@ -12,8 +12,8 @@
                         interactive maps.
                     </p>
                     <p class="docs-item-desc">
-                        The application is designed for offline-first operation: every domain
-                        supports configurable online and offline data sources, with automatic
+                        The application is designed for off grid-first operation: every domain
+                        supports configurable online and off grid data sources, with automatic
                         fallback when connectivity changes. A global connectivity mode and
                         per-domain source overrides allow fine-grained control.
                     </p>
@@ -98,7 +98,7 @@ npm run typecheck  # type-check only</pre>
                         <li style="margin-bottom: 8px;">Open the <strong>Settings panel</strong> (gear icon, bottom-right) and set <em>My Location</em> to your latitude/longitude. This centres the map and scopes aircraft queries to your area.</li>
                         <li style="margin-bottom: 8px;">Navigate to the <strong>AIR</strong> domain to see live aircraft. Clicking an aircraft shows callsign, altitude, speed, and heading. Use the tracking list to persist aircraft across sessions.</li>
                         <li style="margin-bottom: 8px;">Navigate to the <strong>SPACE</strong> domain. The ISS is tracked by default. Open Settings and use <em>UPDATE TLE</em> to load additional satellite categories from Celestrak.</li>
-                        <li style="margin-bottom: 8px;">For offline use, follow the <a href="#offline-maps" style="color: var(--color-accent);">Offline Maps</a> guide to download PMTiles, then switch <em>Connectivity Mode</em> to <em>Offline</em>.</li>
+                        <li style="margin-bottom: 8px;">For off grid use, follow the <a href="#offline-maps" style="color: var(--color-accent);">Off Grid Maps</a> guide to download PMTiles, then switch <em>Connectivity Mode</em> to <em>Off Grid</em>.</li>
                     </ol>
                 </div>
             </section>
@@ -173,8 +173,8 @@ npm run typecheck  # type-check only</pre>
                         <tbody>
                             <tr>
                                 <td><code>connectivityMode</code></td>
-                                <td><code>"online"</code> | <code>"offline"</code></td>
-                                <td>Global data-source selector. <em>online</em> uses upstream internet feeds; <em>offline</em> routes all domains to their configured local/offline source URL. Individual domains can override this with <code>sourceOverride</code>.</td>
+                                <td><code>"online"</code> | <code>"offgrid"</code></td>
+                                <td>Global data-source selector. <em>online</em> uses upstream internet feeds; <em>offline</em> routes all domains to their configured local/off grid source URL. Individual domains can override this with <code>sourceOverride</code>.</td>
                             </tr>
                             <tr>
                                 <td><code>connectivityProbeUrl</code></td>
@@ -195,8 +195,8 @@ npm run typecheck  # type-check only</pre>
                             </tr>
                             <tr>
                                 <td><code>sourceOverride</code></td>
-                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offline"</code></td>
-                                <td>Per-domain source selector. <em>auto</em> follows the global <code>connectivityMode</code>. <em>online</em> or <em>offline</em> force this domain to use a specific source regardless of the app-level mode.</td>
+                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offgrid"</code></td>
+                                <td>Per-domain source selector. <em>auto</em> follows the global <code>connectivityMode</code>. <em>online</em> or <em>off grid</em> force this domain to use a specific source regardless of the app-level mode.</td>
                             </tr>
                             <tr>
                                 <td><code>onlineUrl</code></td>
@@ -217,7 +217,7 @@ npm run typecheck  # type-check only</pre>
                             </tr>
                             <tr>
                                 <td><code>sourceOverride</code></td>
-                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offline"</code></td>
+                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offgrid"</code></td>
                                 <td>Per-domain source selector — same behaviour as the AIR domain override.</td>
                             </tr>
                             <tr>
@@ -253,7 +253,7 @@ npm run typecheck  # type-check only</pre>
                             </tr>
                             <tr>
                                 <td><code>sourceOverride</code></td>
-                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offline"</code></td>
+                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offgrid"</code></td>
                                 <td>Per-domain source selector — will be respected when SEA functionality is implemented.</td>
                             </tr>
                         </tbody>
@@ -270,7 +270,7 @@ npm run typecheck  # type-check only</pre>
                             </tr>
                             <tr>
                                 <td><code>sourceOverride</code></td>
-                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offline"</code></td>
+                                <td><code>"auto"</code> | <code>"online"</code> | <code>"offgrid"</code></td>
                                 <td>Per-domain source selector — will be respected when LAND functionality is implemented.</td>
                             </tr>
                         </tbody>
@@ -291,9 +291,9 @@ npm run typecheck  # type-check only</pre>
                                 <td>Base URL for an online SDR data feed.</td>
                             </tr>
                             <tr>
-                                <td><code>offlineSource</code></td>
+                                <td><code>offgridSource</code></td>
                                 <td>object — <code>{ "url": string }</code></td>
-                                <td>Configuration for a local/offline SDR source. The nested <code>url</code> field should point to a self-hosted SDR server (e.g. <code>http://192.168.1.x:port</code>).</td>
+                                <td>Configuration for a local/off grid SDR source. The nested <code>url</code> field should point to a self-hosted SDR server (e.g. <code>http://192.168.1.x:port</code>).</td>
                             </tr>
                         </tbody>
                     </table>
@@ -344,7 +344,7 @@ npm run typecheck  # type-check only</pre>
   "sdr": {
     "enabled": true,
     "onlineUrl": "https://",
-    "offlineSource": { "url": "http://localhost" }
+    "offgridSource": { "url": "http://localhost" }
   }
 }</pre>
                 </div>
@@ -366,7 +366,7 @@ npm run typecheck  # type-check only</pre>
 │   ├── database.py          SQLAlchemy engine, session factory, seed data
 │   ├── models.py            ORM models (AdsbCache, TleCache, UserSettings …)
 │   ├── cache.py             TTL helpers (now_ms, is_fresh, is_within_stale)
-│   ├── utils.py             resolve_domain_urls — online/offline URL logic
+│   ├── utils.py             resolve_domain_urls — online/off grid URL logic
 │   ├── routers/
 │   │   ├── air.py           ADS-B proxy, messages, tracking
 │   │   ├── space.py         ISS, day/night, TLE management
@@ -439,10 +439,10 @@ npm run typecheck  # type-check only</pre>
                 <div class="docs-item">
                     <h2 class="docs-item-label">Connectivity Model</h2>
                     <p class="docs-item-desc">
-                        Each domain has two data source slots — <em>online</em> and <em>offline</em>.
-                        A global <code>connectivityMode</code> setting (online/offline) selects which
+                        Each domain has two data source slots — <em>online</em> and <em>off grid</em>.
+                        A global <code>connectivityMode</code> setting (online/off grid) selects which
                         slot is active. Individual domains can override this with a per-domain
-                        <code>sourceOverride</code> (auto / online / offline).
+                        <code>sourceOverride</code> (auto / online / off grid).
                         <code>resolve_domain_urls()</code> in <code>utils.py</code> encapsulates
                         this logic and returns the effective <em>(primary_url, fallback_url)</em>
                         pair for any request.
@@ -525,8 +525,8 @@ npm run typecheck  # type-check only</pre>
                     <table class="docs-table">
                         <thead><tr><th>Setting</th><th>Description</th></tr></thead>
                         <tbody>
-                            <tr><td>Connectivity Mode</td><td>Global toggle between <em>online</em> and <em>offline</em> data sources across all domains.</td></tr>
-                            <tr><td>Connectivity Probe URL</td><td>A URL polled every 2 seconds to detect internet access. A failed fetch switches the indicator to offline.</td></tr>
+                            <tr><td>Connectivity Mode</td><td>Global toggle between <em>online</em> and <em>off grid</em> data sources across all domains.</td></tr>
+                            <tr><td>Connectivity Probe URL</td><td>A URL polled every 2 seconds to detect internet access. A failed fetch switches the indicator to off grid.</td></tr>
                             <tr><td>My Location</td><td>Fixed latitude/longitude used as the map centre and for range queries. Dispatches a <code>sentinel:setUserLocation</code> event on change.</td></tr>
                         </tbody>
                     </table>
@@ -537,9 +537,9 @@ npm run typecheck  # type-check only</pre>
                     <table class="docs-table">
                         <thead><tr><th>Setting</th><th>Description</th></tr></thead>
                         <tbody>
-                            <tr><td>Source Override</td><td><em>Auto</em> — follow app-level connectivity mode. <em>Online</em> or <em>Offline</em> — force a specific source regardless of app mode.</td></tr>
+                            <tr><td>Source Override</td><td><em>Auto</em> — follow app-level connectivity mode. <em>Online</em> or <em>Off Grid</em> — force a specific source regardless of app mode.</td></tr>
                             <tr><td>Online Data Source</td><td>Base URL for the live upstream data feed.</td></tr>
-                            <tr><td>Offline Data Source</td><td>Base URL for a local network server (e.g. a self-hosted feed on <code>http://192.168.1.x:port</code>).</td></tr>
+                            <tr><td>Off Grid Data Source</td><td>Base URL for a local network server (e.g. a self-hosted feed on <code>http://192.168.1.x:port</code>).</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -742,15 +742,15 @@ npm run typecheck  # type-check only</pre>
 
             <hr class="docs-divider">
 
-            <!-- Offline Maps ─────────────────────────────────────────────────── -->
+            <!-- Off Grid Maps ─────────────────────────────────────────────────── -->
             <section class="docs-section" id="offline-maps">
                 <span class="docs-section-label">Maps</span>
-                <h1 class="docs-section-title">Offline Maps</h1>
+                <h1 class="docs-section-title">Off Grid Maps</h1>
 
                 <div class="docs-item">
                     <p class="docs-item-desc">
                         Sentinel uses <a href="https://protomaps.com" style="color: var(--color-accent);">PMTiles</a>
-                        vector tile archives for offline map rendering. Two files are required,
+                        vector tile archives for off grid map rendering. Two files are required,
                         both placed in <code>frontend/assets/tiles/</code>:
                     </p>
                     <table class="docs-table">
@@ -860,10 +860,10 @@ npm run typecheck  # type-check only</pre>
                 </div>
 
                 <div class="docs-item">
-                    <h2 class="docs-item-label">Switching to Offline Mode</h2>
+                    <h2 class="docs-item-label">Switching to Off Grid Mode</h2>
                     <p class="docs-item-desc">
-                        Once the tile files are in place, switch to offline mode via
-                        <strong>Settings → Connectivity Mode → Offline</strong>, or let Sentinel
+                        Once the tile files are in place, switch to off grid mode via
+                        <strong>Settings → Connectivity Mode → Off Grid</strong>, or let Sentinel
                         detect the loss of connectivity automatically (it polls the configured
                         probe URL every 2 seconds). The map style switches from the online
                         OpenFreeMap tile server to the local PMTiles files automatically.

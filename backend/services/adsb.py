@@ -1,7 +1,7 @@
 import httpx
 
 
-async def fetch_aircraft_from_upstream(lat: float, lon: float, radius: int, base_url: str) -> dict:
+async def fetch_aircraft(lat: float, lon: float, radius: int, base_url: str) -> dict:
     """Fetch live aircraft data from the configured ADS-B upstream endpoint.
 
     Args:
@@ -27,7 +27,3 @@ async def fetch_aircraft_from_upstream(lat: float, lon: float, radius: int, base
         )
         response.raise_for_status()  # raises HTTPStatusError on 4xx/5xx
         return response.json()
-
-
-# Keep original name as alias so air.py router import doesn't break
-fetch_aircraft = fetch_aircraft_from_upstream

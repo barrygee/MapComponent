@@ -342,6 +342,70 @@
 
 
 /* ============================================================
+   FILTER MODE FLYOUT
+   Appears to the left of the filter button on hover.
+   Four options: ALL / CIVIL / MILITARY / HIDE ALL.
+   ============================================================ */
+
+.sm-group:has(#sm-filter-btn) {
+    position: relative;
+}
+
+#filter-mode-flyout {
+    position: absolute;
+    right: calc(100% + 8px);
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: transparent;
+    pointer-events: none;
+    width: 0;
+    overflow: hidden;
+    transition: width 0.2s ease;
+    z-index: 1002;
+    white-space: nowrap;
+}
+
+/* Show flyout — class toggled by JS with leave-delay */
+#filter-mode-flyout.filter-flyout-visible {
+    width: 80px;
+    pointer-events: auto;
+}
+
+/* Hide the tooltip when the flyout is open */
+#sm-filter-btn.filter-flyout-open::before {
+    opacity: 0 !important;
+}
+
+.filter-flyout-btn {
+    background: #000;
+    border: none;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.35);
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    padding: 0 14px;
+    height: 36px;
+    width: 80px;
+    display: flex;
+    align-items: center;
+    text-transform: uppercase;
+    transition: color 0.15s, background 0.15s;
+}
+
+.filter-flyout-btn:hover {
+    color: #fff;
+}
+
+.filter-flyout-btn.active {
+    color: var(--color-accent);
+}
+
+
+/* ============================================================
    3D CONTROLS WIDGET
    Fixed bottom-right floating panel, shown when 3D mode is active.
    3×3 grid: tilt-up centre-top, rotate left/right middle row with

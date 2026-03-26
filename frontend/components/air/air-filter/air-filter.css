@@ -2,15 +2,15 @@
    FILTER PANEL
    Floating search panel that appears below the nav bar,
    horizontally centred within the space left of the side menu.
-   Allows searching aircraft by callsign / ICAO hex / squawk,
-   and filtering display mode (ALL / CIVIL / MIL / HIDE).
+   Allows searching aircraft by callsign / ICAO hex / squawk.
+   Filter mode (ALL / CIVIL / MIL / HIDE) is controlled via the
+   hover flyout on the filter button in the side menu.
 
    Positioning uses CSS custom properties to account for whether
    the side menu is expanded or minimised, adjusting the centring
    accordingly via :has() selectors.
 
    Sections:
-     #filter-mode-bar      — ALL / CIVIL / MIL / HIDE tab row
      #filter-input-wrap    — search input + clear button
      #filter-results       — scrollable list of matching aircraft/airports
    ============================================================ */
@@ -45,50 +45,6 @@ body:has(#side-menu.expanded) #filter-panel {
     left: calc(var(--menu-left) / 2);
     transform: translateX(-50%);
     max-width: calc(var(--menu-left) - 28px);
-}
-
-/* ---- Filter mode bar (ALL / CIVIL / MIL / HIDE) ----
-   Tab-style row at the top of the panel. Active mode shown in lime. */
-#filter-mode-bar {
-    display: flex;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Individual mode tab buttons */
-.filter-mode-btn {
-    flex: 1;
-    background: none;
-    border: none;
-    border-right: 1px solid var(--color-border);
-    cursor: pointer;
-    color: rgba(255, 255, 255, 0.3);
-    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    padding: 9px 0;
-    transition: color 0.15s, background 0.15s;
-    text-transform: uppercase;
-}
-
-/* Remove right border from last tab to avoid double border */
-.filter-mode-btn:last-child {
-    border-right: none;
-}
-
-.filter-mode-btn:hover {
-    color: rgba(255, 255, 255, 0.7);
-    background: rgba(255, 255, 255, 0.04);
-}
-
-/* Active mode: lime for ALL/CIVIL/MIL */
-.filter-mode-btn.active {
-    color: var(--color-accent);
-}
-
-/* Active HIDE mode: muted white (not lime — indicates suppression) */
-.filter-mode-btn[data-mode="none"].active {
-    color: rgba(255, 255, 255, 0.5);
 }
 
 /* ---- Search input row ---- */

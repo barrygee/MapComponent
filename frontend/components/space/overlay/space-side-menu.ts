@@ -28,7 +28,7 @@
     function makeGroup(id: string): HTMLDivElement {
         const group = document.createElement('div');
         group.className = 'sm-group';
-        if (id) group.id = id;
+        group.id = id;
         return group;
     }
 
