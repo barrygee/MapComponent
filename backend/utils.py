@@ -21,11 +21,11 @@ async def resolve_domain_urls(domain: str, db: AsyncSession) -> tuple[str | None
     """Return (primary_url, fallback_url) for a given domain based on connectivity mode and override.
 
     Resolves effective mode:
-      1. If {domain}.sourceOverride is 'online' or 'offline', use that.
-      2. Otherwise, fall back to app.connectivityMode ('online' | 'offline', default 'online').
+      1. If {domain}.sourceOverride is 'online' or 'offgrid', use that.
+      2. Otherwise, fall back to app.connectivityMode ('online' | 'offgrid', default 'online').
 
-    When effective mode is 'online':  primary = online URL,  fallback = offline URL
-    When effective mode is 'offline': primary = offline URL, fallback = online URL
+    When effective mode is 'online':   primary = online URL,   fallback = offgrid URL
+    When effective mode is 'offgrid':  primary = offgrid URL,  fallback = online URL
 
     Args:
         domain: Domain namespace string, e.g. 'air' or 'space'.
@@ -49,20 +49,20 @@ async def resolve_domain_urls(domain: str, db: AsyncSession) -> tuple[str | None
 
     # Resolve effective mode
     override = settings_map.get(f"{domain}.sourceOverride", "auto")
-    if override in ("online", "offline"):
+    if override in ("online", "offgrid"):
         effective_mode = override
     else:
         effective_mode = settings_map.get("app.connectivityMode", "online") or "online"
 
     online = _valid_url(settings_map.get(f"{domain}.onlineUrl"))
 
-    # offlineSource is stored as {"url": "http://..."} by the frontend settings panel
-    offline_raw = settings_map.get(f"{domain}.offlineSource")
-    if isinstance(offline_raw, dict):
-        offline = _valid_url(offline_raw.get("url"))
+    # offgridSource is stored as {"url": "http://..."} by the frontend settings panel
+    offgrid_raw = settings_map.get(f"{domain}.offgridSource")
+    if isinstance(offgrid_raw, dict):
+        offgrid = _valid_url(offgrid_raw.get("url"))
     else:
-        offline = _valid_url(offline_raw)
+        offgrid = _valid_url(offgrid_raw)
 
-    if effective_mode == "offline":
-        return offline, online
-    return online, offline
+    if effective_mode == "offgrid":
+        return offgrid, online
+    return online, offgrid

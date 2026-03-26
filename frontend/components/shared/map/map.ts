@@ -29,34 +29,34 @@ maplibregl.addProtocol('pmtiles', _pmtilesProtocol.tile.bind(_pmtilesProtocol) a
 // On change: updates the footer pill, switches map style, notifies.
 // ============================================================
 
-// 'auto' | 'online' | 'offline' — tracks whether the user has manually forced a mode
+// 'auto' | 'online' | 'offgrid' — tracks whether the user has manually forced a mode
 let _connModeOverride: string = (function () {
     try { return localStorage.getItem('sentinel_app_connectivityMode') || 'auto'; } catch { return 'auto'; }
 })();
 
 // Seed connectivity state: honour a forced override, otherwise use the browser's best guess
 const _mapIsOnline  = _connModeOverride === 'online' ? true
-                    : _connModeOverride === 'offline' ? false
+                    : _connModeOverride === 'offgrid' ? false
                     : navigator.onLine;
 let   _mapConnState = _mapIsOnline;
 
 
 /**
  * Update the footer connection-status pill text and colour class.
- * When _connModeOverride is 'online' or 'offline', shows the forced state
+ * When _connModeOverride is 'online' or 'offgrid', shows the forced state
  * with a distinct style so the user knows the mode has been overridden.
  */
 function _updateConnStatusPill(online: boolean): void {
     const el = document.getElementById('conn-status');
     if (!el) return;
-    const forced = _connModeOverride === 'online' || _connModeOverride === 'offline';
+    const forced = _connModeOverride === 'online' || _connModeOverride === 'offgrid';
     if (forced) {
         const isForceOnline = _connModeOverride === 'online';
         el.className   = isForceOnline ? 'conn-online conn-mode-forced' : 'conn-offline conn-mode-forced';
-        el.textContent = isForceOnline ? '● ONLINE' : '● OFFLINE';
+        el.textContent = isForceOnline ? '● ONLINE' : '● OFF GRID';
     } else {
         el.className   = online ? 'conn-online' : 'conn-offline';
-        el.textContent = online ? '● ONLINE' : '● OFFLINE';
+        el.textContent = online ? '● ONLINE' : '● OFF GRID';
     }
 }
 _updateConnStatusPill(_mapIsOnline); // set pill immediately on load
@@ -64,11 +64,11 @@ _updateConnStatusPill(_mapIsOnline); // set pill immediately on load
 // Listen for manual connectivity mode changes from the settings panel
 window.addEventListener('sentinel:connectivityModeChanged', (e: Event) => {
     const { mode } = (e as CustomEvent).detail as { mode: string };
-    _connModeOverride = mode; // 'online', 'offline', or 'auto'
+    _connModeOverride = mode; // 'online', 'offgrid', or 'auto'
     if (mode === 'online') {
         _mapConnState = true;
         _switchMapStyle(true);
-    } else if (mode === 'offline') {
+    } else if (mode === 'offgrid') {
         _mapConnState = false;
         _switchMapStyle(false);
     }
@@ -88,7 +88,7 @@ function _fixStylePaths(_prev: maplibregl.StyleSpecification | undefined, next: 
 }
 
 /**
- * Switch the MapLibre base style between the online (OSM tiles) and offline (PMTiles) versions.
+ * Switch the MapLibre base style between the online (OSM tiles) and off grid (PMTiles) versions.
  */
 function _switchMapStyle(online: boolean): void {
     if (typeof _sentinelMap === 'undefined') return;
@@ -125,7 +125,7 @@ fetch('/api/settings/app')
  * Skipped when the user has forced a specific mode via the settings toggle.
  */
 function _checkInternetConnection(): void {
-    if (_connModeOverride === 'online' || _connModeOverride === 'offline') return;
+    if (_connModeOverride === 'online' || _connModeOverride === 'offgrid') return;
     fetch(_probeUrl, { method: 'HEAD', cache: 'no-store', mode: 'no-cors' })
         .then(() => {
             if (!_mapConnState) {

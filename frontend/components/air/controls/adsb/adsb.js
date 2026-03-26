@@ -578,7 +578,7 @@ class AdsbLiveControl {
         this._applyTypeFilter();
         if (this._geojson.features.length)
             this._interpolate();
-        if (this.visible && !this._pollInterval && _airEffectiveMode() !== 'offline')
+        if (this.visible && !this._pollInterval && _airEffectiveMode() !== 'offgrid')
             this._startPolling();
     }
     // ---- ADS-B category label ----
@@ -1921,7 +1921,7 @@ function _clearAdsbAircraft() {
 }
 function _handleAirConnectivityChange() {
     const mode = _airEffectiveMode();
-    if (mode === 'offline') {
+    if (mode === 'offgrid') {
         _clearAdsbAircraft();
     }
     else if (adsbControl.visible) {

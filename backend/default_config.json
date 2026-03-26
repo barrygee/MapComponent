@@ -37,6 +37,6 @@
   "sdr": {
     "enabled": true,
     "onlineUrl": "https://",
-    "offlineSource": { "url": "http://localhost" }
+    "offgridSource": { "url": "http://localhost" }
   }
 }

@@ -50,7 +50,7 @@ window._Tracking.init();
                 const val = localStorage.getItem('sentinel_' + ns + '_onlineUrl') || '';
                 return val.length > 0 && !_isPlaceholder(val);
             } else {
-                const raw = localStorage.getItem('sentinel_' + ns + '_offlineSource');
+                const raw = localStorage.getItem('sentinel_' + ns + '_offgridSource');
                 if (!raw) return false;
                 const obj = JSON.parse(raw);
                 const url = (obj && obj.url) || '';
@@ -62,8 +62,8 @@ window._Tracking.init();
 
     function _show() {
         const mode = _getActiveMode();
-        const modeLabel = mode === 'online' ? 'Online' : 'Offline';
-        const settingLabel = mode === 'online' ? 'Online Data Source' : 'Offline Data Source';
+        const modeLabel = mode === 'online' ? 'Online' : 'Off Grid';
+        const settingLabel = mode === 'online' ? 'Online Data Source' : 'Off Grid Data Source';
         msgEl.textContent = modeLabel + ' mode is active but no ' + settingLabel + ' URL has been set for '
             + ns.toUpperCase() + '. Configure a URL in settings or switch connectivity mode to continue.';
         btn.dataset.section = ns;
@@ -88,13 +88,13 @@ window._Tracking.init();
             if (!data) { _check(); return; }
             var lsKey = mode === 'online'
                 ? 'sentinel_' + ns + '_onlineUrl'
-                : 'sentinel_' + ns + '_offlineSource';
+                : 'sentinel_' + ns + '_offgridSource';
             var backendUrl = '';
             if (mode === 'online') {
                 backendUrl = (data['onlineUrl'] || '') + '';
             } else {
                 try {
-                    var src = data['offlineSource'];
+                    var src = data['offgridSource'];
                     backendUrl = (src && typeof src === 'object' && src.url) ? src.url : '';
                 } catch (e) {}
             }
@@ -105,7 +105,7 @@ window._Tracking.init();
                 _show();
             } else {
                 // Backend has a valid URL — sync to localStorage and hide overlay
-                try { localStorage.setItem(lsKey, mode === 'online' ? backendUrl : JSON.stringify(data['offlineSource'])); } catch (e) {}
+                try { localStorage.setItem(lsKey, mode === 'online' ? backendUrl : JSON.stringify(data['offgridSource'])); } catch (e) {}
                 overlay.classList.add('hidden');
             }
         }).catch(function () { _check(); });
