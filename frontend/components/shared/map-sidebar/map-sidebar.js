@@ -24,10 +24,10 @@ window._MapSidebar = (() => {
         `<div id="map-sidebar-panes">` +
         `<div class="msb-pane msb-pane-active" id="msb-pane-search"></div>` +
         `<div class="msb-pane" id="msb-pane-alerts">` +
-        `<div id="msb-alerts-empty">No current alerts</div>` +
+        `<div id="msb-alerts-empty">No alerts</div>` +
         `</div>` +
         `<div class="msb-pane" id="msb-pane-tracking">` +
-        `<div id="msb-tracking-empty">No active tracks</div>` +
+        `<div id="msb-tracking-empty"></div>` +
         `</div>` +
         `</div>` +
         `</div>`;
@@ -93,7 +93,14 @@ window._MapSidebar = (() => {
         const hidden = sidebar.classList.toggle('msb-hidden');
         btn.classList.toggle('msb-btn-active', !hidden);
     }
-    function init() {
+    function init(opts) {
+        // Set domain-specific empty-state labels
+        const alertsEmpty = document.getElementById('msb-alerts-empty');
+        const trackingEmpty = document.getElementById('msb-tracking-empty');
+        if (alertsEmpty)
+            alertsEmpty.textContent = (opts && opts.alertsEmptyText) || 'No alerts';
+        if (trackingEmpty)
+            trackingEmpty.textContent = (opts && opts.trackingEmptyText) || 'No tracked items';
         // Wire tab clicks (called once from each domain's boot)
         const tabs = _getTabs();
         tabs.forEach(tab => {

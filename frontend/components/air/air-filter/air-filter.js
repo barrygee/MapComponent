@@ -19,9 +19,8 @@ window._FilterPanel = (() => {
             return;
         const html = `<div id="filter-input-wrap">` +
             `<svg id="filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
-            `<line x1="1" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
-            `<line x1="3" y1="6.5" x2="10" y2="6.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
-            `<line x1="5" y1="10" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
+            `<circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>` +
+            `<line x1="8.5" y1="8.5" x2="12" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>` +
             `</svg>` +
             `<input id="filter-input" type="text" placeholder="CALLSIGN · ICAO · SQUAWK" autocomplete="off" spellcheck="false" />` +
             `<button id="filter-clear-btn" aria-label="Clear filter">✕</button>` +
@@ -114,7 +113,7 @@ window._FilterPanel = (() => {
         const props = feature.properties;
         _fitBoundsWithControlPadding(props.bounds);
         if (airportsControl) {
-            airportsControl._showAirportPanel(props, feature.geometry.coordinates);
+            airportsControl._showAirportPanel(props, feature.geometry.coordinates, true);
         }
     }
     function _selectMil(feature) {

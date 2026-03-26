@@ -71,6 +71,9 @@ window._Tracking = ((): TrackingAPI => {
     function closePanel(): void {
         const btn = _getBtn();
         if (btn) btn.classList.remove('tracking-btn-active');
+        // Hide sidebar only if notifications panel is also closed
+        const notifOpen = typeof window._Notifications !== 'undefined' && window._Notifications.isPanelOpen();
+        if (!notifOpen && typeof window._MapSidebar !== 'undefined') window._MapSidebar.hide();
         _refreshBadge();
     }
 

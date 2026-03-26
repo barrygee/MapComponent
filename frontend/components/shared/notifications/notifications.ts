@@ -284,6 +284,10 @@ window._Notifications = ((): NotificationsAPI => {
             if (typeof window._MapSidebar !== 'undefined') { window._MapSidebar.show(); window._MapSidebar.switchTab('alerts'); }
             // Tab mutex: close tracking
             if (typeof window._Tracking !== 'undefined') window._Tracking.closePanel();
+        } else {
+            // Hide sidebar only if tracking panel is also closed
+            const trackingOpen = typeof window._Tracking !== 'undefined' && window._Tracking.isPanelOpen();
+            if (!trackingOpen && typeof window._MapSidebar !== 'undefined') window._MapSidebar.hide();
         }
 
         if (open) _updateScrollHint();

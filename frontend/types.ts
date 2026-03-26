@@ -189,8 +189,13 @@ interface SpaceFilterPanelAPI {
 }
 
 // ----- Map sidebar -----
+interface MapSidebarInitOptions {
+    alertsEmptyText?:   string;
+    trackingEmptyText?: string;
+}
+
 interface MapSidebarAPI {
-    init(): void;
+    init(opts?: MapSidebarInitOptions): void;
     switchTab(tab: 'search' | 'alerts' | 'tracking'): void;
     setAlertCount(n: number): void;
     setTrackingCount(n: number): void;
