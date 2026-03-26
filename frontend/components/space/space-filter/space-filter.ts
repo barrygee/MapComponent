@@ -117,6 +117,18 @@ window._SpaceFilterPanel = (() => {
         'military', 'amateur', 'science', 'cubesat', 'unknown',
     ];
 
+    const _CATEGORY_SECTION_LABELS: Record<string, string> = {
+        space_station: 'SPACE STATION',
+        amateur:       'AMATEUR',
+        weather:       'WEATHER',
+        military:      'MILITARY',
+        navigation:    'NAVIGATION',
+        science:       'SCIENCE',
+        cubesat:       'CUBESAT',
+        active:        'ACTIVE',
+        unknown:       'UNKNOWN',
+    };
+
     function _renderSatItem(sat: SatEntry, container: HTMLElement, doSelect: () => void): void {
         const item = document.createElement('div') as HTMLDivElement & { _selectAction?: () => void };
         item.className = 'space-filter-result-item';
@@ -206,9 +218,7 @@ window._SpaceFilterPanel = (() => {
         groups.forEach((sats, cat) => {
             if (!sats.length) return;
             const display = sats.slice(0, CAP_PER_GROUP);
-            const catLabel = (Object.keys(_CATEGORY_LABELS).includes(cat)
-                ? cat.replace(/_/g, ' ').toUpperCase()
-                : cat.toUpperCase());
+            const catLabel = _CATEGORY_SECTION_LABELS[cat] || cat.replace(/_/g, ' ').toUpperCase();
 
             const lbl = document.createElement('div');
             lbl.className = 'space-filter-section-label';
