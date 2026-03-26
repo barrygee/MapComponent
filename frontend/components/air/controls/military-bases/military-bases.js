@@ -85,7 +85,7 @@ class MilitaryBasesToggleControl extends SentinelControlBase {
             `</div>` +
             `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
     }
-    _showMilitaryBasesPanel(p, coords) {
+    _showMilitaryBasesPanel(p, coords, fromSearch = false) {
         let bar = document.getElementById('adsb-status-bar');
         if (!bar) {
             bar = document.createElement('div');
@@ -99,7 +99,7 @@ class MilitaryBasesToggleControl extends SentinelControlBase {
         bar.dataset['apt'] = '1';
         bar.innerHTML = this._buildMilitaryBasesPanelHTML(p, coords);
         bar.classList.add('adsb-sb-visible');
-        if (typeof window._Tracking !== 'undefined') {
+        if (!fromSearch && typeof window._Tracking !== 'undefined') {
             window._Tracking.setCount(1);
             window._Tracking.openPanel();
         }

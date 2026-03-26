@@ -112,6 +112,63 @@ window._SpaceFilterPanel = (() => {
         );
     }
 
+    const _CATEGORY_ORDER = [
+        'space_station', 'active', 'weather', 'navigation',
+        'military', 'amateur', 'science', 'cubesat', 'unknown',
+    ];
+
+    function _renderSatItem(sat: SatEntry, container: HTMLElement, doSelect: () => void): void {
+        const item = document.createElement('div') as HTMLDivElement & { _selectAction?: () => void };
+        item.className = 'space-filter-result-item';
+
+        const icon = document.createElement('div');
+        icon.className = 'space-filter-result-icon';
+        icon.innerHTML = _SAT_ICON;
+
+        const info = document.createElement('div');
+        info.className = 'space-filter-result-info';
+
+        const primary = document.createElement('div');
+        primary.className = 'space-filter-result-primary';
+        primary.textContent = sat.name || sat.norad_id;
+
+        const secondary = document.createElement('div');
+        secondary.className = 'space-filter-result-secondary';
+        secondary.textContent = 'NORAD ' + sat.norad_id;
+
+        info.appendChild(primary);
+        info.appendChild(secondary);
+
+        const badge = document.createElement('div');
+        badge.className = 'space-filter-result-badge';
+        badge.textContent = _categoryBadge(sat.category);
+
+        const selectBtn = document.createElement('button');
+        selectBtn.className = 'space-filter-action-btn space-filter-select-btn';
+        selectBtn.textContent = 'SELECT';
+
+        selectBtn.addEventListener('mousedown', e => e.stopPropagation());
+        selectBtn.addEventListener('click', (e) => { e.stopPropagation(); doSelect(); });
+
+        item.addEventListener('mouseenter', () => { if (issControl) issControl.previewSatellite(sat.norad_id); });
+        item.addEventListener('mouseleave', () => { if (issControl) issControl.clearPreview(); });
+
+        item.appendChild(icon);
+        item.appendChild(info);
+        item.appendChild(badge);
+        item.appendChild(selectBtn);
+
+        info.style.flex = '1';
+        info.style.minWidth = '0';
+        info.style.cursor = 'pointer';
+        info.addEventListener('click', doSelect);
+        icon.style.cursor = 'pointer';
+        icon.addEventListener('click', doSelect);
+        item._selectAction = doSelect;
+
+        container.appendChild(item);
+    }
+
     function _renderResults(results: SatEntry[], query: string): void {
         const container = _getResults();
         if (!container) return;
@@ -135,76 +192,36 @@ window._SpaceFilterPanel = (() => {
             return;
         }
 
-        // Cap display to 50 results for performance
-        const display = results.slice(0, 50);
+        // Group by category, preserving defined order then any extras
+        const groups = new Map<string, SatEntry[]>();
+        for (const cat of _CATEGORY_ORDER) groups.set(cat, []);
+        for (const sat of results) {
+            const key = sat.category || 'unknown';
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(sat);
+        }
 
-        const lbl = document.createElement('div');
-        lbl.className = 'space-filter-section-label';
-        lbl.textContent = `SATELLITES${results.length > 50 ? ' (showing 50 of ' + results.length + ')' : ''}`;
-        container.appendChild(lbl);
+        const CAP_PER_GROUP = 20;
 
-        display.forEach(sat => {
-            const item = document.createElement('div') as HTMLDivElement & { _selectAction?: () => void };
-            item.className = 'space-filter-result-item';
+        groups.forEach((sats, cat) => {
+            if (!sats.length) return;
+            const display = sats.slice(0, CAP_PER_GROUP);
+            const catLabel = (Object.keys(_CATEGORY_LABELS).includes(cat)
+                ? cat.replace(/_/g, ' ').toUpperCase()
+                : cat.toUpperCase());
 
-            const icon = document.createElement('div');
-            icon.className = 'space-filter-result-icon';
-            icon.innerHTML = _SAT_ICON;
+            const lbl = document.createElement('div');
+            lbl.className = 'space-filter-section-label';
+            lbl.textContent = catLabel + (sats.length > CAP_PER_GROUP ? ' (showing ' + CAP_PER_GROUP + ' of ' + sats.length + ')' : '');
+            container.appendChild(lbl);
 
-            const info = document.createElement('div');
-            info.className = 'space-filter-result-info';
-
-            const primary = document.createElement('div');
-            primary.className = 'space-filter-result-primary';
-            primary.textContent = sat.name || sat.norad_id;
-
-            const secondary = document.createElement('div');
-            secondary.className = 'space-filter-result-secondary';
-            secondary.textContent = 'NORAD ' + sat.norad_id;
-
-            info.appendChild(primary);
-            info.appendChild(secondary);
-
-            const badge = document.createElement('div');
-            badge.className = 'space-filter-result-badge';
-            badge.textContent = _categoryBadge(sat.category);
-
-            // SELECT button — switches the active satellite on the map
-            const selectBtn = document.createElement('button');
-            selectBtn.className = 'space-filter-action-btn space-filter-select-btn';
-            selectBtn.textContent = 'SELECT';
-
-            const doSelect = () => {
-                if (issControl) {
-                    issControl.switchSatellite(sat.norad_id, sat.name || sat.norad_id);
-                }
-                close();
-            };
-
-            selectBtn.addEventListener('mousedown', e => e.stopPropagation());
-            selectBtn.addEventListener('click', (e) => { e.stopPropagation(); doSelect(); });
-
-            item.addEventListener('mouseenter', () => {
-                if (issControl) issControl.previewSatellite(sat.norad_id);
+            display.forEach(sat => {
+                const doSelect = () => {
+                    if (issControl) issControl.switchSatellite(sat.norad_id, sat.name || sat.norad_id);
+                    close();
+                };
+                _renderSatItem(sat, container, doSelect);
             });
-            item.addEventListener('mouseleave', () => {
-                if (issControl) issControl.clearPreview();
-            });
-
-            item.appendChild(icon);
-            item.appendChild(info);
-            item.appendChild(badge);
-            item.appendChild(selectBtn);
-
-            info.style.flex = '1';
-            info.style.minWidth = '0';
-            info.style.cursor = 'pointer';
-            info.addEventListener('click', doSelect);
-            icon.style.cursor = 'pointer';
-            icon.addEventListener('click', doSelect);
-            item._selectAction = doSelect;
-
-            container.appendChild(item);
         });
     }
 

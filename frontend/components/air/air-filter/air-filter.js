@@ -120,7 +120,7 @@ window._FilterPanel = (() => {
         const props = feature.properties;
         _fitBoundsWithControlPadding(props.bounds);
         if (militaryBasesControl) {
-            militaryBasesControl._showMilitaryBasesPanel(props, feature.geometry.coordinates);
+            militaryBasesControl._showMilitaryBasesPanel(props, feature.geometry.coordinates, true);
         }
     }
     function _renderResults(results, query) {
@@ -277,43 +277,55 @@ window._FilterPanel = (() => {
             const icon = document.createElement('div');
             icon.className = 'filter-result-icon filter-icon-airport';
             icon.innerHTML = _AIRPORT_ICON;
+            const info = document.createElement('div');
+            info.className = 'filter-result-info';
             const primary = document.createElement('div');
             primary.className = 'filter-result-primary';
             primary.textContent = r.icao;
             const secondary = document.createElement('div');
             secondary.className = 'filter-result-secondary';
             secondary.textContent = r.name.toUpperCase() + (r.iata ? ' · ' + r.iata : '');
+            info.appendChild(primary);
+            info.appendChild(secondary);
             const badge = document.createElement('div');
             badge.className = 'filter-result-badge';
             badge.textContent = 'CVL';
             item.appendChild(icon);
-            item.appendChild(primary);
-            item.appendChild(secondary);
+            item.appendChild(info);
             item.appendChild(badge);
-            item.addEventListener('click', () => _selectAirport(r.feature));
+            info.style.cursor = 'pointer';
+            icon.style.cursor = 'pointer';
+            info.addEventListener('click', () => _selectAirport(r.feature));
+            icon.addEventListener('click', () => _selectAirport(r.feature));
             item._selectAction = () => _selectAirport(r.feature);
             container.appendChild(item);
         });
-        addSection('MILITARY', militaryBases, (r) => {
+        addSection('MILITARY BASES', militaryBases, (r) => {
             const item = document.createElement('div');
             item.className = 'filter-result-item';
             const icon = document.createElement('div');
             icon.className = 'filter-result-icon filter-icon-mil';
             icon.innerHTML = _MIL_ICON;
+            const info = document.createElement('div');
+            info.className = 'filter-result-info';
             const primary = document.createElement('div');
             primary.className = 'filter-result-primary';
             primary.textContent = r.icao || r.name.toUpperCase().slice(0, 6);
             const secondary = document.createElement('div');
             secondary.className = 'filter-result-secondary';
             secondary.textContent = r.name.toUpperCase();
+            info.appendChild(primary);
+            info.appendChild(secondary);
             const badge = document.createElement('div');
             badge.className = 'filter-result-badge';
             badge.textContent = 'MIL';
             item.appendChild(icon);
-            item.appendChild(primary);
-            item.appendChild(secondary);
+            item.appendChild(info);
             item.appendChild(badge);
-            item.addEventListener('click', () => _selectMil(r.feature));
+            info.style.cursor = 'pointer';
+            icon.style.cursor = 'pointer';
+            info.addEventListener('click', () => _selectMil(r.feature));
+            icon.addEventListener('click', () => _selectMil(r.feature));
             item._selectAction = () => _selectMil(r.feature);
             container.appendChild(item);
         });

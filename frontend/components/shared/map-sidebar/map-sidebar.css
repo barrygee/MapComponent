@@ -239,7 +239,7 @@
     max-height: none;
     overflow-y: auto;
     scrollbar-width: none;
-    padding: 6px 0;
+    padding: 0;
     align-items: stretch;
 }
 
