@@ -108,6 +108,7 @@ window._SettingsPanel = (function () {
             id: 'space-filter-hover-preview',
             label: 'Filter Hover Behaviour',
             desc: 'When hovering a satellite in the search results, choose whether the map stays in place or flies to that satellite',
+            groupLabel: 'FILTER HOVER',
             renderControl: _renderSpaceHoverPreviewControl,
         },
         // SEA
@@ -170,17 +171,13 @@ window._SettingsPanel = (function () {
             renderControl: _renderConfigCurrentControl,
         },
     ];
-    const _DOMAIN_SECTIONS = [
+    const _NAV_SECTIONS = [
+        { key: 'app', label: 'App Settings' },
         { key: 'air', label: 'AIR' },
         { key: 'space', label: 'SPACE' },
         { key: 'sea', label: 'SEA' },
         { key: 'land', label: 'LAND' },
         { key: 'sdr', label: 'SDR' },
-    ];
-    const _enabledDomains = window._SENTINEL_ENABLED_DOMAINS || [];
-    const _NAV_SECTIONS = [
-        { key: 'app', label: 'App Settings' },
-        ..._DOMAIN_SECTIONS.filter(function (s) { return _enabledDomains.includes(s.key); }),
     ];
     // ── DOM injection ────────────────────────────────────────
     (function _injectHTML() {
@@ -274,10 +271,7 @@ window._SettingsPanel = (function () {
         if (!hasError) {
             _pending.clear();
             _showApplyStatus('SAVED', false);
-            setTimeout(function () {
-                try { sessionStorage.setItem('sentinel_settings_reopen', '1'); } catch (e) {}
-                location.reload();
-            }, 800);
+            setTimeout(function () { location.reload(); }, 800);
         }
         else {
             _showApplyStatus('ERROR', true);
@@ -712,10 +706,10 @@ window._SettingsPanel = (function () {
                 return;
             }
             // Fetch from backend and reconcile
-            window._SettingsAPI.getNamespace('app').then(function (ns) {
-                if (!ns || !ns['theme'])
+            window._SettingsAPI.getNamespace('app').then(function (appSettings) {
+                if (!appSettings || !appSettings['theme'])
                     return;
-                const backendMode = ns['theme'];
+                const backendMode = appSettings['theme'];
                 const localMode = isDark ? 'dark' : 'light';
                 if (backendMode !== localMode) {
                     isDark = backendMode === 'dark';
@@ -825,7 +819,8 @@ window._SettingsPanel = (function () {
             URL.revokeObjectURL(url);
         });
         fetch('/api/settings/config/preview')
-            .then(function (res) { if (!res.ok) throw new Error(res.status.toString()); return res.json(); })
+            .then(function (res) { if (!res.ok)
+            throw new Error(res.status.toString()); return res.json(); })
             .then(function (data) { textarea.value = JSON.stringify(data, null, 2); autoSize(); })
             .catch(function (err) { textarea.value = 'Failed to load config: ' + err.message; autoSize(); });
         return wrap;
@@ -2041,13 +2036,6 @@ window._SettingsPanel = (function () {
         if (applyBtn) {
             applyBtn.addEventListener('click', _commitAll);
         }
-        // Reopen panel if it was open before an Apply Changes reload
-        try {
-            if (sessionStorage.getItem('sentinel_settings_reopen') === '1') {
-                sessionStorage.removeItem('sentinel_settings_reopen');
-                open();
-            }
-        } catch (e) {}
         // Sync location inputs when user pins a location via right-click on map
         window.addEventListener('sentinel:locationChanged', function (e) {
             if (!_open || _activeSection !== 'app')

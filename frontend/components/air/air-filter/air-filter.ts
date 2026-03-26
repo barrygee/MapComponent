@@ -21,12 +21,6 @@ window._FilterPanel = (() => {
         const panel = document.createElement('div');
         panel.id = 'filter-panel';
         panel.innerHTML =
-            `<div id="filter-mode-bar">` +
-                `<button class="filter-mode-btn active" data-mode="all">ALL</button>` +
-                `<button class="filter-mode-btn" data-mode="civil">CIVIL</button>` +
-                `<button class="filter-mode-btn" data-mode="mil">MILITARY</button>` +
-                `<button class="filter-mode-btn" data-mode="none">HIDE ALL</button>` +
-            `</div>` +
             `<div id="filter-input-wrap">` +
                 `<svg id="filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
                     `<line x1="1" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
@@ -476,69 +470,22 @@ window._FilterPanel = (() => {
             });
         }
 
-        const modeBar = document.getElementById('filter-mode-bar');
-        if (modeBar) {
-            modeBar.querySelectorAll('[data-mode]').forEach(btn => {
-                const modeBtn = btn as HTMLElement;
-                if (modeBtn.dataset['mode'] === 'none') {
-                    modeBtn.addEventListener('click', () => {
-                        if (!adsbControl) return;
-                        const isHiding = !adsbControl._allHidden;
-                        modeBtn.textContent = isHiding ? 'SHOW ALL' : 'HIDE ALL';
-                        modeBtn.classList.toggle('active', isHiding);
-                        if (!isHiding) {
-                            adsbControl.setTypeFilter('all');
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
-                                (b as HTMLElement).classList.toggle('active', (b as HTMLElement).dataset['mode'] === 'all');
-                            });
-                        } else {
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
-                                (b as HTMLElement).classList.remove('active');
-                            });
-                        }
-                        adsbControl.setAllHidden(isHiding);
-                        _saveAdsbFilter();
-                        if (_syncSideMenuForPlanes) _syncSideMenuForPlanes();
-                    });
-                } else {
-                    modeBtn.addEventListener('click', () => {
-                        const mode = modeBtn.dataset['mode']!;
-                        if (!adsbControl) return;
-                        if (adsbControl._allHidden) {
-                            adsbControl.setAllHidden(false);
-                            const hideBtn = modeBar.querySelector('[data-mode="none"]') as HTMLElement | null;
-                            if (hideBtn) { hideBtn.textContent = 'HIDE ALL'; hideBtn.classList.remove('active'); }
-                            if (_syncSideMenuForPlanes) _syncSideMenuForPlanes();
-                        }
-                        adsbControl.setTypeFilter(mode as 'all' | 'civil' | 'mil');
-                        _saveAdsbFilter();
-                        modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => (b as HTMLElement).classList.toggle('active', b === modeBtn));
-                    });
-                }
-            });
-
-            // ---- Restore persisted filter state ----
-            try {
-                const saved = localStorage.getItem('adsbFilter');
-                if (saved) {
-                    const { typeFilter, allHidden } = JSON.parse(saved) as { typeFilter: string; allHidden: boolean };
-                    if (adsbControl) {
-                        if (allHidden) {
-                            adsbControl.setAllHidden(true);
-                            const hideBtn = modeBar.querySelector('[data-mode="none"]') as HTMLElement | null;
-                            if (hideBtn) { hideBtn.textContent = 'SHOW ALL'; hideBtn.classList.add('active'); }
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => (b as HTMLElement).classList.remove('active'));
-                        } else if (typeFilter && typeFilter !== 'all') {
-                            adsbControl.setTypeFilter(typeFilter as 'civil' | 'mil');
-                            modeBar.querySelectorAll('[data-mode]:not([data-mode="none"])').forEach(b => {
-                                (b as HTMLElement).classList.toggle('active', (b as HTMLElement).dataset['mode'] === typeFilter);
-                            });
-                        }
+        // ---- Restore persisted filter state ----
+        try {
+            const saved = localStorage.getItem('adsbFilter');
+            if (saved) {
+                const { typeFilter, allHidden } = JSON.parse(saved) as { typeFilter: string; allHidden: boolean };
+                if (adsbControl) {
+                    if (allHidden) {
+                        adsbControl.setAllHidden(true);
+                    } else if (typeFilter && typeFilter !== 'all') {
+                        adsbControl.setTypeFilter(typeFilter as 'civil' | 'mil');
                     }
+                    if (_syncSideMenuForPlanes) _syncSideMenuForPlanes();
                 }
-            } catch (e) {}
-        }
+            }
+        } catch (e) {}
     }
 
-    return { open, close, toggle, init, reposition: _repositionPanel };
+    return { open, close, toggle, init, reposition: _repositionPanel, saveAdsbFilter: _saveAdsbFilter };
 })();

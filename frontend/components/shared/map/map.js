@@ -89,7 +89,7 @@ function _fixStylePaths(_prev, next) {
     return next;
 }
 /**
- * Switch the MapLibre base style between the online (OSM tiles) and offline (PMTiles) versions.
+ * Switch the MapLibre base style between the online (OSM tiles) and off grid (PMTiles) versions.
  */
 function _switchMapStyle(online) {
     if (typeof _sentinelMap === 'undefined')

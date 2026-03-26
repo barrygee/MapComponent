@@ -312,6 +312,8 @@
     // ---- Filter button ----
     const FILTER_SVG = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="1" y1="3.5" x2="14" y2="3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="3.5" y1="7.5" x2="11.5" y2="7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="6" y1="11.5" x2="9" y2="11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
     const filterGroup = makeGroup();
+    filterGroup.style.position = 'relative';
+
     const filterBtn   = document.createElement('button');
     filterBtn.className       = 'sm-btn enabled';
     filterBtn.dataset['tooltip'] = 'FILTER';
@@ -330,10 +332,72 @@
     filterBtn.addEventListener('click', () => {
         if (window._FilterPanel) window._FilterPanel.toggle();
     });
+
+    // ---- Filter mode flyout (shown on hover) ----
+    const filterFlyout = document.createElement('div');
+    filterFlyout.id = 'filter-mode-flyout';
+
+    function _saveFilter(): void {
+        if (window._FilterPanel) window._FilterPanel.saveAdsbFilter();
+    }
+
+    function _syncFlyoutActive(): void {
+        const hidden = adsbControl ? adsbControl._allHidden : false;
+        const mode   = adsbControl ? adsbControl._typeFilter : 'all';
+        filterFlyout.querySelectorAll<HTMLElement>('[data-mode]').forEach(b => {
+            const m = b.dataset['mode']!;
+            b.classList.toggle('active', m === 'none' ? hidden : (!hidden && mode === m));
+        });
+    }
+
+    // JS hover management — small leave-delay prevents flyout vanishing mid-gap
+    let _flyoutLeaveTimer: ReturnType<typeof setTimeout> | null = null;
+    function _showFlyout(): void {
+        if (_flyoutLeaveTimer) { clearTimeout(_flyoutLeaveTimer); _flyoutLeaveTimer = null; }
+        filterFlyout.classList.add('filter-flyout-visible');
+        filterBtn.classList.add('filter-flyout-open');
+        _syncFlyoutActive();
+    }
+    function _hideFlyout(): void {
+        _flyoutLeaveTimer = setTimeout(() => {
+            filterFlyout.classList.remove('filter-flyout-visible');
+            filterBtn.classList.remove('filter-flyout-open');
+        }, 120);
+    }
+    filterBtn.addEventListener('mouseenter', _showFlyout);
+    filterBtn.addEventListener('mouseleave', _hideFlyout);
+    filterFlyout.addEventListener('mouseenter', _showFlyout);
+    filterFlyout.addEventListener('mouseleave', _hideFlyout);
+
+    (['all', 'civil', 'mil', 'none'] as const).forEach(mode => {
+        const btn = document.createElement('button');
+        btn.className = 'filter-flyout-btn';
+        btn.dataset['mode'] = mode;
+        btn.textContent = mode === 'all' ? 'ALL' : mode === 'civil' ? 'CIVIL' : mode === 'mil' ? 'MILITARY' : 'NONE';
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!adsbControl) return;
+            if (mode === 'none') {
+                const isHiding = !adsbControl._allHidden;
+                if (!isHiding) adsbControl.setTypeFilter('all');
+                adsbControl.setAllHidden(isHiding);
+            } else {
+                if (adsbControl._allHidden) adsbControl.setAllHidden(false);
+                adsbControl.setTypeFilter(mode);
+            }
+            _saveFilter();
+            _syncFlyoutActive();
+            if (_syncSideMenuForPlanes) _syncSideMenuForPlanes();
+        });
+        filterFlyout.appendChild(btn);
+    });
+
     filterGroup.appendChild(filterBtn);
+    filterGroup.appendChild(filterFlyout);
     panel.appendChild(filterGroup);
 
-    function syncFilterBtn(): void {}
+    // Sync flyout state whenever adsbControl state may have changed
+    function syncFilterBtn(): void { _syncFlyoutActive(); }
     syncFilterBtn();
 
     _syncSideMenuForPlanes = function () { syncLabelsBtn(); syncFilterBtn(); };

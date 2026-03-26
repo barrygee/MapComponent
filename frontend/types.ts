@@ -177,6 +177,7 @@ interface FilterPanelAPI {
     open(): void;
     close(): void;
     reposition(): void;
+    saveAdsbFilter(): void;
 }
 
 // ----- Space filter panel -----
