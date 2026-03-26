@@ -110,13 +110,24 @@
     display: flex;
     flex-shrink: 0;
     height: 40px;
+    position: relative;
+}
+
+#map-sidebar-tabs::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--color-border);
 }
 
 .msb-tab {
     flex: 1;
     background: none;
     border: none;
-    border-bottom: 1px solid transparent;
+    border-bottom: 2px solid transparent;
     color: rgba(255, 255, 255, 0.3);
     font-family: var(--font-primary);
     font-size: 9px;
@@ -128,11 +139,10 @@
     transition: color 0.15s, border-color 0.15s;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 5px;
     padding-left: 28px;
     justify-content: flex-start;
-    margin-bottom: -1px; /* overlap container border so active tab border replaces it */
+    position: relative;
+    z-index: 1; /* sits above the ::after divider line */
 }
 
 .msb-tab:hover {
@@ -250,6 +260,10 @@
 /* Notification cards fill pane width */
 #msb-pane-alerts .notif-item {
     width: 100%;
+}
+
+#msb-pane-alerts .notif-item:first-child {
+    margin-top: 16px;
 }
 
 /* Scroll hint sits in the footer at 50% width */

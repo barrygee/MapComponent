@@ -95,7 +95,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 13px 12px 13px 28px;
+    padding: 13px 20px 13px 28px;
     border-bottom: none;
     transition: background 0.12s;
     cursor: pointer;
