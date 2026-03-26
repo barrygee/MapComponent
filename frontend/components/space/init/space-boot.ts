@@ -36,6 +36,9 @@ if ('geolocation' in navigator) {
 })();
 
 // ---- 2. Panel initialisation ----
+if (typeof window._MapSidebar !== 'undefined') {
+    window._MapSidebar.init({ trackingEmptyText: 'No tracked satellites' });
+}
 if (typeof window._Notifications !== 'undefined') {
     window._Notifications.init();
 }

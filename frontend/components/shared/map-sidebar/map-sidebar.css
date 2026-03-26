@@ -1,0 +1,300 @@
+/* ============================================================
+   MAP SIDEBAR
+   Fixed left-side overlay panel on air and space map pages.
+   Always visible; sits over the map canvas.
+   Width matches the docs/settings sidebar (325px).
+   Background is dark but lighter than the pure-black header/footer.
+
+   Contains three tabs:
+     SEARCH   — domain filter search box (air-filter or space-filter)
+     ALERTS   — notifications panel content
+     TRACK    — tracking panel content
+
+   Structure:
+     #map-sidebar
+       #map-sidebar-tabs        — tab bar
+         .msb-tab[data-tab]     — individual tab buttons
+       #map-sidebar-panes       — pane container
+         .msb-pane#msb-pane-search
+         .msb-pane#msb-pane-alerts
+         .msb-pane#msb-pane-tracking
+   ============================================================ */
+
+/* ---- Footer toggle button ---- */
+#map-sidebar-btn {
+    height: 36px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    opacity: 0.6;
+    transition: background 0.2s, opacity 0.2s;
+    flex-shrink: 0;
+    margin: 4px 0;
+    position: relative;
+}
+
+#map-sidebar-btn:hover {
+    background: var(--color-border);
+    border-radius: 6px;
+    opacity: 1;
+}
+
+#map-sidebar-btn.msb-btn-active {
+    opacity: 1;
+    color: var(--color-accent);
+    background: rgba(200, 255, 0, 0.08);
+    border-radius: 6px;
+}
+
+#map-sidebar-btn[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    background: #000;
+    color: var(--color-text-muted);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0 14px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 10001;
+}
+
+#map-sidebar-btn[data-tooltip]:hover::before {
+    opacity: 1;
+}
+
+#map-sidebar-btn.msb-btn-active[data-tooltip]::before {
+    opacity: 0 !important;
+}
+
+/* ---- Sidebar container ---- */
+#map-sidebar {
+    position: fixed;
+    top: var(--nav-height);       /* 68px — flush under header */
+    bottom: var(--footer-height); /* 44px — flush above footer */
+    left: 0;
+    width: 325px;
+    background: rgba(10, 13, 20, 0.92);
+    border-right: 1px solid var(--color-border);
+    z-index: 1002;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+    transform: translateX(0);
+    transition: transform 0.2s ease;
+}
+
+/* Hidden state — slides off to the left */
+#map-sidebar.msb-hidden {
+    transform: translateX(-100%);
+}
+
+/* ---- Tab bar ---- */
+#map-sidebar-tabs {
+    display: flex;
+    flex-shrink: 0;
+    height: 40px;
+}
+
+.msb-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    border-bottom: 1px solid transparent;
+    color: rgba(255, 255, 255, 0.3);
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.15s, border-color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding-left: 28px;
+    justify-content: flex-start;
+    margin-bottom: -1px; /* overlap container border so active tab border replaces it */
+}
+
+.msb-tab:hover {
+    color: var(--color-text-muted);
+}
+
+.msb-tab.msb-tab-active {
+    color: var(--color-accent);
+    border-bottom-color: var(--color-accent);
+}
+
+/* Count badge on Alerts / Track tabs */
+.msb-tab-badge {
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.35);
+    line-height: 1;
+}
+
+.msb-tab-badge.msb-badge-active {
+    color: var(--color-accent);
+}
+
+/* ---- Pane container ---- */
+#map-sidebar-panes {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Individual content pane — hidden by default */
+.msb-pane {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+.msb-pane.msb-pane-active {
+    display: flex;
+}
+
+/* ---- Search pane ----
+   Hosts the filter input and results from air-filter / space-filter.
+   No extra padding — filter components supply their own. */
+#msb-pane-search {
+    overflow: hidden;
+}
+
+/* Filter input wrap sits flush at the top of the search pane */
+#msb-pane-search #filter-input-wrap,
+#msb-pane-search #space-filter-input-wrap {
+    flex-shrink: 0;
+}
+
+/* Results area fills remaining height and scrolls */
+#msb-pane-search #filter-results,
+#msb-pane-search #space-filter-results {
+    flex: 1;
+    max-height: none; /* override floating-panel max-height — sidebar provides the bound */
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+#msb-pane-search #filter-results::-webkit-scrollbar,
+#msb-pane-search #space-filter-results::-webkit-scrollbar {
+    display: none;
+}
+
+/* ---- Alerts pane ----
+   Hosts the notifications list. The existing notif-item cards render
+   inside #notif-list which scrolls within this pane. */
+#msb-pane-alerts {
+    overflow: hidden;
+}
+
+/* Footer bar at the bottom of the alerts pane */
+#msb-pane-alerts #notif-footer {
+    flex-shrink: 0;
+    width: auto;
+    pointer-events: all;
+}
+
+/* List wrap fills remaining space — row layout with scroll hint on side */
+#msb-pane-alerts #notif-list-wrap {
+    flex: 1;
+    min-height: 0;
+    visibility: visible;
+    opacity: 1;
+    pointer-events: all;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    overflow: hidden;
+}
+
+/* Notification list fills pane width (not fixed 220px) */
+#msb-pane-alerts #notif-list {
+    flex: 1;
+    width: auto;
+    max-height: none;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 6px 0;
+    align-items: stretch;
+}
+
+#msb-pane-alerts #notif-list::-webkit-scrollbar {
+    display: none;
+}
+
+/* Notification cards fill pane width */
+#msb-pane-alerts .notif-item {
+    width: 100%;
+}
+
+/* Scroll hint sits in the footer at 50% width */
+#msb-pane-alerts #notif-scroll-hint {
+    flex-shrink: 0;
+    flex: 1;
+}
+
+/* Empty-state placeholder */
+#msb-alerts-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.18);
+}
+
+/* ---- Tracking pane ----
+   Hosts the ADS-B status bar and tracking card. */
+#msb-pane-tracking {
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Status bar fills pane width and full height so footer sticks to bottom */
+#msb-pane-tracking #adsb-status-bar,
+#msb-pane-tracking #iss-status-bar {
+    width: auto;
+    flex: 1;
+    flex-direction: column;
+}
+
+/* Empty-state placeholder */
+#msb-tracking-empty {
+    padding: 20px 14px;
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.18);
+    text-align: center;
+}

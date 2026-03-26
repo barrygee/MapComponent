@@ -280,6 +280,7 @@ const _sentinelMap = new maplibregl.Map({
     fadeDuration: 0,
     cooperativeGestures: false,
     transformRequest: (url) => ({ url: url.startsWith('/') ? _mapOrigin + url : url }),
+    padding: { top: 0, bottom: 0, left: 260, right: 0 },
 });
 _sentinelMap.setStyle(_mapStyleURL, { transformStyle: _fixStylePaths });
 _sentinelMap.scrollZoom.enable();

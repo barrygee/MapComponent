@@ -28,18 +28,17 @@ window._Notifications = ((): NotificationsAPI => {
 
     let _unreadCount = 0;
 
-    const PANEL_HTML =
-        `<div id="notifications-panel">` +
-            `<div id="notif-header">` +
-                `<button id="notif-clear-all-btn" aria-label="Clear notifications">CLEAR</button>` +
-                `<div id="notif-scroll-hint">MORE ` +
-                    `<svg id="notif-scroll-arrow" width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">` +
-                        `<polyline points="1,2.5 4,5.5 7,2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` +
-                    `</svg>` +
-                `</div>` +
-            `</div>` +
-            `<div id="notif-list-wrap">` +
-                `<div id="notif-list"></div>` +
+    // Notifications content HTML — injected into #msb-pane-alerts
+    const PANEL_INNER_HTML =
+        `<div id="notif-list-wrap">` +
+            `<div id="notif-list"></div>` +
+        `</div>` +
+        `<div id="notif-footer">` +
+            `<button id="notif-clear-all-btn" aria-label="Clear notifications">CLEAR</button>` +
+            `<div id="notif-scroll-hint">MORE ` +
+                `<svg id="notif-scroll-arrow" width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">` +
+                    `<polyline points="1,2.5 4,5.5 7,2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` +
+                `</svg>` +
             `</div>` +
         `</div>`;
 
@@ -77,7 +76,7 @@ window._Notifications = ((): NotificationsAPI => {
     }
 
     // ---- DOM accessors ----
-    function _getWrapper(): HTMLElement | null { return document.getElementById('notifications-panel'); }
+    function _getWrapper(): HTMLElement | null { return document.getElementById('msb-pane-alerts'); }
     function _getList():    HTMLElement | null { return document.getElementById('notif-list'); }
     function _getBtn():     HTMLElement | null { return document.getElementById('notif-toggle-btn'); }
     function _getCount():   HTMLElement | null { return document.getElementById('notif-count'); }
@@ -141,7 +140,7 @@ window._Notifications = ((): NotificationsAPI => {
 
         const detail    = item.detail || '';
         const action    = _actions[item.id];
-        const isActive  = !!action || item.type === 'tracking' || item.type === 'track';
+        const isActive  = !!action || item.type === 'tracking';
 
         el.innerHTML =
             `<div class="notif-header">` +
@@ -208,14 +207,19 @@ window._Notifications = ((): NotificationsAPI => {
 
         const clearBtn = document.getElementById('notif-clear-all-btn') as HTMLButtonElement | null;
         if (clearBtn) {
-            clearBtn.style.display = (total > 0 && _isPanelOpen()) ? 'block' : 'none';
+            clearBtn.style.display = total > 0 ? 'block' : 'none';
         }
 
         const toggleBtn = _getBtn() as HTMLButtonElement | null;
         if (toggleBtn) {
-            toggleBtn.disabled            = total === 0;
-            toggleBtn.style.opacity       = total === 0 ? '0.35' : '';
-            toggleBtn.style.pointerEvents = total === 0 ? 'none'  : '';
+            toggleBtn.disabled            = false;
+            toggleBtn.style.opacity       = '';
+            toggleBtn.style.pointerEvents = '';
+        }
+
+        // Update sidebar tab badge
+        if (typeof window._MapSidebar !== 'undefined') {
+            window._MapSidebar.setAlertCount(total);
         }
     }
 
@@ -270,15 +274,20 @@ window._Notifications = ((): NotificationsAPI => {
     function _setPanelOpen(open: boolean): void {
         try { localStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch (e) {}
 
-        const wrapper = _getWrapper();
-        const btn     = _getBtn();
-        if (wrapper) wrapper.classList.toggle('notif-panel-open', open);
-        if (btn)     btn.classList.toggle('notif-btn-active', open);
+        const btn = _getBtn();
+        if (btn) btn.classList.toggle('notif-btn-active', open);
 
         if (open) {
             _stopBellPulse();
             _unreadCount = 0;
+            // Ensure sidebar is visible and switch to alerts tab
+            if (typeof window._MapSidebar !== 'undefined') { window._MapSidebar.show(); window._MapSidebar.switchTab('alerts'); }
+            // Tab mutex: close tracking
             if (typeof window._Tracking !== 'undefined') window._Tracking.closePanel();
+        } else {
+            // Hide sidebar only if tracking panel is also closed
+            const trackingOpen = typeof window._Tracking !== 'undefined' && window._Tracking.isPanelOpen();
+            if (!trackingOpen && typeof window._MapSidebar !== 'undefined') window._MapSidebar.hide();
         }
 
         if (open) _updateScrollHint();
@@ -429,7 +438,7 @@ window._Notifications = ((): NotificationsAPI => {
         const items = _load();
         if (!items.length) return;
 
-        const isActive  = (i: StoredNotificationItem) => !!_actions[i.id] || i.type === 'tracking' || i.type === 'track';
+        const isActive  = (i: StoredNotificationItem) => !!_actions[i.id] || i.type === 'tracking';
         const toClear   = items.filter(i => !isActive(i));
         const toKeep    = items.filter(i =>  isActive(i));
         if (!toClear.length) return;
@@ -464,8 +473,13 @@ window._Notifications = ((): NotificationsAPI => {
     }
 
     function init(): void {
-        if (!document.getElementById('notifications-panel')) {
-            document.body.insertAdjacentHTML('beforeend', PANEL_HTML);
+        // Inject notifications content into the sidebar alerts pane
+        const pane = document.getElementById('msb-pane-alerts');
+        if (pane && !document.getElementById('notif-list')) {
+            // Remove empty-state placeholder before injecting content
+            const empty = document.getElementById('msb-alerts-empty');
+            if (empty) empty.remove();
+            pane.insertAdjacentHTML('afterbegin', PANEL_INNER_HTML);
         }
 
         _initScrollListeners();
@@ -502,5 +516,5 @@ window._Notifications = ((): NotificationsAPI => {
             .catch(() => {});
     }
 
-    return { add, update, dismiss, clearAll, render, init, toggle, repositionBar: _repositionBar };
+    return { add, update, dismiss, clearAll, render, init, toggle, repositionBar: _repositionBar, isPanelOpen: _isPanelOpen };
 })();

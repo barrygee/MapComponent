@@ -13,15 +13,12 @@
 window._Tracking = ((): TrackingAPI => {
     let _count = 0;
 
-    const PANEL_HTML = `<div id="tracking-panel"><div id="adsb-status-bar"></div></div>`;
-
-    function _getPanel(): HTMLElement | null { return document.getElementById('tracking-panel'); }
     function _getBtn():   HTMLElement | null { return document.getElementById('tracking-toggle-btn'); }
     function _getCount(): HTMLElement | null { return document.getElementById('tracking-count'); }
 
     function _isPanelOpen(): boolean {
-        const p = _getPanel();
-        return p ? p.classList.contains('tracking-panel-open') : false;
+        const btn = _getBtn();
+        return btn ? btn.classList.contains('tracking-btn-active') : false;
     }
 
     function _refreshBadge(): void {
@@ -38,9 +35,14 @@ window._Tracking = ((): TrackingAPI => {
 
         const btn = _getBtn() as HTMLButtonElement | null;
         if (btn) {
-            btn.disabled            = _count === 0;
-            btn.style.opacity       = _count === 0 ? '0.35' : '';
-            btn.style.pointerEvents = _count === 0 ? 'none'  : '';
+            btn.disabled            = false;
+            btn.style.opacity       = '';
+            btn.style.pointerEvents = '';
+        }
+
+        // Update sidebar tab badge
+        if (typeof window._MapSidebar !== 'undefined') {
+            window._MapSidebar.setTrackingCount(_count);
         }
     }
 
@@ -50,31 +52,28 @@ window._Tracking = ((): TrackingAPI => {
     }
 
     function openPanel(): void {
-        const panel = _getPanel();
-        const btn   = _getBtn();
-        if (panel && btn) {
-            const rect = btn.getBoundingClientRect();
-            panel.style.left = `${rect.left}px`;
-        }
-        if (panel) panel.classList.add('tracking-panel-open');
-        if (btn)   btn.classList.add('tracking-btn-active');
-        _refreshBadge();
+        const btn = _getBtn();
+        if (btn) btn.classList.add('tracking-btn-active');
+
+        // Ensure sidebar is visible and switch to tracking tab
+        if (typeof window._MapSidebar !== 'undefined') { window._MapSidebar.show(); window._MapSidebar.switchTab('tracking'); }
 
         // Tab mutex: close notifications panel when tracking opens
         if (typeof window._Notifications !== 'undefined') {
-            const nw = document.getElementById('notifications-panel');
             const nb = document.getElementById('notif-toggle-btn');
-            if (nw) nw.classList.remove('notif-panel-open');
             if (nb) nb.classList.remove('notif-btn-active');
             try { localStorage.setItem('notificationsOpen', '0'); } catch (e) {}
         }
+
+        _refreshBadge();
     }
 
     function closePanel(): void {
-        const panel = _getPanel();
-        const btn   = _getBtn();
-        if (panel) panel.classList.remove('tracking-panel-open');
-        if (btn)   btn.classList.remove('tracking-btn-active');
+        const btn = _getBtn();
+        if (btn) btn.classList.remove('tracking-btn-active');
+        // Hide sidebar only if notifications panel is also closed
+        const notifOpen = typeof window._Notifications !== 'undefined' && window._Notifications.isPanelOpen();
+        if (!notifOpen && typeof window._MapSidebar !== 'undefined') window._MapSidebar.hide();
         _refreshBadge();
     }
 
@@ -83,13 +82,17 @@ window._Tracking = ((): TrackingAPI => {
     }
 
     function init(): void {
-        if (!document.getElementById('tracking-panel')) {
-            document.body.insertAdjacentHTML('beforeend', PANEL_HTML);
+        // Inject status bar into the sidebar tracking pane if needed
+        const pane = document.getElementById('msb-pane-tracking');
+        if (pane && !document.getElementById('adsb-status-bar')) {
+            const empty = document.getElementById('msb-tracking-empty');
+            if (empty) empty.remove();
+            pane.insertAdjacentHTML('afterbegin', `<div id="adsb-status-bar"></div>`);
         }
         const btn = _getBtn();
         if (btn) btn.addEventListener('click', toggle);
         _refreshBadge();
     }
 
-    return { openPanel, closePanel, toggle, init, setCount };
+    return { openPanel, closePanel, toggle, init, setCount, isPanelOpen: _isPanelOpen };
 })();

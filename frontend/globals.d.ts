@@ -14,6 +14,7 @@ interface SettingsAPI {
 
 interface Window {
     MapComponent:    MapComponentAPI;
+    _MapSidebar:     MapSidebarAPI;
     _Notifications:  NotificationsAPI;
     _Tracking:       TrackingAPI;
     _FilterPanel:    FilterPanelAPI;

@@ -159,6 +159,7 @@ interface NotificationsAPI {
     toggle(): void;
     init(): void;
     repositionBar(): void;
+    isPanelOpen(): boolean;
 }
 
 // ----- Tracking panel -----
@@ -168,6 +169,7 @@ interface TrackingAPI {
     toggle(): void;
     setCount(n: number): void;
     init(): void;
+    isPanelOpen(): boolean;
 }
 
 // ----- Filter panel -----
@@ -186,6 +188,23 @@ interface SpaceFilterPanelAPI {
     toggle(): void;
     open(): void;
     close(): void;
+}
+
+// ----- Map sidebar -----
+interface MapSidebarInitOptions {
+    alertsEmptyText?:   string;
+    trackingEmptyText?: string;
+}
+
+interface MapSidebarAPI {
+    init(opts?: MapSidebarInitOptions): void;
+    switchTab(tab: 'search' | 'alerts' | 'tracking'): void;
+    setAlertCount(n: number): void;
+    setTrackingCount(n: number): void;
+    getSearchPane(): HTMLElement | null;
+    show(): void;
+    hide(): void;
+    toggle(): void;
 }
 
 // ----- Map component -----

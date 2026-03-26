@@ -38,6 +38,7 @@ interface MapComponentAPI {
 interface Window {
     _SettingsAPI:    SettingsAPI;
     MapComponent:    MapComponentAPI;
+    _MapSidebar:     MapSidebarAPI;
     _Notifications:  NotificationsAPI;
     _Tracking:       TrackingAPI;
     _FilterPanel:       FilterPanelAPI;

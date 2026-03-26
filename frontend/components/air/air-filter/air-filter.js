@@ -13,26 +13,33 @@
 /// <reference path="../../types.ts" />
 window._FilterPanel = (() => {
     let _open = false;
-    // ---- Inject panel HTML if not already present ----
+    // ---- Inject filter HTML into the map sidebar search pane ----
     (function _injectHTML() {
-        if (document.getElementById('filter-panel'))
+        if (document.getElementById('filter-input-wrap'))
             return;
-        const panel = document.createElement('div');
-        panel.id = 'filter-panel';
-        panel.innerHTML =
-            `<div id="filter-input-wrap">` +
-                `<svg id="filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
-                `<line x1="1" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
-                `<line x1="3" y1="6.5" x2="10" y2="6.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
-                `<line x1="5" y1="10" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
-                `</svg>` +
-                `<input id="filter-input" type="text" placeholder="CALLSIGN · ICAO · SQUAWK" autocomplete="off" spellcheck="false" />` +
-                `<button id="filter-clear-btn" aria-label="Clear filter">✕</button>` +
-                `</div>` +
-                `<div id="filter-results"></div>`;
-        document.body.appendChild(panel);
+        const html = `<div id="filter-input-wrap">` +
+            `<svg id="filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+            `<circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>` +
+            `<line x1="8.5" y1="8.5" x2="12" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>` +
+            `</svg>` +
+            `<input id="filter-input" type="text" placeholder="CALLSIGN · ICAO · SQUAWK" autocomplete="off" spellcheck="false" />` +
+            `<button id="filter-clear-btn" aria-label="Clear filter">✕</button>` +
+            `</div>` +
+            `<div id="filter-results"></div>`;
+        const pane = document.getElementById('msb-pane-search');
+        if (pane) {
+            pane.insertAdjacentHTML('afterbegin', html);
+        }
+        else {
+            // Fallback: sidebar not yet available — retry on DOMContentLoaded
+            document.addEventListener('DOMContentLoaded', () => {
+                const p = document.getElementById('msb-pane-search');
+                if (p && !document.getElementById('filter-input-wrap'))
+                    p.insertAdjacentHTML('afterbegin', html);
+            });
+        }
     })();
-    function _getPanel() { return document.getElementById('filter-panel'); }
+    function _getPanel() { return document.getElementById('msb-pane-search'); }
     function _getInput() { return document.getElementById('filter-input'); }
     function _getResults() { return document.getElementById('filter-results'); }
     function _getClearBtn() { return document.getElementById('filter-clear-btn'); }
@@ -106,7 +113,7 @@ window._FilterPanel = (() => {
         const props = feature.properties;
         _fitBoundsWithControlPadding(props.bounds);
         if (airportsControl) {
-            airportsControl._showAirportPanel(props, feature.geometry.coordinates);
+            airportsControl._showAirportPanel(props, feature.geometry.coordinates, true);
         }
     }
     function _selectMil(feature) {
@@ -311,18 +318,14 @@ window._FilterPanel = (() => {
             container.appendChild(item);
         });
     }
-    function _repositionPanel() {
-        const panel = _getPanel();
-        if (panel)
-            panel.style.bottom = '';
-    }
+    function _repositionPanel() { }
     function _getFilterBtn() { return document.getElementById('sm-filter-btn'); }
     function open() {
         _open = true;
-        const panel = _getPanel();
-        if (panel)
-            panel.classList.add('filter-panel-visible');
-        _repositionPanel();
+        if (typeof window._MapSidebar !== 'undefined') {
+            window._MapSidebar.show();
+            window._MapSidebar.switchTab('search');
+        }
         const btn = _getFilterBtn();
         if (btn) {
             btn.classList.add('active');
@@ -336,15 +339,11 @@ window._FilterPanel = (() => {
     }
     function close() {
         _open = false;
-        const panel = _getPanel();
-        if (panel)
-            panel.classList.remove('filter-panel-visible');
         const btn = _getFilterBtn();
         if (btn) {
             btn.classList.remove('active');
             btn.classList.add('enabled');
         }
-        _repositionPanel();
     }
     function toggle() {
         if (_open)

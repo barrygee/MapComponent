@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="/frontend/components/shared/map/map.css">
     <link rel="stylesheet" href="/frontend/assets/template.css">
     <link rel="stylesheet" href="/frontend/components/shared/user-location/user-location.css">
+    <link rel="stylesheet" href="/frontend/components/shared/map-sidebar/map-sidebar.css">
     <link rel="stylesheet" href="/frontend/components/shared/notifications/notifications.css">
     <link rel="stylesheet" href="/frontend/components/shared/tracking/tracking.css">
     <link rel="stylesheet" href="/frontend/components/shared/settings/settings.css">
@@ -43,20 +44,6 @@
     </header>
 
     {% block content %}{% endblock %}
-
-    <div id="notifications-panel">
-        <div id="notif-header">
-            <button id="notif-clear-all-btn" aria-label="Clear notifications">CLEAR</button>
-            <div id="notif-scroll-hint">MORE <svg id="notif-scroll-arrow" width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="1,2.5 4,5.5 7,2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        </div>
-        <div id="notif-list-wrap">
-            <div id="notif-list"></div>
-        </div>
-    </div>
-
-    <div id="tracking-panel">
-        <div id="adsb-status-bar"></div>
-    </div>
 
     <!-- ── Docs panel (overlay, same layer as settings) ────────────────────── -->
     <div id="docs-panel">
@@ -86,6 +73,12 @@
 
     <footer id="footer">
         <div id="footer-left">
+            <button id="map-sidebar-btn" aria-label="Toggle map sidebar" data-tooltip="SIDE PANEL">
+                <svg width="17" height="17" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="1.5" y="1.5" width="12" height="12" rx="1" stroke="currentColor" stroke-width="1.1"/>
+                    <line x1="5.5" y1="1.5" x2="5.5" y2="13.5" stroke="currentColor" stroke-width="1.1"/>
+                </svg>
+            </button>
             <button id="notif-toggle-btn" aria-label="Toggle notifications" data-tooltip="NOTIFICATIONS">
                 <svg id="notif-icon" width="17" height="17" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor" fill-opacity="1"/>
@@ -133,6 +126,7 @@
 
     <!-- Shared components -->
     <script src="/frontend/components/shared/settings/settings-api.js"></script>
+    <script src="/frontend/components/shared/map-sidebar/map-sidebar.js"></script>
     <script src="/frontend/components/shared/notifications/notifications.js"></script>
     <script src="/frontend/components/shared/tracking/tracking.js"></script>
     <script src="/frontend/components/shared/settings/settings.js"></script>

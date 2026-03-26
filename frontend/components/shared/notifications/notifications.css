@@ -1,12 +1,7 @@
 /* ============================================================
-   NOTIFICATIONS PANEL
-   Fixed overlay anchored bottom-left, between header and footer.
-   Grows upward from the footer anchor (justify-content: flex-end).
-   Contains a scrollable list of notification cards (.notif-item).
-
-   Opened by JS adding .notif-panel-open to #notifications-panel.
-   pointer-events: none on the panel container means only the
-   inner list (#notif-list-wrap) intercepts clicks when visible.
+   NOTIFICATIONS
+   Notification cards and controls, hosted inside the map sidebar
+   alerts pane (#msb-pane-alerts). Layout is managed by map-sidebar.css.
 
    Notification types (data-type attribute on .notif-item):
      flight     — new tracked flight entered range
@@ -19,93 +14,61 @@
      emergency  — squawk 7500/7600/7700 alert (red)
      squawk-clr — emergency squawk cleared
    ============================================================ */
-#notifications-panel {
-    position: fixed;
-    bottom: calc(44px + 14px); /* footer height + breathing gap */
-    top: calc(68px + 8px);     /* header height + breathing gap — prevents overflow */
-    left: 24px;
-    z-index: 10001;
+
+/* ---- Notification list wrapper ---- */
+#notif-list-wrap {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-end;  /* new notifications stack up from the bottom */
-    pointer-events: none;       /* closed: pass map clicks through */
+    align-items: stretch;
+    gap: 0;
+    pointer-events: all;
+    touch-action: none;         /* JS handles touch scrolling to prevent map pan interference */
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
-/* ---- Notification list wrapper ----
-   Flex row so the list and scroll-hint sit side by side.
-   Fades in/out with panel open state. flex: 0 1 auto lets it
-   shrink if the panel height is constrained by the viewport. */
-#notif-list-wrap {
+/* ---- Panel footer row (MORE scroll hint + CLEAR button) ---- */
+#notif-footer {
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    gap: 0;
-    visibility: hidden;
-    opacity: 0;
+    flex-shrink: 0;
+    border-top: none;
     pointer-events: all;
-    touch-action: none;         /* JS handles touch scrolling to prevent map pan interference */
-    transition: opacity 0.2s ease, visibility 0.2s ease;
-    flex: 0 1 auto;
-    min-height: 0;
+    height: 40px;
 }
 
-/* Show the list when the panel is opened */
-#notifications-panel.notif-panel-open #notif-list-wrap {
-    visibility: visible;
-    opacity: 1;
-}
-
-/* ---- Panel header row ("NOTIFICATIONS" label + "CLEAR ALL" button) ----
-   Hidden when panel is closed; becomes flex row when open. */
-#notif-header {
-    display: none;
-    width: 220px;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
-    pointer-events: none;
-}
-
-#notifications-panel.notif-panel-open #notif-header {
-    display: flex;
-}
-
-/* "CLEAR ALL" button — dismisses all notifications at once */
+/* "CLEAR" button — dismisses all notifications at once, 50% width */
 #notif-clear-all-btn {
-    display: block;
+    flex: 1;
     pointer-events: all;
-    background: rgba(0, 0, 0, 0.55);
+    background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.5);
+    border-right: 1px solid var(--color-border);
+    color: rgba(255, 255, 255, 0.4);
     font-family: 'Barlow Condensed', 'Barlow', sans-serif;
     font-size: 10px;
     font-weight: 600;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
     cursor: pointer;
-    padding: 4px 10px;
-    margin-bottom: 0;
     line-height: 1;
     transition: color 0.15s ease, background 0.15s ease;
 }
 
 #notif-clear-all-btn:hover {
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(255, 255, 255, 0.04);
     color: var(--color-text-muted);
 }
 
-/* ---- Scrollable notification list ----
-   220px wide, max 580px tall (capped so it stays within the panel).
-   Scrollbar hidden on all browsers; scrolling still works natively. */
+/* ---- Scrollable notification list ---- */
 #notif-list {
     display: flex;
     flex-direction: column;
     gap: 4px;
     align-items: flex-start;
-    width: 220px;
-    max-height: 580px;          /* upper bound on large screens */
-    flex: 0 1 auto;             /* shrinks on small screens */
+    flex: 1;
     min-height: 0;
     overflow-y: auto;
     scrollbar-width: none;      /* Firefox */
@@ -121,18 +84,19 @@
    area, telling the user there are more notifications to scroll to.
    Arrow rotates 180° when the user is at the bottom (#notif-arrow-up). */
 #notif-scroll-hint {
-    margin-left: auto;
-    background: rgba(0, 0, 0, 0.25);
+    flex: 1;
+    background: none;
     color: rgba(255, 255, 255, 0.35);
     font-family: 'Barlow Condensed', 'Barlow', sans-serif;
     font-size: 10px;
     font-weight: 600;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
     line-height: 1;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 5px;
-    padding: 4px 10px;
     pointer-events: none;
     visibility: hidden;
     opacity: 0;
@@ -162,7 +126,7 @@
    fades in. Cards remain flex-shrink: 0 so they never squash.
    pointer-events: auto overrides the parent's pointer-events: none. */
 .notif-item {
-    width: 220px;
+    width: 100%;
     background: #000;
     color: #fff;
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
@@ -188,7 +152,7 @@
     align-items: center;
     justify-content: space-between;
     height: 38px;
-    padding: 0 14px;
+    padding: 0 14px 0 28px;
     border-bottom: 1px solid var(--color-border);
     background: #000;
     position: relative;
@@ -197,6 +161,7 @@
 
 /* Type label — colour-coded per data-type (see selectors below) */
 .notif-label {
+    flex: 1;
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.14em;
@@ -236,7 +201,7 @@
 
 /* Card body: title + detail text + timestamp */
 .notif-body {
-    padding: 10px 14px 12px;
+    padding: 10px 14px 12px 28px;
     display: flex;
     flex-direction: column;
     gap: 3px;

@@ -17,25 +17,32 @@ window._SpaceFilterPanel = (() => {
     let _open = false;
     let _satellites = [];
     let _loaded = false;
-    // ---- Inject panel HTML ----
+    // ---- Inject filter HTML into the map sidebar search pane ----
     (function _injectHTML() {
-        if (document.getElementById('space-filter-panel'))
+        if (document.getElementById('space-filter-input-wrap'))
             return;
-        const panel = document.createElement('div');
-        panel.id = 'space-filter-panel';
-        panel.innerHTML =
-            `<div id="space-filter-input-wrap">` +
-                `<svg id="space-filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
-                `<circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>` +
-                `<line x1="8.5" y1="8.5" x2="12" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>` +
-                `</svg>` +
-                `<input id="space-filter-input" type="text" placeholder="SATELLITE NAME · NORAD ID · CATEGORY" autocomplete="off" spellcheck="false" />` +
-                `<button id="space-filter-clear-btn" aria-label="Clear filter">✕</button>` +
-                `</div>` +
-                `<div id="space-filter-results"></div>`;
-        document.body.appendChild(panel);
+        const html = `<div id="space-filter-input-wrap">` +
+            `<svg id="space-filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+            `<circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>` +
+            `<line x1="8.5" y1="8.5" x2="12" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>` +
+            `</svg>` +
+            `<input id="space-filter-input" type="text" placeholder="SATELLITE NAME · NORAD ID · CATEGORY" autocomplete="off" spellcheck="false" />` +
+            `<button id="space-filter-clear-btn" aria-label="Clear filter">✕</button>` +
+            `</div>` +
+            `<div id="space-filter-results"></div>`;
+        const pane = document.getElementById('msb-pane-search');
+        if (pane) {
+            pane.insertAdjacentHTML('afterbegin', html);
+        }
+        else {
+            document.addEventListener('DOMContentLoaded', () => {
+                const p = document.getElementById('msb-pane-search');
+                if (p && !document.getElementById('space-filter-input-wrap'))
+                    p.insertAdjacentHTML('afterbegin', html);
+            });
+        }
     })();
-    function _getPanel() { return document.getElementById('space-filter-panel'); }
+    function _getPanel() { return document.getElementById('msb-pane-search'); }
     function _getInput() { return document.getElementById('space-filter-input'); }
     function _getResults() { return document.getElementById('space-filter-results'); }
     function _getClearBtn() { return document.getElementById('space-filter-clear-btn'); }
@@ -188,9 +195,10 @@ window._SpaceFilterPanel = (() => {
     function _getFilterBtn() { return document.getElementById('ssm-filter-btn'); }
     function open() {
         _open = true;
-        const panel = _getPanel();
-        if (panel)
-            panel.classList.add('space-filter-panel-visible');
+        if (typeof window._MapSidebar !== 'undefined') {
+            window._MapSidebar.show();
+            window._MapSidebar.switchTab('search');
+        }
         const btn = _getFilterBtn();
         if (btn) {
             btn.classList.add('active');
@@ -206,9 +214,6 @@ window._SpaceFilterPanel = (() => {
     }
     function close() {
         _open = false;
-        const panel = _getPanel();
-        if (panel)
-            panel.classList.remove('space-filter-panel-visible');
         const btn = _getFilterBtn();
         if (btn) {
             btn.classList.remove('active');
@@ -294,16 +299,6 @@ window._SpaceFilterPanel = (() => {
                 input.focus();
             });
         }
-        // Close on outside click
-        document.addEventListener('mousedown', (e) => {
-            if (!_open)
-                return;
-            const panel = _getPanel();
-            const btn = _getFilterBtn();
-            if (panel && !panel.contains(e.target) && (!btn || !btn.contains(e.target))) {
-                close();
-            }
-        });
     }
     return { open, close, toggle, init };
 })();

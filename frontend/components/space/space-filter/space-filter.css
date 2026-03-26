@@ -1,49 +1,21 @@
 /* ============================================================
    SPACE FILTER PANEL
-   Floating search panel that appears below the nav bar,
-   horizontally centred within the space left of the side menu.
-   Allows searching satellites by name or NORAD ID.
+   Search input and results hosted inside the map sidebar search pane.
+   The outer floating #space-filter-panel container is no longer used —
+   #space-filter-input-wrap and #space-filter-results are injected
+   directly into #msb-pane-search by space-filter.ts.
 
-   Positioning mirrors the air filter panel, adapted for the
-   space side menu IDs.
+   Sections:
+     #space-filter-input-wrap  — search input + clear button
+     #space-filter-results     — scrollable list of matching satellites
    ============================================================ */
-
-#space-filter-panel {
-    position: fixed;
-    top: calc(68px + 12px);
-    --side-menu-width: calc((148px - 8px) / 3 + 14px);
-    left: calc((100vw - var(--side-menu-width)) / 2);
-    transform: translateX(-50%);
-    width: 460px;
-    max-width: calc(100vw - 28px);
-    background: rgba(0, 0, 0, 0.92);
-    color: #fff;
-    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
-    z-index: 1001;
-    display: none;
-    pointer-events: auto;
-    user-select: none;
-    box-sizing: border-box;
-}
-
-#space-filter-panel.space-filter-panel-visible {
-    display: block;
-}
-
-/* When space side menu is expanded */
-body:has(#space-side-menu.expanded) #space-filter-panel {
-    --menu-left: calc(100vw - 14px - 148px);
-    left: calc(var(--menu-left) / 2);
-    transform: translateX(-50%);
-    max-width: calc(var(--menu-left) - 28px);
-}
 
 /* ---- Search input row ---- */
 #space-filter-input-wrap {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 13px 18px;
+    padding: 13px 18px 13px 28px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -222,19 +194,3 @@ body:has(#space-side-menu.expanded) #space-filter-panel {
     text-transform: uppercase;
 }
 
-@media (max-width: 600px) {
-    #space-filter-panel {
-        left: 50%;
-        transform: translateX(-50%);
-        width: calc(100vw - 200px);
-        max-width: calc(100vw - 200px);
-    }
-
-    body:has(#space-side-menu.expanded) #space-filter-panel {
-        --menu-left: calc(100vw - 14px - 148px);
-        left: calc(var(--menu-left) / 2);
-        transform: translateX(-50%);
-        width: calc(var(--menu-left) - 28px);
-        max-width: calc(var(--menu-left) - 28px);
-    }
-}

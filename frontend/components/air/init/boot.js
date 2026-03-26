@@ -29,6 +29,7 @@ map.once('load', () => {
     }
 });
 // ---- 3. Panel initialisation ----
+window._MapSidebar.init({ trackingEmptyText: 'No tracked aircraft' });
 window._Notifications.init();
 window._Tracking.init();
 window._FilterPanel.init();

@@ -1,58 +1,21 @@
 /* ============================================================
    FILTER PANEL
-   Floating search panel that appears below the nav bar,
-   horizontally centred within the space left of the side menu.
-   Allows searching aircraft by callsign / ICAO hex / squawk.
-   Filter mode (ALL / CIVIL / MIL / HIDE) is controlled via the
-   hover flyout on the filter button in the side menu.
-
-   Positioning uses CSS custom properties to account for whether
-   the side menu is expanded or minimised, adjusting the centring
-   accordingly via :has() selectors.
+   Search input and results hosted inside the map sidebar search pane.
+   The outer floating #filter-panel container is no longer used —
+   #filter-input-wrap and #filter-results are injected directly into
+   #msb-pane-search by air-filter.ts.
 
    Sections:
      #filter-input-wrap    — search input + clear button
      #filter-results       — scrollable list of matching aircraft/airports
    ============================================================ */
-#filter-panel {
-    position: fixed;
-    top: calc(68px + 12px);
-    /* centre in the viewport minus the side menu's right column */
-    --side-menu-width: calc((148px - 8px) / 3 + 14px);
-    left: calc((100vw - var(--side-menu-width)) / 2);
-    transform: translateX(-50%);
-    width: 460px;
-    max-width: calc(100vw - 28px);
-    background: rgba(0, 0, 0, 0.92);
-    color: #fff;
-    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
-    z-index: 1001;
-    display: none;          /* hidden until .filter-panel-visible added by JS */
-    pointer-events: auto;
-    user-select: none;
-    box-sizing: border-box;
-}
-
-/* Visible state toggled by JS */
-#filter-panel.filter-panel-visible {
-    display: block;
-}
-
-/* When side menu is expanded, re-centre filter in the narrower available space
-   (viewport width minus the 148px expanded menu and its 14px right offset) */
-body:has(#side-menu.expanded) #filter-panel {
-    --menu-left: calc(100vw - 14px - 148px);
-    left: calc(var(--menu-left) / 2);
-    transform: translateX(-50%);
-    max-width: calc(var(--menu-left) - 28px);
-}
 
 /* ---- Search input row ---- */
 #filter-input-wrap {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 13px 18px;
+    padding: 13px 18px 13px 28px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -264,23 +227,3 @@ body:has(#side-menu.expanded) #filter-panel {
     text-transform: uppercase;
 }
 
-/* ---- Filter panel responsive behaviour ----
-   On narrow viewports the panel narrows to avoid overlapping
-   the side menu; the centring logic is preserved. */
-@media (max-width: 600px) {
-    #filter-panel {
-        left: 50%;
-        transform: translateX(-50%);
-        width: calc(100vw - 200px);
-        max-width: calc(100vw - 200px);
-    }
-
-    /* When side menu is expanded on mobile, further constrain the panel */
-    body:has(#side-menu.expanded) #filter-panel {
-        --menu-left: calc(100vw - 14px - 148px);
-        left: calc(var(--menu-left) / 2);
-        transform: translateX(-50%);
-        width: calc(var(--menu-left) - 28px);
-        max-width: calc(var(--menu-left) - 28px);
-    }
-}

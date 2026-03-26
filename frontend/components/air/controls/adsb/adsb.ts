@@ -681,14 +681,13 @@ class AdsbLiveControl implements maplibregl.IControl {
             `<span class="adsb-sb-value${lbl === 'EMRG' ? ' adsb-sb-emrg' : ''}">${val}</span>` +
             `</div>`
         ).join('');
-        return `<div class="adsb-sb-header">` +
-            `<span class="adsb-sb-label-tag">TRACKING</span>` +
-            `<button class="adsb-sb-untrack-btn">UNTRACK</button>` +
-            `</div>` +
-            `<div class="adsb-sb-header" style="border-top:none;height:auto;padding:8px 14px 9px">` +
+        return `<div class="adsb-sb-name-row">` +
             `<span class="adsb-sb-callsign" style="color:${headerColor}">${callsign}</span>` +
             `</div>` +
-            `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
+            `<div class="adsb-sb-fields">${fieldsHTML}</div>` +
+            `<div class="adsb-sb-footer">` +
+            `<button class="adsb-sb-untrack-btn">UNTRACK</button>` +
+            `</div>`;
     }
 
     // ---- Status bar ----

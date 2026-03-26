@@ -26,7 +26,7 @@
 /* ── Sidebar ─────────────────────────────────────────────────────────────────── */
 
 #docs-sidebar {
-    width: 260px;
+    width: 325px;
     flex-shrink: 0;
     background: rgba(0, 0, 0, 0.15);
     border-right: 1px solid var(--color-border);

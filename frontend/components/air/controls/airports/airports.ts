@@ -127,7 +127,7 @@ class AirportsToggleControl extends SentinelControlBase {
             `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
     }
 
-    _showAirportPanel(p: AirportProperties, coords: LngLat): void {
+    _showAirportPanel(p: AirportProperties, coords: LngLat, fromSearch = false): void {
         let bar = document.getElementById('adsb-status-bar');
         if (!bar) {
             bar = document.createElement('div');
@@ -140,7 +140,7 @@ class AirportsToggleControl extends SentinelControlBase {
         bar.innerHTML      = this._buildAirportPanelHTML(p, coords);
         bar.classList.add('adsb-sb-visible');
 
-        if (typeof window._Tracking !== 'undefined') { window._Tracking.setCount(1); window._Tracking.openPanel(); }
+        if (!fromSearch && typeof window._Tracking !== 'undefined') { window._Tracking.setCount(1); window._Tracking.openPanel(); }
 
         bar.querySelector('#apt-panel-close')!.addEventListener('click', (e: Event) => {
             e.stopPropagation();
