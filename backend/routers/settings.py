@@ -6,11 +6,12 @@ Endpoints:
   GET  /api/settings/{namespace}        — settings for one namespace as { key: value }
   PUT  /api/settings/{namespace}/{key}  — upsert a single setting
   GET  /api/settings/config/preview     — current settings as a downloadable config JSON
+  POST /api/settings/config/upload      — replace all settings from an uploaded config JSON
 """
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -78,6 +79,49 @@ async def config_preview(db: AsyncSession = Depends(get_db)):
 
     payload = json.dumps(config, indent=2, ensure_ascii=False)
     return Response(content=payload, media_type="application/json")
+
+
+@router.post("/config/upload", status_code=200)
+async def config_upload(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Replace all settings from an uploaded config JSON file."""
+    try:
+        content = await file.read()
+        config = json.loads(content)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {exc}")
+
+    if not isinstance(config, dict):
+        raise HTTPException(status_code=400, detail="Config must be a JSON object")
+
+    ts = now_ms()
+    for namespace, keys in config.items():
+        if not isinstance(keys, dict):
+            continue
+        for key, value in keys.items():
+            result = await db.execute(
+                select(UserSettings).where(
+                    UserSettings.namespace == namespace,
+                    UserSettings.key == key,
+                )
+            )
+            row = result.scalar_one_or_none()
+            value_str = json.dumps(value)
+            if row:
+                row.value = value_str
+                row.updated_at = ts
+            else:
+                db.add(UserSettings(
+                    namespace=namespace,
+                    key=key,
+                    value=value_str,
+                    updated_at=ts,
+                ))
+
+    await db.commit()
+    return JSONResponse({"status": "ok"})
 
 
 # ── Namespace / key endpoints (registered after /config/* to avoid shadowing) ─
