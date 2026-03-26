@@ -162,7 +162,7 @@ window._SpaceFilterPanel = (() => {
         selectBtn.addEventListener('mousedown', e => e.stopPropagation());
         selectBtn.addEventListener('click', (e) => { e.stopPropagation(); doSelect(); });
 
-        item.addEventListener('mouseenter', () => { if (issControl) issControl.previewSatellite(sat.norad_id); });
+        item.addEventListener('mouseenter', () => { if (issControl) issControl.previewSatellite(sat.norad_id, sat.name || sat.norad_id); });
         item.addEventListener('mouseleave', () => { if (issControl) issControl.clearPreview(); });
 
         item.appendChild(icon);

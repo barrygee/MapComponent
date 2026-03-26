@@ -386,11 +386,13 @@ class IssControl extends SentinelControlBase {
                 if (this._passNotifEnabled) this._startPassNotifPolling();
             }
 
-            // Keep callsign label in sync (only when tag is not shown)
-            if (this.issVisible && !this._hoverTagMarker && !this._followEnabled) {
-                this._showLabel(position.lon, position.lat);
-            } else if (this.issVisible && this._labelMarker) {
-                this._labelMarker.setLngLat([position.lon, position.lat]);
+            // Keep callsign label in sync (only when tag is not shown, and not during a hover preview)
+            if (!this._previewNoradId) {
+                if (this.issVisible && !this._hoverTagMarker && !this._followEnabled) {
+                    this._showLabel(position.lon, position.lat);
+                } else if (this.issVisible && this._labelMarker) {
+                    this._labelMarker.setLngLat([position.lon, position.lat]);
+                }
             }
 
             // Keep hover tag position in sync while open
@@ -903,7 +905,7 @@ class IssControl extends SentinelControlBase {
     // ---- Filter hover preview ----
     // Temporarily shows a different satellite on the map while hovering a search result.
     // Does not affect polling or the active satellite state.
-    async previewSatellite(noradId: string): Promise<void> {
+    async previewSatellite(noradId: string, name?: string): Promise<void> {
         // If already previewing this satellite, do nothing
         if (this._previewNoradId === noradId) return;
 
@@ -954,6 +956,15 @@ class IssControl extends SentinelControlBase {
             if (trackSource) trackSource.setData(ground_track);
             if (fpSource)    fpSource.setData(footprintGeo);
 
+            // Update the callsign label to show the previewed satellite's name and position
+            if (this._labelMarker) {
+                this._labelMarker.setLngLat([position.lon, position.lat]);
+                if (name) {
+                    const nameSpan = this._labelMarker.getElement().querySelector('span');
+                    if (nameSpan) nameSpan.textContent = name;
+                }
+            }
+
             // Fly to the previewed satellite only if the user setting allows it
             let hoverPreference = 'stay';
             try { hoverPreference = localStorage.getItem('sentinel_space_filterHoverPreview') || 'stay'; } catch (_e) {}
@@ -979,6 +990,13 @@ class IssControl extends SentinelControlBase {
         if (issSource)   issSource.setData(this._issGeojson);
         if (trackSource) trackSource.setData(this._trackGeojson);
         if (fpSource)    fpSource.setData(this._footprintGeojson);
+
+        // Restore the callsign label to the active satellite's name and position
+        if (this._labelMarker) {
+            const nameSpan = this._labelMarker.getElement().querySelector('span');
+            if (nameSpan) nameSpan.textContent = this._activeSatName;
+            if (this._lastPosition) this._labelMarker.setLngLat([this._lastPosition.lon, this._lastPosition.lat]);
+        }
 
         // Return map view to active satellite (only if fly mode was active)
         let hoverPreference = 'stay';
