@@ -7,12 +7,11 @@
 // content is injected by each domain's filter component.
 //
 // PUBLIC API:
-//   init()                        — inject HTML, wire tabs, wire footer toggle
+//   init()                        — inject HTML, wire tabs
 //   switchTab(tab)                — switch active tab ('search'|'alerts'|'tracking')
 //   setAlertCount(n)              — update alerts tab badge
 //   setTrackingCount(n)           — update tracking tab badge
 //   getSearchPane()               — returns #msb-pane-search element
-//   toggle()                      — show/hide the sidebar
 // ============================================================
 /// <reference path="../globals.d.ts" />
 window._MapSidebar = (() => {
@@ -70,6 +69,14 @@ window._MapSidebar = (() => {
         if (empty)
             empty.style.display = n > 0 ? 'none' : '';
     }
+    function show() {
+        const sidebar = document.getElementById('map-sidebar');
+        const btn = document.getElementById('map-sidebar-btn');
+        if (!sidebar || !btn)
+            return;
+        sidebar.classList.remove('msb-hidden');
+        btn.classList.add('msb-btn-active');
+    }
     function toggle() {
         const sidebar = document.getElementById('map-sidebar');
         const btn = document.getElementById('map-sidebar-btn');
@@ -95,5 +102,5 @@ window._MapSidebar = (() => {
             btn.addEventListener('click', toggle);
         }
     }
-    return { init, switchTab, setAlertCount, setTrackingCount, getSearchPane, toggle };
+    return { init, switchTab, setAlertCount, setTrackingCount, getSearchPane, show, toggle };
 })();

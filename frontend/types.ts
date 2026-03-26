@@ -195,6 +195,7 @@ interface MapSidebarAPI {
     setAlertCount(n: number): void;
     setTrackingCount(n: number): void;
     getSearchPane(): HTMLElement | null;
+    show(): void;
     toggle(): void;
 }
 

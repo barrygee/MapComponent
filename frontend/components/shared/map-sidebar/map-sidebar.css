@@ -277,6 +277,7 @@
 /* ---- Tracking pane ----
    Hosts the ADS-B status bar and tracking card. */
 #msb-pane-tracking {
+    flex-direction: column;
     overflow-y: auto;
     scrollbar-width: none;
     padding: 6px 0;

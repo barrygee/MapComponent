@@ -226,7 +226,7 @@ window._SpaceFilterPanel = (() => {
 
     function open(): void {
         _open = true;
-        if (typeof window._MapSidebar !== 'undefined') window._MapSidebar.switchTab('search');
+        if (typeof window._MapSidebar !== 'undefined') { window._MapSidebar.show(); window._MapSidebar.switchTab('search'); }
         const btn = _getFilterBtn();
         if (btn) { btn.classList.add('active'); btn.classList.remove('enabled'); }
         const input = _getInput();

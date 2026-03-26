@@ -323,8 +323,10 @@ window._FilterPanel = (() => {
     function _getFilterBtn() { return document.getElementById('sm-filter-btn'); }
     function open() {
         _open = true;
-        if (typeof window._MapSidebar !== 'undefined')
+        if (typeof window._MapSidebar !== 'undefined') {
+            window._MapSidebar.show();
             window._MapSidebar.switchTab('search');
+        }
         const btn = _getFilterBtn();
         if (btn) {
             btn.classList.add('active');

@@ -261,9 +261,11 @@ window._Notifications = (() => {
         if (open) {
             _stopBellPulse();
             _unreadCount = 0;
-            // Switch sidebar to alerts tab
-            if (typeof window._MapSidebar !== 'undefined')
+            // Ensure sidebar is visible and switch to alerts tab
+            if (typeof window._MapSidebar !== 'undefined') {
+                window._MapSidebar.show();
                 window._MapSidebar.switchTab('alerts');
+            }
             // Tab mutex: close tracking
             if (typeof window._Tracking !== 'undefined')
                 window._Tracking.closePanel();

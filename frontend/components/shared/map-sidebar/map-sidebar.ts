@@ -78,6 +78,14 @@ window._MapSidebar = (() => {
         if (empty) empty.style.display = n > 0 ? 'none' : '';
     }
 
+    function show(): void {
+        const sidebar = document.getElementById('map-sidebar');
+        const btn     = document.getElementById('map-sidebar-btn');
+        if (!sidebar || !btn) return;
+        sidebar.classList.remove('msb-hidden');
+        btn.classList.add('msb-btn-active');
+    }
+
     function toggle(): void {
         const sidebar = document.getElementById('map-sidebar');
         const btn     = document.getElementById('map-sidebar-btn');
@@ -104,5 +112,5 @@ window._MapSidebar = (() => {
         }
     }
 
-    return { init, switchTab, setAlertCount, setTrackingCount, getSearchPane, toggle };
+    return { init, switchTab, setAlertCount, setTrackingCount, getSearchPane, show, toggle };
 })();

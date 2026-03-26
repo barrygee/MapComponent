@@ -47,9 +47,11 @@ window._Tracking = (() => {
         const btn = _getBtn();
         if (btn)
             btn.classList.add('tracking-btn-active');
-        // Switch sidebar to tracking tab
-        if (typeof window._MapSidebar !== 'undefined')
+        // Ensure sidebar is visible and switch to tracking tab
+        if (typeof window._MapSidebar !== 'undefined') {
+            window._MapSidebar.show();
             window._MapSidebar.switchTab('tracking');
+        }
         // Tab mutex: close notifications panel when tracking opens
         if (typeof window._Notifications !== 'undefined') {
             const nb = document.getElementById('notif-toggle-btn');
