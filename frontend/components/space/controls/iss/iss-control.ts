@@ -848,11 +848,9 @@ class IssControl extends SentinelControlBase {
         ).join('');
         return `<div class="adsb-sb-name-row">` +
             `<span class="adsb-sb-callsign">${this._activeSatName}</span>` +
+            `<button class="adsb-sb-untrack-btn" aria-label="Untrack">UNTRACK</button>` +
             `</div>` +
-            `<div class="adsb-sb-fields">${fieldsHTML}</div>` +
-            `<div class="adsb-sb-footer">` +
-            `<button class="adsb-sb-untrack-btn">UNTRACK</button>` +
-            `</div>`;
+            `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
     }
 
     private _showStatusBar(p: IssPosition): void {
