@@ -113,7 +113,7 @@ class MilitaryBasesToggleControl extends SentinelControlBase {
             e.stopPropagation();
             bar!.classList.remove('adsb-sb-visible');
             delete bar!.dataset['apt'];
-            if (typeof window._Tracking !== 'undefined') { window._Tracking.setCount(0); window._Tracking.closePanel(); }
+            if (typeof window._Tracking !== 'undefined') window._Tracking.setCount(0);
             const is3D = typeof window._is3DActive === 'function' && window._is3DActive();
             this.map.flyTo({ center: [-4.4815, 54.1453], zoom: 6, pitch: is3D ? 45 : 0, bearing: 0, duration: 800 });
         });

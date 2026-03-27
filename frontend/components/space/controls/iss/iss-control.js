@@ -831,10 +831,8 @@ class IssControl extends SentinelControlBase {
         const bar = document.getElementById('iss-status-bar');
         if (bar)
             bar.style.display = 'none';
-        if (typeof window._Tracking !== 'undefined') {
+        if (typeof window._Tracking !== 'undefined')
             window._Tracking.setCount(0);
-            window._Tracking.closePanel();
-        }
         if (typeof window._FilterPanel !== 'undefined')
             window._FilterPanel.reposition();
     }

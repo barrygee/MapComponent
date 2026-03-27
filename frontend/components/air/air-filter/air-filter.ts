@@ -292,10 +292,23 @@ window._FilterPanel = (() => {
                 const matchedFeature = (adsbControl._geojson.features as GeoJSON.Feature[]).find(f => (f.properties as AircraftProperties).hex === hex);
                 if (!matchedFeature) return;
 
-                // If already tracking this aircraft, untrack it via the status bar button
+                // If already tracking this aircraft, untrack it without closing the side panel
                 if (adsbControl._followEnabled && adsbControl._tagHex === hex) {
-                    const untrackBtn = document.querySelector('.adsb-sb-untrack-btn') as HTMLButtonElement | null;
-                    if (untrackBtn) untrackBtn.click();
+                    adsbControl._followEnabled = false;
+                    if (adsbControl._tagHex) {
+                        if (adsbControl._trackingNotifIds && adsbControl._trackingNotifIds[adsbControl._tagHex]) {
+                            window._Notifications.update({ id: adsbControl._trackingNotifIds[adsbControl._tagHex], type: 'untrack', action: null });
+                            delete adsbControl._trackingNotifIds[adsbControl._tagHex];
+                        }
+                        adsbControl._notifEnabled.delete(adsbControl._tagHex);
+                    }
+                    // Hide the status bar without closing the side panel
+                    const bar = document.getElementById('adsb-status-bar');
+                    if (bar) bar.classList.remove('adsb-sb-visible');
+                    if (typeof window._Tracking !== 'undefined') window._Tracking.setCount(0);
+                    (adsbControl as any)._saveTrackingState();
+                    const is3D = typeof window._is3DActive === 'function' && window._is3DActive();
+                    if (!is3D) map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
                     return;
                 }
 

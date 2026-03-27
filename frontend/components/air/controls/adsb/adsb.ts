@@ -712,7 +712,7 @@ class AdsbLiveControl implements maplibregl.IControl {
     private _hideStatusBar(): void {
         const bar = document.getElementById('adsb-status-bar');
         if (bar) bar.classList.remove('adsb-sb-visible');
-        if (typeof window._Tracking !== 'undefined') { window._Tracking.setCount(0); window._Tracking.closePanel(); }
+        if (typeof window._Tracking !== 'undefined') window._Tracking.setCount(0);
         if (typeof window._FilterPanel !== 'undefined') window._FilterPanel.reposition();
     }
 
