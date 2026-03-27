@@ -151,10 +151,6 @@ window._SpaceFilterPanel = (() => {
         info.appendChild(primary);
         info.appendChild(secondary);
 
-        const badge = document.createElement('div');
-        badge.className = 'space-filter-result-badge';
-        badge.textContent = _categoryBadge(sat.category);
-
         const selectBtn = document.createElement('button');
         selectBtn.className = 'space-filter-action-btn space-filter-select-btn';
         selectBtn.textContent = 'SELECT';
@@ -167,7 +163,6 @@ window._SpaceFilterPanel = (() => {
 
         item.appendChild(icon);
         item.appendChild(info);
-        item.appendChild(badge);
         item.appendChild(selectBtn);
 
         info.style.flex = '1';
