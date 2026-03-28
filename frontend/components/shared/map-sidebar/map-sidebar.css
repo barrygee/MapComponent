@@ -292,6 +292,7 @@
     flex-direction: column;
     overflow-y: auto;
     scrollbar-width: none;
+    padding-top: 13px;
 }
 
 #msb-pane-tracking::-webkit-scrollbar {

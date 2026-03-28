@@ -54,17 +54,13 @@
     display: flex;
 }
 
-/* Extra top padding on first tracked item to match first search result */
-.tracking-item:first-child .adsb-sb-name-row {
-    padding-top: 54px;
-}
 
 /* Name row — callsign left, untrack link right-aligned */
 .adsb-sb-name-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 20px 8px 28px;
+    padding: 20px 28px 8px 28px;
 }
 
 /* × untrack button — right-aligned in the name row */
@@ -76,8 +72,8 @@
     padding: 0;
     color: rgba(255, 255, 255, 0.25);
     font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 14px;
-    font-weight: 300;
+    font-size: 9px;
+    font-weight: 700;
     line-height: 1;
     transition: color 0.2s;
     flex-shrink: 0;

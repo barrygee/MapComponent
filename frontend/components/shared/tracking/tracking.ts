@@ -170,7 +170,8 @@ window._Tracking = ((): TrackingAPI => {
                 const el = document.createElement('div');
                 el.className = 'tracking-item tracking-item-readonly';
                 el.dataset['trackingId'] = s.id;
-                el.innerHTML = _buildItemHTML(s.id, s.name, s.domain, s.fields, false);
+                el.innerHTML = _buildItemHTML(s.id, s.name, s.domain, s.fields, true);
+                _wireUntrack(el, { ...s, onUntrack: () => unregister(s.id) });
                 pane.appendChild(el);
             }
         });
