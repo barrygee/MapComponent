@@ -161,7 +161,8 @@
         catch (e) {
             console.error('[globe] setProjection failed:', e);
         }
-        if (spaceNamesControl) spaceNamesControl.applyNamesVisibility();
+        if (spaceNamesControl)
+            spaceNamesControl.applyNamesVisibility();
     }
     const globeBtn = makeOverlayBtn(GLOBE_SVG, '15px', 'GLOBE', () => _spaceGlobeActive, _toggleGlobe, true);
     globeGroup.appendChild(globeBtn);

@@ -12,5 +12,5 @@
 // eslint-disable-next-line no-var
 var map: maplibregl.Map = window.MapComponent.map;
 
-// Set global view — centred on equator, zoomed out to show full Earth
-map.jumpTo({ center: [12, 20], zoom: 2 });
+// Set global view — centred on equator, zoomed in enough for the full globe to fill the window with margin
+map.jumpTo({ center: [12, 20], zoom: 1.5 });

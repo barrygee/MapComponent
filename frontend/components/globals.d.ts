@@ -43,6 +43,7 @@ interface Window {
     _Tracking:       TrackingAPI;
     _FilterPanel:       FilterPanelAPI;
     _SpaceFilterPanel:  SpaceFilterPanelAPI;
+    _SpacePassesPanel:  SpacePassesPanelAPI;
     _SettingsPanel:     SettingsPanelAPI;
     _is3DActive?:    () => boolean;
     setUserLocation?: (position: { coords: { longitude: number; latitude: number }; _fromCache?: boolean; _manual?: boolean }) => void;

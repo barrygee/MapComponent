@@ -207,6 +207,14 @@ interface SpaceFilterPanelAPI {
     close(): void;
 }
 
+// ----- Space passes panel -----
+interface SpacePassesPanelAPI {
+    init(): void;
+    toggle(): void;
+    open(): void;
+    close(): void;
+}
+
 // ----- Map sidebar -----
 interface MapSidebarInitOptions {
     alertsEmptyText?:   string;
@@ -215,7 +223,7 @@ interface MapSidebarInitOptions {
 
 interface MapSidebarAPI {
     init(opts?: MapSidebarInitOptions): void;
-    switchTab(tab: 'search' | 'alerts' | 'tracking'): void;
+    switchTab(tab: 'search' | 'alerts' | 'tracking' | 'passes'): void;
     setAlertCount(n: number): void;
     setTrackingCount(n: number): void;
     getSearchPane(): HTMLElement | null;

@@ -3,6 +3,7 @@
 {% block head %}
     <link rel="stylesheet" href="/frontend/components/space/overlay/space-side-menu.css">
     <link rel="stylesheet" href="/frontend/components/space/space-filter/space-filter.css">
+    <link rel="stylesheet" href="/frontend/components/space/passes/space-passes.css">
 {% endblock %}
 
 {% block content %}
@@ -22,6 +23,7 @@
             <button class="no-url-overlay-btn" id="no-tle-overlay-btn">Open Space Settings</button>
         </div>
     </div>
+    <canvas id="space-starfield" aria-hidden="true"></canvas>
     <div id="map"></div>
 {% endblock %}
 
@@ -47,5 +49,6 @@
     <!-- Side menu, filter, and boot -->
     <script src="/frontend/components/space/overlay/space-side-menu.js"></script>
     <script src="/frontend/components/space/space-filter/space-filter.js"></script>
+    <script src="/frontend/components/space/passes/space-passes.js"></script>
     <script src="/frontend/components/space/init/space-boot.js"></script>
 {% endblock %}

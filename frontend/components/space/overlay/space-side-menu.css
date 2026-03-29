@@ -1,4 +1,20 @@
 /* ============================================================
+   STARFIELD BACKDROP
+   Canvas sits behind the map; parallax-shifted on globe rotate/pan.
+   ============================================================ */
+
+#space-starfield {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    background: #000;
+}
+
+
+/* ============================================================
    SPACE SIDE MENU
    Collapsible control panel for the space domain.
    Mirrors the air side-menu layout but scoped to #space-side-menu.
@@ -160,9 +176,11 @@
     display: none;
 }
 
-/* ---- Globe projection: black space background ---- */
-body.globe-active #map {
-    background: #000 !important;
+/* ---- Globe projection: transparent map so starfield canvas shows through ---- */
+body.globe-active #map,
+body.globe-active #map .maplibregl-canvas-container,
+body.globe-active #map .maplibregl-canvas {
+    background: transparent !important;
 }
 
 /* ---- Globe projection: lighten side menu buttons so they're visible against black ---- */

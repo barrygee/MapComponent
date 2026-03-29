@@ -274,7 +274,7 @@ const _sentinelMap = new maplibregl.Map({
     container: 'map',
     center: _mapIsOnline ? [-4.4815, 54.1453] : [-4.5481, 54.2361],
     zoom: _mapIsOnline ? 6 : 5,
-    minZoom: 2,
+    minZoom: 1,
     maxBounds: undefined,
     attributionControl: false,
     fadeDuration: 0,

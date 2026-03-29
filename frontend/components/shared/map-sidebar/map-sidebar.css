@@ -105,6 +105,16 @@
     transform: translateX(-100%);
 }
 
+/* Space domain — 4 tabs × 108px = 432px */
+body[data-domain="space"] #map-sidebar {
+    width: 432px;
+}
+
+/* Hide PASSES tab on all domains except space */
+body:not([data-domain="space"]) .msb-tab[data-tab="passes"] {
+    display: none;
+}
+
 /* ---- Tab bar ---- */
 #map-sidebar-tabs {
     display: flex;
@@ -124,7 +134,8 @@
 }
 
 .msb-tab {
-    flex: 1;
+    flex: 0 0 auto;
+    width: 108px;
     background: none;
     border: none;
     border-bottom: 1px solid transparent;

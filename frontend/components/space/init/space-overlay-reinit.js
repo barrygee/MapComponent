@@ -16,7 +16,8 @@ window.MapComponent.onStyleLoad(function () {
     if (issControl) {
         issControl.initLayers();
         // Always show and track ISS on load
-        if (!issControl.issVisible) issControl.toggleIss();
+        if (!issControl.issVisible)
+            issControl.toggleIss();
         issControl._fetch();
         issControl._startPolling();
     }

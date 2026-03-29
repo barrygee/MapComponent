@@ -15,7 +15,7 @@
 
 /// <reference path="../globals.d.ts" />
 
-type MapSidebarTab = 'search' | 'alerts' | 'tracking';
+type MapSidebarTab = 'search' | 'alerts' | 'tracking' | 'passes';
 
 window._MapSidebar = (() => {
 
@@ -25,6 +25,7 @@ window._MapSidebar = (() => {
                 `<button class="msb-tab msb-tab-active" data-tab="search">SEARCH</button>` +
                 `<button class="msb-tab" data-tab="alerts">ALERTS <span class="msb-tab-badge" id="msb-alerts-badge"></span></button>` +
                 `<button class="msb-tab" data-tab="tracking">TRACKING <span class="msb-tab-badge" id="msb-tracking-badge"></span></button>` +
+                `<button class="msb-tab" data-tab="passes">PASSES</button>` +
             `</div>` +
             `<div id="map-sidebar-panes">` +
                 `<div class="msb-pane msb-pane-active" id="msb-pane-search"></div>` +
@@ -34,6 +35,7 @@ window._MapSidebar = (() => {
                 `<div class="msb-pane" id="msb-pane-tracking">` +
                     `<div id="msb-tracking-empty"></div>` +
                 `</div>` +
+                `<div class="msb-pane" id="msb-pane-passes"></div>` +
             `</div>` +
         `</div>`;
 

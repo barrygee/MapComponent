@@ -178,6 +178,94 @@ async def get_satellite_passes(
         return JSONResponse({"error": f"Unexpected error: {e}"}, status_code=500)
 
 
+@router.get("/passes")
+async def get_multi_satellite_passes(
+    lat: float = Query(..., description="Observer latitude in degrees"),
+    lon: float = Query(..., description="Observer longitude in degrees"),
+    hours: int = Query(24, ge=1, le=48, description="Lookahead window in hours"),
+    min_el: float = Query(10.0, ge=0.0, le=90.0, description="Minimum max-elevation filter (degrees)"),
+    categories: str = Query(None, description="Comma-separated category names to include"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of passes to return"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Predict upcoming passes for all satellites in the given categories.
+
+    For each matching satellite, computes passes within the next N hours and returns
+    them sorted by AOS time across all satellites. Satellites with no cached TLE are
+    silently skipped.
+
+    Large category sets (e.g. amateur with 500+ satellites) may take 10-20 seconds.
+    Recommend filtering to 1-3 categories and using min_el >= 10.
+    """
+    try:
+        # Parse and validate categories
+        if categories:
+            requested = [c.strip() for c in categories.split(",") if c.strip()]
+            invalid = [c for c in requested if c not in _VALID_CATEGORIES]
+            if invalid:
+                return JSONResponse(
+                    {"error": f"Invalid categories: {invalid}. Valid: {sorted(_VALID_CATEGORIES)}"},
+                    status_code=400,
+                )
+            category_filter = requested
+        else:
+            category_filter = list(_VALID_CATEGORIES)
+
+        # Single query to get matching satellites
+        result = await db.execute(
+            select(SatelliteCatalogue.norad_id, SatelliteCatalogue.name, SatelliteCatalogue.category)
+            .where(SatelliteCatalogue.category.in_(category_filter))
+        )
+        satellites = result.all()
+
+        if not satellites:
+            return JSONResponse({
+                "passes": [],
+                "obs_lat": lat,
+                "obs_lon": lon,
+                "lookahead_hours": hours,
+                "satellite_count": 0,
+                "computed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            })
+
+        online_url, _ = await resolve_domain_urls("space", db)
+        all_passes = []
+
+        for norad_id, name, category in satellites[:500]:
+            try:
+                tle_text = await tle_service.fetch_tle(norad_id, db, online_url)
+                _, line1, line2 = tle_service.parse_tle_lines(tle_text)
+                passes = sat_service.compute_passes(
+                    line1, line2,
+                    obs_lat=lat,
+                    obs_lon=lon,
+                    lookahead_hours=hours,
+                    min_elevation_deg=min_el,
+                )
+                for p in passes:
+                    p["norad_id"] = norad_id
+                    p["name"] = name
+                    p["category"] = category
+                all_passes.extend(passes)
+            except (RuntimeError, ValueError):
+                continue
+
+        all_passes.sort(key=lambda p: p["aos_unix_ms"])
+        all_passes = all_passes[:limit]
+
+        return JSONResponse({
+            "passes": all_passes,
+            "obs_lat": lat,
+            "obs_lon": lon,
+            "lookahead_hours": hours,
+            "satellite_count": len(satellites),
+            "computed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        })
+
+    except Exception as e:
+        return JSONResponse({"error": f"Unexpected error: {e}"}, status_code=500)
+
+
 @router.get("/daynight")
 async def get_daynight():
     """Return the current day/night terminator as a GeoJSON Polygon Feature.

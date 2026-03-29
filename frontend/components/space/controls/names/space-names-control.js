@@ -31,10 +31,16 @@ class SpaceNamesToggleControl extends SentinelControlBase {
         const countryVis = this.namesVisible ? 'visible' : 'none';
         const detailVis = (this.namesVisible && !globeMode) ? 'visible' : 'none';
         countryLayers.forEach(id => {
-            try { this.map.setLayoutProperty(id, 'visibility', countryVis); } catch (e) {}
+            try {
+                this.map.setLayoutProperty(id, 'visibility', countryVis);
+            }
+            catch (e) { }
         });
         detailLayers.forEach(id => {
-            try { this.map.setLayoutProperty(id, 'visibility', detailVis); } catch (e) {}
+            try {
+                this.map.setLayoutProperty(id, 'visibility', detailVis);
+            }
+            catch (e) { }
         });
         this.setButtonActive(this.namesVisible);
     }

@@ -1,0 +1,417 @@
+/* ============================================================
+   SPACE PASSES PANEL
+   Content injected into #msb-pane-passes in the map sidebar.
+   Cards match the .space-filter-result-item pattern.
+   Space domain only — PASSES tab hidden on other domains via
+   map-sidebar.css body[data-domain] selector.
+   ============================================================ */
+
+/* ---- Passes pane layout ---- */
+#msb-pane-passes {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+#msb-pane-passes.msb-pane-active {
+    display: flex;
+}
+
+/* ============================================================
+   FILTER TOGGLE — collapsed header row
+   ============================================================ */
+
+.spp-filter-toggle {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 18px 20px 18px 28px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: background 0.12s;
+    box-sizing: border-box;
+}
+
+.spp-filter-toggle:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.spp-filter-toggle-left {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.spp-filter-toggle-icon {
+    display: flex;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.3);
+    transition: transform 0.2s ease, color 0.15s;
+    flex-shrink: 0;
+    transform: rotate(-90deg);
+}
+
+.spp-filter-toggle.expanded .spp-filter-toggle-icon {
+    transform: rotate(0deg);
+    color: var(--color-accent);
+}
+
+.spp-filter-toggle-left > span:last-child {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    transition: color 0.15s;
+}
+
+.spp-filter-toggle.expanded .spp-filter-toggle-left > span:last-child {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.spp-filter-summary {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.25);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.spp-filter-toggle.expanded .spp-filter-summary {
+    opacity: 0;
+}
+
+/* ============================================================
+   FILTER BODY — collapsible
+   ============================================================ */
+
+.spp-filter-body {
+    flex-shrink: 0;
+    display: none;
+    flex-direction: column;
+    gap: 22px;
+    padding: 20px 20px 22px 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    transition: opacity 0.2s;
+    overflow: hidden;
+}
+
+.spp-filter-body.expanded {
+    display: flex;
+}
+
+/* ---- Section label inside filter body ---- */
+.spp-section-label {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.25);
+    text-transform: uppercase;
+}
+
+/* ---- Category toggle buttons ---- */
+#spp-category-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.spp-cat-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.35);
+    padding: 4px 9px;
+    text-transform: uppercase;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.spp-cat-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.spp-cat-btn.active {
+    background: rgba(200, 255, 0, 0.1);
+    border-color: rgba(200, 255, 0, 0.4);
+    color: var(--color-accent);
+}
+
+.spp-cat-btn.active:hover {
+    background: rgba(200, 255, 0, 0.16);
+    border-color: rgba(200, 255, 0, 0.65);
+}
+
+/* ---- Elevation slider row ---- */
+.spp-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.spp-filter-label {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    flex-shrink: 0;
+    min-width: 90px;
+}
+
+#spp-elevation-slider {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--color-accent);
+    outline: none;
+    border: none;
+}
+
+#spp-elevation-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+#spp-elevation-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+#spp-elevation-slider::-moz-range-track {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--color-accent);
+}
+
+.spp-filter-value {
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--color-accent);
+    min-width: 28px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* ---- Hours segmented buttons ---- */
+.spp-seg-btns {
+    display: flex;
+    gap: 4px;
+}
+
+.spp-seg-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.35);
+    padding: 4px 10px;
+    text-transform: uppercase;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.spp-seg-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.spp-seg-btn.active {
+    background: rgba(200, 255, 0, 0.1);
+    border-color: rgba(200, 255, 0, 0.4);
+    color: var(--color-accent);
+}
+
+/* ============================================================
+   STATUS BAR
+   ============================================================ */
+
+#spp-status-bar {
+    flex-shrink: 0;
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.22);
+    text-transform: uppercase;
+    padding: 16px 20px 8px 28px;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+}
+
+#spp-status-bar.spp-loading {
+    color: var(--color-accent);
+}
+
+/* ============================================================
+   PASS LIST
+   ============================================================ */
+
+#spp-list {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+#spp-list::-webkit-scrollbar {
+    display: none;
+}
+
+/* ---- Pass card — matches .space-filter-result-item layout ---- */
+.spp-pass-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 20px 13px 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.spp-pass-card:first-child {
+    padding-top: 18px;
+}
+
+.spp-pass-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* Left: name + secondary info */
+.spp-pass-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.spp-pass-primary {
+    font-family: var(--font-primary);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.spp-pass-secondary {
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.4);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Right: AOS + detail stacked right-aligned */
+.spp-pass-meta {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.spp-pass-aos {
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--color-accent);
+    white-space: nowrap;
+    text-transform: uppercase;
+}
+
+.spp-pass-aos.spp-in-progress {
+    color: #ff9900;
+}
+
+.spp-pass-detail {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.4);
+    white-space: nowrap;
+}
+
+/* ============================================================
+   EMPTY / MESSAGE STATE
+   ============================================================ */
+
+.spp-message {
+    padding: 24px 28px;
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.25);
+    text-transform: uppercase;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    line-height: 1.6;
+}
+
+.spp-action-btn {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 5px 10px;
+    text-transform: uppercase;
+    transition: color 0.12s, border-color 0.12s;
+}
+
+.spp-action-btn:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.5);
+}
