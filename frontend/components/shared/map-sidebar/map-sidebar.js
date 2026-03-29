@@ -63,6 +63,7 @@ window._MapSidebar = (() => {
         const panes = document.querySelectorAll('.msb-pane');
         tabs.forEach(t => t.classList.toggle('msb-tab-active', t.dataset['tab'] === tab));
         panes.forEach(p => p.classList.toggle('msb-pane-active', p.id === `msb-pane-${tab}`));
+        document.dispatchEvent(new CustomEvent('msb-tab-switch', { detail: { tab } }));
     }
     function setAlertCount(n) {
         const badge = document.getElementById('msb-alerts-badge');
