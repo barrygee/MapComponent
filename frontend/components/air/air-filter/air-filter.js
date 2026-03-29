@@ -56,11 +56,24 @@ window._FilterPanel = (() => {
         const lowerQuery = query.toLowerCase();
         return fields.some(field => field && field.toLowerCase().includes(lowerQuery));
     }
+    function _searchAll() {
+        const results = [];
+        const planes = _getAircraftData();
+        for (const feature of planes) {
+            const props = feature.properties;
+            const callsign = (props.flight || '').trim();
+            const hex = (props.hex || '').trim();
+            const reg = (props.r || '').trim();
+            const squawk = (props.squawk || '').trim();
+            results.push({ kind: 'plane', feature, callsign, hex, reg, squawk, emergency: !!props.emergency && props.emergency !== 'none' });
+        }
+        return results;
+    }
     function _search(query) {
         const trimmedQuery = query.trim();
-        const results = [];
         if (!trimmedQuery)
-            return results;
+            return null; // null = show all
+        const results = [];
         const planes = _getAircraftData();
         for (const feature of planes) {
             const props = feature.properties;
@@ -128,18 +141,17 @@ window._FilterPanel = (() => {
         if (!container)
             return;
         container.innerHTML = '';
-        if (!query.trim())
-            return;
-        if (!results.length) {
+        const list = results === null ? _searchAll() : results;
+        if (!list.length) {
             const el = document.createElement('div');
             el.className = 'filter-no-results';
-            el.textContent = 'No results';
+            el.textContent = results === null ? 'No aircraft in range' : 'No results';
             container.appendChild(el);
             return;
         }
-        const planes = results.filter(r => r.kind === 'plane');
-        const airports = results.filter(r => r.kind === 'airport');
-        const militaryBases = results.filter(r => r.kind === 'mil');
+        const planes = list.filter(r => r.kind === 'plane');
+        const airports = list.filter(r => r.kind === 'airport');
+        const militaryBases = list.filter(r => r.kind === 'mil');
         function addSection(label, items, renderFn) {
             if (!items.length)
                 return;
@@ -322,6 +334,7 @@ window._FilterPanel = (() => {
             input.focus();
             input.select();
         }
+        _renderResults(null, '');
     }
     function close() {
         _open = false;
@@ -409,9 +422,7 @@ window._FilterPanel = (() => {
             clearBtn.addEventListener('click', () => {
                 input.value = '';
                 clearBtn.classList.remove('filter-clear-visible');
-                const container = _getResults();
-                if (container)
-                    container.innerHTML = '';
+                _renderResults(null, '');
                 input.focus();
             });
         }

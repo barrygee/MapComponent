@@ -61,7 +61,12 @@ function initUserLocation(config) {
             }).setLngLat([longitude, latitude]).addTo(map);
         }
         if (isFirstFix && !position._fromCache) {
-            map.flyTo({ center: [longitude, latitude], zoom: Math.max(map.getZoom(), config.flyToZoom) });
+            if (typeof _spaceGlobeActive !== 'undefined' && _spaceGlobeActive) {
+                map.easeTo({ center: [longitude, latitude], duration: 800 });
+            }
+            else {
+                map.flyTo({ center: [longitude, latitude], zoom: Math.max(map.getZoom(), config.flyToZoom) });
+            }
         }
         _center = [longitude, latitude];
         _updateFooter(latitude, longitude);

@@ -108,7 +108,7 @@ window._SpaceFilterPanel = (() => {
     function _search(query) {
         const q = query.trim();
         if (!q)
-            return [];
+            return null; // null = show all
         const matchedCategory = _categoryForQuery(q);
         return _satellites.filter(s => _matchesQuery(q, s.name, s.norad_id) ||
             (matchedCategory !== null && s.category === matchedCategory));
@@ -169,8 +169,6 @@ window._SpaceFilterPanel = (() => {
         if (!container)
             return;
         container.innerHTML = '';
-        if (!query.trim())
-            return;
         if (!_loaded) {
             const el = document.createElement('div');
             el.className = 'space-filter-no-results';
@@ -178,7 +176,9 @@ window._SpaceFilterPanel = (() => {
             container.appendChild(el);
             return;
         }
-        if (!results.length) {
+        // null means no query — show all satellites grouped
+        const list = results === null ? _satellites : results;
+        if (!list.length) {
             const el = document.createElement('div');
             el.className = 'space-filter-no-results';
             el.textContent = 'No satellites found';
@@ -189,7 +189,7 @@ window._SpaceFilterPanel = (() => {
         const groups = new Map();
         for (const cat of _CATEGORY_ORDER)
             groups.set(cat, []);
-        for (const sat of results) {
+        for (const sat of list) {
             const key = sat.category || 'unknown';
             if (!groups.has(key))
                 groups.set(key, []);
@@ -247,8 +247,8 @@ window._SpaceFilterPanel = (() => {
             input.focus();
             input.select();
         }
-        // Refresh satellite list on open so it stays up to date
-        void _loadSatellites();
+        // Populate results (shows list if loaded, "Loading…" if still fetching)
+        _renderResults(null, '');
     }
     function close() {
         _open = false;
@@ -273,8 +273,11 @@ window._SpaceFilterPanel = (() => {
         const clearBtn = _getClearBtn();
         if (!input)
             return;
-        // Pre-load satellite list on init
-        void _loadSatellites();
+        // Pre-load satellite list on init, then populate if panel is already open
+        void _loadSatellites().then(() => {
+            if (_open && !input.value)
+                _renderResults(null, '');
+        });
         input.addEventListener('input', () => {
             const val = input.value;
             if (clearBtn)
@@ -332,9 +335,7 @@ window._SpaceFilterPanel = (() => {
             clearBtn.addEventListener('click', () => {
                 input.value = '';
                 clearBtn.classList.remove('space-filter-clear-visible');
-                const container = _getResults();
-                if (container)
-                    container.innerHTML = '';
+                _renderResults(null, '');
                 input.focus();
             });
         }

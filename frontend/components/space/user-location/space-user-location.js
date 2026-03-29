@@ -22,9 +22,23 @@ const _spaceUserLocation = initUserLocation({
 });
 /**
  * Fly the map to the user's last known location.
+ * In globe mode, just rotate to the location without changing zoom.
  */
 function goToSpaceUserLocation() {
-    _spaceUserLocation.goToLocation();
+    if (_spaceGlobeActive) {
+        const center = _spaceUserLocation.getCenter();
+        if (center) {
+            map.easeTo({ center: center, duration: 800 });
+            if (_onGoToSpaceUserLocation)
+                _onGoToSpaceUserLocation();
+        }
+        else {
+            _spaceUserLocation.goToLocation();
+        }
+    }
+    else {
+        _spaceUserLocation.goToLocation();
+    }
 }
 function setSpaceUserLocation(position) {
     _spaceUserLocation.setLocation(position);

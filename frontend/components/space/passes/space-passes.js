@@ -448,6 +448,7 @@ window._SpacePassesPanel = (() => {
         const pane = document.getElementById('msb-pane-passes');
         if (pane) {
             _injectHTML();
+            // Auto-populate immediately if location is available
             if (spaceUserLocationCenter)
                 void _fetchPasses();
             else

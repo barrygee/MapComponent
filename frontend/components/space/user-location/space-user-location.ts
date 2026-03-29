@@ -23,9 +23,20 @@ const _spaceUserLocation = initUserLocation({
 
 /**
  * Fly the map to the user's last known location.
+ * In globe mode, just rotate to the location without changing zoom.
  */
 function goToSpaceUserLocation(): void {
-    _spaceUserLocation.goToLocation();
+    if (_spaceGlobeActive) {
+        const center = _spaceUserLocation.getCenter();
+        if (center) {
+            map.easeTo({ center: center as maplibregl.LngLatLike, duration: 800 });
+            if (_onGoToSpaceUserLocation) _onGoToSpaceUserLocation();
+        } else {
+            _spaceUserLocation.goToLocation();
+        }
+    } else {
+        _spaceUserLocation.goToLocation();
+    }
 }
 
 function setSpaceUserLocation(position: { coords: { longitude: number; latitude: number }; _fromCache?: boolean; _manual?: boolean }): void {

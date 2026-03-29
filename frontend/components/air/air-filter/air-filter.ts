@@ -85,11 +85,25 @@ window._FilterPanel = (() => {
         return fields.some(field => field && field.toLowerCase().includes(lowerQuery));
     }
 
-    function _search(query: string): SearchResult[] {
-        const trimmedQuery = query.trim();
+    function _searchAll(): SearchResult[] {
         const results: SearchResult[] = [];
+        const planes = _getAircraftData();
+        for (const feature of planes) {
+            const props = feature.properties as AircraftProperties;
+            const callsign = (props.flight || '').trim();
+            const hex      = (props.hex || '').trim();
+            const reg      = (props.r || '').trim();
+            const squawk   = (props.squawk || '').trim();
+            results.push({ kind: 'plane', feature, callsign, hex, reg, squawk, emergency: !!props.emergency && props.emergency !== 'none' });
+        }
+        return results;
+    }
 
-        if (!trimmedQuery) return results;
+    function _search(query: string): SearchResult[] | null {
+        const trimmedQuery = query.trim();
+        if (!trimmedQuery) return null; // null = show all
+
+        const results: SearchResult[] = [];
 
         const planes = _getAircraftData();
         for (const feature of planes) {
@@ -163,24 +177,24 @@ window._FilterPanel = (() => {
         }
     }
 
-    function _renderResults(results: SearchResult[], query: string): void {
+    function _renderResults(results: SearchResult[] | null, query: string): void {
         const container = _getResults();
         if (!container) return;
         container.innerHTML = '';
 
-        if (!query.trim()) return;
+        const list = results === null ? _searchAll() : results;
 
-        if (!results.length) {
+        if (!list.length) {
             const el = document.createElement('div');
             el.className = 'filter-no-results';
-            el.textContent = 'No results';
+            el.textContent = results === null ? 'No aircraft in range' : 'No results';
             container.appendChild(el);
             return;
         }
 
-        const planes         = results.filter(r => r.kind === 'plane')   as PlaneResult[];
-        const airports       = results.filter(r => r.kind === 'airport') as AirportResult[];
-        const militaryBases  = results.filter(r => r.kind === 'mil')     as MilResult[];
+        const planes         = list.filter(r => r.kind === 'plane')   as PlaneResult[];
+        const airports       = list.filter(r => r.kind === 'airport') as AirportResult[];
+        const militaryBases  = list.filter(r => r.kind === 'mil')     as MilResult[];
 
         function addSection<T>(label: string, items: T[], renderFn: (r: T) => void) {
             if (!items.length) return;
@@ -377,6 +391,7 @@ window._FilterPanel = (() => {
         if (btn) { btn.classList.add('active'); btn.classList.remove('enabled'); }
         const input = _getInput();
         if (input) { input.focus(); input.select(); }
+        _renderResults(null, '');
     }
 
     function close(): void {
@@ -450,8 +465,7 @@ window._FilterPanel = (() => {
             clearBtn.addEventListener('click', () => {
                 input.value = '';
                 clearBtn.classList.remove('filter-clear-visible');
-                const container = _getResults();
-                if (container) container.innerHTML = '';
+                _renderResults(null, '');
                 input.focus();
             });
         }

@@ -64,6 +64,7 @@ map.once('load', function () {
     const STAR_COUNT = 320;
     let stars = [];
     let W = 0, H = 0;
+    // parallax offset driven by map bearing / pitch
     let offsetX = 0, offsetY = 0;
     function _resize() {
         W = canvas.width = window.innerWidth;
@@ -95,6 +96,7 @@ map.once('load', function () {
     _seed();
     _draw();
     window.addEventListener('resize', () => { _resize(); _seed(); _draw(); });
+    // Shift stars on map move/rotate for parallax effect
     let _lastBearing = 0;
     let _lastCenter = null;
     map.on('move', () => {
@@ -103,6 +105,7 @@ map.once('load', function () {
         const db = bearing - _lastBearing;
         const dlng = _lastCenter ? (center.lng - _lastCenter.lng) : 0;
         const dlat = _lastCenter ? (center.lat - _lastCenter.lat) : 0;
+        // Bearing change → rotate star field; pan → translate gently
         offsetX += db * 1.4 - dlng * 1.8;
         offsetY += dlat * 1.8;
         _lastBearing = bearing;
