@@ -419,6 +419,23 @@ window._FilterPanel = (() => {
         const clearBtn = _getClearBtn();
         if (!input) return;
 
+        // Populate results whenever the search tab becomes active
+        document.addEventListener('msb-tab-switch', (e: Event) => {
+            const { tab } = (e as CustomEvent<{ tab: string }>).detail;
+            if (tab === 'search') {
+                _renderResults(_search(input.value), input.value);
+            }
+        });
+
+        // Re-render when new ADS-B data arrives (handles initial data load delay)
+        document.addEventListener('adsb-data-update', () => {
+            const searchTab = document.querySelector<HTMLElement>('.msb-tab[data-tab="search"]');
+            const searchActive = searchTab && searchTab.classList.contains('msb-tab-active');
+            if (searchActive) {
+                _renderResults(_search(input.value), input.value);
+            }
+        });
+
         input.addEventListener('input', () => {
             const inputValue = input.value;
             if (clearBtn) clearBtn.classList.toggle('filter-clear-visible', inputValue.length > 0);

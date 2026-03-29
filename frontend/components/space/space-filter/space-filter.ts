@@ -290,25 +290,13 @@ window._SpaceFilterPanel = (() => {
         const clearBtn = _getClearBtn();
         if (!input) return;
 
-        // Pre-load satellite list on init, then populate results if the search tab
-        // is already visible (sidebar open on page load with search as active tab)
-        void _loadSatellites().then(() => {
-            const sidebar = document.getElementById('map-sidebar');
-            const searchTab = document.querySelector<HTMLElement>('.msb-tab[data-tab="search"]');
-            const sidebarOpen = sidebar && !sidebar.classList.contains('msb-hidden');
-            const searchActive = searchTab && searchTab.classList.contains('msb-tab-active');
-            if (sidebarOpen && searchActive) {
-                _open = true;
-                _renderResults(_search(input.value), input.value);
-            } else if (_open && !input.value) {
-                _renderResults(null, '');
-            }
-        });
+        // Pre-load satellite list on init
+        void _loadSatellites();
 
-        // Populate results whenever the search tab becomes active
+        // Populate results whenever the search tab becomes active (only if user has already opened search)
         document.addEventListener('msb-tab-switch', (e: Event) => {
             const { tab } = (e as CustomEvent<{ tab: string }>).detail;
-            if (tab === 'search') {
+            if (tab === 'search' && (_open || input.value.length > 0)) {
                 _open = true;
                 _renderResults(_search(input.value), input.value);
             }
