@@ -290,13 +290,19 @@ window._SpaceFilterPanel = (() => {
         const clearBtn = _getClearBtn();
         if (!input) return;
 
-        // Pre-load satellite list on init
-        void _loadSatellites();
+        // Pre-load satellite list on init; render immediately if search tab is already active
+        void _loadSatellites().then(() => {
+            const pane = document.getElementById('msb-pane-search');
+            if (pane && pane.classList.contains('msb-pane-active')) {
+                _open = true;
+                _renderResults(_search(input.value), input.value);
+            }
+        });
 
-        // Populate results whenever the search tab becomes active (only if user has already opened search)
+        // Populate results whenever the search tab becomes active
         document.addEventListener('msb-tab-switch', (e: Event) => {
             const { tab } = (e as CustomEvent<{ tab: string }>).detail;
-            if (tab === 'search' && (_open || input.value.length > 0)) {
+            if (tab === 'search') {
                 _open = true;
                 _renderResults(_search(input.value), input.value);
             }

@@ -46,6 +46,9 @@ if (typeof window._SpaceFilterPanel !== 'undefined') {
 if (typeof window._SpacePassesPanel !== 'undefined') {
     window._SpacePassesPanel.init();
 }
+if (typeof window._SatInfoPanel !== 'undefined') {
+    window._SatInfoPanel.init();
+}
 // ---- 2b. Sync space overlay states from backend (after controls are ready) ----
 map.once('load', function () {
     if (typeof _syncSpaceOverlayStatesFromBackend === 'function') {

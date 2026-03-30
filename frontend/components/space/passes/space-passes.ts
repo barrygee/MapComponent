@@ -262,8 +262,13 @@ window._SpacePassesPanel = (() => {
 
         pane.appendChild(statusBar);
         pane.appendChild(list);
-        pane.appendChild(filterToggle);
-        pane.appendChild(filterBody);
+
+        // Filter toggle + body go into #map-sidebar (after panes) so they're
+        // visible on all tabs, below the SATELLITE INFO panel
+        const sidebar = document.getElementById('map-sidebar');
+        const target = sidebar || pane;
+        target.appendChild(filterToggle);
+        target.appendChild(filterBody);
 
         _injected = true;
     }

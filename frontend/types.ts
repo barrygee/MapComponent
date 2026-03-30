@@ -221,6 +221,13 @@ interface MapSidebarInitOptions {
     trackingEmptyText?: string;
 }
 
+// ----- Sat info panel -----
+interface SatInfoPanelAPI {
+    init(): void;
+    show(noradId: string, name: string): void;
+    close(): void;
+}
+
 interface MapSidebarAPI {
     init(opts?: MapSidebarInitOptions): void;
     switchTab(tab: 'search' | 'alerts' | 'tracking' | 'passes'): void;

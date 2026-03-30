@@ -1,0 +1,328 @@
+/* ============================================================
+   SAT INFO PANEL
+   Appended directly to #map-sidebar so it persists across all tabs.
+   Mirrors the .spp-filter-toggle / .spp-filter-body pattern.
+   ============================================================ */
+
+/* ============================================================
+   TOGGLE HEADER
+   ============================================================ */
+
+.sip-toggle {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 18px 20px 18px 28px;
+    background: none;
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: background 0.12s;
+    box-sizing: border-box;
+}
+
+.sip-toggle:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Left: chevron + label */
+.sip-toggle-left {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+}
+
+.sip-toggle-icon {
+    display: flex;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.3);
+    transition: transform 0.2s ease, color 0.15s;
+    flex-shrink: 0;
+    transform: rotate(-90deg);
+}
+
+.sip-toggle.sip-expanded .sip-toggle-icon {
+    transform: rotate(0deg);
+    color: var(--color-accent);
+}
+
+.sip-toggle-label {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    transition: color 0.15s;
+}
+
+.sip-toggle.sip-expanded .sip-toggle-label {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Right: sat name + norad (fades out when expanded) */
+.sip-toggle-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    min-width: 0;
+    overflow: hidden;
+    transition: opacity 0.15s;
+}
+
+.sip-toggle.sip-expanded .sip-toggle-right {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sip-sat-name {
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.45);
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+}
+
+.sip-sat-norad {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.22);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* ============================================================
+   COLLAPSIBLE BODY
+   ============================================================ */
+
+.sip-body {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.25s ease, opacity 0.2s ease;
+}
+
+.sip-body.sip-expanded {
+    max-height: 520px;
+    opacity: 1;
+}
+
+/* ---- Sat name header inside body ---- */
+.sip-body-header {
+    flex-shrink: 0;
+    padding: 16px 20px 10px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sip-body-name {
+    font-family: var(--font-primary);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: #fff;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sip-body-norad {
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.32);
+    text-transform: uppercase;
+}
+
+/* ---- Status bar ---- */
+.sip-status {
+    flex-shrink: 0;
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.22);
+    text-transform: uppercase;
+    padding: 14px 20px 6px 28px;
+}
+
+.sip-status.sip-loading {
+    color: var(--color-accent);
+}
+
+/* ---- Pass list ---- */
+.sip-list {
+    overflow-y: auto;
+    max-height: 380px;
+    scrollbar-width: none;
+}
+
+.sip-list::-webkit-scrollbar {
+    display: none;
+}
+
+/* ---- Pass card ---- */
+.sip-pass-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 20px 10px 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sip-pass-card:first-child {
+    padding-top: 12px;
+}
+
+.sip-pass-card:last-child {
+    border-bottom: none;
+    padding-bottom: 16px;
+}
+
+.sip-pass-num {
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.18);
+    flex-shrink: 0;
+    min-width: 18px;
+}
+
+.sip-pass-times {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sip-pass-aos-row {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+}
+
+.sip-pass-date {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.28);
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.sip-pass-time {
+    font-family: var(--font-primary);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #fff;
+}
+
+.sip-pass-los {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.07em;
+    color: rgba(255, 255, 255, 0.28);
+    text-transform: uppercase;
+}
+
+.sip-pass-meta {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.sip-pass-countdown {
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--color-accent);
+    white-space: nowrap;
+    text-transform: uppercase;
+}
+
+.sip-pass-countdown.sip-in-progress {
+    color: #ff9900;
+}
+
+.sip-pass-maxel {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.07em;
+    color: rgba(255, 255, 255, 0.32);
+    white-space: nowrap;
+    text-transform: uppercase;
+}
+
+/* ============================================================
+   MESSAGE / EMPTY STATE
+   ============================================================ */
+
+.sip-message {
+    padding: 14px 20px 18px 28px;
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.25);
+    text-transform: uppercase;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.6;
+}
+
+.sip-action-btn {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 5px 10px;
+    text-transform: uppercase;
+    transition: color 0.12s, border-color 0.12s;
+}
+
+.sip-action-btn:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================================
+   SPACE DOMAIN ONLY — hide on other domains
+   ============================================================ */
+
+body:not([data-domain="space"]) .sip-toggle,
+body:not([data-domain="space"]) .sip-body {
+    display: none;
+}

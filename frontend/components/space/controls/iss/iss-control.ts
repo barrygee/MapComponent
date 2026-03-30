@@ -1020,6 +1020,9 @@ class IssControl extends SentinelControlBase {
         this._stopPolling();
         this._fetch();
         this._startPolling();
+
+        // Notify sat-info panel
+        document.dispatchEvent(new CustomEvent('satellite-selected', { detail: { noradId, name } }));
     }
 
     // ---- Visibility toggles ----

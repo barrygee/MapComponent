@@ -364,12 +364,14 @@ window._FilterPanel = (() => {
         const clearBtn = _getClearBtn();
         if (!input)
             return;
+        // Populate results whenever the search tab becomes active
         document.addEventListener('msb-tab-switch', (e) => {
             const { tab } = e.detail;
             if (tab === 'search') {
                 _renderResults(_search(input.value), input.value);
             }
         });
+        // Re-render when new ADS-B data arrives (handles initial data load delay)
         document.addEventListener('adsb-data-update', () => {
             const searchTab = document.querySelector('.msb-tab[data-tab="search"]');
             const searchActive = searchTab && searchTab.classList.contains('msb-tab-active');

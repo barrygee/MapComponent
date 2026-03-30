@@ -426,3 +426,9 @@
     color: #fff;
     border-color: rgba(255, 255, 255, 0.5);
 }
+
+/* Filter toggle + body live in #map-sidebar — hide on non-space domains */
+body:not([data-domain="space"]) .spp-filter-toggle,
+body:not([data-domain="space"]) .spp-filter-body {
+    display: none;
+}
