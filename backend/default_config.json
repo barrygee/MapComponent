@@ -36,7 +36,11 @@
   },
   "sdr": {
     "enabled": true,
-    "onlineUrl": "https://",
-    "offgridSource": { "url": "http://localhost" }
+    "defaultSampleRate": 2048000,
+    "defaultFftSize": 1024,
+    "defaultGain": 30.0,
+    "defaultSquelch": -60.0,
+    "waterfallRows": 300,
+    "spectrumFps": 15
   }
 }

@@ -1,0 +1,156 @@
+/* ============================================================
+   SDR SIDE MENU
+   Collapsible right-side overlay.
+   Follows the exact same structure as space-side-menu.css.
+   ============================================================ */
+
+#sdr-side-menu {
+    position: fixed;
+    top: 80px;
+    right: 14px;
+    z-index: 1002;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+}
+
+#sdr-side-menu .sm-group {
+    background: transparent;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 4px;
+    width: calc((148px - 8px) / 3);
+    transition: width 0.2s ease;
+}
+
+#sdr-side-menu.expanded .sm-group {
+    width: 148px;
+}
+
+#sdr-side-menu.expanded #ssdr-group-toggle {
+    gap: 0;
+    width: calc((148px - 8px) / 3);
+}
+
+#sdr-side-menu-toggle {
+    width: 100%;
+    height: 36px;
+    background: #000;
+    border: none;
+    color: rgba(255, 255, 255, 0.35);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, background 0.2s;
+}
+
+#sdr-side-menu-toggle:hover {
+    background: #111;
+    color: var(--color-text-muted);
+}
+
+#sdr-side-menu .sm-btn {
+    width: 100%;
+    height: 36px;
+    background: #000;
+    border: none;
+    color: #fff;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, opacity 0.2s, color 0.2s;
+    opacity: 1;
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 0;
+}
+
+#sdr-side-menu .sm-btn:hover {
+    background: #111;
+}
+
+#sdr-side-menu .sm-btn.active {
+    color: rgba(200, 255, 0, 0.75);
+}
+
+#sdr-side-menu .sm-btn .sm-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 29px;
+    flex-shrink: 0;
+}
+
+#sdr-side-menu .sm-btn .sm-icon svg {
+    display: block;
+    flex-shrink: 0;
+    width: auto;
+    height: 15px;
+}
+
+#sdr-side-menu .sm-btn .sm-label {
+    display: none;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+}
+
+#sdr-side-menu.expanded .sm-btn {
+    justify-content: flex-start;
+    padding: 0 14px;
+}
+
+#sdr-side-menu.expanded .sm-btn .sm-icon {
+    display: none;
+}
+
+#sdr-side-menu.expanded .sm-btn .sm-label {
+    display: flex;
+}
+
+/* ---- Tooltips ---- */
+#sdr-side-menu:not(.expanded) .sm-btn[data-tooltip],
+#sdr-side-menu:not(.expanded) #sdr-side-menu-toggle[data-tooltip] {
+    position: relative;
+}
+
+#sdr-side-menu:not(.expanded) .sm-btn[data-tooltip]::before,
+#sdr-side-menu:not(.expanded) #sdr-side-menu-toggle[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    right: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #000;
+    color: var(--color-text-muted);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0 10px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 1002;
+}
+
+#sdr-side-menu:not(.expanded) .sm-btn[data-tooltip]:hover::before,
+#sdr-side-menu:not(.expanded) #sdr-side-menu-toggle[data-tooltip]:hover::before {
+    opacity: 1;
+}

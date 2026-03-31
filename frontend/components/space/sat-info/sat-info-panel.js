@@ -111,7 +111,14 @@ window._SatInfoPanel = (() => {
         const liveData = document.createElement('div');
         liveData.id = 'sip-live-data';
         liveData.className = 'sip-live-data';
-        [['ALT', 'alt'], ['VEL', 'vel'], ['HDG', 'hdg'], ['LAT', 'lat'], ['LON', 'lon']].forEach(([lbl, key]) => {
+        const fields = [
+            ['ALT', '—'],
+            ['VEL', '—'],
+            ['HDG', '—'],
+            ['LAT', '—'],
+            ['LON', '—'],
+        ];
+        fields.forEach(([lbl]) => {
             const row = document.createElement('div');
             row.className = 'sip-live-row';
             const labelEl = document.createElement('span');
@@ -119,7 +126,7 @@ window._SatInfoPanel = (() => {
             labelEl.textContent = lbl;
             const valueEl = document.createElement('span');
             valueEl.className = 'sip-live-value';
-            valueEl.id = `sip-live-${key}`;
+            valueEl.id = `sip-live-${lbl.toLowerCase()}`;
             valueEl.textContent = '—';
             row.appendChild(labelEl);
             row.appendChild(valueEl);
@@ -129,10 +136,6 @@ window._SatInfoPanel = (() => {
         const status = document.createElement('div');
         status.id = 'sip-status';
         status.className = 'sip-status';
-        // Passes section title
-        const passesTitle = document.createElement('div');
-        passesTitle.className = 'sip-passes-title';
-        passesTitle.textContent = 'UPCOMING PASSES';
         // Pass list
         const list = document.createElement('div');
         list.id = 'sip-list';
@@ -140,7 +143,6 @@ window._SatInfoPanel = (() => {
         body.appendChild(bodyHeader);
         body.appendChild(liveData);
         body.appendChild(status);
-        body.appendChild(passesTitle);
         body.appendChild(list);
         // Wire toggle click
         toggle.addEventListener('click', () => {
@@ -157,7 +159,8 @@ window._SatInfoPanel = (() => {
         if (panesEl && panesEl.nextSibling) {
             sidebar.insertBefore(toggle, panesEl.nextSibling);
             sidebar.insertBefore(body, toggle.nextSibling);
-        } else {
+        }
+        else {
             sidebar.appendChild(toggle);
             sidebar.appendChild(body);
         }
@@ -249,13 +252,15 @@ window._SatInfoPanel = (() => {
             return;
         }
         const now = Date.now();
-        passes.slice(0, 10).forEach((pass, i) => {
+        passes.forEach((pass, i) => {
             const card = document.createElement('div');
             card.className = 'sip-pass-card';
             card.dataset['aosMs'] = String(pass.aos_unix_ms);
             card.dataset['losMs'] = String(pass.los_unix_ms);
             const isNow = now >= pass.aos_unix_ms && now <= pass.los_unix_ms;
-
+            const num = document.createElement('div');
+            num.className = 'sip-pass-num';
+            num.textContent = String(i + 1).padStart(2, '0');
             const times = document.createElement('div');
             times.className = 'sip-pass-times';
             const aosRow = document.createElement('div');
@@ -283,6 +288,7 @@ window._SatInfoPanel = (() => {
             maxEl.textContent = `MAX ${pass.max_elevation_deg.toFixed(1)}°`;
             meta.appendChild(countdown);
             meta.appendChild(maxEl);
+            card.appendChild(num);
             card.appendChild(times);
             card.appendChild(meta);
             list.appendChild(card);
@@ -332,11 +338,19 @@ window._SatInfoPanel = (() => {
             bodyName.textContent = name;
         if (bodyNorad)
             bodyNorad.textContent = `NORAD ${noradId}`;
-        // Show toggle but don't auto-expand
+        // Auto-expand — but don't switch tabs
+        _expanded = true;
         const body = _getBody();
         const toggle = _getToggle();
-        if (toggle) { toggle.style.display = ''; }
-        if (body) { body.style.display = ''; }
+        if (toggle) {
+            toggle.style.display = '';
+            toggle.classList.add('sip-expanded');
+            toggle.setAttribute('aria-expanded', 'true');
+        }
+        if (body) {
+            body.style.display = '';
+            body.classList.add('sip-expanded');
+        }
         // Show sidebar (whatever tab is active stays active)
         if (window._MapSidebar)
             window._MapSidebar.show();
@@ -367,11 +381,17 @@ window._SatInfoPanel = (() => {
         }
         const toggle = _getToggle();
         const body = _getBody();
-        if (toggle) toggle.style.display = 'none';
-        if (body) body.style.display = 'none';
+        if (toggle)
+            toggle.style.display = 'none';
+        if (body)
+            body.style.display = 'none';
     }
     function updatePosition(p) {
-        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+        const set = (id, val) => {
+            const el = document.getElementById(id);
+            if (el)
+                el.textContent = val;
+        };
         set('sip-live-alt', `${p.alt_km} km`);
         set('sip-live-vel', `${p.velocity_kms} km/s`);
         set('sip-live-hdg', `${p.track_deg}°`);
@@ -388,8 +408,6 @@ window._SatInfoPanel = (() => {
             const { noradId, name } = e.detail;
             show(noradId, name);
         });
-        // Default to ISS (auto-selected when space section opens)
-        show('25544', 'ISS');
     }
     return { init, show, close, updatePosition };
 })();

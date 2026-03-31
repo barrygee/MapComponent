@@ -1,0 +1,81 @@
+/* ============================================================
+   SDR DISPLAY — SigPlot layout + tuning overlay
+   ============================================================ */
+
+#sdr-content {
+    position: fixed;
+    top: var(--nav-height);
+    bottom: calc(var(--footer-height) + 72px);
+    left: 260px;
+    right: 47px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+    overflow: hidden;
+    transition: left 0.2s ease;
+}
+
+body.sdr-panel-hidden #sdr-content {
+    left: 0;
+}
+
+/* Spectrum: top 30% */
+#sdr-spectrum {
+    flex: 0 0 30%;
+    min-height: 0;
+    width: 100%;
+    background: #000;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+/* Waterfall: remaining 70% */
+#sdr-waterfall {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    background: #000;
+}
+
+/* SigPlot canvas elements fill their containers */
+#sdr-spectrum canvas,
+#sdr-waterfall canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+#sdr-spectrum > div,
+#sdr-waterfall > div {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Tuning overlay — covers full content area, pointer events on top */
+#sdr-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    z-index: 10;
+    pointer-events: auto;
+}
+
+/* No-signal placeholder */
+#sdr-content.sdr-no-signal::after {
+    content: 'SELECT A RADIO TO BEGIN';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+    z-index: 1;
+}

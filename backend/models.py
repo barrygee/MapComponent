@@ -84,6 +84,46 @@ class AirTracking(Base):
     added_at  = Column(Integer, nullable=False)            # Unix ms when tracking began
 
 
+class SdrRadio(Base):
+    """A configured SDR device reachable via rtl_tcp on the network."""
+    __tablename__ = "sdr_radios"
+
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    name        = Column(Text, nullable=False)               # user label e.g. "Roof RTL-SDR"
+    host        = Column(Text, nullable=False)               # hostname or IP e.g. "192.168.1.45"
+    port        = Column(Integer, nullable=False, default=1234)
+    description = Column(Text, nullable=False, default="")
+    enabled     = Column(Boolean, nullable=False, default=True)
+    created_at  = Column(Integer, nullable=False)            # Unix ms
+
+
+class SdrFrequencyGroup(Base):
+    """Named group that organises stored frequencies (e.g. 'Aviation', 'Marine')."""
+    __tablename__ = "sdr_frequency_groups"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    name       = Column(Text, nullable=False)
+    color      = Column(Text, nullable=False, default="#c8ff00")
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(Integer, nullable=False)             # Unix ms
+
+
+class SdrStoredFrequency(Base):
+    """An individual saved frequency (bookmark) with tuning parameters."""
+    __tablename__ = "sdr_stored_frequencies"
+
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    group_id     = Column(Integer, nullable=True)            # FK → sdr_frequency_groups.id (nullable = ungrouped)
+    label        = Column(Text, nullable=False)              # e.g. "ATIS 118.05"
+    frequency_hz = Column(Integer, nullable=False)           # stored as integer Hz e.g. 118050000
+    mode         = Column(Text, nullable=False, default="AM")  # AM|NFM|WFM|USB|LSB|CW
+    squelch      = Column(Float, nullable=False, default=-60.0)  # dBFS threshold
+    gain         = Column(Float, nullable=False, default=30.0)   # dB; use -1.0 for auto
+    scannable    = Column(Boolean, nullable=False, default=True)
+    notes        = Column(Text, nullable=False, default="")
+    created_at   = Column(Integer, nullable=False)           # Unix ms
+
+
 class UserSettings(Base):
     """User preferences and overlay toggle states, persisted across browser sessions.
 

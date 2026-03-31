@@ -19,6 +19,7 @@ Endpoints:
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
+import httpx
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import case, delete, func, select
@@ -422,8 +423,10 @@ async def fetch_tle_from_url(
 
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=422)
+    except (httpx.TimeoutException, httpx.ConnectError) as e:
+        return JSONResponse({"error": f"Network error — could not reach {url}: {type(e).__name__}"}, status_code=502)
     except Exception as e:
-        return JSONResponse({"error": f"Fetch failed: {e}"}, status_code=502)
+        return JSONResponse({"error": f"Fetch failed: {type(e).__name__}: {e}"}, status_code=502)
 
 
 @router.post("/tle/manual")

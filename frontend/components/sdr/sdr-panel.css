@@ -1,0 +1,453 @@
+/* ============================================================
+   SDR PANEL
+   Fixed left panel for the SDR page.
+   Mirrors the geometry of #map-sidebar but is entirely SDR-specific.
+   ============================================================ */
+
+#sdr-panel {
+    position: fixed;
+    top: var(--nav-height);         /* 68px */
+    bottom: var(--footer-height);   /* 44px */
+    left: 0;
+    width: 260px;
+    background: rgba(10, 13, 20, 0.97);
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+    transform: translateX(0);
+    transition: transform 0.2s ease;
+}
+
+#sdr-panel.sdr-panel-hidden {
+    transform: translateX(-100%);
+}
+
+/* ---- Tab bar ---- */
+#sdr-panel-tabs {
+    display: flex;
+    flex-shrink: 0;
+    height: 44px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.sdr-ptab {
+    flex: 1;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: rgba(255, 255, 255, 0.28);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.15s, border-color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sdr-ptab:hover {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.sdr-ptab.sdr-ptab-active {
+    color: #c8ff00;
+    border-bottom-color: #c8ff00;
+}
+
+/* ---- Pane container ---- */
+#sdr-panel-panes {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.sdr-ppane {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+.sdr-ppane.sdr-ppane-active {
+    display: flex;
+}
+
+/* ---- FREQS pane ---- */
+#sdr-pane-freqs {
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 8px 0;
+}
+
+#sdr-pane-freqs::-webkit-scrollbar { display: none; }
+
+.sdr-freq-group-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 14px 4px;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.sdr-freq-group-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sdr-freq-row-item {
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: background 0.12s;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.sdr-freq-row-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.sdr-freq-row-main {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 2px;
+}
+
+.sdr-freq-row-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+.sdr-freq-row-mode {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(200, 255, 0, 0.6);
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.sdr-freq-row-hz {
+    font-family: 'Barlow Condensed', 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    color: #c8ff00;
+    letter-spacing: 0.02em;
+}
+
+.sdr-freq-row-hz span {
+    font-size: 9px;
+    color: rgba(200, 255, 0, 0.5);
+    margin-left: 2px;
+}
+
+.sdr-panel-empty {
+    padding: 24px 18px;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.18);
+    line-height: 1.7;
+    display: none;
+}
+
+/* ---- GROUPS pane ---- */
+#sdr-pane-groups {
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 8px 0;
+}
+
+#sdr-pane-groups::-webkit-scrollbar { display: none; }
+
+.sdr-group-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sdr-group-name {
+    flex: 1;
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.sdr-group-del {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 4px;
+    transition: color 0.15s;
+}
+
+.sdr-group-del:hover { color: rgba(255, 80, 80, 0.8); }
+
+.sdr-panel-add-row {
+    display: flex;
+    gap: 6px;
+    padding: 10px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin-top: auto;
+    flex-shrink: 0;
+}
+
+.sdr-panel-input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    color: rgba(255, 255, 255, 0.85);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    padding: 5px 8px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.sdr-panel-input:focus {
+    border-color: rgba(200, 255, 0, 0.5);
+}
+
+.sdr-panel-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.sdr-panel-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.sdr-panel-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.sdr-panel-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+/* ---- SCAN pane ---- */
+#sdr-pane-scan {
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 12px 14px;
+    gap: 10px;
+}
+
+#sdr-pane-scan::-webkit-scrollbar { display: none; }
+
+.sdr-scan-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.sdr-scan-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    flex-shrink: 0;
+}
+
+.sdr-scan-indicator.sdr-scan-running {
+    background: #c8ff00;
+    animation: sdr-scan-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes sdr-scan-pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.3; }
+}
+
+#sdr-scan-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.sdr-scan-current {
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 14px;
+    color: #c8ff00;
+    letter-spacing: 0.04em;
+    min-height: 18px;
+    margin-bottom: 4px;
+}
+
+.sdr-scan-dwell-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.sdr-scan-dwell-row .sdr-ctrl-label {
+    font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+    white-space: nowrap;
+}
+
+.sdr-scan-dwell-unit {
+    font-family: 'Barlow', sans-serif;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.sdr-scan-dwell-row .sdr-panel-input {
+    width: 70px;
+    flex: none;
+}
+
+.sdr-scan-controls {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.sdr-scan-btn { background: rgba(200,255,0,0.08); border-color: rgba(200,255,0,0.25); color: #c8ff00; }
+.sdr-scan-btn:hover { background: rgba(200,255,0,0.15); }
+.sdr-scan-stop-btn { }
+
+.sdr-scan-queue-label {
+    font-family: 'Barlow', sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.25);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sdr-scan-queue-label span {
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.sdr-scan-item {
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+/* ---- TEST pane ---- */
+#sdr-pane-test {
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 10px 0;
+    gap: 6px;
+}
+
+#sdr-pane-test::-webkit-scrollbar { display: none; }
+
+.sdr-test-section-label {
+    font-family: 'Barlow', sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.25);
+    padding: 0 14px 6px;
+}
+
+.sdr-test-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 14px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.sdr-test-row .sdr-ctrl-label {
+    font-family: 'Barlow', sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.28);
+    margin-bottom: 0;
+}
+
+.sdr-test-row .sdr-panel-input {
+    flex: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.sdr-test-log {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 0 14px;
+    font-family: 'Barlow Condensed', monospace, sans-serif;
+    font-size: 10px;
+    max-height: 180px;
+}
+
+.sdr-test-log::-webkit-scrollbar { display: none; }
+
+.sdr-test-log-line {
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+.sdr-test-sent { color: rgba(200, 255, 0, 0.7); }
+.sdr-test-ok   { color: rgba(255, 255, 255, 0.5); }
+.sdr-test-err  { color: rgba(255, 80, 80, 0.8); }

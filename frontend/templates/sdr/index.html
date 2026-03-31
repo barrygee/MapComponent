@@ -1,15 +1,32 @@
 {% extends "base.html" %}
 
+{% block head %}
+    <link rel="stylesheet" href="/frontend/components/sdr/sdr-panel.css">
+    <link rel="stylesheet" href="/frontend/components/sdr/sdr-display.css">
+    <link rel="stylesheet" href="/frontend/components/sdr/sdr-controls.css">
+    <link rel="stylesheet" href="/frontend/components/sdr/sdr-side-menu.css">
+{% endblock %}
+
 {% block content %}
-    <div class="no-url-overlay">
-        <div class="no-url-overlay-box">
-            <div class="no-url-overlay-domain">SDR</div>
-            <div class="no-url-overlay-title">Coming Soon</div>
-            <div class="no-url-overlay-msg">Software-defined radio monitoring is under development.</div>
-        </div>
-    </div>
+    <div id="sdr-root"></div>
 {% endblock %}
 
 {% block scripts %}
-    <script src="/frontend/assets/template.js"></script>
+    <!-- SigPlot: bundled offline (no CDN) -->
+    <script src="/assets/vendor/sigplot/sigplot.bundle.js"></script>
+
+    <!-- SDR: global state variables (must load first) -->
+    <script src="/frontend/components/sdr/sdr-globals.js"></script>
+
+    <!-- SDR: UI components -->
+    <script src="/frontend/components/sdr/sdr-display.js"></script>
+    <script src="/frontend/components/sdr/sdr-controls.js"></script>
+    <script src="/frontend/components/sdr/sdr-panel.js"></script>
+    <script src="/frontend/components/sdr/sdr-side-menu.js"></script>
+
+    <!-- SDR: audio demodulator -->
+    <script src="/frontend/components/sdr/sdr-audio.js"></script>
+
+    <!-- SDR: boot (wires everything, opens WebSocket) -->
+    <script src="/frontend/components/sdr/sdr-boot.js"></script>
 {% endblock %}
