@@ -349,8 +349,20 @@
         if (!hz)
             return;
         _sdrCurrentFreqHz = hz;
-        sendCmd({ cmd: 'tune', frequency_hz: hz });
         displayFreq(hz);
+        if (window._SdrAudio)
+            window._SdrAudio.initAudio();
+        if (!_sdrSocket || _sdrSocket.readyState !== WebSocket.OPEN) {
+            // Socket is dead — trigger a reconnect; boot will auto-tune on open
+            sessionStorage.setItem('sdrLastFreqHz', String(hz));
+            sessionStorage.setItem('sdrLastMode', _sdrCurrentMode);
+            const radioId = getSelectedRadioId();
+            if (radioId) {
+                document.dispatchEvent(new CustomEvent('sdr-radio-selected', { detail: { radioId } }));
+            }
+            return;
+        }
+        sendCmd({ cmd: 'tune', frequency_hz: hz });
     }
     freqTuneBtn.addEventListener('click', tune);
     freqInput.addEventListener('keydown', (e) => { if (e.key === 'Enter')
@@ -760,7 +772,7 @@
         }
         buildDeviceMenu(radios);
     };
-    window._SdrControls = { setStatus, applyStatus, getSelectedRadioId };
+    window._SdrControls = { setStatus, applyStatus, getSelectedRadioId, updateSignalBar };
     // ── Render frequency list ─────────────────────────────────────────────────
     function renderFreqs() {
         const list = document.getElementById('sdr-freq-list');

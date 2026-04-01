@@ -85,6 +85,7 @@ interface SdrControlsAPI {
     setStatus(connected: boolean): void;
     applyStatus(msg: SdrStatusMsg): void;
     getSelectedRadioId(): number | null;
+    updateSignalBar(dbfs: number): void;
 }
 
 interface SdrPanelAPI {

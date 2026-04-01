@@ -324,7 +324,10 @@ async def sdr_iq_websocket(radio_id: int, websocket: WebSocket):
             await websocket.send_text(json.dumps({"type": "error", "code": "CONNECT_FAILED", "message": str(last_exc)}))
         except Exception:
             pass
-        await websocket.close()
+        try:
+            await websocket.close()
+        except RuntimeError:
+            pass
         return
 
     queue = broadcaster.subscribe_iq()
@@ -389,7 +392,10 @@ async def sdr_websocket(radio_id: int, websocket: WebSocket):
             await websocket.send_text(json.dumps({"type": "error", "code": "CONNECT_FAILED", "message": str(last_exc)}))
         except Exception:
             pass
-        await websocket.close()
+        try:
+            await websocket.close()
+        except RuntimeError:
+            pass
         return
 
     conn = sdr_svc.get_connection(radio.host, radio.port)

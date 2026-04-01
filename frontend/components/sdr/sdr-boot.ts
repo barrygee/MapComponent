@@ -71,6 +71,13 @@
                     sessionStorage.setItem('sdrLastFreqHz', String(msg.center_hz));
                     sessionStorage.setItem('sdrLastMode',   msg.mode);
                     break;
+                case 'spectrum':
+                    if (window._SdrControls && Array.isArray(msg.bins) && msg.bins.length > 0) {
+                        const bins: number[] = msg.bins;
+                        const peak = Math.max(...bins);
+                        window._SdrControls.updateSignalBar(peak);
+                    }
+                    break;
                 case 'error':
                     console.warn('[SDR] error', msg.code, msg.message);
                     if (window._SdrControls) window._SdrControls.setStatus(false);

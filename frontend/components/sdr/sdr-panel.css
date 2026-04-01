@@ -49,6 +49,7 @@
 #sdr-pane-radio {
     overflow-y: visible;
     scrollbar-width: none;
+    padding-bottom: 20px;
 }
 
 /* Status row (status label only, inside collapsed body) */
@@ -837,6 +838,14 @@
 .sdr-scanner-section-toggle-expanded .sdr-scanner-section-icon {
     transform: rotate(0deg);
     color: #c8ff00;
+}
+
+.sdr-scanner-main-toggle .sdr-scanner-section-icon {
+    transform: rotate(-90deg);
+}
+
+.sdr-scanner-main-toggle-expanded .sdr-scanner-section-icon {
+    transform: rotate(0deg);
 }
 
 .sdr-scanner-section-label {
