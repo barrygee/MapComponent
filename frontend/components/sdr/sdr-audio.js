@@ -21,13 +21,13 @@
     let _iqSocket = null;
     let _radioId = null;
     let _ready = false;
-    let _mode = 'WFM';
+    let _mode = 'AM';
     let _squelch = -120;
     // Processor source inlined to avoid Safari blob/fetch/proxy issues with addModule
     const PROCESSOR_SRC = `registerProcessor('sdr-demod-processor', class extends AudioWorkletProcessor {
     constructor() {
         super();
-        this._mode='WFM'; this._squelch=-120; this._sampleRate=2048000;
+        this._mode='AM'; this._squelch=-120; this._sampleRate=2048000;
         this._buf=[]; this._wfmPrevI=1; this._wfmPrevQ=0; this._amDc=0;
         this._bwHz=0; // 0 = full bandwidth
         this.port.onmessage=(ev)=>{
@@ -68,17 +68,24 @@
     }
     _am(i,q){
         const n=i.length,e=new Float32Array(n);
+        // DC removal: time constant ~0.05s at input sample rate
         const a=1/(this._sampleRate*0.05);let dc=this._amDc;
         for(let k=0;k<n;k++){const m=Math.sqrt(i[k]*i[k]+q[k]*q[k]);dc+=a*(m-dc);e[k]=m-dc;}
         this._amDc=dc;return this._decimate(e,this._sampleRate,48000);
     }
     _ssb(i,q,s){const o=new Float32Array(i.length);for(let k=0;k<i.length;k++)o[k]=i[k]+s*q[k];return this._decimate(o,this._sampleRate,48000);}
+    // Decimate with boxcar (moving-average) anti-alias filter.
+    // Decimation factor D = round(inR/outR). Filter averages D samples per output.
     _decimate(inp,inR,outR){
         const D=Math.round(inR/outR);
         if(D<=1)return inp;
         const n=Math.floor(inp.length/D),o=new Float32Array(n);
         const inv=1/D;
-        for(let k=0;k<n;k++){let s=0,base=k*D;for(let j=0;j<D;j++)s+=inp[base+j];o[k]=s*inv;}
+        for(let k=0;k<n;k++){
+            let s=0,base=k*D;
+            for(let j=0;j<D;j++)s+=inp[base+j];
+            o[k]=s*inv;
+        }
         return o;
     }
     process(_,outputs){
@@ -95,7 +102,7 @@
             const blob = new Blob([PROCESSOR_SRC], { type: 'application/javascript' });
             const blobUrl = URL.createObjectURL(blob);
             _ctx = new AudioContext({ sampleRate: 48000 });
-            _ctx.resume().catch(() => {});
+            _ctx.resume().catch(() => { });
             await _ctx.audioWorklet.addModule(blobUrl);
             URL.revokeObjectURL(blobUrl);
             _worklet = new AudioWorkletNode(_ctx, 'sdr-demod-processor', {
@@ -130,9 +137,8 @@
         ws.binaryType = 'arraybuffer';
         _iqSocket = ws;
         ws.addEventListener('message', (ev) => {
-            if (!_ready || !_worklet || !(ev.data instanceof ArrayBuffer)) {
+            if (!_ready || !_worklet || !(ev.data instanceof ArrayBuffer))
                 return;
-            }
             const buf = ev.data;
             if (buf.byteLength < 9)
                 return; // need at least header + 1 byte
@@ -179,7 +185,8 @@
     }
     // Call this from a user gesture (click/keydown) to init the AudioContext
     async function initAudio(radioId) {
-        if (radioId != null) _radioId = radioId;
+        if (radioId != null)
+            _radioId = radioId;
         await _initAudio();
         if (_ctx && _ctx.state === 'suspended') {
             await _ctx.resume();

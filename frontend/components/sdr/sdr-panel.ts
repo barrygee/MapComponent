@@ -357,6 +357,17 @@
         });
     }
 
+    function defaultBwHz(mode: string): number {
+        switch (mode) {
+            case 'WFM':         return 200_000;
+            case 'NFM':         return 12_500;
+            case 'AM':          return 10_000;
+            case 'USB': case 'LSB': return 3_000;
+            case 'CW':          return 500;
+            default:            return 10_000;
+        }
+    }
+
     modePillsEl.addEventListener('click', (e) => {
         const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.sdr-mode-pill');
         if (!btn || !btn.dataset.mode) return;
@@ -364,7 +375,10 @@
         setModePill(modePillsEl, mode);
         _sdrCurrentMode = mode;
         sendCmd({ cmd: 'mode', mode });
-        if (window._SdrAudio) window._SdrAudio.setMode(mode);
+        if (window._SdrAudio) {
+            window._SdrAudio.setMode(mode);
+            window._SdrAudio.setBandwidthHz(defaultBwHz(mode));
+        }
     });
 
     // ── Tune ──────────────────────────────────────────────────────────────────
@@ -374,7 +388,11 @@
         if (!hz) return;
         _sdrCurrentFreqHz = hz;
         displayFreq(hz);
-        if (window._SdrAudio) window._SdrAudio.initAudio(getSelectedRadioId());
+        if (window._SdrAudio) {
+            window._SdrAudio.initAudio(getSelectedRadioId() ?? undefined);
+            window._SdrAudio.setMode(_sdrCurrentMode);
+            window._SdrAudio.setBandwidthHz(defaultBwHz(_sdrCurrentMode));
+        }
         // Always persist so reconnect restores the user's chosen frequency
         sessionStorage.setItem('sdrLastFreqHz', String(hz));
         sessionStorage.setItem('sdrLastMode', _sdrCurrentMode);

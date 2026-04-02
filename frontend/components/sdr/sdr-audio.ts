@@ -23,14 +23,14 @@
     let _iqSocket:  WebSocket | null = null;
     let _radioId:   number | null = null;
     let _ready      = false;
-    let _mode       = 'WFM';
+    let _mode       = 'AM';
     let _squelch    = -120;
 
     // Processor source inlined to avoid Safari blob/fetch/proxy issues with addModule
     const PROCESSOR_SRC = `registerProcessor('sdr-demod-processor', class extends AudioWorkletProcessor {
     constructor() {
         super();
-        this._mode='WFM'; this._squelch=-120; this._sampleRate=2048000;
+        this._mode='AM'; this._squelch=-120; this._sampleRate=2048000;
         this._buf=[]; this._wfmPrevI=1; this._wfmPrevQ=0; this._amDc=0;
         this._bwHz=0; // 0 = full bandwidth
         this.port.onmessage=(ev)=>{

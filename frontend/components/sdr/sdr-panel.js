@@ -336,6 +336,17 @@
             btn.classList.toggle('active', btn.dataset.mode === mode);
         });
     }
+    function defaultBwHz(mode) {
+        switch (mode) {
+            case 'WFM': return 200000;
+            case 'NFM': return 12500;
+            case 'AM': return 10000;
+            case 'USB':
+            case 'LSB': return 3000;
+            case 'CW': return 500;
+            default: return 10000;
+        }
+    }
     modePillsEl.addEventListener('click', (e) => {
         const btn = e.target.closest('.sdr-mode-pill');
         if (!btn || !btn.dataset.mode)
@@ -344,8 +355,10 @@
         setModePill(modePillsEl, mode);
         _sdrCurrentMode = mode;
         sendCmd({ cmd: 'mode', mode });
-        if (window._SdrAudio)
+        if (window._SdrAudio) {
             window._SdrAudio.setMode(mode);
+            window._SdrAudio.setBandwidthHz(defaultBwHz(mode));
+        }
     });
     // ── Tune ──────────────────────────────────────────────────────────────────
     function tune() {
@@ -354,8 +367,11 @@
             return;
         _sdrCurrentFreqHz = hz;
         displayFreq(hz);
-        if (window._SdrAudio)
-            window._SdrAudio.initAudio(getSelectedRadioId());
+        if (window._SdrAudio) {
+            window._SdrAudio.initAudio(getSelectedRadioId() ?? undefined);
+            window._SdrAudio.setMode(_sdrCurrentMode);
+            window._SdrAudio.setBandwidthHz(defaultBwHz(_sdrCurrentMode));
+        }
         // Always persist so reconnect restores the user's chosen frequency
         sessionStorage.setItem('sdrLastFreqHz', String(hz));
         sessionStorage.setItem('sdrLastMode', _sdrCurrentMode);
@@ -372,9 +388,11 @@
         sendCmd({ cmd: 'tune', frequency_hz: hz });
     }
     freqTuneBtn.addEventListener('click', tune);
-    freqInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tune(); });
+    freqInput.addEventListener('keydown', (e) => { if (e.key === 'Enter')
+        tune(); });
     freqStopBtn.addEventListener('click', () => {
-        if (window._SdrAudio) window._SdrAudio.stop();
+        if (window._SdrAudio)
+            window._SdrAudio.stop();
     });
     // ── Gain + AGC ────────────────────────────────────────────────────────────
     let _gainDebounce = null;
@@ -651,12 +669,14 @@
         setStatus(msg.connected);
         if (msg.connected) {
             const hadUserFreq = _sdrCurrentFreqHz && _sdrCurrentFreqHz !== msg.center_hz;
-            if (!hadUserFreq) _sdrCurrentFreqHz = msg.center_hz;
+            if (!hadUserFreq)
+                _sdrCurrentFreqHz = msg.center_hz;
             _sdrCurrentMode = msg.mode;
             _sdrCurrentGain = msg.gain_db;
             _sdrCurrentGainAuto = msg.gain_auto;
             _sdrCurrentSampleRate = msg.sample_rate;
-            if (!hadUserFreq) displayFreq(msg.center_hz);
+            if (!hadUserFreq)
+                displayFreq(msg.center_hz);
             setModePill(modePillsEl, msg.mode);
             if (msg.gain_auto) {
                 agcCheck.checked = true;
