@@ -39,11 +39,20 @@
                 </div>
 
                 <!-- ── Group 1: Device / Bandwidth / RF Gain / AGC ── -->
-                <div class="sdr-control-group">
+                <button class="sdr-group-toggle sdr-group-toggle-expanded" id="sdr-device-group-toggle">
+                    <div class="sdr-scanner-section-left">
+                        <span class="sdr-group-toggle-icon">
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </span>
+                        <span class="sdr-group-toggle-label">DEVICE</span>
+                    </div>
+                </button>
+                <div class="sdr-group-body sdr-group-body-expanded" id="sdr-device-group-body">
 
                     <!-- Device -->
                     <div class="sdr-radio-section">
-                        <label class="sdr-field-label">DEVICE</label>
                         <div class="sdr-device-dropdown" id="sdr-device-dropdown" tabindex="0">
                             <div class="sdr-device-dropdown-selected">
                                 <span class="sdr-device-dropdown-text" id="sdr-device-dropdown-text">— select radio —</span>
@@ -54,7 +63,7 @@
                     </div>
 
                     <!-- Bandwidth -->
-                    <div class="sdr-radio-section">
+                    <div class="sdr-radio-section sdr-radio-section--tight">
                         <div class="sdr-slider-header">
                             <label class="sdr-field-label">BANDWIDTH</label>
                             <span id="sdr-bw-val" class="sdr-slider-val">10 kHz</span>
@@ -63,7 +72,7 @@
                     </div>
 
                     <!-- RF Gain -->
-                    <div class="sdr-radio-section">
+                    <div class="sdr-radio-section sdr-radio-section--tight">
                         <div class="sdr-slider-header">
                             <label class="sdr-field-label">RF GAIN</label>
                             <span id="sdr-gain-val" class="sdr-slider-val">30.0 dB</span>
@@ -82,25 +91,29 @@
 
                 </div>
 
-                <!-- ── Group 2: Signal / Frequency / Mode / Volume / Squelch ── -->
-                <div class="sdr-control-group">
-
-                    <!-- Signal meter -->
-                    <div class="sdr-radio-section">
-                        <span class="sdr-field-label">SIGNAL</span>
-                        <div id="sdr-signal-bar" class="sdr-signal-segments"></div>
+                <!-- ── Group 2: Frequency / Mode / Signal / Volume / Squelch ── -->
+                <button class="sdr-group-toggle sdr-group-toggle-expanded" id="sdr-signal-group-toggle">
+                    <div class="sdr-scanner-section-left">
+                        <span class="sdr-group-toggle-icon">
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </span>
+                        <span class="sdr-group-toggle-label">SIGNAL</span>
                     </div>
+                </button>
+                <div class="sdr-group-body sdr-group-body-expanded" id="sdr-signal-group-body">
 
                     <!-- Frequency -->
                     <div class="sdr-radio-section">
                         <label class="sdr-field-label">FREQUENCY MHz</label>
                         <div class="sdr-freq-row">
-                            <input id="sdr-freq-input" class="sdr-panel-input sdr-freq-input-large" type="text"
+                            <input id="sdr-freq-input" class="sdr-freq-input-large" type="text"
                                    placeholder="100.000" autocomplete="off" spellcheck="false">
-                            <button id="sdr-freq-tune" class="sdr-tune-btn" type="button" title="Tune">
+                            <button id="sdr-freq-tune" class="sdr-mode-pill sdr-tune-btn" type="button" title="Tune">
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polygon points="2,1 11,6 2,11" fill="currentColor"/></svg>
                             </button>
-                            <button id="sdr-freq-stop" class="sdr-tune-btn sdr-stop-btn" type="button" title="Stop audio">
+                            <button id="sdr-freq-stop" class="sdr-mode-pill sdr-tune-btn sdr-stop-btn" type="button" title="Stop audio">
                                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="currentColor"/></svg>
                             </button>
                         </div>
@@ -117,6 +130,12 @@
                             <button class="sdr-mode-pill" data-mode="LSB">LSB</button>
                             <button class="sdr-mode-pill" data-mode="CW">CW</button>
                         </div>
+                    </div>
+
+                    <!-- Signal meter -->
+                    <div class="sdr-radio-section">
+                        <span class="sdr-field-label">SIGNAL</span>
+                        <div id="sdr-signal-bar" class="sdr-signal-segments"></div>
                     </div>
 
                     <!-- Volume -->
@@ -301,6 +320,20 @@
                 body.classList.toggle('sdr-scanner-section-body-expanded', !expanded);
         });
     });
+    // ── Radio group toggles (Device / Signal) ────────────────────────────────
+    function bindGroupToggle(toggleId, bodyId) {
+        const toggle = document.getElementById(toggleId);
+        const body = document.getElementById(bodyId);
+        if (!toggle || !body)
+            return;
+        toggle.addEventListener('click', () => {
+            const expanded = toggle.classList.contains('sdr-group-toggle-expanded');
+            toggle.classList.toggle('sdr-group-toggle-expanded', !expanded);
+            body.classList.toggle('sdr-group-body-expanded', !expanded);
+        });
+    }
+    bindGroupToggle('sdr-device-group-toggle', 'sdr-device-group-body');
+    bindGroupToggle('sdr-signal-group-toggle', 'sdr-signal-group-body');
     // ── Element refs ──────────────────────────────────────────────────────────
     const radioSelect = document.getElementById('sdr-radio-select');
     const freqInput = document.getElementById('sdr-freq-input');

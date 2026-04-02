@@ -100,16 +100,71 @@
 
 /* ---- Radio section rows ---- */
 .sdr-radio-section {
-    padding: 22px 28px;
+    padding: 14px 28px;
 }
 
-/* Control groups */
-.sdr-control-group {
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
+/* Reduced top spacing for tightly grouped items */
+.sdr-radio-section--tight {
+    padding-top: 10px;
 }
 
-.sdr-control-group + .sdr-control-group {
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
+/* ---- Radio group toggles (Device / Signal) ---- */
+.sdr-group-toggle {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0 28px;
+    height: 38px;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background 0.12s;
+}
+
+.sdr-group-toggle:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.sdr-group-toggle-icon {
+    display: flex;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.3);
+    transition: transform 0.2s ease, color 0.15s;
+    flex-shrink: 0;
+    transform: rotate(-90deg);
+    margin-right: 7px;
+}
+
+.sdr-group-toggle-expanded .sdr-group-toggle-icon {
+    transform: rotate(0deg);
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.sdr-group-toggle-label {
+    font-family: var(--font-primary, 'Barlow', sans-serif);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.25);
+    text-transform: uppercase;
+    transition: color 0.15s;
+}
+
+.sdr-group-toggle-expanded .sdr-group-toggle-label {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.sdr-group-body {
+    flex-shrink: 0;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.25s ease;
+}
+
+.sdr-group-body-expanded {
+    max-height: 2000px;
 }
 
 /* Field label */
@@ -226,11 +281,12 @@
 /* ---- Mode — pill buttons ---- */
 .sdr-mode-pills {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
 }
 
 .sdr-mode-pill {
+    flex: 1;
     background: rgba(255, 255, 255, 0.08);
     border: none;
     cursor: pointer;
@@ -239,12 +295,13 @@
     font-weight: 700;
     letter-spacing: 0.14em;
     color: rgba(255, 255, 255, 0.5);
-    padding: 0 10px;
+    padding: 0;
     height: 28px;
     text-transform: uppercase;
     transition: background 0.15s, color 0.15s;
     white-space: nowrap;
     display: flex;
+    justify-content: center;
     align-items: center;
 }
 
@@ -267,11 +324,12 @@
 .sdr-freq-row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 4px;
 }
 
 .sdr-freq-input-large {
     flex: 1;
+    min-width: 0;
     font-family: 'Barlow Condensed', 'Barlow', sans-serif;
     font-size: 18px;
     font-weight: 300;
@@ -280,7 +338,8 @@
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 2px;
-    padding: 6px 8px;
+    padding: 0 8px;
+    height: 28px;
     outline: none;
     box-sizing: border-box;
     transition: border-color 0.15s;
@@ -294,24 +353,15 @@
     color: rgba(200, 255, 0, 0.2);
 }
 
-/* ---- Tune button — matches mode pill style ---- */
+/* ---- Tune / stop buttons — same as mode pills ---- */
 .sdr-tune-btn {
     flex-shrink: 0;
-    background: rgba(255, 255, 255, 0.08);
-    border: none;
     color: rgba(200, 255, 0, 0.75);
-    width: 28px;
-    height: 28px;
     padding: 0;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 28px;
 }
 
 .sdr-tune-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
     color: #c8ff00;
 }
 
@@ -320,7 +370,7 @@
 }
 
 .sdr-stop-btn:hover {
-    background: rgba(255, 80, 80, 0.15);
+    background: rgba(255, 80, 80, 0.15) !important;
     color: #ff5050;
 }
 
@@ -642,7 +692,7 @@
 
 /* ---- Mode pills in editfreq ---- */
 .sdr-editfreq-field .sdr-mode-pills {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 /* ---- Groups pill row in editfreq ---- */
