@@ -90,6 +90,7 @@ interface SdrControlsAPI {
     applyStatus(msg: SdrStatusMsg): void;
     getSelectedRadioId(): number | null;
     updateSignalBar(dbfs: number): void;
+    drawSpectrum(bins: number[], centerHz: number, sampleRate: number): void;
 }
 
 interface SdrPanelAPI {

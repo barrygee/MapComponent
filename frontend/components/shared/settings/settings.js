@@ -8,7 +8,7 @@ window._SettingsPanel = (function () {
     // ── State ────────────────────────────────────────────────
     let _open = false;
     let _activeSection = 'app';
-    // Pending changes map: key → { commit: () => void }
+    // Pending changes map: key → { commit: () => Promise<unknown> | void }
     const _pending = new Map();
     // ── SDR Devices control ──────────────────────────────────
     function _renderSdrDevicesControl() {
@@ -301,7 +301,7 @@ window._SettingsPanel = (function () {
                     return;
                 const raw = await res.json();
                 // Normalise IDs to numbers (guards against string IDs in stored JSON)
-                _radios = raw.map(r => ({ ...r, id: Number(r.id) }));
+                _radios = raw.map((r) => ({ ...r, id: Number(r.id) }));
                 _renderList();
             }
             catch (_e) { }

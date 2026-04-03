@@ -31,9 +31,9 @@ logger = logging.getLogger(__name__)
 # Default FFT parameters
 DEFAULT_FFT_SIZE    = 1024   # bins used for spectrum display
 DEFAULT_SAMPLE_RATE = 2_048_000
-# Read ~21ms worth of IQ per chunk (43008 bytes @ 2.048MHz).
-# Smaller chunks reduce USB transfer pressure on rtl_tcp over Docker/network.
-READ_CHUNK_SAMPLES  = 21504  # ~21ms @ 2.048MHz (multiple of 512 for USB alignment)
+# Read ~5ms worth of IQ per chunk (10240 bytes @ 2.048MHz).
+# Must stay small so the async loop drains rtl_tcp fast enough to avoid worker timeout.
+READ_CHUNK_SAMPLES  = 5120   # ~5ms @ 2.048MHz (multiple of 512 for USB alignment)
 READ_CHUNK_BYTES    = READ_CHUNK_SAMPLES * 2  # 2 bytes per IQ pair
 
 # Connection cache: key = "host:port"
@@ -179,6 +179,9 @@ class RadioBroadcaster:
     async def _run(self) -> None:
         conn = self._conn
         logger.info("Broadcaster started for %s:%d", conn.host, conn.port)
+        # Queue between the read loop and the process loop — large enough to absorb bursts
+        iq_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=16)
+        process_task = asyncio.create_task(self._process(iq_queue))
         try:
             while True:
                 # Reconnect if needed
@@ -193,7 +196,6 @@ class RadioBroadcaster:
                 try:
                     raw_iq = await conn.read_iq_chunk()
                 except asyncio.IncompleteReadError:
-                    # Dongle briefly stops sending during retune — skip this chunk
                     logger.debug("rtl_tcp incomplete read during retune, skipping")
                     continue
                 except (ConnectionError, Exception) as exc:
@@ -202,14 +204,39 @@ class RadioBroadcaster:
                     await asyncio.sleep(1)
                     continue
 
-                # FFT uses only the first fft_size samples from the chunk
-                frame = compute_fft_frame(raw_iq, conn.fft_size, conn.sample_rate, conn.center_hz)
+                # Drop oldest chunk if process loop is falling behind — never block the read
+                if iq_queue.full():
+                    try:
+                        iq_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        pass
+                iq_queue.put_nowait(raw_iq)
+
+        except asyncio.CancelledError:
+            pass
+        finally:
+            process_task.cancel()
+            try:
+                await process_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("Broadcaster stopped for %s:%d", conn.host, conn.port)
+
+    async def _process(self, iq_queue: asyncio.Queue) -> None:
+        """Consume raw IQ chunks, compute FFT, and fan out to subscribers."""
+        conn = self._conn
+        loop = asyncio.get_event_loop()
+        try:
+            while True:
+                raw_iq = await iq_queue.get()
+                # Run numpy FFT in a thread so it doesn't block the event loop
+                frame = await loop.run_in_executor(
+                    None, compute_fft_frame, raw_iq, conn.fft_size, conn.sample_rate, conn.center_hz
+                )
                 self._broadcast(frame)
                 self._broadcast_iq(raw_iq, conn.sample_rate, conn.center_hz)
         except asyncio.CancelledError:
             pass
-        finally:
-            logger.info("Broadcaster stopped for %s:%d", conn.host, conn.port)
 
     def _broadcast(self, frame: dict) -> None:
         for q in list(self._subscribers):

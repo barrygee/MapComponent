@@ -108,6 +108,20 @@
     padding-top: 10px;
 }
 
+/* ---- Spectrum canvas ---- */
+.sdr-spectrum-section {
+    padding: 8px 14px 4px;
+}
+
+.sdr-spectrum-canvas {
+    display: block;
+    width: 100%;
+    height: 120px;
+    border-radius: 4px;
+    background: #0a0d14;
+    border: 1px solid rgba(200, 255, 0, 0.12);
+}
+
 /* ---- Radio group toggles (Device / Signal) ---- */
 .sdr-group-toggle {
     flex-shrink: 0;

@@ -136,6 +136,11 @@
                         </div>
                     </div>
 
+                    <!-- Spectrum display -->
+                    <div class="sdr-radio-section sdr-spectrum-section">
+                        <canvas id="sdr-spectrum-canvas" class="sdr-spectrum-canvas"></canvas>
+                    </div>
+
                     <!-- Signal meter -->
                     <div class="sdr-radio-section">
                         <span class="sdr-field-label">SIGNAL</span>
@@ -369,6 +374,8 @@
     const statusLabel  = document.getElementById('sdr-status-label')   as HTMLSpanElement;
     const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanElement;
     const signalBarEl  = document.getElementById('sdr-signal-bar')     as HTMLDivElement;
+    const specCanvas   = document.getElementById('sdr-spectrum-canvas') as HTMLCanvasElement;
+    const specCtx      = specCanvas.getContext('2d')!;
     const radioScanBtn = document.getElementById('sdr-radio-scan-btn') as HTMLButtonElement;
     const radioScanInd = document.getElementById('sdr-radio-scan-indicator') as HTMLDivElement;
     const radioScanLbl = document.getElementById('sdr-radio-scan-label') as HTMLSpanElement;
@@ -601,6 +608,113 @@
         for (let i = 0; i < SIGNAL_SEGS; i++) {
             _segEls[i].classList.toggle('sdr-signal-seg--on', i < lit);
         }
+    }
+
+    // ── Spectrum display ──────────────────────────────────────────────────────
+
+    const SPEC_MIN_DB = -120;
+    const SPEC_MAX_DB = -20;
+    const SPEC_RANGE  = SPEC_MAX_DB - SPEC_MIN_DB;
+    let   _specPeaks: Float32Array | null = null;
+    let   _specPeakAge: Uint8Array | null = null;
+    const PEAK_HOLD_FRAMES = 60;
+
+    function _resizeCanvas() {
+        const w = specCanvas.offsetWidth;
+        const h = specCanvas.offsetHeight;
+        if (specCanvas.width !== w || specCanvas.height !== h) {
+            specCanvas.width  = w;
+            specCanvas.height = h;
+            _specPeaks   = null;
+            _specPeakAge = null;
+        }
+    }
+
+    function drawSpectrum(bins: number[], centerHz: number, sampleRate: number) {
+        _resizeCanvas();
+        const W = specCanvas.width;
+        const H = specCanvas.height;
+        if (W === 0 || H === 0) return;
+
+        const n = bins.length;
+
+        // Init peak hold arrays
+        if (!_specPeaks || _specPeaks.length !== n) {
+            _specPeaks   = new Float32Array(n).fill(SPEC_MIN_DB);
+            _specPeakAge = new Uint8Array(n);
+        }
+
+        // Background
+        specCtx.fillStyle = '#0a0d14';
+        specCtx.fillRect(0, 0, W, H);
+
+        // Grid lines
+        specCtx.strokeStyle = 'rgba(200,255,0,0.08)';
+        specCtx.lineWidth = 1;
+        const dbSteps = [-100, -80, -60, -40];
+        for (const db of dbSteps) {
+            const y = Math.round(H * (1 - (db - SPEC_MIN_DB) / SPEC_RANGE)) + 0.5;
+            specCtx.beginPath();
+            specCtx.moveTo(0, y);
+            specCtx.lineTo(W, y);
+            specCtx.stroke();
+        }
+
+        // Spectrum fill + line
+        const bw = W / n;
+        specCtx.beginPath();
+        for (let i = 0; i < n; i++) {
+            const db = Math.max(SPEC_MIN_DB, Math.min(SPEC_MAX_DB, bins[i]));
+            const y  = H * (1 - (db - SPEC_MIN_DB) / SPEC_RANGE);
+            const x  = i * bw;
+            if (i === 0) specCtx.moveTo(x, y);
+            else specCtx.lineTo(x, y);
+        }
+        specCtx.lineTo(W, H);
+        specCtx.lineTo(0, H);
+        specCtx.closePath();
+        const grad = specCtx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0,   'rgba(200,255,0,0.55)');
+        grad.addColorStop(0.5, 'rgba(200,255,0,0.18)');
+        grad.addColorStop(1,   'rgba(200,255,0,0.04)');
+        specCtx.fillStyle = grad;
+        specCtx.fill();
+
+        specCtx.beginPath();
+        for (let i = 0; i < n; i++) {
+            const db = Math.max(SPEC_MIN_DB, Math.min(SPEC_MAX_DB, bins[i]));
+            const y  = H * (1 - (db - SPEC_MIN_DB) / SPEC_RANGE);
+            const x  = i * bw;
+            if (i === 0) specCtx.moveTo(x, y);
+            else specCtx.lineTo(x, y);
+        }
+        specCtx.strokeStyle = '#c8ff00';
+        specCtx.lineWidth = 1.5;
+        specCtx.stroke();
+
+        // Peak hold
+        specCtx.fillStyle = 'rgba(255,220,0,0.85)';
+        for (let i = 0; i < n; i++) {
+            if (bins[i] >= _specPeaks![i]) {
+                _specPeaks![i]   = bins[i];
+                _specPeakAge![i] = 0;
+            } else {
+                _specPeakAge![i]++;
+                if (_specPeakAge![i] > PEAK_HOLD_FRAMES) {
+                    _specPeaks![i] -= 0.5;
+                }
+            }
+            const db = Math.max(SPEC_MIN_DB, Math.min(SPEC_MAX_DB, _specPeaks![i]));
+            const y  = Math.round(H * (1 - (db - SPEC_MIN_DB) / SPEC_RANGE));
+            specCtx.fillRect(i * bw, y, Math.max(1, bw - 0.5), 1.5);
+        }
+
+        // Center frequency label
+        const mhz = (centerHz / 1e6).toFixed(4);
+        specCtx.fillStyle = 'rgba(200,255,0,0.5)';
+        specCtx.font = '10px monospace';
+        specCtx.textAlign = 'center';
+        specCtx.fillText(`${mhz} MHz`, W / 2, H - 4);
     }
 
     // ── Radio select ──────────────────────────────────────────────────────────
@@ -980,7 +1094,7 @@
         buildDeviceMenu(radios);
     };
 
-    window._SdrControls = { setStatus, applyStatus, getSelectedRadioId, updateSignalBar };
+    window._SdrControls = { setStatus, applyStatus, getSelectedRadioId, updateSignalBar, drawSpectrum };
 
     // ── Render frequency list ─────────────────────────────────────────────────
 
