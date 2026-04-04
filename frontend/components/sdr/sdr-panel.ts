@@ -827,6 +827,10 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         _sdrConnected = connected;
         connDot.className = 'sdr-conn-dot ' + (connected ? 'sdr-dot-on' : 'sdr-dot-off');
         connDot.title = connected ? 'Connected' : 'Disconnected';
+        if (!connected) {
+            _signalSmoothed = -120;
+            for (let i = 0; i < SIGNAL_SEGS; i++) _segEls[i].classList.remove('sdr-signal-seg--on');
+        }
     }
 
     function applyStatus(msg: SdrStatusMsg) {
