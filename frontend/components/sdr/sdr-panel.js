@@ -568,6 +568,8 @@ const activeFreq = document.getElementById('sdr-active-freq');
         const id = parseInt(radioSelect.value, 10);
         if (!isNaN(id) && id > 0) {
             radioSelect.dispatchEvent(new CustomEvent('sdr-radio-selected', { bubbles: true, detail: { radioId: id } }));
+        } else {
+            document.dispatchEvent(new CustomEvent('sdr-radio-deselected'));
         }
     });
     // ── Scan (radio tab) ──────────────────────────────────────────────────────
@@ -833,6 +835,7 @@ const activeFreq = document.getElementById('sdr-active-freq');
             deviceDropdownText.textContent = '— select radio —';
             deviceDropdownText.classList.remove('sdr-device-dropdown-text--chosen');
             closeDeviceMenu();
+            document.dispatchEvent(new CustomEvent('sdr-radio-deselected'));
         });
         _deviceMenuEl.appendChild(placeholder);
         radios.filter(r => r.enabled).forEach(r => {

@@ -127,19 +127,8 @@
         try {
             const res = await fetch('/api/sdr/radios');
             const radios = await res.json();
-            const lastId = parseInt(sessionStorage.getItem('sdrLastRadioId') || '0', 10);
-            const match = radios.find(r => r.id === lastId && r.enabled);
-            // Pre-select the last radio before populating so _sdrPopulateRadios can restore the dropdown text
-            if (match) {
-                const sel = document.getElementById('sdr-radio-select');
-                if (sel)
-                    sel.value = String(match.id);
-            }
             if (window._sdrPopulateRadios) {
                 window._sdrPopulateRadios(radios);
-            }
-            if (match) {
-                openSocket(match.id);
             }
         }
         catch (e) {
@@ -150,11 +139,19 @@
     document.addEventListener('sdr:radios-changed', function () {
         loadRadios();
     });
-    // ── Listen for radio selection change ─────────────────────────────────────
+    // ── Listen for radio selection / deselection ──────────────────────────────
     document.addEventListener('sdr-radio-selected', (e) => {
         const detail = e.detail;
         if (detail.radioId)
             openSocket(detail.radioId);
+    });
+    document.addEventListener('sdr-radio-deselected', () => {
+        if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+        if (_sdrSocket) { _sdrSocket.close(); _sdrSocket = null; }
+        _currentRadioId = null;
+        _sdrCurrentRadioId = null;
+        if (window._SdrAudio) window._SdrAudio.stop();
+        if (window._SdrControls) window._SdrControls.setStatus(false);
     });
     // ── Load stored frequencies into panel ────────────────────────────────────
     async function loadFrequencies() {
