@@ -434,9 +434,6 @@
         if (window._SdrAudio) {
             window._SdrAudio.initAudio(getSelectedRadioId() ?? undefined);
             window._SdrAudio.setMode(_sdrCurrentMode);
-            const bw = defaultBwHz(_sdrCurrentMode);
-            window._SdrAudio.setBandwidthHz(bw);
-            setBandwidthSlider(bw);
         }
         setPlayingState(true);
         // Always persist so reconnect restores the user's chosen frequency

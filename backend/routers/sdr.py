@@ -380,10 +380,26 @@ async def sdr_iq_websocket(radio_id: int, websocket: WebSocket):
             pass
         return
 
+    # Accumulate IQ chunks before sending to reduce WebSocket frame overhead.
+    # Each chunk is ~5ms; batching 4 gives ~20ms frames (50/s) — smoother for WFM.
+    IQ_BATCH = 4
+    HEADER_BYTES = 8  # 4-byte sample_rate + 4-byte center_hz
+
     queue = broadcaster.subscribe_iq()
     try:
         while True:
-            payload = await queue.get()
+            # Wait for first chunk
+            first = await queue.get()
+            header = first[:HEADER_BYTES]
+            iq_parts = [first[HEADER_BYTES:]]
+            # Drain up to IQ_BATCH-1 more chunks non-blocking
+            for _ in range(IQ_BATCH - 1):
+                try:
+                    chunk = queue.get_nowait()
+                    iq_parts.append(chunk[HEADER_BYTES:])
+                except asyncio.QueueEmpty:
+                    break
+            payload = header + b"".join(iq_parts)
             try:
                 await websocket.send_bytes(payload)
             except (WebSocketDisconnect, RuntimeError):
