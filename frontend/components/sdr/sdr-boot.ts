@@ -80,14 +80,6 @@
                     }
                     sessionStorage.setItem('sdrLastMode', msg.mode);
                     break;
-                case 'spectrum':
-                    if (window._SdrControls) {
-                        window._SdrControls.drawSpectrum(msg.bins, msg.center_hz, msg.sample_rate);
-                        // Drive signal meter from peak bin power
-                        const peak = Math.max(...msg.bins);
-                        window._SdrControls.updateSignalBar(peak);
-                    }
-                    break;
                 case 'error':
                     console.warn('[SDR] error', msg.code, msg.message);
                     if (window._SdrControls) window._SdrControls.setStatus(false);

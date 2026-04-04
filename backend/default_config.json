@@ -41,11 +41,8 @@
       "url": "http://localhost"
     },
     "defaultSampleRate": 2048000,
-    "defaultFftSize": 1024,
     "defaultGain": 30,
     "defaultSquelch": -60,
-    "waterfallRows": 300,
-    "spectrumFps": 15,
     "radios": [
       {
         "name": "Sentinel RTL-SDR",

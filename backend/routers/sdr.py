@@ -21,7 +21,7 @@ REST endpoints:
   GET    /api/sdr/status/{radio_id}       — connection state for a radio
 
 WebSocket:
-  WS     /ws/sdr/{radio_id}              — stream spectrum frames; receive commands
+  WS     /ws/sdr/{radio_id}              — receive commands
 """
 
 from __future__ import annotations
@@ -404,7 +404,6 @@ async def sdr_websocket(radio_id: int, websocket: WebSocket):
     on-demand here if a radio with this id exists in the DB).
 
     Outbound (server→client):
-      { type: "spectrum", center_hz, sample_rate, bins, timestamp_ms }
       { type: "status",   connected, radio_id, radio_name, center_hz, mode, gain_db, gain_auto }
       { type: "error",    code, message }
 
@@ -476,63 +475,36 @@ async def sdr_websocket(radio_id: int, websocket: WebSocket):
         logger.warning("SDR WS: initial status send failed: %s", exc)
         return
 
-    # Subscribe to the broadcaster queue for this client
-    queue = broadcaster.subscribe()
-
-    async def _read_commands():
-        """Background task: receive JSON commands from browser and apply them."""
-        try:
-            while True:
-                raw = await websocket.receive_text()
-                try:
-                    msg = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue
-                cmd = msg.get("cmd")
-                try:
-                    # Reconnect + restart broadcaster if the TCP connection dropped
-                    if not conn.connected:
-                        await sdr_svc.get_or_create_broadcaster(radio["host"], radio["port"])
-                    if cmd == "tune":
-                        hz = int(msg["frequency_hz"])
-                        logger.info("SDR tune: %d Hz", hz)
-                        await conn.set_frequency(hz)
-                    elif cmd == "mode":
-                        conn.mode = str(msg.get("mode", "AM"))
-                    elif cmd == "gain":
-                        gval = msg.get("gain_db")
-                        if gval is None:
-                            await conn.set_gain_auto()
-                        else:
-                            await conn.set_gain_manual(float(gval))
-                    elif cmd == "sample_rate":
-                        await conn.set_sample_rate(int(msg["rate_hz"]))
-                    elif cmd == "ping":
-                        await websocket.send_text(json.dumps({"type": "pong"}))
-                except Exception as exc:
-                    logger.warning("SDR command error (%s): %s", cmd, exc, exc_info=True)
-        except (WebSocketDisconnect, asyncio.CancelledError):
-            pass
-
-    cmd_task = asyncio.create_task(_read_commands())
-
-    # Stream loop: pull frames from the shared broadcaster queue and forward them
+    # Receive JSON commands from browser and apply them
     try:
         while True:
-            frame = await queue.get()
+            raw = await websocket.receive_text()
             try:
-                await websocket.send_text(json.dumps(frame))
-            except (WebSocketDisconnect, RuntimeError):
-                break
-
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            cmd = msg.get("cmd")
+            try:
+                # Reconnect + restart broadcaster if the TCP connection dropped
+                if not conn.connected:
+                    await sdr_svc.get_or_create_broadcaster(radio["host"], radio["port"])
+                if cmd == "tune":
+                    hz = int(msg["frequency_hz"])
+                    logger.info("SDR tune: %d Hz", hz)
+                    await conn.set_frequency(hz)
+                elif cmd == "mode":
+                    conn.mode = str(msg.get("mode", "AM"))
+                elif cmd == "gain":
+                    gval = msg.get("gain_db")
+                    if gval is None:
+                        await conn.set_gain_auto()
+                    else:
+                        await conn.set_gain_manual(float(gval))
+                elif cmd == "sample_rate":
+                    await conn.set_sample_rate(int(msg["rate_hz"]))
+                elif cmd == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+            except Exception as exc:
+                logger.warning("SDR command error (%s): %s", cmd, exc, exc_info=True)
     except (WebSocketDisconnect, asyncio.CancelledError):
         pass
-    except Exception as exc:
-        logger.error("SDR stream loop crashed: %s", exc, exc_info=True)
-    finally:
-        broadcaster.unsubscribe(queue)
-        cmd_task.cancel()
-        try:
-            await cmd_task
-        except asyncio.CancelledError:
-            pass

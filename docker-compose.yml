@@ -7,16 +7,24 @@ services:
     network_mode: host
     volumes:
       - sentinel_db:/app/data
+      - ./backend:/app/backend         # Live reload backend code
+      - ./frontend:/app/frontend       # Live reload frontend files
     environment:
       - DB_PATH=/app/data/sentinel.db
+      - PYTHONUNBUFFERED=1
+    # The --reload flag is key here
+    command: uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
 
   map-server:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: sentinel
     ports:
       - "8080:80"
     volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./frontend/assets/tiles:/usr/share/nginx/html/frontend/assets/tiles:ro
     depends_on:
       - backend
@@ -24,3 +32,33 @@ services:
 
 volumes:
   sentinel_db:
+
+
+# NO HOT RELOAD
+
+# services:
+#   backend:
+#     build:
+#       context: .
+#       dockerfile: backend/Dockerfile
+#     container_name: sentinel-api
+#     network_mode: host
+#     volumes:
+#       - sentinel_db:/app/data
+#     environment:
+#       - DB_PATH=/app/data/sentinel.db
+#     restart: unless-stopped
+
+#   map-server:
+#     build: .
+#     container_name: sentinel
+#     ports:
+#       - "8080:80"
+#     volumes:
+#       - ./frontend/assets/tiles:/usr/share/nginx/html/frontend/assets/tiles:ro
+#     depends_on:
+#       - backend
+#     restart: unless-stopped
+
+# volumes:
+#   sentinel_db:

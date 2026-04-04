@@ -36,14 +36,6 @@ interface SdrStoredFrequency {
     created_at: number;
 }
 
-interface SdrSpectrumFrame {
-    type: 'spectrum';
-    center_hz: number;
-    sample_rate: number;
-    bins: number[];
-    timestamp_ms: number;
-}
-
 interface SdrStatusMsg {
     type: 'status';
     connected: boolean;
@@ -90,7 +82,6 @@ interface SdrControlsAPI {
     applyStatus(msg: SdrStatusMsg): void;
     getSelectedRadioId(): number | null;
     updateSignalBar(dbfs: number): void;
-    drawSpectrum(bins: number[], centerHz: number, sampleRate: number): void;
 }
 
 interface SdrPanelAPI {
