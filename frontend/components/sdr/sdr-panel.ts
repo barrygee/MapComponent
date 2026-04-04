@@ -865,9 +865,6 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
                 gainVal.textContent = `${msg.gain_db.toFixed(1)} dB`;
             }
 
-            if (typeof (msg as any).signal_dbfs === 'number') {
-                updateSignalBar((msg as any).signal_dbfs);
-            }
         }
     }
 
@@ -974,6 +971,10 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
             if (chosen) {
                 deviceDropdownText.textContent = chosen.name;
                 deviceDropdownText.classList.add('sdr-device-dropdown-text--chosen');
+            } else {
+                // Previously selected radio no longer exists — clear the display
+                deviceDropdownText.textContent = '— select radio —';
+                deviceDropdownText.classList.remove('sdr-device-dropdown-text--chosen');
             }
         }
         buildDeviceMenu(radios);
@@ -1116,18 +1117,7 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
     }
 
     async function deleteGroup(id: number) {
-        const freqsToUpdate = _freqs.filter(f => {
-            const ids = (f.group_ids || []).filter(gid => gid !== 0);
-            return ids.length === 1 && ids[0] === id;
-        });
         try {
-            await Promise.all(freqsToUpdate.map(f =>
-                fetch(`/api/sdr/frequencies/${f.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ group_ids: [] }),
-                })
-            ));
             await fetch(`/api/sdr/groups/${id}`, { method: 'DELETE' });
             await reloadData();
         } catch (_) {}
@@ -1205,7 +1195,7 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         _visible = false;
         panel.classList.add('sdr-panel-hidden');
         document.body.classList.add('sdr-panel-hidden');
-        sessionStorage.removeItem('sdrPanelOpen');
+        sessionStorage.setItem('sdrPanelOpen', '0');
     }
 
     function toggle() { if (_visible) hide(); else show(); }

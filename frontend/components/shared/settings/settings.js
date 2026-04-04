@@ -74,7 +74,7 @@ window._SettingsPanel = (function () {
             const portInput = document.createElement('input');
             portInput.type = 'number';
             portInput.className = 'sdr-devices-form-input';
-            portInput.placeholder = '8890';
+            portInput.placeholder = '1234';
             portInput.min = '1';
             portInput.max = '65535';
             const bwInput = document.createElement('input');
@@ -130,7 +130,7 @@ window._SettingsPanel = (function () {
                 agcInput.checked = radio.agc === true;
             }
             else {
-                portInput.value = '8890';
+                portInput.value = '1234';
             }
             const errMsg = document.createElement('div');
             errMsg.className = 'sdr-devices-form-error';
@@ -194,7 +194,7 @@ window._SettingsPanel = (function () {
                 }
                 return {
                     name, host,
-                    port: parseInt(portInput.value, 10) || 8890,
+                    port: parseInt(portInput.value, 10) || 1234,
                     bandwidth: bwInput.value.trim() ? parseInt(bwInput.value, 10) : null,
                     rf_gain: gainInput.value.trim() ? parseFloat(gainInput.value) : null,
                     agc: agcInput.checked,

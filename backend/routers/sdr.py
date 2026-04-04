@@ -6,14 +6,14 @@ REST endpoints:
   PUT    /api/sdr/radios/{id}             — update a radio
   DELETE /api/sdr/radios/{id}             — delete a radio
 
-  GET    /api/sdr/groups                  — list frequency groups (with frequencies)
+  GET    /api/sdr/groups                  — list frequency groups
   POST   /api/sdr/groups                  — create a group
-  PUT    /api/sdr/groups/{id}             — update a group
+  PUT|PATCH /api/sdr/groups/{id}          — update a group
   DELETE /api/sdr/groups/{id}             — delete a group
 
   GET    /api/sdr/frequencies             — list all stored frequencies
   POST   /api/sdr/frequencies             — save a frequency
-  PUT    /api/sdr/frequencies/{id}        — update a frequency
+  PUT|PATCH /api/sdr/frequencies/{id}     — update a frequency
   DELETE /api/sdr/frequencies/{id}        — delete a frequency
 
   POST   /api/sdr/connect                 — open TCP connection to a radio
@@ -21,7 +21,14 @@ REST endpoints:
   GET    /api/sdr/status/{radio_id}       — connection state for a radio
 
 WebSocket:
-  WS     /ws/sdr/{radio_id}              — receive commands
+  WS     /ws/sdr/{radio_id}              — command channel (tune, mode, gain…)
+  WS     /ws/sdr/{radio_id}/iq           — raw IQ binary stream
+
+Notes on group assignment:
+  Frequencies support a single group_id in the database.  The API
+  serialises it as group_ids (a list of 0 or 1 integers) so the frontend
+  can treat group membership uniformly.  When the client sends group_ids
+  the first valid entry is stored as group_id; an empty list stores NULL.
 """
 
 from __future__ import annotations
@@ -29,7 +36,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -53,7 +59,7 @@ router = APIRouter(tags=["sdr"])
 class RadioIn(BaseModel):
     name: str
     host: str
-    port: int = 8890
+    port: int = 1234
     description: str = ""
     enabled: bool = True
     bandwidth: Optional[int] = None
@@ -68,7 +74,12 @@ class GroupIn(BaseModel):
 
 
 class FrequencyIn(BaseModel):
-    group_id: Optional[int] = None
+    """Frequency create/update body.
+
+    The frontend sends group membership as group_ids (list).  We accept that
+    field and pick the first element as the single stored group_id.
+    """
+    group_ids: Optional[list[int]] = None   # frontend sends this
     label: str
     frequency_hz: int
     mode: str = "AM"
@@ -76,6 +87,13 @@ class FrequencyIn(BaseModel):
     gain: float = 30.0
     scannable: bool = True
     notes: str = ""
+
+    def first_group_id(self) -> Optional[int]:
+        """Return the first valid (non-zero) group_id from the list, or None."""
+        if not self.group_ids:
+            return None
+        valid = [gid for gid in self.group_ids if gid and gid != 0]
+        return valid[0] if valid else None
 
 
 class ConnectIn(BaseModel):
@@ -153,7 +171,7 @@ def _group_to_dict(g: SdrFrequencyGroup) -> dict:
 def _freq_to_dict(f: SdrStoredFrequency) -> dict:
     return {
         "id": f.id,
-        "group_id": f.group_id,
+        "group_ids": [f.group_id] if f.group_id is not None else [],
         "label": f.label,
         "frequency_hz": f.frequency_hz,
         "mode": f.mode,
@@ -229,8 +247,7 @@ async def create_group(body: GroupIn, db: AsyncSession = Depends(get_db)):
     return JSONResponse(_group_to_dict(group), status_code=201)
 
 
-@router.put("/api/sdr/groups/{group_id}")
-async def update_group(group_id: int, body: GroupIn, db: AsyncSession = Depends(get_db)):
+async def _do_update_group(group_id: int, body: GroupIn, db: AsyncSession):
     row = (await db.execute(select(SdrFrequencyGroup).where(SdrFrequencyGroup.id == group_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(404, "Group not found")
@@ -239,6 +256,16 @@ async def update_group(group_id: int, body: GroupIn, db: AsyncSession = Depends(
     await db.commit()
     await db.refresh(row)
     return JSONResponse(_group_to_dict(row))
+
+
+@router.put("/api/sdr/groups/{group_id}")
+async def update_group(group_id: int, body: GroupIn, db: AsyncSession = Depends(get_db)):
+    return await _do_update_group(group_id, body, db)
+
+
+@router.patch("/api/sdr/groups/{group_id}")
+async def patch_group(group_id: int, body: GroupIn, db: AsyncSession = Depends(get_db)):
+    return await _do_update_group(group_id, body, db)
 
 
 @router.delete("/api/sdr/groups/{group_id}", status_code=204)
@@ -264,23 +291,48 @@ async def list_frequencies(db: AsyncSession = Depends(get_db)):
 
 @router.post("/api/sdr/frequencies", status_code=201)
 async def create_frequency(body: FrequencyIn, db: AsyncSession = Depends(get_db)):
-    freq = SdrStoredFrequency(**body.model_dump(), created_at=now_ms())
+    freq = SdrStoredFrequency(
+        group_id=body.first_group_id(),
+        label=body.label,
+        frequency_hz=body.frequency_hz,
+        mode=body.mode,
+        squelch=body.squelch,
+        gain=body.gain,
+        scannable=body.scannable,
+        notes=body.notes,
+        created_at=now_ms(),
+    )
     db.add(freq)
     await db.commit()
     await db.refresh(freq)
     return JSONResponse(_freq_to_dict(freq), status_code=201)
 
 
-@router.put("/api/sdr/frequencies/{freq_id}")
-async def update_frequency(freq_id: int, body: FrequencyIn, db: AsyncSession = Depends(get_db)):
+async def _do_update_frequency(freq_id: int, body: FrequencyIn, db: AsyncSession):
     row = (await db.execute(select(SdrStoredFrequency).where(SdrStoredFrequency.id == freq_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(404, "Frequency not found")
-    for k, v in body.model_dump().items():
-        setattr(row, k, v)
+    row.group_id     = body.first_group_id()
+    row.label        = body.label
+    row.frequency_hz = body.frequency_hz
+    row.mode         = body.mode
+    row.squelch      = body.squelch
+    row.gain         = body.gain
+    row.scannable    = body.scannable
+    row.notes        = body.notes
     await db.commit()
     await db.refresh(row)
     return JSONResponse(_freq_to_dict(row))
+
+
+@router.put("/api/sdr/frequencies/{freq_id}")
+async def update_frequency(freq_id: int, body: FrequencyIn, db: AsyncSession = Depends(get_db)):
+    return await _do_update_frequency(freq_id, body, db)
+
+
+@router.patch("/api/sdr/frequencies/{freq_id}")
+async def patch_frequency(freq_id: int, body: FrequencyIn, db: AsyncSession = Depends(get_db)):
+    return await _do_update_frequency(freq_id, body, db)
 
 
 @router.delete("/api/sdr/frequencies/{freq_id}", status_code=204)

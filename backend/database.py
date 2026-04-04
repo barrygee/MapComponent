@@ -45,15 +45,6 @@ async def create_tables():
         except OperationalError:
             # Column already exists — raised by SQLite on duplicate ALTER TABLE
             pass
-        for col_ddl in [
-            "ALTER TABLE sdr_radios ADD COLUMN bandwidth INTEGER",
-            "ALTER TABLE sdr_radios ADD COLUMN rf_gain REAL",
-            "ALTER TABLE sdr_radios ADD COLUMN agc INTEGER DEFAULT 0",
-        ]:
-            try:
-                await conn.execute(sa_text(col_ddl))
-            except OperationalError:
-                pass
 
 
 async def get_db():
@@ -141,51 +132,3 @@ async def seed_default_settings() -> None:
         await session.commit()
 
 
-async def migrate_sdr_radios_to_config() -> None:
-    """One-time migration: copy rows from sdr_radios table into UserSettings sdr.radios.
-
-    Only runs if the sdr.radios setting doesn't exist yet, ensuring idempotency.
-    """
-    from backend.models import UserSettings  # avoid circular import at module level
-
-    async with AsyncSessionLocal() as session:
-        # Skip if already migrated
-        existing = (await session.execute(
-            select(UserSettings).where(
-                UserSettings.namespace == "sdr",
-                UserSettings.key == "radios",
-            )
-        )).scalar_one_or_none()
-        if existing is not None:
-            return
-
-        # Read rows directly via raw SQL so we don't need the ORM model
-        try:
-            rows = (await session.execute(
-                sa_text("SELECT id, name, host, port, description, enabled, bandwidth, rf_gain, agc, created_at FROM sdr_radios ORDER BY created_at")
-            )).fetchall()
-        except Exception:
-            rows = []
-
-        radios = []
-        for row in rows:
-            radios.append({
-                "id":          row[0],
-                "name":        row[1],
-                "host":        row[2],
-                "port":        row[3],
-                "description": row[4] or "",
-                "enabled":     bool(row[5]),
-                "bandwidth":   row[6],
-                "rf_gain":     row[7],
-                "agc":         bool(row[8]) if row[8] is not None else False,
-                "created_at":  row[9],
-            })
-
-        session.add(UserSettings(
-            namespace  = "sdr",
-            key        = "radios",
-            value      = json.dumps(radios),
-            updated_at = int(time.time() * 1000),
-        ))
-        await session.commit()

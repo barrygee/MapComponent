@@ -71,12 +71,6 @@ declare let _sdrScanLocked: boolean;
 
 // ── SDR component public APIs ─────────────────────────────────────────────────
 
-interface SdrDisplayAPI {
-    renderFrame(frame: SdrSpectrumFrame): void;
-    resize(): void;
-    setFreqMarker(hz: number): void;
-}
-
 interface SdrControlsAPI {
     setStatus(connected: boolean): void;
     applyStatus(msg: SdrStatusMsg): void;
@@ -97,7 +91,6 @@ interface SdrAudioAPI {
     start(radioId?: number): Promise<void>;
     initAudio(radioId?: number): Promise<void>;
     stop(): void;
-    pushFrame(frame: SdrSpectrumFrame): void;
     setRadioId(id: number): void;
     setMode(mode: string): void;
     setSquelch(dbfs: number): void;
@@ -108,7 +101,6 @@ interface SdrAudioAPI {
 // ── Extend Window ─────────────────────────────────────────────────────────────
 
 interface Window {
-    _SdrDisplay:  SdrDisplayAPI;
     _SdrControls: SdrControlsAPI;
     _SdrPanel:    SdrPanelAPI;
     _SdrAudio:    SdrAudioAPI;

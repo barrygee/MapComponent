@@ -84,21 +84,6 @@ class AirTracking(Base):
     added_at  = Column(Integer, nullable=False)            # Unix ms when tracking began
 
 
-class SdrRadio(Base):
-    """A configured SDR device reachable via rtl_tcp on the network."""
-    __tablename__ = "sdr_radios"
-
-    id          = Column(Integer, primary_key=True, autoincrement=True)
-    name        = Column(Text, nullable=False)               # user label e.g. "Roof RTL-SDR"
-    host        = Column(Text, nullable=False)               # hostname or IP e.g. "192.168.1.45"
-    port        = Column(Integer, nullable=False, default=1234)
-    description = Column(Text, nullable=False, default="")
-    enabled     = Column(Boolean, nullable=False, default=True)
-    bandwidth   = Column(Integer, nullable=True)             # sample bandwidth in Hz (optional)
-    rf_gain     = Column(Float,   nullable=True)             # RF gain in dB (optional)
-    agc         = Column(Boolean, nullable=True, default=False)  # auto gain control (optional)
-    created_at  = Column(Integer, nullable=False)            # Unix ms
-
 
 class SdrFrequencyGroup(Base):
     """Named group that organises stored frequencies (e.g. 'Aviation', 'Marine')."""

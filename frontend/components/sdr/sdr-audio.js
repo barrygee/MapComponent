@@ -272,6 +272,10 @@
         }
     }
     function stop() {
+        if (_iqReconnectTimer) {
+            clearTimeout(_iqReconnectTimer);
+            _iqReconnectTimer = null;
+        }
         if (_iqSocket) {
             _iqSocket.close();
             _iqSocket = null;
@@ -309,7 +313,5 @@
         if (_worklet)
             _worklet.port.postMessage({ type: 'bw', bandwidth_hz: hz });
     }
-    // pushFrame is a no-op now — real IQ comes over the binary socket
-    function pushFrame(_frame) { }
-    window._SdrAudio = { start, initAudio, stop, pushFrame, setRadioId, setMode, setSquelch, setVolume, setBandwidthHz };
+    window._SdrAudio = { start, initAudio, stop, setRadioId, setMode, setSquelch, setVolume, setBandwidthHz };
 })();

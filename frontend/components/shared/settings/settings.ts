@@ -125,7 +125,7 @@ window._SettingsPanel = (function () {
             const portInput = document.createElement('input');
             portInput.type = 'number';
             portInput.className = 'sdr-devices-form-input';
-            portInput.placeholder = '8890';
+            portInput.placeholder = '1234';
             portInput.min = '1';
             portInput.max = '65535';
 
@@ -193,7 +193,7 @@ window._SettingsPanel = (function () {
                 gainInput.value  = radio.rf_gain   != null ? String(radio.rf_gain)   : '';
                 agcInput.checked = radio.agc === true;
             } else {
-                portInput.value = '8890';
+                portInput.value = '1234';
             }
 
             const errMsg = document.createElement('div');
@@ -258,7 +258,7 @@ window._SettingsPanel = (function () {
                 if (!name || !host) { showErr('Name and IP address are required.'); return null; }
                 return {
                     name, host,
-                    port:        parseInt(portInput.value, 10) || 8890,
+                    port:        parseInt(portInput.value, 10) || 1234,
                     bandwidth:   bwInput.value.trim()  ? parseInt(bwInput.value, 10)  : null,
                     rf_gain:     gainInput.value.trim() ? parseFloat(gainInput.value) : null,
                     agc:         agcInput.checked,
