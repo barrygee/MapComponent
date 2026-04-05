@@ -364,6 +364,27 @@
     const efSave = document.getElementById('sdr-ef-save');
     const efDelete = document.getElementById('sdr-ef-delete');
     // ── Helpers ───────────────────────────────────────────────────────────────
+    function setRadioControlsDisabled(disabled) {
+        freqInput.disabled    = disabled;
+        freqTuneBtn.disabled  = disabled;
+        freqStopBtn.disabled  = disabled;
+        gainSlider.disabled   = disabled || _sdrCurrentGainAuto;
+        agcCheck.disabled     = disabled;
+        volSlider.disabled    = disabled;
+        sqSlider.disabled     = disabled;
+        bwSlider.disabled     = disabled;
+        radioScanBtn.disabled = disabled;
+        lockBtn.disabled      = disabled;
+        addFreqBtn.disabled   = disabled;
+        modePillsEl.querySelectorAll('.sdr-mode-pill').forEach(btn => {
+            btn.disabled = disabled;
+        });
+        [gainVal, volVal, sqVal, bwVal].forEach(el => {
+            el.classList.toggle('sdr-slider-val--dimmed', disabled);
+        });
+    }
+    // Disable controls until a radio is selected
+    setRadioControlsDisabled(true);
     function sendCmd(obj) {
         if (_sdrSocket && _sdrSocket.readyState === WebSocket.OPEN) {
             _sdrSocket.send(JSON.stringify(obj));
@@ -475,6 +496,7 @@
         if (window._SdrAudio)
             window._SdrAudio.stop();
         setPlayingState(false);
+        clearRadioSelection();
     });
     // ── Gain + AGC ────────────────────────────────────────────────────────────
     let _gainDebounce = null;
@@ -570,9 +592,11 @@
     radioSelect.addEventListener('change', () => {
         const id = parseInt(radioSelect.value, 10);
         if (!isNaN(id) && id > 0) {
+            setRadioControlsDisabled(false);
             radioSelect.dispatchEvent(new CustomEvent('sdr-radio-selected', { bubbles: true, detail: { radioId: id } }));
         }
         else {
+            setRadioControlsDisabled(true);
             document.dispatchEvent(new CustomEvent('sdr-radio-deselected'));
         }
         setStatus(false);
@@ -785,6 +809,13 @@
                 _segEls[i].classList.remove('sdr-signal-seg--on');
         }
     }
+    function clearRadioSelection() {
+        radioSelect.value = '';
+        deviceDropdownText.textContent = '— select radio —';
+        deviceDropdownText.classList.remove('sdr-device-dropdown-text--chosen');
+        setRadioControlsDisabled(true);
+        document.dispatchEvent(new CustomEvent('sdr-radio-deselected'));
+    }
     function applyStatus(msg) {
         setStatus(msg.connected);
         if (msg.connected) {
@@ -839,6 +870,7 @@
             deviceDropdownText.textContent = '— select radio —';
             deviceDropdownText.classList.remove('sdr-device-dropdown-text--chosen');
             closeDeviceMenu();
+            setRadioControlsDisabled(true);
             document.dispatchEvent(new CustomEvent('sdr-radio-deselected'));
         });
         _deviceMenuEl.appendChild(placeholder);

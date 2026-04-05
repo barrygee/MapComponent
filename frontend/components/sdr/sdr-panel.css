@@ -320,6 +320,12 @@
     color: #c8ff00;
 }
 
+.sdr-mode-pill:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* ---- Frequency row ---- */
 .sdr-freq-row {
     display: flex;
@@ -351,6 +357,11 @@
 
 .sdr-freq-input-large::placeholder {
     color: rgba(200, 255, 0, 0.2);
+}
+
+.sdr-freq-input-large:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
 }
 
 /* ---- Tune / stop buttons — same as mode pills ---- */
@@ -403,6 +414,10 @@
     min-width: 60px;
     text-align: right;
     flex-shrink: 0;
+}
+
+.sdr-slider-val--dimmed {
+    opacity: 0.25;
 }
 
 .sdr-panel-slider {
