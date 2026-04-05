@@ -497,7 +497,6 @@
         if (window._SdrAudio)
             window._SdrAudio.stop();
         setPlayingState(false);
-        clearRadioSelection();
     });
     // ── Gain + AGC ────────────────────────────────────────────────────────────
     let _gainDebounce = null;
