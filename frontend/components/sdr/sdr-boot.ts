@@ -82,6 +82,8 @@
         const ws    = new WebSocket(`${proto}://${location.host}/ws/sdr/${radioId}`);
         _sdrSocket  = ws;
 
+        let _dataConfirmed = false;
+
         ws.addEventListener('message', (ev: MessageEvent) => {
             let msg: any;
             try { msg = JSON.parse(ev.data); } catch { return; }
@@ -96,8 +98,16 @@
                     }
                     sessionStorage.setItem('sdrLastMode', msg.mode);
                     break;
+                case 'spectrum':
+                    // Only mark connected once real data arrives from the device
+                    if (!_dataConfirmed) {
+                        _dataConfirmed = true;
+                        if (window._SdrControls) window._SdrControls.setStatus(true);
+                    }
+                    break;
                 case 'error':
                     console.warn('[SDR] error', msg.code, msg.message);
+                    _dataConfirmed = false;
                     if (window._SdrControls) window._SdrControls.setStatus(false);
                     if (msg.code === 'CONNECT_FAILED') {
                         console.error(`[SDR] Cannot reach rtl_tcp — check host/port in Settings. ${msg.message}`);

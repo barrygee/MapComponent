@@ -278,6 +278,7 @@
         }
         _ready = false;
         if (_worklet) {
+            _worklet.port.onmessage = null;
             _worklet.disconnect();
             _worklet = null;
         }
@@ -289,6 +290,8 @@
             _ctx.close();
             _ctx = null;
         }
+        if (window._SdrControls)
+            window._SdrControls.setStatus(false);
     }
     function setRadioId(id) {
         _radioId = id;

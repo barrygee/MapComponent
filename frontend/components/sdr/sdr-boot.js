@@ -43,7 +43,8 @@
     // ── WebSocket management ──────────────────────���───────────────────────────
     let _reconnectTimer = null;
     let _activeRadioId = null;
-    function openControlSocket(radioId) {
+    let _radioCache = new Map();
+    async function openControlSocket(radioId) {
         if (_reconnectTimer) {
             clearTimeout(_reconnectTimer);
             _reconnectTimer = null;
@@ -60,9 +61,25 @@
         _activeRadioId = radioId;
         _sdrCurrentRadioId = radioId;
         sessionStorage.setItem('sdrLastRadioId', String(radioId));
+        // POST stored defaults to configure the backend connection before opening the WebSocket
+        const cfg = _radioCache.get(radioId);
+        try {
+            await fetch('/api/sdr/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    radio_id: radioId,
+                    gain_db: cfg?.rf_gain ?? 30.0,
+                    gain_auto: cfg?.agc ?? false,
+                    sample_rate: cfg?.bandwidth ?? 2048000,
+                }),
+            });
+        }
+        catch (_e) { /* non-fatal — WS will still attempt connection */ }
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
         const ws = new WebSocket(`${proto}://${location.host}/ws/sdr/${radioId}`);
         _sdrSocket = ws;
+        let _dataConfirmed = false;
         ws.addEventListener('message', (ev) => {
             let msg;
             try {
@@ -83,10 +100,22 @@
                     }
                     sessionStorage.setItem('sdrLastMode', msg.mode);
                     break;
+                case 'spectrum':
+                    // Only mark connected once real data arrives from the device
+                    if (!_dataConfirmed) {
+                        _dataConfirmed = true;
+                        if (window._SdrControls)
+                            window._SdrControls.setStatus(true);
+                    }
+                    break;
                 case 'error':
                     console.warn('[SDR] error', msg.code, msg.message);
+                    _dataConfirmed = false;
                     if (window._SdrControls)
                         window._SdrControls.setStatus(false);
+                    if (msg.code === 'CONNECT_FAILED') {
+                        console.error(`[SDR] Cannot reach rtl_tcp — check host/port in Settings. ${msg.message}`);
+                    }
                     break;
                 case 'pong':
                     break;
@@ -110,7 +139,7 @@
                 clearTimeout(_reconnectTimer);
             _reconnectTimer = setTimeout(() => {
                 if (_sdrCurrentRadioId === radioId)
-                    openControlSocket(radioId);
+                    void openControlSocket(radioId);
             }, 3000);
         });
         ws.addEventListener('error', () => {
@@ -124,6 +153,8 @@
         try {
             const res = await fetch('/api/sdr/radios');
             const radios = await res.json();
+            _radioCache.clear();
+            radios.forEach((r) => _radioCache.set(r.id, r));
             if (window._sdrPopulateRadios) {
                 window._sdrPopulateRadios(radios);
             }
@@ -146,7 +177,7 @@
     document.addEventListener('sdr-radio-selected', (e) => {
         const { radioId } = e.detail;
         if (radioId)
-            openControlSocket(radioId);
+            void openControlSocket(radioId);
     });
     document.addEventListener('sdr-radio-deselected', () => {
         if (_reconnectTimer) {
