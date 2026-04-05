@@ -45,16 +45,26 @@
     "defaultSquelch": -60,
     "radios": [
       {
+        "id": 1,
         "name": "Sentinel RTL-SDR",
         "host": "192.168.1.111",
         "port": 1234,
-        "enabled": true
+        "enabled": true,
+        "bandwidth": null,
+        "rf_gain": null,
+        "agc": null,
+        "description": ""
       },
       {
+        "id": 2,
         "name": "Pauls SDR",
         "host": "192.168.20.222",
         "port": 1234,
-        "enabled": true
+        "enabled": true,
+        "bandwidth": null,
+        "rf_gain": null,
+        "agc": null,
+        "description": ""
       }
     ]
   }

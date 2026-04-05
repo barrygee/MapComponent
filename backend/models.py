@@ -95,6 +95,9 @@ class SdrRadio(Base):
     port        = Column(Integer, nullable=False, default=1234)
     description = Column(Text, nullable=False, default="")
     enabled     = Column(Boolean, nullable=False, default=True)
+    bandwidth   = Column(Integer,  nullable=True, default=None)  # Hz sample rate; None = rtl_tcp default
+    rf_gain     = Column(Float,    nullable=True, default=None)  # dB; None = use panel default
+    agc         = Column(Boolean,  nullable=True, default=None)  # None = not overridden
     created_at  = Column(Integer, nullable=False)            # Unix ms
 
 

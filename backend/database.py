@@ -45,6 +45,15 @@ async def create_tables():
         except OperationalError:
             # Column already exists — raised by SQLite on duplicate ALTER TABLE
             pass
+        for col_sql in [
+            "ALTER TABLE sdr_radios ADD COLUMN bandwidth INTEGER",
+            "ALTER TABLE sdr_radios ADD COLUMN rf_gain REAL",
+            "ALTER TABLE sdr_radios ADD COLUMN agc INTEGER",
+        ]:
+            try:
+                await conn.execute(sa_text(col_sql))
+            except OperationalError:
+                pass
 
 
 async def get_db():
@@ -84,6 +93,62 @@ def _build_default_settings() -> list[tuple[str, str, object]]:
     for ns, key, value in rows:
         result.append((ns, key, overrides.get((ns, key), value)))
     return result
+
+
+async def migrate_sdr_radios_to_settings() -> None:
+    """One-time migration: copy rows from sdr_radios table into UserSettings sdr.radios.
+
+    Only runs if sdr_radios has rows AND sdr.radios does not yet exist in UserSettings.
+    Safe to call on every startup — skips immediately if the key already exists.
+    """
+    from backend.models import UserSettings  # avoid circular import
+
+    async with AsyncSessionLocal() as session:
+        # Check if sdr.radios already exists in UserSettings
+        existing = await session.execute(
+            select(UserSettings).where(
+                UserSettings.namespace == "sdr",
+                UserSettings.key == "radios",
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            return  # already migrated or seeded — nothing to do
+
+        # Read rows from sdr_radios (table may not exist on a fresh install)
+        try:
+            result = await session.execute(sa_text(
+                "SELECT id, name, host, port, description, enabled, bandwidth, rf_gain, agc, created_at "
+                "FROM sdr_radios ORDER BY created_at"
+            ))
+            rows = result.fetchall()
+        except Exception:
+            return  # table doesn't exist yet — nothing to migrate
+
+        if not rows:
+            return  # empty table — let seed_default_settings handle it
+
+        radios = []
+        for row in rows:
+            radios.append({
+                "id":          row[0],
+                "name":        row[1],
+                "host":        row[2],
+                "port":        row[3],
+                "description": row[4] or "",
+                "enabled":     bool(row[5]),
+                "bandwidth":   row[6],
+                "rf_gain":     row[7],
+                "agc":         bool(row[8]) if row[8] is not None else None,
+                "created_at":  row[9],
+            })
+
+        session.add(UserSettings(
+            namespace="sdr",
+            key="radios",
+            value=json.dumps(radios),
+            updated_at=int(time.time() * 1000),
+        ))
+        await session.commit()
 
 
 async def seed_default_settings() -> None:

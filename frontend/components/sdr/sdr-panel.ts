@@ -294,9 +294,10 @@
 
     // ── State ─────────────────────────────────────────────────────────────────
 
-    let _groups:  SdrFrequencyGroup[]   = [];
-    let _freqs:   SdrStoredFrequency[]  = [];
-    let _visible: boolean = true;
+    let _groups:       SdrFrequencyGroup[]   = [];
+    let _freqs:        SdrStoredFrequency[]  = [];
+    let _knownRadios:  SdrRadio[]            = [];
+    let _visible:      boolean = true;
     let _editingFreqId: number | null = null;
 
     // ── Radio / Scanner main section toggles ─────────────────────────────────
@@ -602,6 +603,27 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
     radioSelect.addEventListener('change', () => {
         const id = parseInt(radioSelect.value, 10);
         if (!isNaN(id) && id > 0) {
+            // Apply stored defaults to UI sliders immediately on radio selection
+            const radio = _knownRadios.find(r => r.id === id);
+            if (radio) {
+                if (radio.agc === true) {
+                    agcCheck.checked    = true;
+                    gainSlider.disabled = true;
+                    gainVal.textContent = 'AUTO';
+                    _sdrCurrentGainAuto = true;
+                } else if (radio.rf_gain != null) {
+                    agcCheck.checked    = false;
+                    gainSlider.disabled = false;
+                    gainSlider.value    = String(radio.rf_gain);
+                    gainVal.textContent = `${radio.rf_gain.toFixed(1)} dB`;
+                    _sdrCurrentGain     = radio.rf_gain;
+                    _sdrCurrentGainAuto = false;
+                }
+                if (radio.bandwidth != null) {
+                    setBandwidthSlider(radio.bandwidth);
+                    if (window._SdrAudio) window._SdrAudio.setBandwidthHz(radio.bandwidth);
+                }
+            }
             radioSelect.dispatchEvent(new CustomEvent('sdr-radio-selected', { bubbles: true, detail: { radioId: id } }));
         } else {
             document.dispatchEvent(new CustomEvent('sdr-radio-deselected'));
@@ -955,6 +977,7 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
     // ── Populate radio list ───────────────────────────────────────────────────
 
     (window as any)._sdrPopulateRadios = function(radios: SdrRadio[]) {
+        _knownRadios = radios;
         const current = radioSelect.value;
         while (radioSelect.options.length > 0) radioSelect.remove(0);
         const defOpt = document.createElement('option');

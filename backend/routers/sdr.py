@@ -40,7 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.cache import now_ms
 from backend.database import get_db
-from backend.models import SdrFrequencyGroup, SdrRadio, SdrStoredFrequency
+from backend.models import SdrFrequencyGroup, SdrStoredFrequency, UserSettings
 from backend.services import sdr as sdr_svc
 
 logger = logging.getLogger(__name__)
@@ -53,9 +53,12 @@ router = APIRouter(tags=["sdr"])
 class RadioIn(BaseModel):
     name: str
     host: str
-    port: int = 8890
+    port: int = 1234
     description: str = ""
     enabled: bool = True
+    bandwidth: Optional[int]   = None
+    rf_gain:   Optional[float] = None
+    agc:       Optional[bool]  = None
 
 
 class GroupIn(BaseModel):
@@ -89,18 +92,41 @@ class DisconnectIn(BaseModel):
     radio_id: int
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Radio helpers — read/write sdr.radios from UserSettings ──────────────────
 
-def _radio_to_dict(r: SdrRadio) -> dict:
-    return {
-        "id": r.id,
-        "name": r.name,
-        "host": r.host,
-        "port": r.port,
-        "description": r.description,
-        "enabled": r.enabled,
-        "created_at": r.created_at,
-    }
+async def _get_radios(db: AsyncSession) -> list[dict]:
+    """Read the sdr.radios array from UserSettings. Returns [] if not set."""
+    row = (await db.execute(
+        select(UserSettings).where(
+            UserSettings.namespace == "sdr",
+            UserSettings.key == "radios",
+        )
+    )).scalar_one_or_none()
+    if row is None:
+        return []
+    try:
+        val = json.loads(row.value)
+        return val if isinstance(val, list) else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+async def _save_radios(db: AsyncSession, radios: list[dict]) -> None:
+    """Write the sdr.radios array back to UserSettings (upsert)."""
+    row = (await db.execute(
+        select(UserSettings).where(
+            UserSettings.namespace == "sdr",
+            UserSettings.key == "radios",
+        )
+    )).scalar_one_or_none()
+    ts = now_ms()
+    value_str = json.dumps(radios)
+    if row:
+        row.value = value_str
+        row.updated_at = ts
+    else:
+        db.add(UserSettings(namespace="sdr", key="radios", value=value_str, updated_at=ts))
+    await db.commit()
 
 
 def _group_to_dict(g: SdrFrequencyGroup) -> dict:
@@ -128,42 +154,41 @@ def _freq_to_dict(f: SdrStoredFrequency) -> dict:
     }
 
 
-# ── Radio CRUD ────────────────────────────────────────────────────────────────
+# ── Radio CRUD — backed by UserSettings sdr.radios ───────────────────────────
 
 @router.get("/api/sdr/radios")
 async def list_radios(db: AsyncSession = Depends(get_db)):
-    rows = (await db.execute(select(SdrRadio).order_by(SdrRadio.created_at))).scalars().all()
-    return JSONResponse([_radio_to_dict(r) for r in rows])
+    return JSONResponse(await _get_radios(db))
 
 
 @router.post("/api/sdr/radios", status_code=201)
 async def create_radio(body: RadioIn, db: AsyncSession = Depends(get_db)):
-    radio = SdrRadio(**body.model_dump(), created_at=now_ms())
-    db.add(radio)
-    await db.commit()
-    await db.refresh(radio)
-    return JSONResponse(_radio_to_dict(radio), status_code=201)
+    radios = await _get_radios(db)
+    new_id = max((r.get("id", 0) for r in radios if isinstance(r.get("id"), int)), default=0) + 1
+    new_radio = {"id": new_id, "created_at": now_ms(), **body.model_dump()}
+    radios.append(new_radio)
+    await _save_radios(db, radios)
+    return JSONResponse(new_radio, status_code=201)
 
 
 @router.put("/api/sdr/radios/{radio_id}")
 async def update_radio(radio_id: int, body: RadioIn, db: AsyncSession = Depends(get_db)):
-    row = (await db.execute(select(SdrRadio).where(SdrRadio.id == radio_id))).scalar_one_or_none()
-    if not row:
-        raise HTTPException(404, "Radio not found")
-    for k, v in body.model_dump().items():
-        setattr(row, k, v)
-    await db.commit()
-    await db.refresh(row)
-    return JSONResponse(_radio_to_dict(row))
+    radios = await _get_radios(db)
+    for i, r in enumerate(radios):
+        if r.get("id") == radio_id:
+            radios[i] = {**r, **body.model_dump()}
+            await _save_radios(db, radios)
+            return JSONResponse(radios[i])
+    raise HTTPException(404, "Radio not found")
 
 
 @router.delete("/api/sdr/radios/{radio_id}", status_code=204)
 async def delete_radio(radio_id: int, db: AsyncSession = Depends(get_db)):
-    row = (await db.execute(select(SdrRadio).where(SdrRadio.id == radio_id))).scalar_one_or_none()
-    if not row:
+    radios = await _get_radios(db)
+    new_radios = [r for r in radios if r.get("id") != radio_id]
+    if len(new_radios) == len(radios):
         raise HTTPException(404, "Radio not found")
-    await db.delete(row)
-    await db.commit()
+    await _save_radios(db, new_radios)
 
 
 # ── Group CRUD ────────────────────────────────────────────────────────────────
@@ -250,11 +275,12 @@ async def delete_frequency(freq_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.post("/api/sdr/connect")
 async def connect_radio(body: ConnectIn, db: AsyncSession = Depends(get_db)):
-    radio = (await db.execute(select(SdrRadio).where(SdrRadio.id == body.radio_id))).scalar_one_or_none()
+    radios = await _get_radios(db)
+    radio = next((r for r in radios if r.get("id") == body.radio_id), None)
     if not radio:
         raise HTTPException(404, "Radio not found")
     try:
-        conn = await sdr_svc.get_or_create_connection(radio.host, radio.port)
+        conn = await sdr_svc.get_or_create_connection(radio["host"], radio["port"])
         await conn.set_sample_rate(body.sample_rate)
         await conn.set_frequency(body.frequency_hz)
         if body.gain_auto:
@@ -269,20 +295,22 @@ async def connect_radio(body: ConnectIn, db: AsyncSession = Depends(get_db)):
 
 @router.post("/api/sdr/disconnect")
 async def disconnect_radio(body: DisconnectIn, db: AsyncSession = Depends(get_db)):
-    radio = (await db.execute(select(SdrRadio).where(SdrRadio.id == body.radio_id))).scalar_one_or_none()
+    radios = await _get_radios(db)
+    radio = next((r for r in radios if r.get("id") == body.radio_id), None)
     if not radio:
         raise HTTPException(404, "Radio not found")
-    await sdr_svc.close_connection(radio.host, radio.port)
+    await sdr_svc.close_connection(radio["host"], radio["port"])
     return JSONResponse({"status": "disconnected"})
 
 
 @router.get("/api/sdr/status/{radio_id}")
 async def radio_status(radio_id: int, db: AsyncSession = Depends(get_db)):
-    radio = (await db.execute(select(SdrRadio).where(SdrRadio.id == radio_id))).scalar_one_or_none()
+    radios = await _get_radios(db)
+    radio = next((r for r in radios if r.get("id") == radio_id), None)
     if not radio:
         raise HTTPException(404, "Radio not found")
-    status = sdr_svc.connection_status(radio.host, radio.port)
-    return JSONResponse({"radio_id": radio_id, "radio_name": radio.name, **status})
+    status = sdr_svc.connection_status(radio["host"], radio["port"])
+    return JSONResponse({"radio_id": radio_id, "radio_name": radio["name"], **status})
 
 
 # ── WebSocket bridge ──────────────────────────────────────────────────────────
@@ -302,7 +330,8 @@ async def sdr_iq_websocket(radio_id: int, websocket: WebSocket):
 
     from backend.database import AsyncSessionLocal
     async with AsyncSessionLocal() as db:
-        radio = (await db.execute(select(SdrRadio).where(SdrRadio.id == radio_id))).scalar_one_or_none()
+        radios = await _get_radios(db)
+    radio = next((r for r in radios if r.get("id") == radio_id), None)
 
     if not radio:
         await websocket.send_text(json.dumps({"type": "error", "code": "NOT_FOUND", "message": f"Radio {radio_id} not found"}))
@@ -313,7 +342,7 @@ async def sdr_iq_websocket(radio_id: int, websocket: WebSocket):
     last_exc: Exception = RuntimeError("unknown")
     for attempt in range(3):
         try:
-            broadcaster = await sdr_svc.get_or_create_broadcaster(radio.host, radio.port)
+            broadcaster = await sdr_svc.get_or_create_broadcaster(radio["host"], radio["port"])
             break
         except ConnectionError as exc:
             last_exc = exc
@@ -363,10 +392,11 @@ async def sdr_websocket(radio_id: int, websocket: WebSocket):
     """
     await websocket.accept()
 
-    # Look up radio in DB (no DB dep injection for WebSocket — open our own session)
+    # Look up radio from UserSettings (no DB dep injection for WebSocket — open our own session)
     from backend.database import AsyncSessionLocal
     async with AsyncSessionLocal() as db:
-        radio = (await db.execute(select(SdrRadio).where(SdrRadio.id == radio_id))).scalar_one_or_none()
+        radios = await _get_radios(db)
+    radio = next((r for r in radios if r.get("id") == radio_id), None)
 
     if not radio:
         await websocket.send_text(json.dumps({"type": "error", "code": "NOT_FOUND", "message": f"Radio {radio_id} not found"}))
@@ -378,7 +408,7 @@ async def sdr_websocket(radio_id: int, websocket: WebSocket):
     last_exc: Exception = RuntimeError("unknown")
     for attempt in range(3):
         try:
-            broadcaster = await sdr_svc.get_or_create_broadcaster(radio.host, radio.port)
+            broadcaster = await sdr_svc.get_or_create_broadcaster(radio["host"], radio["port"])
             break
         except ConnectionError as exc:
             last_exc = exc
@@ -392,15 +422,15 @@ async def sdr_websocket(radio_id: int, websocket: WebSocket):
         await websocket.close()
         return
 
-    conn = sdr_svc.get_connection(radio.host, radio.port)
+    conn = sdr_svc.get_connection(radio["host"], radio["port"])
 
     # Send initial status
     try:
         await websocket.send_text(json.dumps({
             "type": "status",
             "connected": True,
-            "radio_id": radio.id,
-            "radio_name": radio.name,
+            "radio_id": radio["id"],
+            "radio_name": radio["name"],
             "center_hz": conn.center_hz,
             "sample_rate": conn.sample_rate,
             "mode": conn.mode,
