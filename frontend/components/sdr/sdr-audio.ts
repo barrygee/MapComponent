@@ -278,9 +278,10 @@
     function stop() {
         if (_iqSocket) { _iqSocket.close(); _iqSocket = null; }
         _ready = false;
-        if (_worklet) { _worklet.disconnect(); _worklet = null; }
+        if (_worklet) { _worklet.port.onmessage = null; _worklet.disconnect(); _worklet = null; }
         if (_gain)    { _gain.disconnect();    _gain    = null; }
         if (_ctx)     { _ctx.close();          _ctx     = null; }
+        if (window._SdrControls) window._SdrControls.setStatus(false);
     }
 
     function setRadioId(id: number) {

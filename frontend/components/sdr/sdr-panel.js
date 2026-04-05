@@ -776,7 +776,7 @@
     // ── Status dot + controls update ─────────────────────────────────────────
     function setStatus(connected) {
         _sdrConnected = connected;
-        const isOn = connected && getSelectedRadioId() !== null;
+        const isOn = connected && (_sdrCurrentRadioId !== null || getSelectedRadioId() !== null);
         connDot.className = 'sdr-conn-dot ' + (isOn ? 'sdr-dot-on' : 'sdr-dot-off');
         connDot.title = isOn ? 'Connected' : 'Disconnected';
         if (!connected) {
