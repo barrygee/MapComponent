@@ -387,7 +387,7 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
     function setRadioControlsDisabled(disabled: boolean) {
         freqInput.disabled   = disabled;
         freqTuneBtn.disabled = disabled;
-        freqStopBtn.disabled = disabled;
+        // freqStopBtn is managed exclusively by setPlayingState
         gainSlider.disabled  = disabled || _sdrCurrentGainAuto;
         agcCheck.disabled    = disabled;
         volSlider.disabled   = disabled;
@@ -626,35 +626,18 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
 
     radioSelect.addEventListener('change', () => {
         const id = parseInt(radioSelect.value, 10);
+
+        // Always stop audio and tear down current session when switching radios
+        if (window._SdrAudio) window._SdrAudio.stop();
+        setPlayingState(false);
+        setStatus(false);
+        setRadioControlsDisabled(true);
+
         if (!isNaN(id) && id > 0) {
-            setRadioControlsDisabled(false);
-            // Apply stored defaults to UI sliders immediately on radio selection
-            const radio = _knownRadios.find(r => r.id === id);
-            if (radio) {
-                if (radio.agc === true) {
-                    agcCheck.checked    = true;
-                    gainSlider.disabled = true;
-                    gainVal.textContent = 'AUTO';
-                    _sdrCurrentGainAuto = true;
-                } else if (radio.rf_gain != null) {
-                    agcCheck.checked    = false;
-                    gainSlider.disabled = false;
-                    gainSlider.value    = String(radio.rf_gain);
-                    gainVal.textContent = `${radio.rf_gain.toFixed(1)} dB`;
-                    _sdrCurrentGain     = radio.rf_gain;
-                    _sdrCurrentGainAuto = false;
-                }
-                if (radio.bandwidth != null) {
-                    setBandwidthSlider(radio.bandwidth);
-                    if (window._SdrAudio) window._SdrAudio.setBandwidthHz(radio.bandwidth);
-                }
-            }
             radioSelect.dispatchEvent(new CustomEvent('sdr-radio-selected', { bubbles: true, detail: { radioId: id } }));
         } else {
-            setRadioControlsDisabled(true);
             document.dispatchEvent(new CustomEvent('sdr-radio-deselected'));
         }
-        setStatus(false);
     });
 
     // ── Scan (radio tab) ──────────────────────────────────────────────────────
@@ -879,7 +862,13 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         const isOn = connected;
         connDot.className = 'sdr-conn-dot ' + (isOn ? 'sdr-dot-on' : 'sdr-dot-off');
         connDot.title = isOn ? 'Connected' : 'Disconnected';
-        if (!connected) {
+        if (connected) {
+            setPlayingState(false);
+            setRadioControlsDisabled(false);
+        } else {
+            setPlayingState(false);
+            setRadioControlsDisabled(true);
+            activeFreq.textContent = '';
             _signalSmoothed = -120;
             for (let i = 0; i < SIGNAL_SEGS; i++) _segEls[i].classList.remove('sdr-signal-seg--on');
         }
@@ -889,6 +878,7 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         radioSelect.value = '';
         deviceDropdownText.textContent = '— select radio —';
         deviceDropdownText.classList.remove('sdr-device-dropdown-text--chosen');
+        setPlayingState(false);
         setRadioControlsDisabled(true);
         document.dispatchEvent(new CustomEvent('sdr-radio-deselected'));
     }
@@ -916,11 +906,11 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
 
             if (msg.gain_auto) {
                 agcCheck.checked    = true;
-                gainSlider.disabled = true;
+                if (_sdrConnected) gainSlider.disabled = true;
                 gainVal.textContent = 'AUTO';
             } else {
                 agcCheck.checked    = false;
-                gainSlider.disabled = false;
+                if (_sdrConnected) gainSlider.disabled = false;
                 gainSlider.value    = String(msg.gain_db);
                 gainVal.textContent = `${msg.gain_db.toFixed(1)} dB`;
             }
