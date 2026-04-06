@@ -441,7 +441,7 @@
         freqTuneBtn.disabled = playing;
         freqStopBtn.disabled = !playing;
     }
-    function tune() {
+    async function tune() {
         const hz = parseFreqMhz(freqInput.value);
         if (!hz)
             return;
@@ -450,7 +450,7 @@
         const alreadyPlaying = !freqStopBtn.disabled;
         if (window._SdrAudio) {
             if (!alreadyPlaying) {
-                window._SdrAudio.initAudio(getSelectedRadioId() ?? undefined);
+                await window._SdrAudio.initAudio(getSelectedRadioId() ?? undefined);
                 window._SdrAudio.setMode(_sdrCurrentMode);
                 const bw = defaultBwHz(_sdrCurrentMode);
                 window._SdrAudio.setBandwidthHz(bw);

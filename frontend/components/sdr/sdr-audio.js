@@ -267,7 +267,11 @@
         if (_ctx && _ctx.state === 'suspended') {
             await _ctx.resume();
         }
-        if (_radioId != null && !_iqSocket) {
+        if (_radioId != null) {
+            if (_iqSocket) {
+                _iqSocket.close();
+                _iqSocket = null;
+            }
             _openIqSocket(_radioId);
         }
     }
