@@ -58,8 +58,8 @@
       {
         "id": 2,
         "name": "Pauls SDR",
-        "host": "192.168.20.222",
-        "port": 1234,
+        "host": "192.168.20.155",
+        "port": 4321,
         "enabled": true,
         "bandwidth": null,
         "rf_gain": null,

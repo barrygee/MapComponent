@@ -29,8 +29,8 @@
         super();
         this._mode='AM'; this._squelch=-120; this._sampleRate=2048000;
         // Circular PCM buffer — 48000*2 = 2s capacity; pre-roll 0.08s before playing
-        this._pcmBuf=new Float32Array(48000*4); this._pcmWr=0; this._pcmRd=0; this._pcmLen=0;
-        this._preroll=Math.round(48000*0.3); this._buffering=true;
+        this._pcmBuf=new Float32Array(48000*8); this._pcmWr=0; this._pcmRd=0; this._pcmLen=0;
+        this._preroll=Math.round(48000*0.8); this._buffering=true;
         this._wfmPrevI=1; this._wfmPrevQ=0; this._amDc=0;
         this._bwHz=0; // 0 = full bandwidth
         // WFM de-emphasis IIR state (75µs time constant)
@@ -161,8 +161,8 @@
         const cap=this._pcmBuf.length;
         for(let k=0;k<need;k++){out[k]=this._pcmBuf[this._pcmRd];this._pcmRd=(this._pcmRd+1)%cap;}
         this._pcmLen-=need;
-        // Only re-buffer if completely empty — avoid thrashing
-        if(this._pcmLen===0)this._buffering=true;
+        // Re-buffer if we've dropped too low — avoids stuttering on underrun
+        if(this._pcmLen<this._preroll*0.25)this._buffering=true;
         return true;
     }
 });`;
