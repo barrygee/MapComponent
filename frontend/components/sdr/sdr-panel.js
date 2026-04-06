@@ -596,11 +596,12 @@
         setStatus(false);
         setRadioControlsDisabled(true);
         if (!isNaN(id) && id > 0) {
-            // Pre-populate slider display values from stored config (controls stay disabled until connected)
+            // Apply stored defaults and enable controls immediately on radio selection
             const radio = _knownRadios.find(r => r.id === id);
             if (radio) {
                 if (radio.agc === true) {
                     agcCheck.checked = true;
+                    gainSlider.disabled = true;
                     gainVal.textContent = 'AUTO';
                     _sdrCurrentGainAuto = true;
                 }
@@ -822,9 +823,8 @@
     // ── Status dot + controls update ─────────────────────────────────────────
     function setStatus(connected) {
         _sdrConnected = connected;
-        const isOn = connected;
-        connDot.className = 'sdr-conn-dot ' + (isOn ? 'sdr-dot-on' : 'sdr-dot-off');
-        connDot.title = isOn ? 'Connected' : 'Disconnected';
+        connDot.className = 'sdr-conn-dot ' + (connected ? 'sdr-dot-on' : 'sdr-dot-off');
+        connDot.title = connected ? 'Connected' : 'Disconnected';
         if (connected) {
             setPlayingState(false);
             setRadioControlsDisabled(false);
@@ -980,18 +980,17 @@
             opt.textContent = r.name;
             radioSelect.appendChild(opt);
         });
-        if (current) {
-            radioSelect.value = current;
-            const chosen = radios.find(r => String(r.id) === current);
-            if (chosen) {
-                deviceDropdownText.textContent = chosen.name;
-                deviceDropdownText.classList.add('sdr-device-dropdown-text--chosen');
-            }
-            else {
-                // Previously selected radio no longer exists — clear the display
-                deviceDropdownText.textContent = '— select radio —';
-                deviceDropdownText.classList.remove('sdr-device-dropdown-text--chosen');
-            }
+        // Restore session selection or keep current
+        const savedId = current || sessionStorage.getItem('sdrLastRadioId') || '';
+        const chosen = savedId ? radios.find(r => r.enabled && String(r.id) === String(savedId)) : null;
+        if (chosen) {
+            radioSelect.value = String(chosen.id);
+            deviceDropdownText.textContent = chosen.name;
+            deviceDropdownText.classList.add('sdr-device-dropdown-text--chosen');
+            radioSelect.dispatchEvent(new Event('change'));
+        } else {
+            deviceDropdownText.textContent = '— select radio —';
+            deviceDropdownText.classList.remove('sdr-device-dropdown-text--chosen');
         }
         buildDeviceMenu(radios);
     };

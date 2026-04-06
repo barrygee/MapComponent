@@ -158,14 +158,6 @@
             if (window._sdrPopulateRadios) {
                 window._sdrPopulateRadios(radios);
             }
-            // Restore last selected radio from sessionStorage
-            const savedRadioId = parseInt(sessionStorage.getItem('sdrLastRadioId') || '0', 10);
-            if (savedRadioId > 0) {
-                const match = radios.find(r => r.id === savedRadioId && r.enabled);
-                if (match) {
-                    document.dispatchEvent(new CustomEvent('sdr-radio-selected', { detail: { radioId: match.id } }));
-                }
-            }
         }
         catch (e) {
             console.warn('[SDR] Could not load radios:', e);
