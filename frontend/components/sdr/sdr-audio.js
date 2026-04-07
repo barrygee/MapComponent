@@ -25,6 +25,7 @@
     let _squelch = -120;
     // ── Recording state ──────────────────────────────────────────────────────
     let _isRecording = false;
+    let _collectingChunks = false; // stays true through the flush yield after rec_stop
     let _recStartTime = null;
     let _recId = null;
     let _recChunks = [];
@@ -222,7 +223,7 @@
                 if (!msg) return;
                 if (msg.type === 'power' && window._SdrControls)
                     window._SdrControls.updateSignalBar(msg.dbfs);
-                if (msg.type === 'pcm_chunk' && _isRecording)
+                if (msg.type === 'pcm_chunk' && _collectingChunks)
                     _recChunks.push(new Float32Array(msg.samples));
             };
             _ready = true;
@@ -402,6 +403,7 @@
             return null;
         }
         _isRecording = true;
+        _collectingChunks = true;
         _recChunks = [];
         _recStartTime = new Date();
         _worklet.port.postMessage({ type: 'rec_start' });
@@ -412,23 +414,29 @@
         _isRecording = false;
         const endTime = new Date();
         if (_worklet) _worklet.port.postMessage({ type: 'rec_stop' });
-        // Brief yield to let the final pcm_chunk flush arrive
-        await new Promise(r => setTimeout(r, 200));
-        if (_recChunks.length === 0) return null;
-        const wav = _encodeWav(_recChunks, 48000);
-        _recChunks = [];
+        // Yield to let the final pcm_chunk flush arrive from the worklet thread,
+        // _collectingChunks stays true so the onmessage handler still captures it
+        await new Promise(r => setTimeout(r, 400));
+        _collectingChunks = false;
         const startedAt = (_recStartTime || endTime).toISOString().replace(/\.\d{3}Z$/, 'Z');
         const endedAt = endTime.toISOString().replace(/\.\d{3}Z$/, 'Z');
         const durationS = ((endTime - (_recStartTime || endTime)) / 1000).toFixed(2);
         const defaultName = `Recording ${startedAt.slice(0, 16).replace('T', ' ')}`;
+        const chunks = _recChunks;
+        _recChunks = [];
+        const recId = _recId;
+        _recId = null;
+        _recStartTime = null;
+        // Always call the stop endpoint so the DB row is marked complete
+        const wav = chunks.length > 0
+            ? _encodeWav(chunks, 48000)
+            : new Blob([new ArrayBuffer(44)], { type: 'audio/wav' }); // empty WAV header
         const form = new FormData();
         form.append('file', wav, 'recording.wav');
-        form.append('recording_id', String(_recId));
+        form.append('recording_id', String(recId));
         form.append('name', metadata.name || defaultName);
         form.append('ended_at', endedAt);
         form.append('duration_s', durationS);
-        _recId = null;
-        _recStartTime = null;
         try {
             const res = await fetch('/api/sdr/recordings/stop', { method: 'POST', body: form });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
