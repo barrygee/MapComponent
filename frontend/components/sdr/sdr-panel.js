@@ -639,6 +639,10 @@
         await window._SdrAudio.stopRecording(metadata);
         _removeLiveRecRow();
         await reloadClips();
+        // Delayed safety reload — covers cases where the WAV upload succeeds but
+        // the DB commit lands just after the first reloadClips fetch (race on
+        // slow/large recordings or transient upload delays).
+        setTimeout(reloadClips, 2000);
         const recGroupToggle = document.getElementById('sdr-recording-group-toggle');
         const recGroupBody = document.getElementById('sdr-recording-group-body');
         if (recGroupToggle && !recGroupToggle.classList.contains('sdr-group-toggle-expanded')) {

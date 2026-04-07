@@ -465,6 +465,8 @@
             return await res.json();
         } catch (e) {
             console.error('[SdrAudio] Recording upload failed:', e);
+            // Clean up the orphaned pending row so it doesn't silently linger
+            try { await fetch(`/api/sdr/recordings/${recId}`, { method: 'DELETE' }); } catch (_) {}
             return null;
         }
     }
