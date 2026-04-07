@@ -1449,8 +1449,9 @@
             : _clips;
         clipsCount.textContent = _clips.length ? String(_clips.length) : '';
         clipsList.innerHTML = '';
+        if (_liveRecRow) clipsList.appendChild(_liveRecRow);
         if (visible.length === 0) {
-            clipsEmpty.style.display = 'block';
+            clipsEmpty.style.display = _liveRecRow ? 'none' : 'block';
             return;
         }
         clipsEmpty.style.display = 'none';
@@ -1465,9 +1466,9 @@
                 <div class="sdr-clip-header">
                     <span class="sdr-clip-name">${_escHtml(c.name)}</span>
                 </div>
-                <div class="sdr-clip-summary">${mhz} MHz &nbsp;·&nbsp; ${dur} &nbsp;·&nbsp; ${sz}</div>
+                <div class="sdr-clip-summary">${mhz} MHz &nbsp;·&nbsp; ${c.mode || ''} &nbsp;·&nbsp; ${dur} &nbsp;·&nbsp; ${sz}</div>
                 <div class="sdr-clip-body">
-                    <div class="sdr-clip-meta">${mhz} MHz &nbsp;·&nbsp; ${dur} &nbsp;·&nbsp; ${sz}</div>
+                    <div class="sdr-clip-meta">${mhz} MHz &nbsp;·&nbsp; ${c.mode || ''} &nbsp;·&nbsp; ${dur} &nbsp;·&nbsp; ${sz}</div>
                     <div class="sdr-clip-date">${dt}</div>
                     ${c.notes ? `<div class="sdr-clip-notes">${_escHtml(c.notes)}</div>` : ''}
                     <div class="sdr-clip-actions">
@@ -1582,10 +1583,11 @@
     }
     async function reloadClips() {
         try {
-            const res = await fetch('/api/sdr/recordings');
+            const res = await fetch('/api/sdr/recordings', { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             _clips = await res.json();
-            renderClips();
-        } catch(_) {}
+        } catch(e) { console.error('[SDR] reloadClips failed:', e); }
+        renderClips();
         renderMgmt();
     }
     // ── Settings / file management ────────────────────────────────────────────
