@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_FFT_SIZE    = 1024   # bins used for spectrum display
 DEFAULT_SAMPLE_RATE = 2_048_000
 # Read ~85ms worth of IQ per chunk (174080 bytes @ 2.048MHz).
-# Large enough to keep the audio worklet buffer full between frames.
 READ_CHUNK_SAMPLES  = 87040  # ~85ms @ 2.048MHz
 READ_CHUNK_BYTES    = READ_CHUNK_SAMPLES * 2  # 2 bytes per IQ pair
 
@@ -158,6 +157,43 @@ class RadioBroadcaster:
         try:
             self._iq_subscribers.remove(q)
         except ValueError:
+            pass
+
+    async def start_iq_recording(self, file_path: str) -> asyncio.Queue:
+        """Subscribe to the IQ stream and write raw uint8 IQ pairs to file_path.
+
+        Returns the queue so the caller can stop recording via stop_iq_recording().
+        File format: raw uint8 interleaved I/Q pairs (no header) — standard .u8 SDR format.
+        sample_rate and center_hz are stored in the SdrRecording DB row, not in the file.
+        """
+        q: asyncio.Queue = asyncio.Queue(maxsize=8)
+        self._iq_subscribers.append(q)
+        asyncio.create_task(self._drain_iq_to_file(q, file_path))
+        return q
+
+    async def _drain_iq_to_file(self, q: asyncio.Queue, file_path: str) -> None:
+        """Drain the IQ subscriber queue to disk.
+
+        Strips the 8-byte header (sample_rate + center_hz) from each broadcast
+        payload and writes only the raw uint8 IQ bytes.
+        """
+        import aiofiles
+        try:
+            async with aiofiles.open(file_path, "wb") as f:
+                while True:
+                    payload = await q.get()
+                    if payload is None:      # sentinel → recording stopped
+                        break
+                    await f.write(payload[8:])   # skip 8-byte header, write raw IQ
+        except Exception as exc:
+            logger.warning("IQ file write error (%s): %s", file_path, exc)
+
+    def stop_iq_recording(self, q: asyncio.Queue) -> None:
+        """Unsubscribe the recording queue and signal the drain task to finish."""
+        self.unsubscribe_iq(q)
+        try:
+            q.put_nowait(None)   # sentinel to unblock the drain coroutine
+        except asyncio.QueueFull:
             pass
 
     async def start(self) -> None:
@@ -309,6 +345,11 @@ def connection_status(host: str, port: int) -> dict:
         "gain_auto": conn.gain_auto,
         "mode": conn.mode,
     }
+
+
+def get_broadcaster(host: str, port: int) -> "RadioBroadcaster | None":
+    """Return the existing broadcaster for this radio, or None if not running."""
+    return _broadcasters.get(f"{host}:{port}")
 
 
 async def get_or_create_broadcaster(host: str, port: int) -> RadioBroadcaster:

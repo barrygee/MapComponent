@@ -54,6 +54,9 @@ async def create_tables():
                 await conn.execute(sa_text(col_sql))
             except OperationalError:
                 pass
+    # Ensure recordings directory exists inside the data volume
+    recordings_dir = Path(settings.db_path).parent / "recordings"
+    recordings_dir.mkdir(parents=True, exist_ok=True)
 
 
 async def get_db():

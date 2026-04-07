@@ -30,17 +30,19 @@ import asyncio
 import json
 import logging
 import time
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.cache import now_ms
+from backend.config import settings
 from backend.database import get_db
-from backend.models import SdrFrequencyGroup, SdrStoredFrequency, UserSettings
+from backend.models import SdrFrequencyGroup, SdrRecording, SdrStoredFrequency, UserSettings
 from backend.services import sdr as sdr_svc
 
 logger = logging.getLogger(__name__)
@@ -90,6 +92,21 @@ class ConnectIn(BaseModel):
 
 class DisconnectIn(BaseModel):
     radio_id: int
+
+
+class RecordingStartIn(BaseModel):
+    radio_id: Optional[int] = None
+    radio_name: str = ""
+    frequency_hz: int
+    mode: str = "AM"
+    gain_db: float = 30.0
+    squelch_dbfs: float = -60.0
+    sample_rate: int = 2_048_000
+
+
+class RecordingPatchIn(BaseModel):
+    name: Optional[str] = None
+    notes: Optional[str] = None
 
 
 # ── Radio helpers — read/write sdr.radios from UserSettings ──────────────────
@@ -152,6 +169,37 @@ def _freq_to_dict(f: SdrStoredFrequency) -> dict:
         "notes": f.notes,
         "created_at": f.created_at,
     }
+
+
+def _recording_to_dict(r: SdrRecording) -> dict:
+    return {
+        "id":                  r.id,
+        "name":                r.name,
+        "notes":               r.notes,
+        "radio_id":            r.radio_id,
+        "radio_name":          r.radio_name,
+        "frequency_hz":        r.frequency_hz,
+        "mode":                r.mode,
+        "gain_db":             r.gain_db,
+        "squelch_dbfs":        r.squelch_dbfs,
+        "sample_rate":         r.sample_rate,
+        "started_at":          r.started_at,
+        "ended_at":            r.ended_at,
+        "duration_s":          r.duration_s,
+        "file_size_bytes":     r.file_size_bytes,
+        "has_iq_file":         r.has_iq_file,
+        "iq_file_size_bytes":  r.iq_file_size_bytes,
+        "status":              r.status,
+        "created_at":          r.created_at,
+    }
+
+
+def _recordings_dir() -> Path:
+    return Path(settings.db_path).parent / "recordings"
+
+
+# In-memory map of active IQ recording queues: recording_id → asyncio.Queue
+_active_iq_recordings: dict[int, asyncio.Queue] = {}
 
 
 # ── Radio CRUD — backed by UserSettings sdr.radios ───────────────────────────
@@ -269,6 +317,201 @@ async def delete_frequency(freq_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(404, "Frequency not found")
     await db.delete(row)
     await db.commit()
+
+
+# ── Recording CRUD + file serving ────────────────────────────────────────────
+
+@router.get("/api/sdr/recordings")
+async def list_recordings(db: AsyncSession = Depends(get_db)):
+    rows = (await db.execute(
+        select(SdrRecording)
+        .where(SdrRecording.status == "complete")
+        .order_by(SdrRecording.created_at.desc())
+    )).scalars().all()
+    return JSONResponse([_recording_to_dict(r) for r in rows])
+
+
+@router.post("/api/sdr/recordings/start", status_code=201)
+async def start_recording(body: RecordingStartIn, db: AsyncSession = Depends(get_db)):
+    """Create a pending recording row and (optionally) start server-side IQ capture."""
+    import datetime
+    started_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rec = SdrRecording(
+        name=f"Recording {started_at[:16].replace('T', ' ')}",
+        notes="",
+        radio_id=body.radio_id,
+        radio_name=body.radio_name,
+        frequency_hz=body.frequency_hz,
+        mode=body.mode,
+        gain_db=body.gain_db,
+        squelch_dbfs=body.squelch_dbfs,
+        sample_rate=body.sample_rate,
+        started_at=started_at,
+        ended_at="",
+        duration_s=0.0,
+        file_size_bytes=0,
+        has_iq_file=False,
+        iq_file_size_bytes=0,
+        status="recording",
+        created_at=now_ms(),
+    )
+    db.add(rec)
+    await db.commit()
+    await db.refresh(rec)
+
+    # Check if raw IQ recording is enabled in settings
+    sdr_settings_row = (await db.execute(
+        select(UserSettings).where(
+            UserSettings.namespace == "sdr",
+            UserSettings.key == "recordRawIq",
+        )
+    )).scalar_one_or_none()
+    record_iq = False
+    if sdr_settings_row:
+        try:
+            record_iq = json.loads(sdr_settings_row.value) is True
+        except Exception:
+            pass
+
+    if record_iq and body.radio_id is not None:
+        # Look up the radio's host/port so we can find its broadcaster
+        radios = await _get_radios(db)
+        radio = next((r for r in radios if r.get("id") == body.radio_id), None)
+        if radio:
+            try:
+                broadcaster = sdr_svc.get_broadcaster(radio["host"], radio["port"])
+                if broadcaster:
+                    rdir = _recordings_dir()
+                    rdir.mkdir(parents=True, exist_ok=True)
+                    iq_path = str(rdir / f"{rec.id}.u8")
+                    q = await broadcaster.start_iq_recording(iq_path)
+                    _active_iq_recordings[rec.id] = q
+                    rec.has_iq_file = True
+                    await db.commit()
+            except Exception as exc:
+                logger.warning("Could not start IQ recording for rec %d: %s", rec.id, exc)
+
+    return JSONResponse({"id": rec.id}, status_code=201)
+
+
+@router.post("/api/sdr/recordings/stop")
+async def stop_recording(
+    recording_id: int        = Form(...),
+    file: UploadFile         = File(...),
+    name: str                = Form(""),
+    ended_at: str            = Form(""),
+    duration_s: float        = Form(0.0),
+    db: AsyncSession         = Depends(get_db),
+):
+    """Finalise a recording: upload WAV, stop IQ capture, update DB row."""
+    row = (await db.execute(
+        select(SdrRecording).where(SdrRecording.id == recording_id)
+    )).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Recording not found")
+
+    # Stop IQ recording if active
+    if recording_id in _active_iq_recordings:
+        q = _active_iq_recordings.pop(recording_id)
+        # Find the broadcaster to call stop properly
+        try:
+            radios_cache = await _get_radios(db)
+            radio = next((r for r in radios_cache if r.get("id") == row.radio_id), None)
+            if radio:
+                broadcaster = sdr_svc.get_broadcaster(radio["host"], radio["port"])
+                if broadcaster:
+                    broadcaster.stop_iq_recording(q)
+                    await asyncio.sleep(0.2)  # let drain task finish flushing
+        except Exception as exc:
+            logger.warning("Error stopping IQ recording %d: %s", recording_id, exc)
+
+    # Save WAV file
+    rdir = _recordings_dir()
+    rdir.mkdir(parents=True, exist_ok=True)
+    content = await file.read()
+    wav_path = rdir / f"{recording_id}.wav"
+    wav_path.write_bytes(content)
+
+    # Update IQ file size if it was recorded
+    iq_file_size = 0
+    if row.has_iq_file:
+        iq_path = rdir / f"{recording_id}.u8"
+        if iq_path.exists():
+            iq_file_size = iq_path.stat().st_size
+
+    import datetime
+    if not ended_at:
+        ended_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    row.name = name or row.name
+    row.ended_at = ended_at
+    row.duration_s = duration_s
+    row.file_size_bytes = len(content)
+    row.iq_file_size_bytes = iq_file_size
+    row.status = "complete"
+    await db.commit()
+    await db.refresh(row)
+    return JSONResponse(_recording_to_dict(row))
+
+
+@router.patch("/api/sdr/recordings/{rec_id}")
+async def update_recording(rec_id: int, body: RecordingPatchIn, db: AsyncSession = Depends(get_db)):
+    row = (await db.execute(
+        select(SdrRecording).where(SdrRecording.id == rec_id)
+    )).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Recording not found")
+    if body.name is not None:
+        row.name = body.name
+    if body.notes is not None:
+        row.notes = body.notes
+    await db.commit()
+    await db.refresh(row)
+    return JSONResponse(_recording_to_dict(row))
+
+
+@router.delete("/api/sdr/recordings/{rec_id}", status_code=204)
+async def delete_recording(rec_id: int, db: AsyncSession = Depends(get_db)):
+    row = (await db.execute(
+        select(SdrRecording).where(SdrRecording.id == rec_id)
+    )).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Recording not found")
+    rdir = _recordings_dir()
+    for ext in ("wav", "u8"):
+        p = rdir / f"{rec_id}.{ext}"
+        if p.exists():
+            p.unlink()
+    await db.delete(row)
+    await db.commit()
+
+
+@router.get("/api/sdr/recordings/{rec_id}/file")
+async def get_recording_wav(rec_id: int, db: AsyncSession = Depends(get_db)):
+    row = (await db.execute(
+        select(SdrRecording).where(SdrRecording.id == rec_id)
+    )).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Recording not found")
+    wav_path = _recordings_dir() / f"{rec_id}.wav"
+    if not wav_path.exists():
+        raise HTTPException(404, "WAV file not found on disk")
+    safe = "".join(c for c in row.name if c.isalnum() or c in " _-").strip() or f"recording_{rec_id}"
+    return FileResponse(str(wav_path), media_type="audio/wav", filename=f"{safe}.wav")
+
+
+@router.get("/api/sdr/recordings/{rec_id}/iq")
+async def get_recording_iq(rec_id: int, db: AsyncSession = Depends(get_db)):
+    row = (await db.execute(
+        select(SdrRecording).where(SdrRecording.id == rec_id)
+    )).scalar_one_or_none()
+    if not row or not row.has_iq_file:
+        raise HTTPException(404, "IQ file not found")
+    iq_path = _recordings_dir() / f"{rec_id}.u8"
+    if not iq_path.exists():
+        raise HTTPException(404, "IQ file not found on disk")
+    safe = "".join(c for c in row.name if c.isalnum() or c in " _-").strip() or f"recording_{rec_id}"
+    return FileResponse(str(iq_path), media_type="application/octet-stream", filename=f"{safe}.u8")
 
 
 # ── Connection control ────────────────────────────────────────────────────────
