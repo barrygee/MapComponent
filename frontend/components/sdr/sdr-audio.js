@@ -437,7 +437,13 @@
         _collectingChunks = false;
         const startedAt = (_recStartTime || endTime).toISOString().replace(/\.\d{3}Z$/, 'Z');
         const endedAt = endTime.toISOString().replace(/\.\d{3}Z$/, 'Z');
-        const defaultName = `Recording ${startedAt.slice(0, 16).replace('T', ' ')}`;
+        const freqMhz = metadata.frequency_hz ? (metadata.frequency_hz / 1e6).toFixed(3) : null;
+        const mode = metadata.mode || null;
+        const defaultName = [
+            startedAt.slice(0, 16).replace('T', ' '),
+            freqMhz ? `${freqMhz} MHz` : null,
+            mode || null,
+        ].filter(Boolean).join(' · ');
         const chunks = _recChunks;
         _recChunks = [];
         const recId = _recId;
