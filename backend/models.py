@@ -128,6 +128,30 @@ class SdrStoredFrequency(Base):
     created_at   = Column(Integer, nullable=False)           # Unix ms
 
 
+class SdrRecording(Base):
+    """A recorded audio clip captured from the SDR demodulator."""
+    __tablename__ = "sdr_recordings"
+
+    id                 = Column(Integer, primary_key=True, autoincrement=True)
+    name               = Column(Text,    nullable=False)
+    notes              = Column(Text,    nullable=False, default="")
+    radio_id           = Column(Integer, nullable=True)
+    radio_name         = Column(Text,    nullable=False, default="")
+    frequency_hz       = Column(Integer, nullable=False)
+    mode               = Column(Text,    nullable=False, default="AM")
+    gain_db            = Column(Float,   nullable=False, default=30.0)
+    squelch_dbfs       = Column(Float,   nullable=False, default=-60.0)
+    sample_rate        = Column(Integer, nullable=False, default=2048000)
+    started_at         = Column(Text,    nullable=False)              # ISO-8601 UTC e.g. "2026-04-06T12:34:56Z"
+    ended_at           = Column(Text,    nullable=False, default="")
+    duration_s         = Column(Float,   nullable=False, default=0.0)
+    file_size_bytes    = Column(Integer, nullable=False, default=0)
+    has_iq_file        = Column(Boolean, nullable=False, default=False)
+    iq_file_size_bytes = Column(Integer, nullable=False, default=0)
+    status             = Column(Text,    nullable=False, default="recording")  # "recording"|"complete"|"error"
+    created_at         = Column(Integer, nullable=False)              # Unix ms
+
+
 class UserSettings(Base):
     """User preferences and overlay toggle states, persisted across browser sessions.
 

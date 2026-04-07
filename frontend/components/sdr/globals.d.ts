@@ -68,6 +68,7 @@ declare let _sdrCurrentSampleRate: number;
 declare let _sdrCurrentBwHz: number;
 declare let _sdrScanActive: boolean;
 declare let _sdrScanLocked: boolean;
+declare let _sdrPlaying: boolean;
 
 // ── SDR component public APIs ─────────────────────────────────────────────────
 

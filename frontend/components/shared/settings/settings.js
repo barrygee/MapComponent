@@ -489,6 +489,14 @@ window._SettingsPanel = (function () {
             desc: 'Configure RTL-SDR devices reachable via rtl_tcp',
             renderControl: _renderSdrDevicesControl,
         },
+        {
+            section: 'sdr',
+            sectionLabel: 'SDR',
+            id: 'sdr-record-raw-iq',
+            label: 'Record Raw IQ',
+            desc: 'Also save the raw IQ stream (.u8) alongside each WAV recording. WARNING: ~4 MB/sec · ~240 MB/min · ~14 GB/hr. Compatible with SDR#, GQRX, GNU Radio.',
+            renderControl: _renderRecordRawIqToggle,
+        },
         // CONFIG
         {
             section: 'app',
@@ -1072,6 +1080,42 @@ window._SettingsPanel = (function () {
         wrap.appendChild(labelDark);
         wrap.appendChild(track);
         wrap.appendChild(labelLight);
+        return wrap;
+    }
+    // ── SDR raw IQ recording toggle ───────────────────────────
+    function _renderRecordRawIqToggle() {
+        const wrap = document.createElement('div');
+        let _enabled = false;
+        const group = document.createElement('div');
+        group.className = 'sdr-devices-enabled-group';
+        const onBtn = document.createElement('button');
+        onBtn.className = 'sdr-devices-enabled-btn';
+        onBtn.textContent = 'ENABLED';
+        const offBtn = document.createElement('button');
+        offBtn.className = 'sdr-devices-enabled-btn is-active';
+        offBtn.textContent = 'DISABLED';
+        function _apply(enabled) {
+            _enabled = enabled;
+            onBtn.classList.toggle('is-active', enabled);
+            offBtn.classList.toggle('is-active', !enabled);
+            if (window._SettingsAPI)
+                window._SettingsAPI.put('sdr', 'recordRawIq', enabled);
+        }
+        onBtn.addEventListener('click', function () { _apply(true); });
+        offBtn.addEventListener('click', function () { _apply(false); });
+        group.appendChild(onBtn);
+        group.appendChild(offBtn);
+        wrap.appendChild(group);
+        // Load persisted value
+        if (window._SettingsAPI) {
+            window._SettingsAPI.getNamespace('sdr').then(function (s) {
+                if (s && s.recordRawIq === true) {
+                    _enabled = true;
+                    onBtn.classList.add('is-active');
+                    offBtn.classList.remove('is-active');
+                }
+            });
+        }
         return wrap;
     }
     // ── Config controls ───────────────────────────────────────

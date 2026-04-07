@@ -589,6 +589,17 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         _sdrCurrentBwHz   = hz;
     }
 
+    // Snap to nearest valid RTL-SDR sample rate (225001–300000 or 900001–3200000 Hz)
+    function snapToValidSampleRate(hz: number): number {
+        if (hz <= 262500) return 250000;
+        if (hz <= 600000) return 300000;
+        if (hz <= 1474000) return 1024000;
+        if (hz <= 1761000) return 1536000;
+        if (hz <= 1921000) return 1792000;
+        if (hz <= 2048000) return 2048000;
+        return 2048000;
+    }
+
     let _bwDebounce: ReturnType<typeof setTimeout> | null = null;
     bwSlider.addEventListener('input', () => {
         const hz = parseInt(bwSlider.value, 10);
@@ -597,7 +608,7 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         if (window._SdrAudio) window._SdrAudio.setBandwidthHz(hz);
         if (_bwDebounce) clearTimeout(_bwDebounce);
         _bwDebounce = setTimeout(() => {
-            sendCmd({ cmd: 'sample_rate', rate_hz: hz });
+            sendCmd({ cmd: 'sample_rate', rate_hz: snapToValidSampleRate(hz) });
         }, 150);
     });
 

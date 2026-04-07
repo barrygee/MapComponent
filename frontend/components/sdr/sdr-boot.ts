@@ -104,6 +104,13 @@
                         _dataConfirmed = true;
                         if (window._SdrControls) window._SdrControls.setStatus(true);
                     }
+                    // Drive signal bar from spectrum only when actively playing
+                    if (window._SdrControls && _sdrPlaying && (msg as any).bins?.length) {
+                        let peak = -120;
+                        const bins = (msg as any).bins as number[];
+                        for (let i = 0; i < bins.length; i++) if (bins[i] > peak) peak = bins[i];
+                        window._SdrControls.updateSignalBar(peak);
+                    }
                     break;
                 case 'error':
                     console.warn('[SDR] error', msg.code, msg.message);

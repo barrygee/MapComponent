@@ -23,14 +23,22 @@
     let _ready = false;
     let _mode = 'AM';
     let _squelch = -120;
+    // ── Recording state ──────────────────────────────────────────────────────
+    let _isRecording = false;
+    let _collectingChunks = false; // stays true through the flush yield after rec_stop
+    let _recStartTime = null;
+    let _recId = null;
+    let _recChunks = [];
     // Processor source inlined to avoid Safari blob/fetch/proxy issues with addModule
     const PROCESSOR_SRC = `registerProcessor('sdr-demod-processor', class extends AudioWorkletProcessor {
     constructor() {
         super();
         this._mode='AM'; this._squelch=-120; this._sampleRate=2048000;
-        // Circular PCM buffer — 48000*2 = 2s capacity; pre-roll 0.08s before playing
-        this._pcmBuf=new Float32Array(48000*2); this._pcmWr=0; this._pcmRd=0; this._pcmLen=0;
-        this._preroll=Math.round(48000*0.08); this._buffering=true;
+        // Circular PCM buffer — 8s capacity; pre-roll 0.8s before playing
+        this._pcmBuf=new Float32Array(48000*8); this._pcmWr=0; this._pcmRd=0; this._pcmLen=0;
+        this._preroll=Math.round(48000*0.4); this._buffering=true;
+        this._powerTick=0;
+        this._squelchStateLast=false; // tracks last posted squelch state
         this._wfmPrevI=1; this._wfmPrevQ=0; this._amDc=0;
         this._bwHz=0; // 0 = full bandwidth
         // WFM de-emphasis IIR state (75µs time constant)
@@ -39,8 +47,26 @@
         this._lpfTaps=null; this._lpfBw=0; this._lpfSr=0;
         // FIR delay line for I and Q channels
         this._lpfDelayI=null; this._lpfDelayQ=null; this._lpfPos=0;
+        // Recording state — accumulates demodulated PCM and posts chunks to main thread
+        this._isRecording=false;
+        this._recChunkSize=4800; // 0.1s at 48kHz
+        this._recChunkBuf=new Float32Array(this._recChunkSize);
+        this._recChunkPos=0;
+        // Squelch-gated recording: track open state + 1.5s tail hold after squelch closes
+        this._squelchOpen=false;
+        this._squelchTail=0; // samples remaining in tail hold
         this.port.onmessage=(ev)=>{
             const{type,i,q,mode,squelch_dbfs,sample_rate,bandwidth_hz}=ev.data;
+            if(type==='reset'){this._pcmWr=0;this._pcmRd=0;this._pcmLen=0;this._buffering=true;return;}
+            if(type==='rec_start'){this._isRecording=true;this._recChunkPos=0;this._squelchOpen=false;this._squelchTail=0;this._squelchStateLast=false;return;}
+            if(type==='rec_stop'){
+                this._isRecording=false;
+                if(this._recChunkPos>0){
+                    this.port.postMessage({type:'pcm_chunk',samples:this._recChunkBuf.slice(0,this._recChunkPos)});
+                    this._recChunkPos=0;
+                }
+                return;
+            }
             if(type==='bw'){if(bandwidth_hz!==undefined)this._bwHz=bandwidth_hz;return;}
             if(type!=='iq')return;
             if(mode!==undefined)this._mode=mode;
@@ -58,6 +84,16 @@
                 if(this._pcmLen<cap){this._pcmBuf[this._pcmWr]=audio[k];this._pcmWr=(this._pcmWr+1)%cap;this._pcmLen++;}
             }
             if(this._buffering&&this._pcmLen>=this._preroll)this._buffering=false;
+            // Recording: only capture when squelch is open (or within 1.5s tail hold)
+            if(this._isRecording&&this._squelchOpen){
+                for(let k=0;k<audio.length;k++){
+                    this._recChunkBuf[this._recChunkPos++]=audio[k];
+                    if(this._recChunkPos>=this._recChunkSize){
+                        this.port.postMessage({type:'pcm_chunk',samples:this._recChunkBuf.slice(0)});
+                        this._recChunkPos=0;
+                    }
+                }
+            }
         };
     }
     // Build windowed-sinc FIR low-pass taps (Hamming window, M=64 taps)
@@ -100,8 +136,20 @@
     _pwr(i,q){let s=0;for(let k=0;k<i.length;k++)s+=i[k]*i[k]+q[k]*q[k];return 10*Math.log10(s/i.length+1e-20);}
     _demod(i,q){
         const dbfs=this._pwr(i,q);
-        this.port.postMessage({type:'power',dbfs});
-        if(dbfs<this._squelch)return new Float32Array(Math.round(i.length*48000/this._sampleRate));
+        // Throttle power posts to ~4Hz to avoid cross-thread overhead
+        if(++this._powerTick>=8){this._powerTick=0;this.port.postMessage({type:'power',dbfs,squelchOpen:this._squelchOpen});}
+        const open=dbfs>=this._squelch;
+        if(open){this._squelchOpen=true;this._squelchTail=Math.round(48000*1.5);}
+        else if(this._squelchOpen){
+            const tailSamples=Math.round(i.length*48000/this._sampleRate);
+            if(this._squelchTail>tailSamples){this._squelchTail-=tailSamples;}
+            else{this._squelchOpen=false;this._squelchTail=0;}
+        }
+        if(this._squelchOpen!==this._squelchStateLast){
+            this._squelchStateLast=this._squelchOpen;
+            this.port.postMessage({type:'squelch_change',open:this._squelchOpen});
+        }
+        if(!open)return new Float32Array(Math.round(i.length*48000/this._sampleRate));
         if(this._mode==='AM')return this._am(i,q);
         if(this._mode==='USB')return this._ssb(i,q,1);
         if(this._mode==='LSB')return this._ssb(i,q,-1);
@@ -161,8 +209,8 @@
         const cap=this._pcmBuf.length;
         for(let k=0;k<need;k++){out[k]=this._pcmBuf[this._pcmRd];this._pcmRd=(this._pcmRd+1)%cap;}
         this._pcmLen-=need;
-        // Only re-buffer if completely empty — avoid thrashing
-        if(this._pcmLen===0)this._buffering=true;
+        // Re-buffer if we've dropped too low — avoids stuttering on underrun
+        if(this._pcmLen<this._preroll*0.5)this._buffering=true;
         return true;
     }
 });`;
@@ -186,9 +234,14 @@
             _worklet.connect(_gain);
             _gain.connect(_ctx.destination);
             _worklet.port.onmessage = (ev) => {
-                if (ev.data?.type === 'power' && window._SdrControls) {
-                    window._SdrControls.updateSignalBar(ev.data.dbfs);
-                }
+                const msg = ev.data;
+                if (!msg) return;
+                if (msg.type === 'power' && window._SdrControls)
+                    window._SdrControls.updateSignalBar(msg.dbfs, msg.squelchOpen);
+                if (msg.type === 'squelch_change' && window._SdrPanel)
+                    window._SdrPanel.onSquelchChange(msg.open);
+                if (msg.type === 'pcm_chunk' && _collectingChunks)
+                    _recChunks.push(new Float32Array(msg.samples));
             };
             _ready = true;
             console.log('[SdrAudio] ready');
@@ -212,6 +265,9 @@
         const ws = new WebSocket(`${proto}://${location.host}/ws/sdr/${radioId}/iq`);
         ws.binaryType = 'arraybuffer';
         _iqSocket = ws;
+        ws.addEventListener('open', () => {
+            if (_worklet) _worklet.port.postMessage({ type: 'reset' });
+        });
         ws.addEventListener('message', (ev) => {
             if (!_ready || !_worklet || !(ev.data instanceof ArrayBuffer))
                 return;
@@ -220,10 +276,8 @@
                 return; // need at least header + 1 byte
             const view = new DataView(buf);
             const sampleRate = view.getUint32(0, true);
-            // center_hz at bytes 4-7 (not needed in worklet but parsed for completeness)
             const iqBytes = new Uint8Array(buf, 8);
-            const n = iqBytes.length >> 1; // number of IQ pairs
-            // Convert uint8 → normalised float32 [-1, 1]
+            const n = iqBytes.length >> 1;
             const i = new Float32Array(n);
             const q = new Float32Array(n);
             for (let k = 0; k < n; k++) {
@@ -290,8 +344,6 @@
             _ctx.close();
             _ctx = null;
         }
-        if (window._SdrControls)
-            window._SdrControls.setStatus(false);
     }
     function setRadioId(id) {
         _radioId = id;
@@ -312,5 +364,117 @@
         if (_worklet)
             _worklet.port.postMessage({ type: 'bw', bandwidth_hz: hz });
     }
-    window._SdrAudio = { start, initAudio, stop, setRadioId, setMode, setSquelch, setVolume, setBandwidthHz };
+    // ── WAV encoder — pure JS, no dependencies ───────────────────────────────
+    function _encodeWav(chunks, sampleRate) {
+        let totalSamples = 0;
+        for (const c of chunks) totalSamples += c.length;
+        const numBytes = totalSamples * 2; // int16
+        const buf = new ArrayBuffer(44 + numBytes);
+        const view = new DataView(buf);
+        const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+        writeStr(0, 'RIFF');
+        view.setUint32(4, 36 + numBytes, true);
+        writeStr(8, 'WAVE');
+        writeStr(12, 'fmt ');
+        view.setUint32(16, 16, true);          // PCM chunk size
+        view.setUint16(20, 1, true);           // PCM format
+        view.setUint16(22, 1, true);           // mono
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true); // byte rate (sr * channels * bps/8)
+        view.setUint16(32, 2, true);           // block align
+        view.setUint16(34, 16, true);          // bits per sample
+        writeStr(36, 'data');
+        view.setUint32(40, numBytes, true);
+        let off = 44;
+        for (const chunk of chunks) {
+            for (let i = 0; i < chunk.length; i++) {
+                const s = Math.max(-32768, Math.min(32767, Math.round(chunk[i] * 32767)));
+                view.setInt16(off, s, true);
+                off += 2;
+            }
+        }
+        return new Blob([buf], { type: 'audio/wav' });
+    }
+    // ── Recording API ─────────────────────────────────────────────────────────
+    async function startRecording(metadata) {
+        if (!_ready || !_worklet) return null;
+        try {
+            const res = await fetch('/api/sdr/recordings/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    radio_id:     metadata.radio_id ?? null,
+                    radio_name:   metadata.radio_name || '',
+                    frequency_hz: metadata.frequency_hz || 0,
+                    mode:         metadata.mode || 'AM',
+                    gain_db:      metadata.gain_db ?? 30.0,
+                    squelch_dbfs: metadata.squelch_dbfs ?? -60.0,
+                    sample_rate:  metadata.sample_rate || 2048000,
+                }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            _recId = data.id;
+        } catch (e) {
+            console.error('[SdrAudio] Failed to start recording on server:', e);
+            return null;
+        }
+        _isRecording = true;
+        _collectingChunks = true;
+        _recChunks = [];
+        _recStartTime = new Date();
+        _worklet.port.postMessage({ type: 'rec_start' });
+        return _recId;
+    }
+    async function stopRecording(metadata) {
+        if (!_isRecording) return null;
+        _isRecording = false;
+        const endTime = new Date();
+        if (_worklet) _worklet.port.postMessage({ type: 'rec_stop' });
+        // Yield to let the final pcm_chunk flush arrive from the worklet thread,
+        // _collectingChunks stays true so the onmessage handler still captures it
+        await new Promise(r => setTimeout(r, 400));
+        _collectingChunks = false;
+        const startedAt = (_recStartTime || endTime).toISOString().replace(/\.\d{3}Z$/, 'Z');
+        const endedAt = endTime.toISOString().replace(/\.\d{3}Z$/, 'Z');
+        const freqMhz = metadata.frequency_hz ? (metadata.frequency_hz / 1e6).toFixed(3) : null;
+        const mode = metadata.mode || null;
+        const defaultName = [
+            startedAt.slice(0, 16).replace('T', ' '),
+            freqMhz ? `${freqMhz} MHz` : null,
+            mode || null,
+        ].filter(Boolean).join(' · ');
+        const chunks = _recChunks;
+        _recChunks = [];
+        const recId = _recId;
+        _recId = null;
+        _recStartTime = null;
+        // If no audio was captured (squelch never broke), discard the recording entirely
+        if (chunks.length === 0) {
+            try { await fetch(`/api/sdr/recordings/${recId}`, { method: 'DELETE' }); } catch (_) {}
+            return null;
+        }
+        // Duration from actual captured samples, not wall-clock time
+        let totalSamples = 0;
+        for (const c of chunks) totalSamples += c.length;
+        const durationS = (totalSamples / 48000).toFixed(2);
+        const wav = _encodeWav(chunks, 48000);
+        const form = new FormData();
+        form.append('file', wav, 'recording.wav');
+        form.append('recording_id', String(recId));
+        form.append('name', metadata.name || defaultName);
+        form.append('ended_at', endedAt);
+        form.append('duration_s', durationS);
+        try {
+            const res = await fetch('/api/sdr/recordings/stop', { method: 'POST', body: form });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        } catch (e) {
+            console.error('[SdrAudio] Recording upload failed:', e);
+            // Clean up the orphaned pending row so it doesn't silently linger
+            try { await fetch(`/api/sdr/recordings/${recId}`, { method: 'DELETE' }); } catch (_) {}
+            return null;
+        }
+    }
+    window._SdrAudio = { start, initAudio, stop, setRadioId, setMode, setSquelch, setVolume, setBandwidthHz, startRecording, stopRecording };
 })();

@@ -107,6 +107,13 @@
                         if (window._SdrControls)
                             window._SdrControls.setStatus(true);
                     }
+                    // Drive signal bar from spectrum only when actively playing
+                    if (window._SdrControls && _sdrPlaying && msg.bins?.length) {
+                        let peak = -120;
+                        const bins = msg.bins;
+                        for (let i = 0; i < bins.length; i++) if (bins[i] > peak) peak = bins[i];
+                        window._SdrControls.updateSignalBar(peak);
+                    }
                     break;
                 case 'error':
                     console.warn('[SDR] error', msg.code, msg.message);
@@ -157,14 +164,6 @@
             radios.forEach((r) => _radioCache.set(r.id, r));
             if (window._sdrPopulateRadios) {
                 window._sdrPopulateRadios(radios);
-            }
-            // Restore last selected radio from sessionStorage
-            const savedRadioId = parseInt(sessionStorage.getItem('sdrLastRadioId') || '0', 10);
-            if (savedRadioId > 0) {
-                const match = radios.find(r => r.id === savedRadioId && r.enabled);
-                if (match) {
-                    document.dispatchEvent(new CustomEvent('sdr-radio-selected', { detail: { radioId: match.id } }));
-                }
             }
         }
         catch (e) {
