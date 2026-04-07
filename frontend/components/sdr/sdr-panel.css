@@ -1415,9 +1415,14 @@
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: #c8ff00;
+    background: #4cff72;
     flex-shrink: 0;
     animation: sdr-rec-pulse 1.2s ease-in-out infinite;
+}
+
+.sdr-clip-live-dot--waiting {
+    background: #ffb300;
+    animation: sdr-rec-pulse 2s ease-in-out infinite;
 }
 
 @keyframes sdr-rec-pulse {

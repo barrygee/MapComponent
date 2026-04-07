@@ -419,6 +419,9 @@
     let _isRecording = false;
     let _recTimerInterval = null;
     let _liveRecRow = null;
+    let _recPausedMs = 0;       // total ms paused waiting for squelch
+    let _recPauseStart = null;  // epoch when current pause began, or null
+    let _recSquelchOpen = true; // assume open until told otherwise
     let _editingRecId = null;
     let _deletingRecId = null;
     // ── Radio / Scanner main section toggles ─────────────────────────────────
@@ -702,7 +705,8 @@
             clearTimeout(_retuneDebounce);
         _retuneDebounce = setTimeout(() => retune(hz), 600);
     });
-    freqStopBtn.addEventListener('click', () => {
+    freqStopBtn.addEventListener('click', async () => {
+        await _stopRecordingIfActive();
         if (window._SdrAudio)
             window._SdrAudio.stop();
         setPlayingState(false);
@@ -801,10 +805,12 @@
         _segEls.push(seg);
     }
     let _signalSmoothed = -120;
-    function updateSignalBar(dbfs) {
+    function updateSignalBar(dbfs, squelchOpen = true) {
         const alpha = dbfs > _signalSmoothed ? 0.3 : 0.05;
         _signalSmoothed += alpha * (dbfs - _signalSmoothed);
-        const lit = Math.round(Math.max(0, Math.min(SIGNAL_SEGS, ((_signalSmoothed + 120) / 120) * SIGNAL_SEGS)));
+        const lit = squelchOpen
+            ? Math.round(Math.max(0, Math.min(SIGNAL_SEGS, ((_signalSmoothed + 120) / 120) * SIGNAL_SEGS)))
+            : 0;
         for (let i = 0; i < SIGNAL_SEGS; i++) {
             _segEls[i].classList.toggle('sdr-signal-seg--on', i < lit);
         }
@@ -1405,7 +1411,7 @@
         if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
         return (b/1048576).toFixed(1) + ' MB';
     }
-    function _createLiveRecRow(metadata, startEpoch) {
+    function _createLiveRecRow(metadata, startEpoch, squelchOpen = true) {
         const mhz = (metadata.frequency_hz / 1e6).toFixed(4);
         const now = new Date(startEpoch);
         const dt = now.toISOString().replace('T',' ').slice(0,16);
@@ -1413,8 +1419,8 @@
         row.className = 'sdr-clip-row sdr-clip-live';
         row.innerHTML = `
             <div class="sdr-clip-header">
-                <span class="sdr-clip-live-dot"></span>
-                <span class="sdr-clip-name">Recording…</span>
+                <span class="sdr-clip-live-dot${squelchOpen ? '' : ' sdr-clip-live-dot--waiting'}"></span>
+                <span class="sdr-clip-name">${squelchOpen ? 'Recording…' : 'Waiting for signal…'}</span>
             </div>
             <div class="sdr-clip-live-meta">
                 <span class="sdr-clip-live-mhz">${mhz} MHz</span>
@@ -1431,6 +1437,7 @@
     }
     function _updateLiveRecRow(elapsedS) {
         if (!_liveRecRow) return;
+        _liveRecRow.querySelector('.sdr-clip-name').textContent = _recSquelchOpen ? 'Recording…' : 'Waiting for signal…';
         _liveRecRow.querySelector('.sdr-clip-live-dur').textContent = _fmtDuration(elapsedS);
         // 48 kHz mono int16 = 96000 bytes/s
         _liveRecRow.querySelector('.sdr-clip-live-sz').textContent = _fmtBytes(elapsedS * 96000);
@@ -1734,17 +1741,25 @@
             if (!recId) return;
             _isRecording = true;
             _recStartEpoch = Date.now();
+            _recPausedMs = 0;
+            // If squelch is set to a real threshold, start paused until signal breaks through
+            const squelchActive = (metadata.squelch_dbfs ?? -120) > -119;
+            _recSquelchOpen = !squelchActive;
+            _recPauseStart = squelchActive ? Date.now() : null;
             clipsCount.textContent = '';
             recBtn.classList.add('sdr-rec-btn--active');
             _setRecBtnIcon(true);
-            if (recTimer) recTimer.textContent = '0:00';
+            if (recTimer) recTimer.textContent = _recSquelchOpen ? '0:00' : '0:00 WAIT';
             _removeLiveRecRow();
-            _liveRecRow = _createLiveRecRow(metadata, _recStartEpoch);
+            _liveRecRow = _createLiveRecRow(metadata, _recStartEpoch, _recSquelchOpen);
             clipsEmpty.style.display = 'none';
             clipsList.insertBefore(_liveRecRow, clipsList.firstChild);
             _recTimerInterval = setInterval(() => {
-                const s = Math.floor((Date.now() - _recStartEpoch) / 1000);
-                if (recTimer) recTimer.textContent = _fmtDuration(s);
+                const pausedSoFar = _recPauseStart != null
+                    ? _recPausedMs + (Date.now() - _recPauseStart)
+                    : _recPausedMs;
+                const s = Math.floor((Date.now() - _recStartEpoch - pausedSoFar) / 1000);
+                if (recTimer) recTimer.textContent = _recSquelchOpen ? _fmtDuration(s) : _fmtDuration(s) + ' WAIT';
                 _updateLiveRecRow(s);
             }, 1000);
         } else {
@@ -1793,7 +1808,30 @@
         buildScanQueue();
     }
     // ── Public API ────────────────────────────────────────────────────────────
-    window._SdrPanel = { show, hide, toggle, isVisible, refresh, setScanStatus };
+    function onSquelchChange(open) {
+        if (!_isRecording) return;
+        if (open && !_recSquelchOpen) {
+            // Squelch just opened — resume timer
+            if (_recPauseStart != null) {
+                _recPausedMs += Date.now() - _recPauseStart;
+                _recPauseStart = null;
+            }
+            _recSquelchOpen = true;
+            if (_liveRecRow) {
+                _liveRecRow.querySelector('.sdr-clip-name').textContent = 'Recording…';
+                _liveRecRow.querySelector('.sdr-clip-live-dot').classList.remove('sdr-clip-live-dot--waiting');
+            }
+        } else if (!open && _recSquelchOpen) {
+            // Squelch just closed — pause timer
+            _recPauseStart = Date.now();
+            _recSquelchOpen = false;
+            if (_liveRecRow) {
+                _liveRecRow.querySelector('.sdr-clip-name').textContent = 'Waiting for signal…';
+                _liveRecRow.querySelector('.sdr-clip-live-dot').classList.add('sdr-clip-live-dot--waiting');
+            }
+        }
+    }
+    window._SdrPanel = { show, hide, toggle, isVisible, refresh, setScanStatus, onSquelchChange };
     window._sdrPanelReload = reloadData;
     reloadData();
 })();

@@ -36,8 +36,9 @@
         this._mode='AM'; this._squelch=-120; this._sampleRate=2048000;
         // Circular PCM buffer — 8s capacity; pre-roll 0.8s before playing
         this._pcmBuf=new Float32Array(48000*8); this._pcmWr=0; this._pcmRd=0; this._pcmLen=0;
-        this._preroll=Math.round(48000*0.8); this._buffering=true;
+        this._preroll=Math.round(48000*0.4); this._buffering=true;
         this._powerTick=0;
+        this._squelchStateLast=false; // tracks last posted squelch state
         this._wfmPrevI=1; this._wfmPrevQ=0; this._amDc=0;
         this._bwHz=0; // 0 = full bandwidth
         // WFM de-emphasis IIR state (75µs time constant)
@@ -51,13 +52,13 @@
         this._recChunkSize=4800; // 0.1s at 48kHz
         this._recChunkBuf=new Float32Array(this._recChunkSize);
         this._recChunkPos=0;
-        // Squelch-gated recording: track open state + 300ms tail hold after squelch closes
+        // Squelch-gated recording: track open state + 1.5s tail hold after squelch closes
         this._squelchOpen=false;
         this._squelchTail=0; // samples remaining in tail hold
         this.port.onmessage=(ev)=>{
             const{type,i,q,mode,squelch_dbfs,sample_rate,bandwidth_hz}=ev.data;
             if(type==='reset'){this._pcmWr=0;this._pcmRd=0;this._pcmLen=0;this._buffering=true;return;}
-            if(type==='rec_start'){this._isRecording=true;this._recChunkPos=0;this._squelchOpen=false;this._squelchTail=0;return;}
+            if(type==='rec_start'){this._isRecording=true;this._recChunkPos=0;this._squelchOpen=false;this._squelchTail=0;this._squelchStateLast=false;return;}
             if(type==='rec_stop'){
                 this._isRecording=false;
                 if(this._recChunkPos>0){
@@ -83,7 +84,7 @@
                 if(this._pcmLen<cap){this._pcmBuf[this._pcmWr]=audio[k];this._pcmWr=(this._pcmWr+1)%cap;this._pcmLen++;}
             }
             if(this._buffering&&this._pcmLen>=this._preroll)this._buffering=false;
-            // Recording: only capture when squelch is open (or within 300ms tail hold)
+            // Recording: only capture when squelch is open (or within 1.5s tail hold)
             if(this._isRecording&&this._squelchOpen){
                 for(let k=0;k<audio.length;k++){
                     this._recChunkBuf[this._recChunkPos++]=audio[k];
@@ -136,13 +137,17 @@
     _demod(i,q){
         const dbfs=this._pwr(i,q);
         // Throttle power posts to ~4Hz to avoid cross-thread overhead
-        if(++this._powerTick>=8){this._powerTick=0;this.port.postMessage({type:'power',dbfs});}
+        if(++this._powerTick>=8){this._powerTick=0;this.port.postMessage({type:'power',dbfs,squelchOpen:this._squelchOpen});}
         const open=dbfs>=this._squelch;
-        if(open){this._squelchOpen=true;this._squelchTail=Math.round(48000*0.3);}
+        if(open){this._squelchOpen=true;this._squelchTail=Math.round(48000*1.5);}
         else if(this._squelchOpen){
             const tailSamples=Math.round(i.length*48000/this._sampleRate);
             if(this._squelchTail>tailSamples){this._squelchTail-=tailSamples;}
             else{this._squelchOpen=false;this._squelchTail=0;}
+        }
+        if(this._squelchOpen!==this._squelchStateLast){
+            this._squelchStateLast=this._squelchOpen;
+            this.port.postMessage({type:'squelch_change',open:this._squelchOpen});
         }
         if(!open)return new Float32Array(Math.round(i.length*48000/this._sampleRate));
         if(this._mode==='AM')return this._am(i,q);
@@ -205,7 +210,7 @@
         for(let k=0;k<need;k++){out[k]=this._pcmBuf[this._pcmRd];this._pcmRd=(this._pcmRd+1)%cap;}
         this._pcmLen-=need;
         // Re-buffer if we've dropped too low — avoids stuttering on underrun
-        if(this._pcmLen<this._preroll*0.25)this._buffering=true;
+        if(this._pcmLen<this._preroll*0.5)this._buffering=true;
         return true;
     }
 });`;
@@ -232,7 +237,9 @@
                 const msg = ev.data;
                 if (!msg) return;
                 if (msg.type === 'power' && window._SdrControls)
-                    window._SdrControls.updateSignalBar(msg.dbfs);
+                    window._SdrControls.updateSignalBar(msg.dbfs, msg.squelchOpen);
+                if (msg.type === 'squelch_change' && window._SdrPanel)
+                    window._SdrPanel.onSquelchChange(msg.open);
                 if (msg.type === 'pcm_chunk' && _collectingChunks)
                     _recChunks.push(new Float32Array(msg.samples));
             };
@@ -430,17 +437,22 @@
         _collectingChunks = false;
         const startedAt = (_recStartTime || endTime).toISOString().replace(/\.\d{3}Z$/, 'Z');
         const endedAt = endTime.toISOString().replace(/\.\d{3}Z$/, 'Z');
-        const durationS = ((endTime - (_recStartTime || endTime)) / 1000).toFixed(2);
         const defaultName = `Recording ${startedAt.slice(0, 16).replace('T', ' ')}`;
         const chunks = _recChunks;
         _recChunks = [];
         const recId = _recId;
         _recId = null;
         _recStartTime = null;
-        // Always call the stop endpoint so the DB row is marked complete
-        const wav = chunks.length > 0
-            ? _encodeWav(chunks, 48000)
-            : new Blob([new ArrayBuffer(44)], { type: 'audio/wav' }); // empty WAV header
+        // If no audio was captured (squelch never broke), discard the recording entirely
+        if (chunks.length === 0) {
+            try { await fetch(`/api/sdr/recordings/${recId}`, { method: 'DELETE' }); } catch (_) {}
+            return null;
+        }
+        // Duration from actual captured samples, not wall-clock time
+        let totalSamples = 0;
+        for (const c of chunks) totalSamples += c.length;
+        const durationS = (totalSamples / 48000).toFixed(2);
+        const wav = _encodeWav(chunks, 48000);
         const form = new FormData();
         form.append('file', wav, 'recording.wav');
         form.append('recording_id', String(recId));
