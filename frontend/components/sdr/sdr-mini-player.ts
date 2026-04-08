@@ -199,7 +199,10 @@
     function updateSignalBar(dbfs: number) {
         const alpha = dbfs > _signalSmoothed ? 0.3 : 0.05;
         _signalSmoothed += alpha * (dbfs - _signalSmoothed);
-        const lit = Math.round(Math.max(0, Math.min(SIGNAL_SEGS, ((_signalSmoothed + 120) / 120) * SIGNAL_SEGS)));
+        // Only light segments when signal breaks squelch
+        const lit = _signalSmoothed > _squelch
+            ? Math.round(Math.max(0, Math.min(SIGNAL_SEGS, ((_signalSmoothed + 120) / 120) * SIGNAL_SEGS)))
+            : 0;
         for (let i = 0; i < SIGNAL_SEGS; i++) {
             _segEls[i].classList.toggle('sdr-mini-seg--on', i < lit);
         }
@@ -498,11 +501,20 @@
         }
     }
 
-    // ── Signal / connection events from boot ─────────────────────────────────
+    // ── Signal bar: driven by audio worklet power messages ───────────────────
+    // The worklet posts {type:'power', dbfs} on every frame — before squelch
+    // gating. We gate here: only light segments when signal exceeds squelch.
+    // _SdrControls.updateSignalBar is what sdr-audio.ts calls from the worklet.
+    // Register it so it routes here when the mini player is active.
 
-    document.addEventListener('sdr-mini:signal', (e: Event) => {
-        if (_playing) updateSignalBar((e as CustomEvent<number>).detail);
-    });
+    if (!window._SdrControls) {
+        (window as any)._SdrControls = {} as SdrControlsAPI;
+    }
+    const _prevUpdateSignalBar = window._SdrControls.updateSignalBar;
+    window._SdrControls.updateSignalBar = (dbfs: number) => {
+        if (_prevUpdateSignalBar) _prevUpdateSignalBar(dbfs);
+        if (_playing) updateSignalBar(dbfs);
+    };
 
     document.addEventListener('sdr-mini:connected', (e: Event) => {
         setConnected((e as CustomEvent<boolean>).detail);
