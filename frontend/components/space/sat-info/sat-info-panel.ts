@@ -45,18 +45,18 @@ window._SatInfoPanel = (() => {
 
     function _formatCountdown(ms: number): string {
         const totalSec = Math.max(0, Math.floor(ms / 1000));
-        const h = Math.floor(totalSec / 3600);
-        const m = Math.floor((totalSec % 3600) / 60);
-        const s = totalSec % 60;
-        if (h > 0) return `IN ${h}h ${m}m`;
-        if (m > 0) return `IN ${m}m ${s}s`;
-        return `IN ${s}s`;
+        const hours = Math.floor(totalSec / 3600);
+        const minutes = Math.floor((totalSec % 3600) / 60);
+        const seconds = totalSec % 60;
+        if (hours > 0) return `IN ${hours}h ${minutes}m`;
+        if (minutes > 0) return `IN ${minutes}m ${seconds}s`;
+        return `IN ${seconds}s`;
     }
 
     function _formatDuration(sec: number): string {
-        const m = Math.floor(sec / 60);
-        const s = sec % 60;
-        return `${m}m ${s}s`;
+        const minutes = Math.floor(sec / 60);
+        const seconds = sec % 60;
+        return `${minutes}m ${seconds}s`;
     }
 
     function _formatTime(utc: string): string {
@@ -86,7 +86,7 @@ window._SatInfoPanel = (() => {
         // Toggle header
         const toggle = document.createElement('button');
         toggle.id        = 'sip-toggle';
-        toggle.className = 'sip-toggle';
+        toggle.className = 'sip-toggle sip-hidden';
         toggle.setAttribute('aria-expanded', 'false');
 
         const toggleLeft = document.createElement('span');
@@ -126,7 +126,7 @@ window._SatInfoPanel = (() => {
         // Collapsible body
         const body = document.createElement('div');
         body.id        = 'sip-body';
-        body.className = 'sip-body';
+        body.className = 'sip-body sip-hidden';
 
         // Sat name header inside body (shown when expanded)
         const bodyHeader = document.createElement('div');
@@ -195,9 +195,6 @@ window._SatInfoPanel = (() => {
             toggle.classList.toggle('sip-expanded', _expanded);
             toggle.setAttribute('aria-expanded', String(_expanded));
         });
-
-        toggle.style.display = 'none';
-        body.style.display   = 'none';
 
         // Insert sat-info toggle/body immediately after #map-sidebar-panes so it
         // appears above the FILTERS section (which space-passes appends after panes).
@@ -284,8 +281,8 @@ window._SatInfoPanel = (() => {
         const list = _getList();
         if (!list) return;
 
-        const d = new Date(computedAt);
-        _setStatus(`NEXT 24H · UPDATED ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, false);
+        const computedDate = new Date(computedAt);
+        _setStatus(`NEXT 24H · UPDATED ${computedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, false);
 
         list.innerHTML = '';
         if (!passes.length) {
@@ -396,8 +393,8 @@ window._SatInfoPanel = (() => {
         _expanded = true;
         const body   = _getBody();
         const toggle = _getToggle();
-        if (toggle) { toggle.style.display = ''; toggle.classList.add('sip-expanded'); toggle.setAttribute('aria-expanded', 'true'); }
-        if (body)   { body.style.display = ''; body.classList.add('sip-expanded'); }
+        if (toggle) { toggle.classList.remove('sip-hidden'); toggle.classList.add('sip-expanded'); toggle.setAttribute('aria-expanded', 'true'); }
+        if (body)   { body.classList.remove('sip-hidden'); body.classList.add('sip-expanded'); }
 
         // Show sidebar (whatever tab is active stays active)
         if (window._MapSidebar) window._MapSidebar.show();
@@ -417,8 +414,8 @@ window._SatInfoPanel = (() => {
         if (_locationPoll) { clearInterval(_locationPoll); _locationPoll = null; }
         const toggle = _getToggle();
         const body   = _getBody();
-        if (toggle) toggle.style.display = 'none';
-        if (body)   body.style.display   = 'none';
+        if (toggle) toggle.classList.add('sip-hidden');
+        if (body)   body.classList.add('sip-hidden');
     }
 
     function updatePosition(p: { alt_km: number; velocity_kms: number; track_deg: number; lat: number; lon: number }): void {

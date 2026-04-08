@@ -58,8 +58,8 @@ window._SpaceFilterPanel = (() => {
             pane.insertAdjacentHTML('afterbegin', html);
         } else {
             document.addEventListener('DOMContentLoaded', () => {
-                const p = document.getElementById('msb-pane-search');
-                if (p && !document.getElementById('space-filter-input-wrap')) p.insertAdjacentHTML('afterbegin', html);
+                const searchPane = document.getElementById('msb-pane-search');
+                if (searchPane && !document.getElementById('space-filter-input-wrap')) searchPane.insertAdjacentHTML('afterbegin', html);
             });
         }
     })();
@@ -116,11 +116,11 @@ window._SpaceFilterPanel = (() => {
     }
 
     function _search(query: string): SatEntry[] | null {
-        const q = query.trim();
-        if (!q) return null; // null = show all
-        const matchedCategory = _categoryForQuery(q);
+        const searchQuery = query.trim();
+        if (!searchQuery) return null; // null = show all
+        const matchedCategory = _categoryForQuery(searchQuery);
         return _satellites.filter(s =>
-            _matchesQuery(q, s.name, s.norad_id) ||
+            _matchesQuery(searchQuery, s.name, s.norad_id) ||
             (matchedCategory !== null && s.category === matchedCategory)
         );
     }
@@ -178,11 +178,7 @@ window._SpaceFilterPanel = (() => {
         item.appendChild(info);
         item.appendChild(selectBtn);
 
-        info.style.flex = '1';
-        info.style.minWidth = '0';
-        info.style.cursor = 'pointer';
         info.addEventListener('click', doSelect);
-        icon.style.cursor = 'pointer';
         icon.addEventListener('click', doSelect);
         item._selectAction = doSelect;
 

@@ -160,7 +160,7 @@ class AirportsToggleControl extends SentinelControlBase {
             this._hoverMarker = null;
 
             this._markers = AIRPORTS_DATA.features.map(f => {
-                const p = f.properties;
+                const airportProperties = f.properties;
                 const coords = f.geometry.coordinates as LngLat;
 
                 const el = document.createElement('div');
@@ -169,8 +169,8 @@ class AirportsToggleControl extends SentinelControlBase {
                 const label = document.createElement('div');
                 label.style.cssText = "color:#fff;font-family:'Barlow Condensed','Barlow',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;line-height:1.5;white-space:nowrap;pointer-events:none";
                 label.innerHTML =
-                    `<span class="apt-icao" style="color:#c8ff00">${p.icao}</span>` +
-                    `<br><span class="apt-name" style="opacity:0.7;font-weight:400">${p.name.toUpperCase()}</span>`;
+                    `<span class="apt-icao" style="color:#c8ff00">${airportProperties.icao}</span>` +
+                    `<br><span class="apt-name" style="opacity:0.7;font-weight:400">${airportProperties.name.toUpperCase()}</span>`;
                 el.appendChild(label);
 
                 el.addEventListener('click', (e: Event) => {
@@ -179,14 +179,14 @@ class AirportsToggleControl extends SentinelControlBase {
                     const easeOpts: maplibregl.EaseToOptions = { center: coords, zoom: 13, duration: 800 };
                     if (pitch !== undefined) easeOpts.pitch = pitch;
                     this.map.easeTo(easeOpts);
-                    this._showAirportPanel(p, coords);
+                    this._showAirportPanel(airportProperties, coords);
                 });
 
                 let freqPanel: HTMLDivElement | null = null;
                 el.addEventListener('mouseenter', () => {
                     if (!freqPanel) {
                         freqPanel = document.createElement('div');
-                        freqPanel.innerHTML  = this._buildFreqPanel(p);
+                        freqPanel.innerHTML  = this._buildFreqPanel(airportProperties);
                         freqPanel.style.cssText = 'pointer-events:none;margin-top:4px';
                         el.appendChild(freqPanel);
                     }

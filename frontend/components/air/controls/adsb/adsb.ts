@@ -552,8 +552,8 @@ class AdsbLiveControl implements maplibregl.IControl {
                 this.map.getCanvas().style.cursor = 'pointer';
                 if (!e.features || !e.features.length) return;
                 const hex = (e.features[0].properties as AircraftProperties).hex;
-                const f = this._geojson.features.find(f => f.properties.hex === hex);
-                if (f) this._showHoverTag(f);
+                const hoveredFeature = this._geojson.features.find(f => f.properties.hex === hex);
+                if (hoveredFeature) this._showHoverTag(hoveredFeature);
             };
             const handleHoverLeave = () => {
                 this.map.getCanvas().style.cursor = '';
@@ -698,8 +698,8 @@ class AdsbLiveControl implements maplibregl.IControl {
     private _updateStatusBar(): void {
         if (!this._followEnabled || !this._selectedHex) return;
         if (typeof window._Tracking === 'undefined') return;
-        const f = this._geojson.features.find(f => f.properties.hex === this._selectedHex);
-        if (f) window._Tracking.updateFields('air', this._buildTrackingFields(f.properties));
+        const aircraftFeature = this._geojson.features.find(f => f.properties.hex === this._selectedHex);
+        if (aircraftFeature) window._Tracking.updateFields('air', this._buildTrackingFields(aircraftFeature.properties));
     }
 
     private _handleUntrack(): void {
@@ -712,11 +712,11 @@ class AdsbLiveControl implements maplibregl.IControl {
         }
         if (this._tagHex) this._notifEnabled.delete(this._tagHex);
         if (this._tagHex) {
-            const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
-            if (f) {
-                const coords = this._interpolatedCoords(this._tagHex) || f.geometry.coordinates;
+            const taggedFeature = this._geojson.features.find(f => f.properties.hex === this._tagHex);
+            if (taggedFeature) {
+                const coords = this._interpolatedCoords(this._tagHex) || taggedFeature.geometry.coordinates;
                 const newEl = document.createElement('div');
-                newEl.innerHTML = this._buildTagHTML(f.properties);
+                newEl.innerHTML = this._buildTagHTML(taggedFeature.properties);
                 this._wireTagButton(newEl);
                 if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
                 this._tagMarker = new maplibregl.Marker({ element: newEl, anchor: 'top-left', offset: [14, -13] })
@@ -743,8 +743,8 @@ class AdsbLiveControl implements maplibregl.IControl {
                 const hex = (bellBtn.dataset['hex'] || overrideHex || this._tagHex)!;
                 if (!hex) return;
                 const wasEnabled = this._notifEnabled.has(hex);
-                const f = this._geojson.features.find(f => f.properties.hex === hex);
-                const callsign = f ? ((f.properties.flight || '').trim() || (f.properties.r || '').trim() || hex) : hex;
+                const aircraftFeature = this._geojson.features.find(f => f.properties.hex === hex);
+                const callsign = aircraftFeature ? ((aircraftFeature.properties.flight || '').trim() || (aircraftFeature.properties.r || '').trim() || hex) : hex;
                 if (!this._trackingNotifIds) this._trackingNotifIds = {};
                 if (wasEnabled) {
                     this._notifEnabled.delete(hex);
@@ -795,15 +795,15 @@ class AdsbLiveControl implements maplibregl.IControl {
                 this._applySelection();
                 this._followEnabled = true;
                 this._notifEnabled.add(hex);
-                const f = this._geojson.features.find(f => f.properties.hex === hex);
-                if (f) {
-                    const cs = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || hex;
+                const aircraftFeature = this._geojson.features.find(f => f.properties.hex === hex);
+                if (aircraftFeature) {
+                    const cs = (aircraftFeature.properties.flight || '').trim() || (aircraftFeature.properties.r || '').trim() || hex;
                     if (!this._trackingNotifIds) this._trackingNotifIds = {};
                     if (this._trackingNotifIds[hex]) window._Notifications.dismiss(this._trackingNotifIds[hex]);
                     this._trackingNotifIds[hex] = window._Notifications.add({ type: 'track', title: cs });
-                    this._showStatusBar(f.properties);
+                    this._showStatusBar(aircraftFeature.properties);
                     const is3D = typeof window._is3DActive === 'function' && window._is3DActive();
-                    const coords = this._interpolatedCoords(hex) || f.geometry.coordinates;
+                    const coords = this._interpolatedCoords(hex) || aircraftFeature.geometry.coordinates;
                     this.map.easeTo({ center: coords, zoom: 16, ...(is3D ? { pitch: 45 } : {}), duration: 600 });
                     const newEl = document.createElement('div');
                     newEl.innerHTML = this._buildTagHTML(f.properties);
@@ -833,11 +833,11 @@ class AdsbLiveControl implements maplibregl.IControl {
                 this._trackingNotifIds[this._tagHex] = window._Notifications.add({ type: 'track', title: trkCs });
             }
             if (this._tagHex) {
-                const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
-                if (f) {
-                    const coords = this._interpolatedCoords(this._tagHex) || f.geometry.coordinates;
+                const taggedFeature = this._geojson.features.find(f => f.properties.hex === this._tagHex);
+                if (taggedFeature) {
+                    const coords = this._interpolatedCoords(this._tagHex) || taggedFeature.geometry.coordinates;
                     const newEl  = document.createElement('div');
-                    newEl.innerHTML = this._buildTagHTML(f.properties);
+                    newEl.innerHTML = this._buildTagHTML(taggedFeature.properties);
                     this._wireTagButton(newEl);
                     if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
                     const anchor = this._followEnabled ? 'left'  : 'top-left';
@@ -869,11 +869,11 @@ class AdsbLiveControl implements maplibregl.IControl {
 
     _rebuildTagForHex(hex: string): void {
         if (!hex || hex !== this._tagHex) return;
-        const f = this._geojson.features.find(f => f.properties.hex === hex);
-        if (!f) return;
-        const coords = this._interpolatedCoords(hex) || f.geometry.coordinates;
+        const taggedFeature = this._geojson.features.find(f => f.properties.hex === hex);
+        if (!taggedFeature) return;
+        const coords = this._interpolatedCoords(hex) || taggedFeature.geometry.coordinates;
         const newEl  = document.createElement('div');
-        newEl.innerHTML = this._buildTagHTML(f.properties);
+        newEl.innerHTML = this._buildTagHTML(taggedFeature.properties);
         this._wireTagButton(newEl);
         if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null; }
         const isTracked = this._followEnabled && hex === this._tagHex;
@@ -1004,8 +1004,8 @@ class AdsbLiveControl implements maplibregl.IControl {
             el.appendChild(badge);
         }
         el.addEventListener('mouseenter', () => {
-            const f = this._geojson.features.find(f => f.properties.hex === props.hex);
-            if (f) this._showHoverTag(f, true);
+            const hoveredFeature = this._geojson.features.find(f => f.properties.hex === props.hex);
+            if (hoveredFeature) this._showHoverTag(hoveredFeature, true);
         });
         el.addEventListener('mouseleave', () => this._hideHoverTag());
         el.addEventListener('click', (e) => {
@@ -1148,8 +1148,8 @@ class AdsbLiveControl implements maplibregl.IControl {
         this._applyTypeFilter();
         this._updateCallsignMarkers();
         if (this._selectedHex) {
-            const f = this._geojson.features.find(f => f.properties.hex === this._selectedHex);
-            this._showSelectedTag(f || null);
+            const selectedFeature = this._geojson.features.find(f => f.properties.hex === this._selectedHex);
+            this._showSelectedTag(selectedFeature || null);
         } else {
             this._hideSelectedTag();
             this._hideStatusBar();
@@ -1161,18 +1161,18 @@ class AdsbLiveControl implements maplibregl.IControl {
         const trailFeatures: TrailGeoFeature[] = [];
         if (this._selectedHex && this._trails[this._selectedHex]) {
             const points = this._trails[this._selectedHex];
-            const n = points.length;
+            const pointCount = points.length;
             const selFeature = this._geojson.features.find(f => f.properties.hex === this._selectedHex);
             const isEmerg = selFeature && (
                 selFeature.properties.squawkEmerg === 1 ||
                 (selFeature.properties.emergency && selFeature.properties.emergency !== 'none')
             ) ? 1 : 0;
-            for (let i = 0; i < n; i++) {
-                const p = points[i];
+            for (let i = 0; i < pointCount; i++) {
+                const trailPoint = points[i];
                 trailFeatures.push({
                     type: 'Feature',
-                    geometry:   { type: 'Point', coordinates: [p.lon, p.lat] },
-                    properties: { alt: p.alt, opacity: (i + 1) / n, emerg: isEmerg as 0 | 1 },
+                    geometry:   { type: 'Point', coordinates: [trailPoint.lon, trailPoint.lat] },
+                    properties: { alt: trailPoint.alt, opacity: (i + 1) / pointCount, emerg: isEmerg as 0 | 1 },
                 });
             }
         }
@@ -1249,12 +1249,12 @@ class AdsbLiveControl implements maplibregl.IControl {
         }
 
         if (this._tagMarker && this._tagHex) {
-            const f = this._interpolatedFeatures.find(f => f.properties.hex === this._tagHex);
-            if (f) {
-                this._tagMarker.setLngLat(f.geometry.coordinates);
+            const interpolatedFeature = this._interpolatedFeatures.find(f => f.properties.hex === this._tagHex);
+            if (interpolatedFeature) {
+                this._tagMarker.setLngLat(interpolatedFeature.geometry.coordinates);
                 if (this._followEnabled) {
                     const followPitch = typeof window._getTargetPitch === 'function' ? window._getTargetPitch() : 0;
-                    this.map.easeTo({ center: f.geometry.coordinates, pitch: followPitch, duration: 150, easing: t => t });
+                    this.map.easeTo({ center: interpolatedFeature.geometry.coordinates, pitch: followPitch, duration: 150, easing: t => t });
                 }
             }
         }
@@ -1267,11 +1267,11 @@ class AdsbLiveControl implements maplibregl.IControl {
 
     _interpolatedCoords(hex: string): [number, number] | null {
         if (this._interpolatedFeatures) {
-            const f = this._interpolatedFeatures.find(f => f.properties.hex === hex);
-            if (f) return f.geometry.coordinates;
+            const interpolatedFeature = this._interpolatedFeatures.find(f => f.properties.hex === hex);
+            if (interpolatedFeature) return interpolatedFeature.geometry.coordinates;
         }
-        const f = this._geojson.features.find(f => f.properties.hex === hex);
-        return f ? f.geometry.coordinates : null;
+        const aircraftFeature = this._geojson.features.find(f => f.properties.hex === hex);
+        return aircraftFeature ? aircraftFeature.geometry.coordinates : null;
     }
 
     // ---- API fetch ----
@@ -1288,7 +1288,7 @@ class AdsbLiveControl implements maplibregl.IControl {
                 if (Date.now() - (loc.ts || 0) < 10 * 60 * 1000) { lat = loc.latitude; lon = loc.longitude; }
             } catch(e) {}
         }
-        if (lat === undefined) { const c = this.map.getCenter(); lat = c.lat; lon = c.lng; }
+        if (lat === undefined) { const mapCenter = this.map.getCenter(); lat = mapCenter.lat; lon = mapCenter.lng; }
 
         try {
             const url  = `${origin}/api/air/adsb/point/${lat!.toFixed(4)}/${lon!.toFixed(4)}/250`;
@@ -1502,9 +1502,9 @@ class AdsbLiveControl implements maplibregl.IControl {
             this._restoreTrackingState();
             this._rebuildTrails();
             if (this._tagHex && this._tagMarker) {
-                const f = this._geojson.features.find(f => f.properties.hex === this._tagHex);
-                if (f) {
-                    this._tagMarker.getElement().innerHTML = this._buildTagHTML(f.properties);
+                const taggedFeature = this._geojson.features.find(f => f.properties.hex === this._tagHex);
+                if (taggedFeature) {
+                    this._tagMarker.getElement().innerHTML = this._buildTagHTML(taggedFeature.properties);
                     this._wireTagButton(this._tagMarker.getElement());
                     this._updateStatusBar();
                 } else { this._hideSelectedTag(); this._hideStatusBar(); }
@@ -1580,8 +1580,8 @@ class AdsbLiveControl implements maplibregl.IControl {
             if (!saved) return true; // nothing to restore, consider done
             const { hex } = JSON.parse(saved);
             if (!hex) return true;
-            const f = this._geojson.features.find(f => f.properties.hex === hex);
-            if (!f) return false; // aircraft not yet in data — retry next fetch
+            const aircraftFeature = this._geojson.features.find(f => f.properties.hex === hex);
+            if (!aircraftFeature) return false; // aircraft not yet in data — retry next fetch
             this._selectedHex = hex;
             this._applySelection();
             this._followEnabled = true;
@@ -1656,11 +1656,11 @@ class AdsbLiveControl implements maplibregl.IControl {
             this._hideHoverTag();
             this._hideStatusBar();
             for (const [hex, marker] of Object.entries(this._callsignMarkers)) {
-                const f = this._geojson.features.find(f => f.properties.hex === hex);
-                if (!f) continue;
-                const cat     = (f.properties.category || '').toUpperCase();
+                const aircraftFeature = this._geojson.features.find(f => f.properties.hex === hex);
+                if (!aircraftFeature) continue;
+                const cat     = (aircraftFeature.properties.category || '').toUpperCase();
                 const isGnd   = ['C1', 'C2'].includes(cat);
-                const isTower = ['C3', 'C4', 'C5'].includes(cat) || (f.properties.t || '').toUpperCase() === 'TWR';
+                const isTower = ['C3', 'C4', 'C5'].includes(cat) || (aircraftFeature.properties.t || '').toUpperCase() === 'TWR';
                 if (!isGnd && !isTower) { marker.remove(); delete this._callsignMarkers[hex]; }
             }
         }

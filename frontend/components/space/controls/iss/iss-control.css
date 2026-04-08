@@ -1,0 +1,147 @@
+/* ============================================================
+   ISS CONTROL
+   Styles for the ISS callsign label, hover tag, track button,
+   and notification button rendered as MapLibre markers.
+   ============================================================ */
+
+/* ---- Callsign label (marker anchored left of ISS icon) ---- */
+.iss-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #ffffff;
+    font-family: 'Barlow Condensed', 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+}
+
+.iss-label.iss-label--tracking {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.iss-label.iss-label--hidden {
+    visibility: hidden;
+}
+
+/* "TRACKING" badge inside the label when following */
+.iss-tracking-badge {
+    color: #c8ff00;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    transition: color 0.2s;
+}
+
+.iss-tracking-badge.iss-tracking-badge--hidden {
+    display: none;
+}
+
+/* ---- Hover / tracking tag wrapper ---- */
+.iss-tag-wrap {
+    pointer-events: auto;
+}
+
+/* Outer tag container */
+.iss-tag {
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    padding: 6px 14px 9px;
+    white-space: nowrap;
+    user-select: none;
+}
+
+/* Tag header row: sat name + action buttons */
+.iss-tag-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Satellite name inside header */
+.iss-tag-name {
+    font-size: 13px;
+    font-weight: 400;
+    pointer-events: none;
+    color: #c8ff00;
+    letter-spacing: 0.12em;
+}
+
+/* Header right: bell + track buttons */
+.iss-tag-actions {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+/* Data rows (ALT / VEL / HDG / LAT / LON) */
+.iss-tag-rows {
+    pointer-events: none;
+}
+
+.iss-tag-row {
+    display: flex;
+    gap: 14px;
+    line-height: 1.8;
+}
+
+.iss-tag-lbl {
+    opacity: 0.5;
+    min-width: 34px;
+    letter-spacing: 0.05em;
+}
+
+/* ---- TRACK button ---- */
+.iss-track-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 12px;
+    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    line-height: 1;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    color: rgba(255, 255, 255, 0.3);
+    transition: color 0.15s;
+}
+
+.iss-track-btn.iss-track-btn--active {
+    color: #c8ff00;
+}
+
+/* ---- Notification (bell) button ---- */
+.iss-notif-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 6px;
+    line-height: 1;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    color: rgba(255, 255, 255, 0.3);
+    transition: color 0.15s;
+}
+
+.iss-notif-btn.iss-notif-btn--active {
+    color: #c8ff00;
+}

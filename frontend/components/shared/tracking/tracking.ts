@@ -51,14 +51,14 @@ window._Tracking = ((): TrackingAPI => {
 
     function _loadStored(): StoredTrackingItem[] {
         try {
-            const s = localStorage.getItem(STORAGE_KEY);
-            return s ? (JSON.parse(s) as StoredTrackingItem[]) : [];
+            const stored_json = localStorage.getItem(STORAGE_KEY);
+            return stored_json ? (JSON.parse(stored_json) as StoredTrackingItem[]) : [];
         } catch (e) { return []; }
     }
 
     function _saveStored(): void {
         // Merge live items into stored list — preserve items from other sections
-        const existing = _loadStored().filter(s => !_live.has(s.id));
+        const existing = _loadStored().filter(item => !_live.has(item.id));
         const live: StoredTrackingItem[] = [];
         _live.forEach(opts => live.push({ id: opts.id, name: opts.name, domain: opts.domain, fields: opts.fields }));
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...existing, ...live])); } catch (e) {}
@@ -83,16 +83,16 @@ window._Tracking = ((): TrackingAPI => {
     function _totalCount(): number {
         // Live items + stored items from other sections not yet in live registry
         const stored = _loadStored();
-        const extra  = stored.filter(s => !_live.has(s.id)).length;
+        const extra  = stored.filter(item => !_live.has(item.id)).length;
         return _live.size + extra;
     }
 
     function _refreshBadge(): void {
-        const n  = _totalCount();
+        const totalCount  = _totalCount();
         const el = _getCount();
         if (el) {
-            el.textContent = n > 0 ? String(n) : '';
-            if (n > 0 && !_isPanelOpen()) {
+            el.textContent = totalCount > 0 ? String(totalCount) : '';
+            if (totalCount > 0 && !_isPanelOpen()) {
                 el.classList.add('tracking-count-active');
             } else {
                 el.classList.remove('tracking-count-active');

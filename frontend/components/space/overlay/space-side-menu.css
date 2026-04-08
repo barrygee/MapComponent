@@ -141,6 +141,7 @@
     justify-content: center;
     width: 29px;
     flex-shrink: 0;
+    font-size: var(--sm-icon-size, 14px);
 }
 
 #space-side-menu .sm-btn .sm-icon svg {

@@ -61,7 +61,7 @@
                     <p class="docs-item-desc">
                         Clone the repo and start the stack. nginx listens on port 80 and proxies to the FastAPI container on port 8000.
                     </p>
-                    <pre class="docs-pre">git clone &lt;repo-url&gt; Sentinel
+                    <pre class="docs-pre">git clone https://github.com/barrygee/Sentinel.git Sentinel
 cd Sentinel
 docker compose up --build</pre>
                     <p class="docs-item-desc">
@@ -276,24 +276,24 @@ npm run typecheck  # type-check only</pre>
                         </tbody>
                     </table>
 
-                    <span class="docs-group-label"><code>sdr</code> — Software-defined radio (stub)</span>
+                    <span class="docs-group-label"><code>sdr</code> — Software-defined radio</span>
                     <table class="docs-table">
                         <thead><tr><th>Key</th><th>Type</th><th>Description</th></tr></thead>
                         <tbody>
                             <tr>
                                 <td><code>enabled</code></td>
                                 <td>boolean</td>
-                                <td>Whether the SDR domain is active.</td>
+                                <td>Whether the SDR domain is active and shown in the nav bar.</td>
                             </tr>
                             <tr>
-                                <td><code>onlineUrl</code></td>
-                                <td>URL string</td>
-                                <td>Base URL for an online SDR data feed.</td>
+                                <td><code>radios</code></td>
+                                <td>array of radio objects</td>
+                                <td>Configured <code>rtl_tcp</code> radio receivers. Each entry has <code>id</code>, <code>name</code>, <code>host</code>, <code>port</code>, <code>description</code>, <code>enabled</code>, <code>bandwidth</code> (Hz, optional), <code>rf_gain</code> (dB, optional), and <code>agc</code> (boolean, optional). Managed via Settings → SDR → Devices.</td>
                             </tr>
                             <tr>
-                                <td><code>offgridSource</code></td>
-                                <td>object — <code>{ "url": string }</code></td>
-                                <td>Configuration for a local/off grid SDR source. The nested <code>url</code> field should point to a self-hosted SDR server (e.g. <code>http://192.168.1.x:port</code>).</td>
+                                <td><code>recordRawIq</code></td>
+                                <td>boolean</td>
+                                <td>When <code>true</code>, each recording also saves a raw IQ file (<code>.u8</code> — 8-bit unsigned interleaved I/Q) alongside the WAV. Disabled by default — raw IQ files are ~4 MB/s.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -343,8 +343,20 @@ npm run typecheck  # type-check only</pre>
   },
   "sdr": {
     "enabled": true,
-    "onlineUrl": "https://",
-    "offgridSource": { "url": "http://localhost" }
+    "recordRawIq": false,
+    "radios": [
+      {
+        "id": 1,
+        "name": "RTL-SDR",
+        "host": "192.168.1.x",
+        "port": 1234,
+        "description": "",
+        "enabled": true,
+        "bandwidth": null,
+        "rf_gain": null,
+        "agc": null
+      }
+    ]
   }
 }</pre>
                 </div>
@@ -496,11 +508,34 @@ npm run typecheck  # type-check only</pre>
                 </div>
 
                 <div class="docs-item">
-                    <h2 class="docs-item-label">SEA / LAND / SDR</h2>
+                    <h2 class="docs-item-label">SDR</h2>
+                    <p class="docs-item-desc">
+                        Software-defined radio receiver interface. Connects to one or more
+                        <code>rtl_tcp</code> daemons running on the network (local or remote)
+                        and streams IQ samples to the browser over a WebSocket.
+                    </p>
+                    <p class="docs-item-desc">
+                        The browser-side DSP pipeline demodulates AM, FM (narrow/wide), USB, LSB,
+                        and CW modes in real time using the Web Audio API. A built-in spectrum
+                        analyser and waterfall display the received signal. Clicking anywhere on
+                        the spectrum tunes the displayed demodulation frequency; dragging the
+                        bandwidth bracket changes the filter width.
+                    </p>
+                    <p class="docs-item-desc">
+                        Stored frequencies can be organised into named groups and recalled with one
+                        click. A scanner mode cycles through scannable frequencies and locks when
+                        a signal breaks squelch. Recordings can be saved as WAV (demodulated audio)
+                        with an optional raw IQ file (<code>.u8</code> — 8-bit unsigned interleaved
+                        I/Q at the configured sample rate).
+                    </p>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">SEA / LAND</h2>
                     <p class="docs-item-desc">
                         These domains are currently stubs — the routing, template, and settings
                         infrastructure is in place but data source integration is not yet
-                        implemented. The source override and URL settings are available and will
+                        implemented. The source override settings are available and will
                         be respected when functionality is added.
                     </p>
                 </div>
@@ -558,6 +593,32 @@ npm run typecheck  # type-check only</pre>
                 </div>
 
                 <div class="docs-item">
+                    <h2 class="docs-item-label">SDR Settings</h2>
+                    <table class="docs-table">
+                        <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td>Devices</td><td>Add, edit, or remove <code>rtl_tcp</code> radio receivers. Each device needs a name, host, and port (default 1234). Optional per-device bandwidth, RF gain, and AGC override the panel defaults when connecting.</td></tr>
+                            <tr><td>Record Raw IQ</td><td>When enabled, each recording saves a <code>.u8</code> raw IQ file alongside the WAV. The file contains 8-bit unsigned interleaved I/Q samples at the session sample rate. Compatible with SDR#, GQRX, GNU Radio, and most SDR tools. Warning: ~4 MB/s, ~240 MB/min, ~14 GB/hr.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="docs-item">
+                    <h2 class="docs-item-label">Config Import / Export</h2>
+                    <p class="docs-item-desc">
+                        All settings can be downloaded as a JSON file and re-uploaded to restore
+                        or clone a configuration. Access via <strong>Settings &rsaquo; Config</strong>:
+                    </p>
+                    <table class="docs-table">
+                        <thead><tr><th>Action</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td>Download</td><td>Downloads the current live settings as <code>application/json</code>. Equivalent to <code>GET /api/settings/config/preview</code>.</td></tr>
+                            <tr><td>Upload</td><td>Replaces all settings from an uploaded JSON file. Additive — keys not present in the file are left unchanged. Equivalent to <code>POST /api/settings/config/upload</code>.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="docs-item">
                     <h2 class="docs-item-label">Settings Storage</h2>
                     <p class="docs-item-desc">
                         Settings are stored with a three-tier strategy:
@@ -610,6 +671,16 @@ npm run typecheck  # type-check only</pre>
                             <td><span class="docs-method docs-method--put">PUT</span></td>
                             <td><code>/api/settings/{namespace}/{key}</code></td>
                             <td>Upsert a setting. Body: <code>{"value": any}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/settings/config/preview</code></td>
+                            <td>Download current settings as a JSON file (all namespaces)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/settings/config/upload</code></td>
+                            <td>Replace settings from an uploaded JSON config file (multipart form)</td>
                         </tr>
                     </tbody>
                 </table>
@@ -735,6 +806,154 @@ npm run typecheck  # type-check only</pre>
                             <td><span class="docs-method docs-method--delete">DELETE</span></td>
                             <td><code>/api/space/tle?confirm=true</code></td>
                             <td>Clear all TLE data. Requires <code>confirm=true</code> query param.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <span class="docs-group-label">SDR — Radios</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/sdr/radios</code></td>
+                            <td>List all configured SDR radios</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/sdr/radios</code></td>
+                            <td>Add a radio. Body: <code>{"name","host","port","description","enabled","bandwidth","rf_gain","agc"}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--put">PUT</span></td>
+                            <td><code>/api/sdr/radios/{id}</code></td>
+                            <td>Update a radio</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--delete">DELETE</span></td>
+                            <td><code>/api/sdr/radios/{id}</code></td>
+                            <td>Delete a radio</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <span class="docs-group-label">SDR — Frequency Groups &amp; Stored Frequencies</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/sdr/groups</code></td>
+                            <td>List frequency groups</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/sdr/groups</code></td>
+                            <td>Create a group. Body: <code>{"name","color","sort_order"}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--put">PUT</span></td>
+                            <td><code>/api/sdr/groups/{id}</code></td>
+                            <td>Update a group</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--delete">DELETE</span></td>
+                            <td><code>/api/sdr/groups/{id}</code></td>
+                            <td>Delete a group (ungrouped frequencies are preserved)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/sdr/frequencies</code></td>
+                            <td>List all stored frequencies ordered by group then frequency</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/sdr/frequencies</code></td>
+                            <td>Save a frequency. Body: <code>{"label","frequency_hz","mode","squelch","gain","scannable","notes","group_id"}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--put">PUT</span></td>
+                            <td><code>/api/sdr/frequencies/{id}</code></td>
+                            <td>Update a stored frequency</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--delete">DELETE</span></td>
+                            <td><code>/api/sdr/frequencies/{id}</code></td>
+                            <td>Delete a stored frequency</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <span class="docs-group-label">SDR — Recordings (CLIPS)</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/sdr/recordings</code></td>
+                            <td>List completed recordings, newest first</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/sdr/recordings/start</code></td>
+                            <td>Begin a recording session. Returns <code>{"id"}</code>. If <code>recordRawIq</code> is enabled, also starts a server-side IQ capture. Body: <code>{"radio_id","frequency_hz","mode","gain_db","squelch_dbfs","sample_rate"}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/sdr/recordings/stop</code></td>
+                            <td>Finalise a recording: upload WAV file (multipart), stop IQ capture, update DB row. Fields: <code>recording_id</code>, <code>file</code> (WAV), <code>name</code>, <code>ended_at</code>, <code>duration_s</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--put">PATCH</span></td>
+                            <td><code>/api/sdr/recordings/{id}</code></td>
+                            <td>Update recording name or notes. Body: <code>{"name","notes"}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--delete">DELETE</span></td>
+                            <td><code>/api/sdr/recordings/{id}</code></td>
+                            <td>Delete a recording and its associated WAV and IQ files from disk</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/sdr/recordings/{id}/file</code></td>
+                            <td>Download the WAV audio file for a recording</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/sdr/recordings/{id}/iq</code></td>
+                            <td>Download the raw IQ file (<code>.u8</code>) for a recording. 404 if not recorded.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <span class="docs-group-label">SDR — Connection &amp; WebSocket</span>
+                <table class="docs-table">
+                    <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/sdr/connect</code></td>
+                            <td>Open a TCP connection to a radio and configure initial parameters. Body: <code>{"radio_id","frequency_hz","mode","gain_db","gain_auto","squelch_dbfs","sample_rate"}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--post">POST</span></td>
+                            <td><code>/api/sdr/disconnect</code></td>
+                            <td>Close the connection to a radio. Body: <code>{"radio_id"}</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">GET</span></td>
+                            <td><code>/api/sdr/status/{radio_id}</code></td>
+                            <td>Connection state for a radio — connected flag, center frequency, sample rate, gain, mode</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">WS</span></td>
+                            <td><code>/ws/sdr/{radio_id}</code></td>
+                            <td>Spectrum WebSocket — streams <code>{"type":"spectrum","bins":[…],"center_hz","sample_rate","timestamp_ms"}</code> frames. Accepts JSON commands: <code>tune</code>, <code>mode</code>, <code>gain</code>, <code>sample_rate</code>, <code>ping</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><span class="docs-method docs-method--get">WS</span></td>
+                            <td><code>/ws/sdr/{radio_id}/iq</code></td>
+                            <td>Raw IQ WebSocket — streams binary frames: 4-byte <code>sample_rate</code> (LE uint32) + 4-byte <code>center_hz</code> (LE uint32) + raw uint8 IQ pairs.</td>
                         </tr>
                     </tbody>
                 </table>

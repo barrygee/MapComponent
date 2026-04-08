@@ -904,8 +904,8 @@ window._SettingsPanel = (function () {
         // placeholder-like values (http://localhost) as empty rather than real URLs.
         const noDefault = defaultUrl === '';
         function _isOfflinePlaceholder(url: string): boolean {
-            const t = url.trim();
-            return !t || /^http:\/\/localhost\/?$/.test(t);
+            const trimmedUrl = url.trim();
+            return !trimmedUrl || /^http:\/\/localhost\/?$/.test(trimmedUrl);
         }
 
         // Load saved value
@@ -1218,10 +1218,10 @@ window._SettingsPanel = (function () {
             // Fallback for browsers without File System Access API
             const blob = new Blob([content], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'sentinel_config.json';
-            a.click();
+            const downloadLink = document.createElement('a');
+            downloadLink.href = url;
+            downloadLink.download = 'sentinel_config.json';
+            downloadLink.click();
             URL.revokeObjectURL(url);
         });
 
@@ -1936,11 +1936,11 @@ window._SettingsPanel = (function () {
         }
 
         function _applyFilters(): void {
-            const q = searchInput.value.trim().toLowerCase();
+            const searchQuery = searchInput.value.trim().toLowerCase();
             _renderTable(_allSats.filter(function (s) {
-                if (!q) return true;
+                if (!searchQuery) return true;
                 const catLabel = s.category ? (_CAT_LABELS[s.category] ?? s.category) : '';
-                return s.name.toLowerCase().includes(q) || s.norad_id.includes(q) || catLabel.toLowerCase().includes(q);
+                return s.name.toLowerCase().includes(searchQuery) || s.norad_id.includes(searchQuery) || catLabel.toLowerCase().includes(searchQuery);
             }));
         }
 
@@ -2386,12 +2386,12 @@ window._SettingsPanel = (function () {
     }
 
     function _search(query: string): SettingItem[] | null {
-        const q = query.trim().toLowerCase();
-        if (!q) return null;
+        const normalizedQuery = query.trim().toLowerCase();
+        if (!normalizedQuery) return null;
         return _settings.filter(function (s) {
-            return s.label.toLowerCase().indexOf(q) !== -1 ||
-                   s.desc.toLowerCase().indexOf(q) !== -1 ||
-                   s.sectionLabel.toLowerCase().indexOf(q) !== -1;
+            return s.label.toLowerCase().indexOf(normalizedQuery) !== -1 ||
+                   s.desc.toLowerCase().indexOf(normalizedQuery) !== -1 ||
+                   s.sectionLabel.toLowerCase().indexOf(normalizedQuery) !== -1;
         });
     }
 
@@ -2500,9 +2500,9 @@ window._SettingsPanel = (function () {
 
         if (input) {
             input.addEventListener('input', function () {
-                const q = input.value;
-                if (clearBtn) clearBtn.classList.toggle('settings-search-clear-visible', q.length > 0);
-                const results = _search(q);
+                const inputValue = input.value;
+                if (clearBtn) clearBtn.classList.toggle('settings-search-clear-visible', inputValue.length > 0);
+                const results = _search(inputValue);
                 if (results === null) {
                     _renderSection(_activeSection);
                 } else {

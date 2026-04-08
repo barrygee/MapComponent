@@ -309,11 +309,11 @@ window._Notifications = ((): NotificationsAPI => {
         if (!_bellPulseTimer) {
             _bellPulseTimer = setInterval(() => {
                 if (_isPanelOpen()) { _stopBellPulse(); return; }
-                const b = _getBtn();
-                if (!b) return;
-                b.classList.remove('notif-btn-unread');
-                void b.offsetWidth;
-                b.classList.add('notif-btn-unread');
+                const notificationButton = _getBtn();
+                if (!notificationButton) return;
+                notificationButton.classList.remove('notif-btn-unread');
+                void notificationButton.offsetWidth;
+                notificationButton.classList.add('notif-btn-unread');
             }, 15000);
         }
     }

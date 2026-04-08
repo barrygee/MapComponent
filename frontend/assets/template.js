@@ -40,20 +40,20 @@ window._Tracking.init();
     }
 
     function _isPlaceholder(url) {
-        const t = url.trim();
-        return !t || /^https?:\/\/?$/.test(t) || /^http:\/\/localhost\/?$/.test(t);
+        const trimmedUrl = url.trim();
+        return !trimmedUrl || /^https?:\/\/?$/.test(trimmedUrl) || /^http:\/\/localhost\/?$/.test(trimmedUrl);
     }
 
     function _hasUrl(mode) {
         try {
             if (mode === 'online') {
-                const val = localStorage.getItem('sentinel_' + ns + '_onlineUrl') || '';
-                return val.length > 0 && !_isPlaceholder(val);
+                const savedUrl = localStorage.getItem('sentinel_' + ns + '_onlineUrl') || '';
+                return savedUrl.length > 0 && !_isPlaceholder(savedUrl);
             } else {
                 const raw = localStorage.getItem('sentinel_' + ns + '_offgridSource');
                 if (!raw) return false;
-                const obj = JSON.parse(raw);
-                const url = (obj && obj.url) || '';
+                const sourceConfig = JSON.parse(raw);
+                const url = (sourceConfig && sourceConfig.url) || '';
                 return url.length > 0 && !_isPlaceholder(url);
             }
         } catch (e) {}

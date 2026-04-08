@@ -31,10 +31,11 @@ function _createMarkerElement(markerClass: string): HTMLDivElement {
     const el = document.createElement('div') as HTMLDivElement;
     el.classList.add(markerClass);
 
-    const cx = 30, cy = 30, r = 13;
+    // SVG viewBox is 60×60; cx/cy centre the circles; outerRadius is the ring, innerRadius the dot
+    const cx = 30, cy = 30, outerRadius = 13, innerRadius = 3.5;
     el.innerHTML = `<svg viewBox="0 0 60 60" width="60" height="60" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#c8ff00" stroke-width="1.8"/>
-        <circle cx="${cx}" cy="${cy}" r="3.5" fill="white"/>
+        <circle cx="${cx}" cy="${cy}" r="${outerRadius}" fill="none" stroke="#c8ff00" stroke-width="1.8"/>
+        <circle cx="${cx}" cy="${cy}" r="${innerRadius}" fill="white"/>
     </svg>`;
 
     return el;

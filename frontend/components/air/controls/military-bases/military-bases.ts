@@ -125,7 +125,7 @@ class MilitaryBasesToggleControl extends SentinelControlBase {
 
         if (!this._markers) {
             this._markers = MILITARY_BASES_DATA.features.map(f => {
-                const p      = f.properties;
+                const baseProperties = f.properties;
                 const coords = f.geometry.coordinates as LngLat;
 
                 const el = document.createElement('div');
@@ -133,9 +133,9 @@ class MilitaryBasesToggleControl extends SentinelControlBase {
 
                 const label = document.createElement('div');
                 label.style.cssText = "color:#fff;font-family:'Barlow Condensed','Barlow',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;line-height:1.5;white-space:nowrap;pointer-events:none";
-                label.innerHTML = p.icao
-                    ? `<span style="color:#c8ff00">${p.icao}</span><br><span style="opacity:0.7;font-weight:400">${p.name.toUpperCase()}</span>`
-                    : `<span style="opacity:0.7;font-weight:400">${p.name.toUpperCase()}</span>`;
+                label.innerHTML = baseProperties.icao
+                    ? `<span style="color:#c8ff00">${baseProperties.icao}</span><br><span style="opacity:0.7;font-weight:400">${baseProperties.name.toUpperCase()}</span>`
+                    : `<span style="opacity:0.7;font-weight:400">${baseProperties.name.toUpperCase()}</span>`;
                 el.appendChild(label);
 
                 el.addEventListener('click', (e: Event) => {
@@ -144,7 +144,7 @@ class MilitaryBasesToggleControl extends SentinelControlBase {
                     const easeOpts: maplibregl.EaseToOptions = { center: coords, zoom: 16, duration: 800 };
                     if (pitch !== undefined) easeOpts.pitch = pitch;
                     this.map.easeTo(easeOpts);
-                    this._showMilitaryBasesPanel(p, coords);
+                    this._showMilitaryBasesPanel(baseProperties, coords);
                 });
 
                 let hintPanel: HTMLDivElement | null = null;

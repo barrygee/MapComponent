@@ -126,10 +126,12 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
+    cursor: pointer;
 }
 
 .space-filter-result-icon {
     display: none;
+    cursor: pointer;
 }
 
 .space-filter-result-primary {

@@ -140,8 +140,8 @@ async def list_air_messages(db: AsyncSession = Depends(get_db)):
     rows = result.scalars().all()
     # Serialise to plain dicts (omit the dismissed flag — client doesn't need it)
     return JSONResponse([
-        {"msg_id": r.msg_id, "type": r.type, "title": r.title, "detail": r.detail, "ts": r.ts}
-        for r in rows
+        {"msg_id": msg.msg_id, "type": msg.type, "title": msg.title, "detail": msg.detail, "ts": msg.ts}
+        for msg in rows
     ])
 
 
@@ -191,8 +191,8 @@ async def list_tracked_aircraft(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AirTracking).order_by(AirTracking.added_at.desc()))
     rows = result.scalars().all()
     return JSONResponse([
-        {"hex": r.hex, "callsign": r.callsign, "follow": r.follow, "added_at": r.added_at}
-        for r in rows
+        {"hex": aircraft.hex, "callsign": aircraft.callsign, "follow": aircraft.follow, "added_at": aircraft.added_at}
+        for aircraft in rows
     ])
 
 
