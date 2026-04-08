@@ -193,13 +193,13 @@ def _jday_offset(jd: int, fr: float, offset_seconds: float) -> tuple[int, float]
     fr_new = fr + offset_seconds / 86400.0
     jd_new = jd
     if fr_new >= 1.0:
-        extra = int(fr_new)
-        jd_new += extra
-        fr_new -= extra
+        extra_days = int(fr_new)
+        jd_new += extra_days
+        fr_new -= extra_days
     elif fr_new < 0.0:
-        extra = int(abs(fr_new)) + 1
-        jd_new -= extra
-        fr_new += extra
+        extra_days = int(abs(fr_new)) + 1
+        jd_new -= extra_days
+        fr_new += extra_days
     return jd_new, fr_new
 
 

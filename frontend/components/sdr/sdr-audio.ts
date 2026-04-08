@@ -297,8 +297,8 @@
         _squelch = dbfs;
     }
 
-    function setVolume(v: number) {
-        if (_gain) _gain.gain.value = Math.max(0, Math.min(2, v));
+    function setVolume(volume: number) {
+        if (_gain) _gain.gain.value = Math.max(0, Math.min(2, volume));
     }
 
     function setBandwidthHz(hz: number) {

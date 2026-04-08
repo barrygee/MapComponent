@@ -38,8 +38,8 @@ window._Tracking = (() => {
     const _live = new Map();
     function _loadStored() {
         try {
-            const s = localStorage.getItem(STORAGE_KEY);
-            return s ? JSON.parse(s) : [];
+            const stored_json = localStorage.getItem(STORAGE_KEY);
+            return stored_json ? JSON.parse(stored_json) : [];
         }
         catch (e) {
             return [];
@@ -47,7 +47,7 @@ window._Tracking = (() => {
     }
     function _saveStored() {
         // Merge live items into stored list — preserve items from other sections
-        const existing = _loadStored().filter(s => !_live.has(s.id));
+        const existing = _loadStored().filter(item => !_live.has(item.id));
         const live = [];
         _live.forEach(opts => live.push({ id: opts.id, name: opts.name, domain: opts.domain, fields: opts.fields }));
         try {
@@ -73,7 +73,7 @@ window._Tracking = (() => {
     function _totalCount() {
         // Live items + stored items from other sections not yet in live registry
         const stored = _loadStored();
-        const extra = stored.filter(s => !_live.has(s.id)).length;
+        const extra = stored.filter(item => !_live.has(item.id)).length;
         return _live.size + extra;
     }
     function _refreshBadge() {

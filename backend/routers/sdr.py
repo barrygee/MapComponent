@@ -228,9 +228,9 @@ async def create_radio(body: RadioIn, db: AsyncSession = Depends(get_db)):
 @router.put("/api/sdr/radios/{radio_id}")
 async def update_radio(radio_id: int, body: RadioIn, db: AsyncSession = Depends(get_db)):
     radios = await _get_radios(db)
-    for i, r in enumerate(radios):
-        if r.get("id") == radio_id:
-            radios[i] = {**r, **body.model_dump()}
+    for i, radio in enumerate(radios):
+        if radio.get("id") == radio_id:
+            radios[i] = {**radio, **body.model_dump()}
             await _save_radios(db, radios)
             return JSONResponse(radios[i])
     raise HTTPException(404, "Radio not found")
@@ -239,7 +239,7 @@ async def update_radio(radio_id: int, body: RadioIn, db: AsyncSession = Depends(
 @router.delete("/api/sdr/radios/{radio_id}", status_code=204)
 async def delete_radio(radio_id: int, db: AsyncSession = Depends(get_db)):
     radios = await _get_radios(db)
-    new_radios = [r for r in radios if r.get("id") != radio_id]
+    new_radios = [radio for radio in radios if radio.get("id") != radio_id]
     if len(new_radios) == len(radios):
         raise HTTPException(404, "Radio not found")
     await _save_radios(db, new_radios)
@@ -281,8 +281,8 @@ async def delete_group(group_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(404, "Group not found")
     # Ungroup any frequencies that belonged to this group
     freqs = (await db.execute(select(SdrStoredFrequency).where(SdrStoredFrequency.group_id == group_id))).scalars().all()
-    for f in freqs:
-        f.group_id = None
+    for freq in freqs:
+        freq.group_id = None
     await db.delete(row)
     await db.commit()
 
@@ -292,7 +292,7 @@ async def delete_group(group_id: int, db: AsyncSession = Depends(get_db)):
 @router.get("/api/sdr/frequencies")
 async def list_frequencies(db: AsyncSession = Depends(get_db)):
     rows = (await db.execute(select(SdrStoredFrequency).order_by(SdrStoredFrequency.group_id, SdrStoredFrequency.frequency_hz))).scalars().all()
-    return JSONResponse([_freq_to_dict(f) for f in rows])
+    return JSONResponse([_freq_to_dict(freq) for freq in rows])
 
 
 @router.post("/api/sdr/frequencies", status_code=201)
