@@ -69,14 +69,11 @@ async def config_preview(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(UserSettings))
     rows = result.scalars().all()
 
-    config: dict[str, dict] = {}
+    grouped: dict[str, list] = {}
     for row in rows:
-        try:
-            value = json.loads(row.value)
-        except (json.JSONDecodeError, TypeError):
-            value = row.value
-        config.setdefault(row.namespace, {})[row.key] = value
+        grouped.setdefault(row.namespace, []).append(row)
 
+    config = {ns: _rows_to_namespace_dict(ns_rows) for ns, ns_rows in grouped.items()}
     payload = json.dumps(config, indent=2, ensure_ascii=False)
     return Response(content=payload, media_type="application/json")
 

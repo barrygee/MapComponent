@@ -123,7 +123,7 @@ async def migrate_sdr_radios_to_settings() -> None:
                 "SELECT id, name, host, port, description, enabled, bandwidth, rf_gain, agc, created_at "
                 "FROM sdr_radios ORDER BY created_at"
             ))
-            rows = result.fetchall()
+            rows = result.mappings().fetchall()
         except Exception:
             return  # table doesn't exist yet — nothing to migrate
 
@@ -133,16 +133,16 @@ async def migrate_sdr_radios_to_settings() -> None:
         radios = []
         for row in rows:
             radios.append({
-                "id":          row[0],
-                "name":        row[1],
-                "host":        row[2],
-                "port":        row[3],
-                "description": row[4] or "",
-                "enabled":     bool(row[5]),
-                "bandwidth":   row[6],
-                "rf_gain":     row[7],
-                "agc":         bool(row[8]) if row[8] is not None else None,
-                "created_at":  row[9],
+                "id":          row["id"],
+                "name":        row["name"],
+                "host":        row["host"],
+                "port":        row["port"],
+                "description": row["description"] or "",
+                "enabled":     bool(row["enabled"]),
+                "bandwidth":   row["bandwidth"],
+                "rf_gain":     row["rf_gain"],
+                "agc":         bool(row["agc"]) if row["agc"] is not None else None,
+                "created_at":  row["created_at"],
             })
 
         session.add(UserSettings(

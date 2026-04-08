@@ -76,21 +76,21 @@ map.once('load', function () {
 
     const STAR_COUNT = 320;
     let stars: Star[] = [];
-    let W = 0, H = 0;
+    let canvasWidth = 0, canvasHeight = 0;
     // parallax offset driven by map bearing / pitch
     let offsetX = 0, offsetY = 0;
 
     function _resize(): void {
-        W = canvas.width  = window.innerWidth;
-        H = canvas.height = window.innerHeight;
+        canvasWidth  = canvas.width  = window.innerWidth;
+        canvasHeight = canvas.height = window.innerHeight;
     }
 
     function _seed(): void {
         stars = [];
         for (let i = 0; i < STAR_COUNT; i++) {
             stars.push({
-                x: Math.random() * W,
-                y: Math.random() * H,
+                x: Math.random() * canvasWidth,
+                y: Math.random() * canvasHeight,
                 r: Math.random() * 1.1 + 0.2,
                 a: Math.random() * 0.55 + 0.15,
             });
@@ -98,10 +98,10 @@ map.once('load', function () {
     }
 
     function _draw(): void {
-        ctx.clearRect(0, 0, W, H);
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
         for (const s of stars) {
-            const px = ((s.x + offsetX) % W + W) % W;
-            const py = ((s.y + offsetY) % H + H) % H;
+            const px = ((s.x + offsetX) % canvasWidth  + canvasWidth)  % canvasWidth;
+            const py = ((s.y + offsetY) % canvasHeight + canvasHeight) % canvasHeight;
             ctx.beginPath();
             ctx.arc(px, py, s.r, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(255,255,255,${s.a})`;
@@ -119,14 +119,14 @@ map.once('load', function () {
     let _lastBearing = 0;
     let _lastCenter: maplibregl.LngLat | null = null;
     map.on('move', () => {
-        const bearing = map.getBearing();
-        const center  = map.getCenter();
-        const db = bearing - _lastBearing;
-        const dlng = _lastCenter ? (center.lng - _lastCenter.lng) : 0;
-        const dlat = _lastCenter ? (center.lat - _lastCenter.lat) : 0;
+        const bearing      = map.getBearing();
+        const center       = map.getCenter();
+        const deltaBearing = bearing - _lastBearing;
+        const deltaLng     = _lastCenter ? (center.lng - _lastCenter.lng) : 0;
+        const deltaLat     = _lastCenter ? (center.lat - _lastCenter.lat) : 0;
         // Bearing change → rotate star field; pan → translate gently
-        offsetX += db * 1.4 - dlng * 1.8;
-        offsetY += dlat * 1.8;
+        offsetX += deltaBearing * 1.4 - deltaLng * 1.8;
+        offsetY += deltaLat * 1.8;
         _lastBearing = bearing;
         _lastCenter  = center;
         _draw();

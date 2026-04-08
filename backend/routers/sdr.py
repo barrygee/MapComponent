@@ -27,6 +27,7 @@ WebSocket:
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import logging
 import time
@@ -198,6 +199,11 @@ def _recordings_dir() -> Path:
     return Path(settings.db_path).parent / "recordings"
 
 
+def _get_radio_by_id(radios: list[dict], radio_id: int) -> dict | None:
+    """Return the radio dict with the given id, or None if not found."""
+    return next((r for r in radios if r.get("id") == radio_id), None)
+
+
 # In-memory map of active IQ recording queues: recording_id → asyncio.Queue
 _active_iq_recordings: dict[int, asyncio.Queue] = {}
 
@@ -334,7 +340,6 @@ async def list_recordings(db: AsyncSession = Depends(get_db)):
 @router.post("/api/sdr/recordings/start", status_code=201)
 async def start_recording(body: RecordingStartIn, db: AsyncSession = Depends(get_db)):
     """Create a pending recording row and (optionally) start server-side IQ capture."""
-    import datetime
     started_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     rec = SdrRecording(
         name=f"Recording {started_at[:16].replace('T', ' ')}",
@@ -376,7 +381,7 @@ async def start_recording(body: RecordingStartIn, db: AsyncSession = Depends(get
     if record_iq and body.radio_id is not None:
         # Look up the radio's host/port so we can find its broadcaster
         radios = await _get_radios(db)
-        radio = next((r for r in radios if r.get("id") == body.radio_id), None)
+        radio = _get_radio_by_id(radios, body.radio_id)
         if radio:
             try:
                 broadcaster = sdr_svc.get_broadcaster(radio["host"], radio["port"])
@@ -416,7 +421,7 @@ async def stop_recording(
         # Find the broadcaster to call stop properly
         try:
             radios_cache = await _get_radios(db)
-            radio = next((r for r in radios_cache if r.get("id") == row.radio_id), None)
+            radio = _get_radio_by_id(radios_cache, row.radio_id)
             if radio:
                 broadcaster = sdr_svc.get_broadcaster(radio["host"], radio["port"])
                 if broadcaster:
@@ -439,7 +444,6 @@ async def stop_recording(
         if iq_path.exists():
             iq_file_size = iq_path.stat().st_size
 
-    import datetime
     if not ended_at:
         ended_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -519,7 +523,7 @@ async def get_recording_iq(rec_id: int, db: AsyncSession = Depends(get_db)):
 @router.post("/api/sdr/connect")
 async def connect_radio(body: ConnectIn, db: AsyncSession = Depends(get_db)):
     radios = await _get_radios(db)
-    radio = next((r for r in radios if r.get("id") == body.radio_id), None)
+    radio = _get_radio_by_id(radios, body.radio_id)
     if not radio:
         raise HTTPException(404, "Radio not found")
     try:
@@ -539,7 +543,7 @@ async def connect_radio(body: ConnectIn, db: AsyncSession = Depends(get_db)):
 @router.post("/api/sdr/disconnect")
 async def disconnect_radio(body: DisconnectIn, db: AsyncSession = Depends(get_db)):
     radios = await _get_radios(db)
-    radio = next((r for r in radios if r.get("id") == body.radio_id), None)
+    radio = _get_radio_by_id(radios, body.radio_id)
     if not radio:
         raise HTTPException(404, "Radio not found")
     await sdr_svc.close_connection(radio["host"], radio["port"])
@@ -549,7 +553,7 @@ async def disconnect_radio(body: DisconnectIn, db: AsyncSession = Depends(get_db
 @router.get("/api/sdr/status/{radio_id}")
 async def radio_status(radio_id: int, db: AsyncSession = Depends(get_db)):
     radios = await _get_radios(db)
-    radio = next((r for r in radios if r.get("id") == radio_id), None)
+    radio = _get_radio_by_id(radios, radio_id)
     if not radio:
         raise HTTPException(404, "Radio not found")
     status = sdr_svc.connection_status(radio["host"], radio["port"])
@@ -557,6 +561,56 @@ async def radio_status(radio_id: int, db: AsyncSession = Depends(get_db)):
 
 
 # ── WebSocket bridge ──────────────────────────────────────────────────────────
+
+async def _resolve_broadcaster(
+    radio_id: int,
+    websocket: WebSocket,
+) -> "tuple[sdr_svc.RadioBroadcaster, dict] | tuple[None, None]":
+    """Look up a radio by id and return a running broadcaster for it.
+
+    Sends an error frame and closes the WebSocket on failure.
+    Returns (broadcaster, radio_dict) on success, or (None, None) on failure.
+    """
+    from backend.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        radios = await _get_radios(db)
+    radio = _get_radio_by_id(radios, radio_id)
+
+    if not radio:
+        try:
+            await websocket.send_text(json.dumps({"type": "error", "code": "NOT_FOUND", "message": f"Radio {radio_id} not found"}))
+        except Exception:
+            pass
+        try:
+            await websocket.close()
+        except RuntimeError:
+            pass
+        return None, None
+
+    broadcaster = None
+    last_exc: Exception = RuntimeError("unknown")
+    for attempt in range(3):
+        try:
+            broadcaster = await sdr_svc.get_or_create_broadcaster(radio["host"], radio["port"])
+            break
+        except ConnectionError as exc:
+            last_exc = exc
+            if attempt < 2:
+                await asyncio.sleep(1)
+
+    if broadcaster is None:
+        try:
+            await websocket.send_text(json.dumps({"type": "error", "code": "CONNECT_FAILED", "message": str(last_exc)}))
+        except Exception:
+            pass
+        try:
+            await websocket.close()
+        except RuntimeError:
+            pass
+        return None, None
+
+    return broadcaster, radio
+
 
 @router.websocket("/ws/sdr/{radio_id}/iq")
 async def sdr_iq_websocket(radio_id: int, websocket: WebSocket):
@@ -571,38 +625,8 @@ async def sdr_iq_websocket(radio_id: int, websocket: WebSocket):
     """
     await websocket.accept()
 
-    from backend.database import AsyncSessionLocal
-    async with AsyncSessionLocal() as db:
-        radios = await _get_radios(db)
-    radio = next((r for r in radios if r.get("id") == radio_id), None)
-
-    if not radio:
-        await websocket.send_text(json.dumps({"type": "error", "code": "NOT_FOUND", "message": f"Radio {radio_id} not found"}))
-        try:
-            await websocket.close()
-        except RuntimeError:
-            pass
-        return
-
-    broadcaster = None
-    last_exc: Exception = RuntimeError("unknown")
-    for attempt in range(3):
-        try:
-            broadcaster = await sdr_svc.get_or_create_broadcaster(radio["host"], radio["port"])
-            break
-        except ConnectionError as exc:
-            last_exc = exc
-            if attempt < 2:
-                await asyncio.sleep(1)
+    broadcaster, _radio = await _resolve_broadcaster(radio_id, websocket)
     if broadcaster is None:
-        try:
-            await websocket.send_text(json.dumps({"type": "error", "code": "CONNECT_FAILED", "message": str(last_exc)}))
-        except Exception:
-            pass
-        try:
-            await websocket.close()
-        except RuntimeError:
-            pass
         return
 
     queue = broadcaster.subscribe_iq()
@@ -641,40 +665,8 @@ async def sdr_websocket(radio_id: int, websocket: WebSocket):
     """
     await websocket.accept()
 
-    # Look up radio from UserSettings (no DB dep injection for WebSocket — open our own session)
-    from backend.database import AsyncSessionLocal
-    async with AsyncSessionLocal() as db:
-        radios = await _get_radios(db)
-    radio = next((r for r in radios if r.get("id") == radio_id), None)
-
-    if not radio:
-        await websocket.send_text(json.dumps({"type": "error", "code": "NOT_FOUND", "message": f"Radio {radio_id} not found"}))
-        try:
-            await websocket.close()
-        except RuntimeError:
-            pass
-        return
-
-    # Connect (or reuse) and start the shared broadcaster — retry a few times
-    broadcaster = None
-    last_exc: Exception = RuntimeError("unknown")
-    for attempt in range(3):
-        try:
-            broadcaster = await sdr_svc.get_or_create_broadcaster(radio["host"], radio["port"])
-            break
-        except ConnectionError as exc:
-            last_exc = exc
-            if attempt < 2:
-                await asyncio.sleep(1)
+    broadcaster, radio = await _resolve_broadcaster(radio_id, websocket)
     if broadcaster is None:
-        try:
-            await websocket.send_text(json.dumps({"type": "error", "code": "CONNECT_FAILED", "message": str(last_exc)}))
-        except Exception:
-            pass
-        try:
-            await websocket.close()
-        except RuntimeError:
-            pass
         return
 
     conn = sdr_svc.get_connection(radio["host"], radio["port"])

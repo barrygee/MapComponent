@@ -239,17 +239,21 @@ class RadioBroadcaster:
         finally:
             logger.info("Broadcaster stopped for %s:%d", conn.host, conn.port)
 
+    @staticmethod
+    def _put_dropping(q: asyncio.Queue, item: object) -> None:
+        """Put item onto queue, dropping the oldest entry if the queue is full."""
+        try:
+            q.put_nowait(item)
+        except asyncio.QueueFull:
+            try:
+                q.get_nowait()
+                q.put_nowait(item)
+            except (asyncio.QueueEmpty, asyncio.QueueFull):
+                pass
+
     def _broadcast(self, frame: dict) -> None:
         for q in list(self._subscribers):
-            try:
-                q.put_nowait(frame)
-            except asyncio.QueueFull:
-                # Slow consumer — drop oldest frame and push new one
-                try:
-                    q.get_nowait()
-                    q.put_nowait(frame)
-                except (asyncio.QueueEmpty, asyncio.QueueFull):
-                    pass
+            self._put_dropping(q, frame)
 
     def _broadcast_iq(self, raw_iq: bytes, sample_rate: int, center_hz: int) -> None:
         """Fan raw IQ bytes to IQ subscribers.
@@ -263,14 +267,7 @@ class RadioBroadcaster:
         header = struct.pack("<II", sample_rate, center_hz)
         payload = header + raw_iq
         for q in list(self._iq_subscribers):
-            try:
-                q.put_nowait(payload)
-            except asyncio.QueueFull:
-                try:
-                    q.get_nowait()
-                    q.put_nowait(payload)
-                except (asyncio.QueueEmpty, asyncio.QueueFull):
-                    pass
+            self._put_dropping(q, payload)
 
 
 # ── FFT ───────────────────────────────────────────────────────────────────────
