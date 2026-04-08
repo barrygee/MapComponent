@@ -2,7 +2,7 @@
 // ============================================================
 // SDR MINI PLAYER
 // Compact, draggable SDR player component for use on any page.
-// Exposes window._SdrMiniPlayer = { tune, show, hide }
+// Exposes window._SdrMiniPlayer = { tune, show, hide, populateRadios }
 //
 // Depends on: sdr-globals.js, sdr-audio.js, sdr-boot.js
 // Those must be loaded before this script on pages that use it.
@@ -10,11 +10,12 @@
 /// <reference path="./globals.d.ts" />
 (function buildSdrMiniPlayer() {
     // ── Constants ────────────────────────────────────────────────────────────
-    const SIGNAL_SEGS = 24;
+    const SIGNAL_SEGS = 36;
+    const DEFAULT_SQUELCH = -60;
     // ── DOM ──────────────────────────────────────────────────────────────────
     const el = document.createElement('div');
     el.id = 'sdr-mini-player';
-    el.className = 'sdr-mini-player sdr-mini-hidden';
+    el.className = 'sdr-mini-hidden';
     el.innerHTML = `
         <div class="sdr-mini-drag-handle" id="sdr-mini-handle">
             <span class="sdr-mini-title" id="sdr-mini-title">SDR</span>
@@ -27,46 +28,110 @@
             </button>
         </div>
 
-        <div class="sdr-mini-body">
+        <!-- Tab bar -->
+        <div class="sdr-mini-tabs">
+            <button class="sdr-mini-tab sdr-mini-tab--active" data-tab="signal">SIGNAL</button>
+            <button class="sdr-mini-tab" data-tab="device">DEVICE</button>
+        </div>
 
-            <!-- Frequency + Mode row -->
-            <div class="sdr-mini-freq-row">
-                <span class="sdr-mini-freq-display" id="sdr-mini-freq">— MHz</span>
-                <span class="sdr-mini-mode-badge" id="sdr-mini-mode">AM</span>
+        <!-- ── Tab: SIGNAL ── -->
+        <div class="sdr-mini-pane" id="sdr-mini-panel-signal">
+
+            <!-- Frequency -->
+            <div class="sdr-mini-section">
+                <label class="sdr-mini-field-label">FREQUENCY MHZ</label>
+                <div class="sdr-mini-freq-row">
+                    <input id="sdr-mini-freq" class="sdr-mini-freq-input" type="text"
+                           placeholder="100.000" autocomplete="off" spellcheck="false">
+                    <button class="sdr-mini-pill sdr-mini-tune-btn" id="sdr-mini-play" title="Tune / Play">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polygon points="2,1 11,6 2,11" fill="currentColor"/></svg>
+                    </button>
+                    <button class="sdr-mini-pill sdr-mini-tune-btn sdr-mini-stop-btn" id="sdr-mini-stop" title="Stop" disabled>
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" fill="currentColor"/></svg>
+                    </button>
+                </div>
             </div>
 
-            <!-- Signal meter -->
-            <div class="sdr-mini-signal-bar" id="sdr-mini-signal-bar"></div>
+            <!-- Mode -->
+            <div class="sdr-mini-section">
+                <label class="sdr-mini-field-label">MODE</label>
+                <div class="sdr-mini-mode-pills" id="sdr-mini-mode-pills">
+                    <button class="sdr-mini-pill sdr-mini-mode-pill active" data-mode="AM">AM</button>
+                    <button class="sdr-mini-pill sdr-mini-mode-pill" data-mode="NFM">NFM</button>
+                    <button class="sdr-mini-pill sdr-mini-mode-pill" data-mode="WFM">WFM</button>
+                    <button class="sdr-mini-pill sdr-mini-mode-pill" data-mode="USB">USB</button>
+                    <button class="sdr-mini-pill sdr-mini-mode-pill" data-mode="LSB">LSB</button>
+                    <button class="sdr-mini-pill sdr-mini-mode-pill" data-mode="CW">CW</button>
+                </div>
+            </div>
 
-            <!-- Controls row: volume | squelch | play/stop -->
-            <div class="sdr-mini-controls-row">
+            <!-- Signal -->
+            <div class="sdr-mini-section">
+                <span class="sdr-mini-field-label">SIGNAL</span>
+                <div class="sdr-mini-signal-bar" id="sdr-mini-signal-bar"></div>
+            </div>
 
-                <div class="sdr-mini-slider-group">
-                    <label class="sdr-mini-label">VOL</label>
-                    <input class="sdr-mini-slider" id="sdr-mini-vol" type="range" min="0" max="200" step="1" value="80">
+            <!-- Volume -->
+            <div class="sdr-mini-section">
+                <div class="sdr-mini-slider-header">
+                    <label class="sdr-mini-field-label">VOLUME</label>
                     <span class="sdr-mini-slider-val" id="sdr-mini-vol-val">80%</span>
                 </div>
-
-                <div class="sdr-mini-slider-group">
-                    <label class="sdr-mini-label">SQL</label>
-                    <input class="sdr-mini-slider" id="sdr-mini-sq" type="range" min="-120" max="0" step="1" value="-120">
-                    <span class="sdr-mini-slider-val" id="sdr-mini-sq-val">-120</span>
-                </div>
-
-                <div class="sdr-mini-play-btns">
-                    <button class="sdr-mini-btn sdr-mini-play-btn" id="sdr-mini-play" title="Play">
-                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                            <polygon points="2,1 11,6 2,11" fill="currentColor"/>
-                        </svg>
-                    </button>
-                    <button class="sdr-mini-btn sdr-mini-stop-btn" id="sdr-mini-stop" title="Stop" disabled>
-                        <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-                            <rect x="1" y="1" width="8" height="8" rx="1" fill="currentColor"/>
-                        </svg>
-                    </button>
-                </div>
-
+                <input class="sdr-mini-slider" id="sdr-mini-vol" type="range" min="0" max="200" step="1" value="80">
             </div>
+
+            <!-- Squelch -->
+            <div class="sdr-mini-section">
+                <div class="sdr-mini-slider-header">
+                    <label class="sdr-mini-field-label">SQUELCH</label>
+                    <span class="sdr-mini-slider-val" id="sdr-mini-sq-val">${DEFAULT_SQUELCH} dBFS</span>
+                </div>
+                <input class="sdr-mini-slider" id="sdr-mini-sq" type="range" min="-120" max="0" step="1" value="${DEFAULT_SQUELCH}">
+            </div>
+
+        </div>
+
+        <!-- ── Tab: DEVICE ── -->
+        <div class="sdr-mini-pane sdr-mini-pane--hidden" id="sdr-mini-panel-device">
+
+            <!-- Radio -->
+            <div class="sdr-mini-section">
+                <div class="sdr-mini-device-dropdown" id="sdr-mini-device-dropdown" tabindex="0">
+                    <div class="sdr-mini-device-selected">
+                        <span class="sdr-mini-device-text" id="sdr-mini-device-text">— SELECT RADIO —</span>
+                        <span class="sdr-mini-device-arrow"></span>
+                    </div>
+                </div>
+                <select id="sdr-mini-radio" style="display:none"></select>
+            </div>
+
+            <!-- Bandwidth -->
+            <div class="sdr-mini-section">
+                <div class="sdr-mini-slider-header">
+                    <label class="sdr-mini-field-label">BANDWIDTH</label>
+                    <span class="sdr-mini-slider-val" id="sdr-mini-bw-val">10 kHz</span>
+                </div>
+                <input class="sdr-mini-slider" id="sdr-mini-bw" type="range" min="1000" max="2048000" step="500" value="10000">
+            </div>
+
+            <!-- RF Gain -->
+            <div class="sdr-mini-section">
+                <div class="sdr-mini-slider-header">
+                    <label class="sdr-mini-field-label">RF GAIN</label>
+                    <span class="sdr-mini-slider-val" id="sdr-mini-gain-val">30.0 dB</span>
+                </div>
+                <input class="sdr-mini-slider" id="sdr-mini-gain" type="range" min="-1" max="49" step="0.5" value="30">
+            </div>
+
+            <!-- AGC -->
+            <div class="sdr-mini-section sdr-mini-agc-row">
+                <label class="sdr-mini-checkbox-label">
+                    <input id="sdr-mini-agc" type="checkbox" class="sdr-mini-checkbox">
+                    <span class="sdr-mini-checkbox-custom"></span>
+                    <span class="sdr-mini-checkbox-text">AGC (Automatic Gain Control)</span>
+                </label>
+            </div>
+
         </div>
     `;
     document.body.appendChild(el);
@@ -75,12 +140,13 @@
     let _mode = 'AM';
     let _playing = false;
     let _signalSmoothed = -120;
+    let _squelch = DEFAULT_SQUELCH;
     // ── Element refs ─────────────────────────────────────────────────────────
     const titleEl = document.getElementById('sdr-mini-title');
     const dotEl = document.getElementById('sdr-mini-dot');
     const closeBtn = document.getElementById('sdr-mini-close');
-    const freqEl = document.getElementById('sdr-mini-freq');
-    const modeEl = document.getElementById('sdr-mini-mode');
+    const freqInput = document.getElementById('sdr-mini-freq');
+    const modePillsEl = document.getElementById('sdr-mini-mode-pills');
     const signalBar = document.getElementById('sdr-mini-signal-bar');
     const volSlider = document.getElementById('sdr-mini-vol');
     const volVal = document.getElementById('sdr-mini-vol-val');
@@ -89,7 +155,26 @@
     const playBtn = document.getElementById('sdr-mini-play');
     const stopBtn = document.getElementById('sdr-mini-stop');
     const handle = document.getElementById('sdr-mini-handle');
-    // ── Signal bar segments ──────────────────────────────────────────────────
+    const radioSelect = document.getElementById('sdr-mini-radio');
+    const bwSlider = document.getElementById('sdr-mini-bw');
+    const bwVal = document.getElementById('sdr-mini-bw-val');
+    const gainSlider = document.getElementById('sdr-mini-gain');
+    const gainVal = document.getElementById('sdr-mini-gain-val');
+    const agcCheck = document.getElementById('sdr-mini-agc');
+    const deviceDropdown = document.getElementById('sdr-mini-device-dropdown');
+    const deviceText = document.getElementById('sdr-mini-device-text');
+    // ── Tabs ──────────────────────────────────────────────────────────────────
+    el.querySelectorAll('.sdr-mini-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            el.querySelectorAll('.sdr-mini-tab').forEach(t => t.classList.remove('sdr-mini-tab--active'));
+            el.querySelectorAll('.sdr-mini-pane').forEach(p => p.classList.add('sdr-mini-pane--hidden'));
+            tab.classList.add('sdr-mini-tab--active');
+            const pane = document.getElementById(`sdr-mini-panel-${tab.dataset.tab}`);
+            if (pane)
+                pane.classList.remove('sdr-mini-pane--hidden');
+        });
+    });
+    // ── Signal bar ───────────────────────────────────────────────────────────
     const _segEls = [];
     for (let i = 0; i < SIGNAL_SEGS; i++) {
         const seg = document.createElement('div');
@@ -122,6 +207,40 @@
         if (!playing)
             resetSignalBar();
     }
+    // ── Frequency helpers ─────────────────────────────────────────────────────
+    function parseFreqMhz(raw) {
+        const v = parseFloat(raw.replace(/[^\d.]/g, ''));
+        if (isNaN(v) || v <= 0)
+            return null;
+        return v > 30000 ? Math.round(v) : Math.round(v * 1e6);
+    }
+    function displayFreq(hz) {
+        if (document.activeElement !== freqInput) {
+            freqInput.value = (hz / 1e6).toFixed(3);
+        }
+    }
+    // ── Mode pills ───────────────────────────────────────────────────────────
+    function setModePill(mode) {
+        modePillsEl.querySelectorAll('.sdr-mini-mode-pill').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+    }
+    modePillsEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('.sdr-mini-mode-pill');
+        if (!btn || btn.disabled)
+            return;
+        _mode = btn.dataset.mode;
+        setModePill(_mode);
+        if (_playing) {
+            if (window._SdrAudio) {
+                window._SdrAudio.setMode(_mode);
+                window._SdrAudio.setBandwidthHz(defaultBwHz(_mode));
+            }
+            if (_sdrSocket && _sdrSocket.readyState === WebSocket.OPEN) {
+                _sdrSocket.send(JSON.stringify({ cmd: 'mode', mode: _mode }));
+            }
+        }
+    });
     // ── Play / stop ──────────────────────────────────────────────────────────
     function defaultBwHz(mode) {
         switch (mode) {
@@ -135,23 +254,24 @@
         }
     }
     function play() {
-        if (!_freqHz)
+        const hz = parseFreqMhz(freqInput.value);
+        if (!hz)
             return;
+        _freqHz = hz;
         if (window._SdrAudio) {
             window._SdrAudio.initAudio(_sdrCurrentRadioId ?? undefined);
             window._SdrAudio.setMode(_mode);
-            window._SdrAudio.setBandwidthHz(defaultBwHz(_mode));
+            window._SdrAudio.setBandwidthHz(parseInt(bwSlider.value, 10));
             window._SdrAudio.setVolume(parseInt(volSlider.value, 10) / 100);
-            window._SdrAudio.setSquelch(parseInt(sqSlider.value, 10));
+            window._SdrAudio.setSquelch(_squelch);
         }
         if (_sdrSocket && _sdrSocket.readyState === WebSocket.OPEN) {
             _sdrSocket.send(JSON.stringify({ cmd: 'tune', frequency_hz: _freqHz }));
             _sdrSocket.send(JSON.stringify({ cmd: 'mode', mode: _mode }));
         }
         else if (!_sdrSocket || _sdrSocket.readyState === WebSocket.CLOSED) {
-            const radioId = _sdrCurrentRadioId;
-            if (radioId) {
-                document.dispatchEvent(new CustomEvent('sdr-radio-selected', { detail: { radioId } }));
+            if (_sdrCurrentRadioId) {
+                document.dispatchEvent(new CustomEvent('sdr-radio-selected', { detail: { radioId: _sdrCurrentRadioId } }));
             }
         }
         sessionStorage.setItem('sdrLastFreqHz', String(_freqHz));
@@ -165,6 +285,10 @@
     }
     playBtn.addEventListener('click', play);
     stopBtn.addEventListener('click', stop);
+    freqInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter')
+            play();
+    });
     // ── Volume ────────────────────────────────────────────────────────────────
     volSlider.addEventListener('input', () => {
         const v = parseInt(volSlider.value, 10);
@@ -175,22 +299,180 @@
     // ── Squelch ──────────────────────────────────────────────────────────────
     let _sqDebounce = null;
     sqSlider.addEventListener('input', () => {
-        const sq = parseInt(sqSlider.value, 10);
-        sqVal.textContent = String(sq);
+        _squelch = parseInt(sqSlider.value, 10);
+        sqVal.textContent = `${_squelch} dBFS`;
         if (_sqDebounce)
             clearTimeout(_sqDebounce);
         _sqDebounce = setTimeout(() => {
             if (_sdrSocket && _sdrSocket.readyState === WebSocket.OPEN) {
-                _sdrSocket.send(JSON.stringify({ cmd: 'squelch', squelch_dbfs: sq }));
+                _sdrSocket.send(JSON.stringify({ cmd: 'squelch', squelch_dbfs: _squelch }));
             }
             if (window._SdrAudio)
-                window._SdrAudio.setSquelch(sq);
+                window._SdrAudio.setSquelch(_squelch);
         }, 150);
     });
-    // ── Signal updates from boot ─────────────────────────────────────────────
-    // Listen to a custom event dispatched by sdr-boot when spectrum data arrives.
-    // sdr-boot already calls window._SdrControls.updateSignalBar — we piggyback
-    // via a separate event so we don't need to monkey-patch _SdrControls.
+    // ── Bandwidth ─────────────────────────────────────────────────────────────
+    function formatBwHz(hz) {
+        if (hz >= 1000000)
+            return `${(hz / 1000000).toFixed(2)} MHz`;
+        if (hz >= 1000)
+            return `${Math.round(hz / 1000)} kHz`;
+        return `${hz} Hz`;
+    }
+    function snapToValidSampleRate(hz) {
+        if (hz <= 262500)
+            return 250000;
+        if (hz <= 600000)
+            return 300000;
+        if (hz <= 1474000)
+            return 1024000;
+        if (hz <= 1761000)
+            return 1536000;
+        if (hz <= 1921000)
+            return 1792000;
+        return 2048000;
+    }
+    let _bwDebounce = null;
+    bwSlider.addEventListener('input', () => {
+        const hz = parseInt(bwSlider.value, 10);
+        bwVal.textContent = formatBwHz(hz);
+        if (window._SdrAudio)
+            window._SdrAudio.setBandwidthHz(hz);
+        if (_bwDebounce)
+            clearTimeout(_bwDebounce);
+        _bwDebounce = setTimeout(() => {
+            if (_sdrSocket && _sdrSocket.readyState === WebSocket.OPEN) {
+                _sdrSocket.send(JSON.stringify({ cmd: 'sample_rate', rate_hz: snapToValidSampleRate(hz) }));
+            }
+        }, 150);
+    });
+    // ── RF Gain / AGC ─────────────────────────────────────────────────────────
+    let _gainDebounce = null;
+    function applyGain() {
+        const auto = agcCheck.checked;
+        gainSlider.disabled = auto;
+        const g = parseFloat(gainSlider.value);
+        gainVal.textContent = auto ? 'AUTO' : `${g.toFixed(1)} dB`;
+        if (_gainDebounce)
+            clearTimeout(_gainDebounce);
+        _gainDebounce = setTimeout(() => {
+            if (_sdrSocket && _sdrSocket.readyState === WebSocket.OPEN) {
+                _sdrSocket.send(JSON.stringify({ cmd: 'gain', gain_db: auto ? null : g }));
+            }
+        }, 150);
+    }
+    gainSlider.addEventListener('input', applyGain);
+    agcCheck.addEventListener('change', applyGain);
+    // ── Custom device dropdown ────────────────────────────────────────────────
+    let _deviceMenuEl = null;
+    let _deviceMenuOpen = false;
+    function buildDeviceMenu(radios) {
+        if (_deviceMenuEl)
+            _deviceMenuEl.remove();
+        _deviceMenuEl = document.createElement('div');
+        _deviceMenuEl.className = 'sdr-mini-device-menu';
+        const placeholder = document.createElement('div');
+        placeholder.className = 'sdr-mini-device-menu-item sdr-mini-device-menu-placeholder';
+        placeholder.textContent = '— select radio —';
+        placeholder.addEventListener('click', () => {
+            radioSelect.value = '';
+            deviceText.textContent = '— SELECT RADIO —';
+            deviceText.classList.remove('sdr-mini-device-text--chosen');
+            closeDeviceMenu();
+            stop();
+            setConnected(false);
+            _sdrCurrentRadioId = null;
+            sessionStorage.removeItem('sdrLastRadioId');
+            document.dispatchEvent(new CustomEvent('sdr-radio-deselected'));
+        });
+        _deviceMenuEl.appendChild(placeholder);
+        radios.filter(r => r.enabled).forEach(r => {
+            const item = document.createElement('div');
+            item.className = 'sdr-mini-device-menu-item';
+            item.textContent = r.name;
+            item.addEventListener('click', () => {
+                radioSelect.value = String(r.id);
+                deviceText.textContent = r.name.toUpperCase();
+                deviceText.classList.add('sdr-mini-device-text--chosen');
+                closeDeviceMenu();
+                stop();
+                setConnected(false);
+                _sdrCurrentRadioId = r.id;
+                sessionStorage.setItem('sdrLastRadioId', String(r.id));
+                document.dispatchEvent(new CustomEvent('sdr-radio-selected', { detail: { radioId: r.id } }));
+            });
+            _deviceMenuEl.appendChild(item);
+        });
+        document.body.appendChild(_deviceMenuEl);
+    }
+    function positionDeviceMenu() {
+        if (!_deviceMenuEl)
+            return;
+        const rect = deviceDropdown.getBoundingClientRect();
+        _deviceMenuEl.style.left = rect.left + 'px';
+        _deviceMenuEl.style.top = rect.bottom + 'px';
+        _deviceMenuEl.style.width = rect.width + 'px';
+    }
+    function openDeviceMenu() {
+        if (!_deviceMenuEl)
+            return;
+        positionDeviceMenu();
+        _deviceMenuEl.classList.add('sdr-mini-device-menu--open');
+        deviceDropdown.classList.add('sdr-mini-device-dropdown--open');
+        _deviceMenuOpen = true;
+    }
+    function closeDeviceMenu() {
+        if (!_deviceMenuEl)
+            return;
+        _deviceMenuEl.classList.remove('sdr-mini-device-menu--open');
+        deviceDropdown.classList.remove('sdr-mini-device-dropdown--open');
+        _deviceMenuOpen = false;
+    }
+    deviceDropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (_deviceMenuOpen)
+            closeDeviceMenu();
+        else
+            openDeviceMenu();
+    });
+    deviceDropdown.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            _deviceMenuOpen ? closeDeviceMenu() : openDeviceMenu();
+        }
+        if (e.key === 'Escape')
+            closeDeviceMenu();
+    });
+    document.addEventListener('click', () => { if (_deviceMenuOpen)
+        closeDeviceMenu(); });
+    // ── Populate radios (called by boot) ─────────────────────────────────────
+    function populateRadios(radios) {
+        // Keep hidden select in sync for value tracking
+        while (radioSelect.options.length > 0)
+            radioSelect.remove(0);
+        const def = document.createElement('option');
+        def.value = '';
+        def.textContent = '— select radio —';
+        radioSelect.appendChild(def);
+        radios.filter(r => r.enabled).forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = String(r.id);
+            opt.textContent = r.name;
+            radioSelect.appendChild(opt);
+        });
+        buildDeviceMenu(radios);
+        // Restore last selection
+        const savedId = _sdrCurrentRadioId != null ? String(_sdrCurrentRadioId) : '';
+        if (savedId) {
+            const radio = radios.find(r => r.enabled && String(r.id) === savedId);
+            if (radio) {
+                radioSelect.value = savedId;
+                deviceText.textContent = radio.name.toUpperCase();
+                deviceText.classList.add('sdr-mini-device-text--chosen');
+            }
+        }
+    }
+    // ── Signal / connection events from boot ─────────────────────────────────
     document.addEventListener('sdr-mini:signal', (e) => {
         if (_playing)
             updateSignalBar(e.detail);
@@ -201,14 +483,10 @@
             setPlaying(false);
     });
     // ── Close ─────────────────────────────────────────────────────────────────
-    closeBtn.addEventListener('click', () => {
-        stop();
-        hide();
-    });
+    closeBtn.addEventListener('click', () => { stop(); hide(); });
     // ── Dragging ─────────────────────────────────────────────────────────────
     let _dragOffX = 0, _dragOffY = 0, _dragging = false;
     handle.addEventListener('mousedown', (e) => {
-        // Ignore clicks on close button
         if (e.target.closest('#sdr-mini-close'))
             return;
         _dragging = true;
@@ -229,13 +507,11 @@
         el.style.top = y + 'px';
     });
     document.addEventListener('mouseup', () => { _dragging = false; });
-    // ── Touch drag ───────────────────────────────────────────────────────────
     handle.addEventListener('touchstart', (e) => {
         if (e.target.closest('#sdr-mini-close'))
             return;
         _dragging = true;
-        const t = e.touches[0];
-        const rect = el.getBoundingClientRect();
+        const t = e.touches[0], rect = el.getBoundingClientRect();
         _dragOffX = t.clientX - rect.left;
         _dragOffY = t.clientY - rect.top;
         el.style.transition = 'none';
@@ -253,26 +529,16 @@
     }, { passive: true });
     document.addEventListener('touchend', () => { _dragging = false; });
     // ── Public API ────────────────────────────────────────────────────────────
-    function show() {
-        el.classList.remove('sdr-mini-hidden');
-    }
-    function hide() {
-        el.classList.add('sdr-mini-hidden');
-    }
-    /**
-     * Tune the mini player to a frequency and show it.
-     * @param freqHz   Frequency in Hz
-     * @param mode     Demodulation mode (AM, NFM, WFM, USB, LSB, CW)
-     * @param name     Display title (e.g. "Heathrow TWR")
-     */
+    function show() { el.classList.remove('sdr-mini-hidden'); }
+    function hide() { el.classList.add('sdr-mini-hidden'); }
     function tune(freqHz, mode, name) {
         _freqHz = freqHz;
         _mode = mode || 'AM';
         titleEl.textContent = name || 'SDR';
-        freqEl.textContent = (freqHz / 1e6).toFixed(3) + ' MHz';
-        modeEl.textContent = _mode;
+        displayFreq(freqHz);
+        setModePill(_mode);
         setPlaying(false);
         show();
     }
-    window._SdrMiniPlayer = { tune, show, hide, updateSignalBar, setConnected };
+    window._SdrMiniPlayer = { tune, show, hide, updateSignalBar, setConnected, populateRadios };
 })();

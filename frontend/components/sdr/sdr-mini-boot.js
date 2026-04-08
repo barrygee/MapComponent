@@ -167,6 +167,9 @@
                     _radioCache.set(first.id, first);
                 }
             }
+            if (window._SdrMiniPlayer?.populateRadios) {
+                window._SdrMiniPlayer.populateRadios(radios);
+            }
         }
         catch (e) {
             console.warn('[SDR mini] Could not load radios:', e);
