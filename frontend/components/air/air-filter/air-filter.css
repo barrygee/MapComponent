@@ -135,6 +135,7 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
+    cursor: pointer;
 }
 
 /* Generic action button (fly-to, track) on the right of each result row */
@@ -148,11 +149,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    color: rgba(255, 255, 255, 0.3);
     transition: color 0.15s;
 }
 
 .filter-action-btn:hover {
     color: #fff !important;
+}
+
+/* Bell button — active (notifications on) */
+.filter-bell-btn.filter-bell-btn--active {
+    color: #c8ff00;
 }
 
 /* Track / Fly-to text action button (text variant of .filter-action-btn) */
@@ -168,6 +175,7 @@
 /* Left icon column — small SVG/unicode glyph indicating result type */
 .filter-result-icon {
     display: none;
+    cursor: pointer;
 }
 
 /* Civil aircraft icon — full white */

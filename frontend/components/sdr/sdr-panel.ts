@@ -689,7 +689,11 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
             btn.dataset.gid = String(id);
             btn.type = 'button';
             if (color) {
-                btn.innerHTML = `<span class="sdr-ef-gpill-dot" style="background:${color}"></span>${label}`;
+                const dot = document.createElement('span');
+                dot.className = 'sdr-ef-gpill-dot';
+                dot.style.setProperty('--dot-color', color);
+                btn.appendChild(dot);
+                btn.appendChild(document.createTextNode(label));
             } else {
                 btn.textContent = label;
             }
@@ -1078,7 +1082,11 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
             if (items.length === 0) return;
             const header = document.createElement('div');
             header.className = 'sdr-freq-group-header';
-            header.innerHTML = `<span class="sdr-freq-group-dot" style="background:${color}"></span>${name}`;
+            const dot = document.createElement('span');
+            dot.className = 'sdr-freq-group-dot';
+            dot.style.setProperty('--dot-color', color);
+            header.appendChild(dot);
+            header.appendChild(document.createTextNode(name));
             list.appendChild(header);
             items.forEach(f => {
                 const row = document.createElement('div');

@@ -179,13 +179,15 @@
 
 /* ---- Icon span (minimised mode) ----
    SVG icon centred in the button; hidden when the menu is expanded
-   and replaced by a text label. */
+   and replaced by a text label.
+   Per-button icon size is set via --sm-icon-size custom property. */
 .sm-btn .sm-icon {
     display: flex;
     align-items: center;
     justify-content: center;
     width: 29px;
     flex-shrink: 0;
+    font-size: var(--sm-icon-size, 14px);
 }
 
 .sm-btn .sm-icon svg {
@@ -421,6 +423,10 @@
     grid-template-columns: repeat(3, 36px);
     grid-template-rows: repeat(3, 36px);
     gap: 4px;
+}
+
+#map-3d-controls.map-3d-controls--hidden {
+    display: none;
 }
 
 .map-3d-btn {

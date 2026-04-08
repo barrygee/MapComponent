@@ -178,11 +178,7 @@ window._SpaceFilterPanel = (() => {
         item.appendChild(info);
         item.appendChild(selectBtn);
 
-        info.style.flex = '1';
-        info.style.minWidth = '0';
-        info.style.cursor = 'pointer';
         info.addEventListener('click', doSelect);
-        icon.style.cursor = 'pointer';
         icon.addEventListener('click', doSelect);
         item._selectAction = doSelect;
 

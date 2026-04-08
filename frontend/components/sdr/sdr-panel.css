@@ -736,6 +736,7 @@
     flex-shrink: 0;
     margin-right: 4px;
     display: inline-block;
+    background: var(--dot-color);
 }
 
 /* ---- Save/cancel/delete row ---- */
@@ -983,6 +984,7 @@
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
+    background: var(--dot-color);
 }
 
 .sdr-freq-row-item {

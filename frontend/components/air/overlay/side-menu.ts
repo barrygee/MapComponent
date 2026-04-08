@@ -66,7 +66,7 @@
         iconSpan.className  = 'sm-icon';
         if (isHTML) iconSpan.innerHTML  = icon;
         else        iconSpan.textContent = icon;
-        iconSpan.style.fontSize = iconFontSize;
+        iconSpan.style.setProperty('--sm-icon-size', iconFontSize);
 
         const labelSpan = document.createElement('span');
         labelSpan.className  = 'sm-label';
@@ -217,7 +217,7 @@
             localStorage.setItem('sentinel_3d', _tiltActive ? '1' : '0');
 
             const panel3d = document.getElementById('map-3d-controls');
-            if (panel3d) panel3d.style.display = _tiltActive ? 'grid' : 'none';
+            if (panel3d) panel3d.classList.toggle('map-3d-controls--hidden', !_tiltActive);
 
             const isFollowingAircraft = adsbControl !== null && adsbControl._followEnabled;
 
@@ -260,7 +260,7 @@
         _tiltActive = active;
         localStorage.setItem('sentinel_3d', _tiltActive ? '1' : '0');
         const panel3d = document.getElementById('map-3d-controls');
-        if (panel3d) panel3d.style.display = _tiltActive ? 'grid' : 'none';
+        if (panel3d) panel3d.classList.toggle('map-3d-controls--hidden', !_tiltActive);
         tiltBtn.classList.toggle('active', _tiltActive);
         if (applyPitch) {
             if (_tiltActive) {
@@ -335,8 +335,6 @@
     // ---- Filter button ----
     const FILTER_SVG = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><line x1="1" y1="3.5" x2="14" y2="3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="3.5" y1="7.5" x2="11.5" y2="7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="6" y1="11.5" x2="9" y2="11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
     const filterGroup = makeGroup();
-    filterGroup.style.position = 'relative';
-
     const filterBtn   = document.createElement('button');
     filterBtn.className       = 'sm-btn enabled';
     filterBtn.dataset['tooltip'] = 'FILTER';
@@ -428,8 +426,8 @@
 
     // ---- 3D controls widget (fixed bottom-right) ----
     const ctrl3d = document.createElement('div');
-    ctrl3d.id            = 'map-3d-controls';
-    ctrl3d.style.display = 'none';
+    ctrl3d.id = 'map-3d-controls';
+    ctrl3d.classList.add('map-3d-controls--hidden');
 
     function make3dBtn(icon: string, title: string, onClick: () => void): HTMLButtonElement {
         const btn = document.createElement('button');
@@ -462,6 +460,6 @@
 
     document.body.appendChild(ctrl3d);
 
-    if (_tiltActive) ctrl3d.style.display = 'grid';
+    if (_tiltActive) ctrl3d.classList.remove('map-3d-controls--hidden');
 
 })();

@@ -86,7 +86,7 @@ window._SatInfoPanel = (() => {
         // Toggle header
         const toggle = document.createElement('button');
         toggle.id        = 'sip-toggle';
-        toggle.className = 'sip-toggle';
+        toggle.className = 'sip-toggle sip-hidden';
         toggle.setAttribute('aria-expanded', 'false');
 
         const toggleLeft = document.createElement('span');
@@ -126,7 +126,7 @@ window._SatInfoPanel = (() => {
         // Collapsible body
         const body = document.createElement('div');
         body.id        = 'sip-body';
-        body.className = 'sip-body';
+        body.className = 'sip-body sip-hidden';
 
         // Sat name header inside body (shown when expanded)
         const bodyHeader = document.createElement('div');
@@ -195,9 +195,6 @@ window._SatInfoPanel = (() => {
             toggle.classList.toggle('sip-expanded', _expanded);
             toggle.setAttribute('aria-expanded', String(_expanded));
         });
-
-        toggle.style.display = 'none';
-        body.style.display   = 'none';
 
         // Insert sat-info toggle/body immediately after #map-sidebar-panes so it
         // appears above the FILTERS section (which space-passes appends after panes).
@@ -396,8 +393,8 @@ window._SatInfoPanel = (() => {
         _expanded = true;
         const body   = _getBody();
         const toggle = _getToggle();
-        if (toggle) { toggle.style.display = ''; toggle.classList.add('sip-expanded'); toggle.setAttribute('aria-expanded', 'true'); }
-        if (body)   { body.style.display = ''; body.classList.add('sip-expanded'); }
+        if (toggle) { toggle.classList.remove('sip-hidden'); toggle.classList.add('sip-expanded'); toggle.setAttribute('aria-expanded', 'true'); }
+        if (body)   { body.classList.remove('sip-hidden'); body.classList.add('sip-expanded'); }
 
         // Show sidebar (whatever tab is active stays active)
         if (window._MapSidebar) window._MapSidebar.show();
@@ -417,8 +414,8 @@ window._SatInfoPanel = (() => {
         if (_locationPoll) { clearInterval(_locationPoll); _locationPoll = null; }
         const toggle = _getToggle();
         const body   = _getBody();
-        if (toggle) toggle.style.display = 'none';
-        if (body)   body.style.display   = 'none';
+        if (toggle) toggle.classList.add('sip-hidden');
+        if (body)   body.classList.add('sip-hidden');
     }
 
     function updatePosition(p: { alt_km: number; velocity_kms: number; track_deg: number; lat: number; lon: number }): void {
