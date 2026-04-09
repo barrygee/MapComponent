@@ -68,7 +68,7 @@ html {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 24px;
+    padding: 0 24px 0 18px;
     z-index: 1000;
 }
 
@@ -76,14 +76,14 @@ html {
 #nav-logo {
     display: flex;
     align-items: center;
-    height: 100%;
 }
 
-/* The logo image; height constrained to 24px */
+/* The logo image; height constrained to 46px */
 #logo-img {
-    height: 54px;
+    height: 56px;
     width: auto;
     display: block;
+    margin-top: 4px;
 }
 
 /* Right side of the nav bar — flex row containing nav links */

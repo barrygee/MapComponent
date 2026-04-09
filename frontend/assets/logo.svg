@@ -1,8 +1,8 @@
-<svg width="246" height="80" viewBox="0 0 246 80" xmlns="http://www.w3.org/2000/svg">
+<svg width="246" height="115" viewBox="0 0 246 115" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <clipPath id="textClip">
       <path fill-rule="evenodd" d="
-        M 0 0 H 246 V 80 H 0 Z
+        M 0 0 H 246 V 115 H 0 Z
         M 118.5 36.5
         m -14 0
         a 14 14 0 1 0 28 0
