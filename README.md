@@ -1,4 +1,4 @@
-![Sentinel logo](frontend/assets/logo-readme.png)
+![Sentinel logo](frontend/assets/logo.svg)
 
 Sentinel is a real-time multi-domain surveillance dashboard for tracking activity across Air, Space, Sea, Land, and SDR domains. It combines a FastAPI backend with a MapLibre GL browser client to display live data on interactive maps.
 

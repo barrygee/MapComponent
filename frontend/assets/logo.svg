@@ -3,7 +3,7 @@
     <clipPath id="textClip">
       <path fill-rule="evenodd" d="
         M 0 0 H 246 V 80 H 0 Z
-        M 117 32
+        M 119 33
         m -14 0
         a 14 14 0 1 0 28 0
         a 14 14 0 1 0 -28 0
@@ -12,7 +12,7 @@
   </defs>
 
   <!-- Circle icon -->
-  <svg x="105" y="19" width="25" height="25" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg x="107" y="21" width="25" height="25" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="18" cy="18" r="14" fill="none" stroke="#c8ff00" stroke-width="5"/>
     <circle cx="18" cy="18" r="4.5" fill="white"/>
   </svg>
