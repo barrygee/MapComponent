@@ -170,8 +170,10 @@
                     _radioCache.set(first.id, first);
                 }
             }
-            if (window._SdrMiniPlayer?.populateRadios) {
-                window._SdrMiniPlayer.populateRadios(radios);
+            // Cache radios so sdr-radio-tab can populate the dropdown after it mounts
+            window._sdrCachedRadios = radios;
+            if (window._sdrPopulateRadios) {
+                window._sdrPopulateRadios(radios);
             }
         }
         catch (e) {

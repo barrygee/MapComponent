@@ -125,7 +125,6 @@ function buildSdrPanel(mountTarget) {
                                 <svg id="sdr-rec-icon" width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg>
                             </button>
                         </div>
-                        <span class="sdr-rec-timer" id="sdr-rec-timer"></span>
                     </div>
 
                     <!-- Mode -->
@@ -443,7 +442,6 @@ function buildSdrPanel(mountTarget) {
     const lockBtn = document.getElementById('sdr-radio-lock-btn');
     // Recording refs
     const recBtn = document.getElementById('sdr-rec-btn');
-    const recTimer = document.getElementById('sdr-rec-timer');
     const clipsSearch = document.getElementById('sdr-clips-search');
     const clipsList = document.getElementById('sdr-clips-list');
     const clipsEmpty = document.getElementById('sdr-clips-empty');
@@ -560,7 +558,6 @@ function buildSdrPanel(mountTarget) {
         }
         recBtn.classList.remove('sdr-rec-btn--active');
         _setRecBtnIcon(false);
-        recTimer.textContent = '';
         if (!window._SdrAudio)
             return;
         const radioId = getSelectedRadioId();
@@ -1048,8 +1045,6 @@ function buildSdrPanel(mountTarget) {
             clipsCount.textContent = '';
             recBtn.classList.add('sdr-rec-btn--active');
             _setRecBtnIcon(true);
-            if (recTimer)
-                recTimer.textContent = _recSquelchOpen ? '0:00' : '0:00 WAIT';
             _removeLiveRecRow();
             _liveRecRow = _createLiveRecRow(metadata, _recStartEpoch, _recSquelchOpen);
             clipsEmpty.style.display = 'none';
@@ -1059,8 +1054,6 @@ function buildSdrPanel(mountTarget) {
                     ? _recPausedMs + (Date.now() - _recPauseStart)
                     : _recPausedMs;
                 const s = Math.floor((Date.now() - _recStartEpoch - pausedSoFar) / 1000);
-                if (recTimer)
-                    recTimer.textContent = _recSquelchOpen ? _fmtDuration(s) : _fmtDuration(s) + ' WAIT';
                 _updateLiveRecRow(s);
             }, 1000);
         }
@@ -1078,7 +1071,13 @@ function buildSdrPanel(mountTarget) {
         _segEls.push(seg);
     }
     let _signalSmoothed = -120;
-    function updateSignalBar(dbfs) {
+    function updateSignalBar(dbfs, squelchOpen) {
+        if (squelchOpen === false) {
+            _signalSmoothed = -120;
+            for (let i = 0; i < SIGNAL_SEGS; i++)
+                _segEls[i].classList.remove('sdr-signal-seg--on');
+            return;
+        }
         const alpha = dbfs > _signalSmoothed ? 0.3 : 0.05;
         _signalSmoothed += alpha * (dbfs - _signalSmoothed);
         const lit = Math.round(Math.max(0, Math.min(SIGNAL_SEGS, ((_signalSmoothed + 120) / 120) * SIGNAL_SEGS)));
@@ -1482,6 +1481,16 @@ function buildSdrPanel(mountTarget) {
         buildDeviceMenu(radios);
     };
     window._SdrControls = { setStatus, applyStatus, getSelectedRadioId, updateSignalBar };
+    // ── In tab mode, sdr-mini-boot drives connection/signal via custom events ──
+    if (_tabMode) {
+        document.addEventListener('sdr-mini:connected', (e) => {
+            setStatus(e.detail);
+        });
+        document.addEventListener('sdr-mini:signal', (e) => {
+            if (_sdrPlaying)
+                updateSignalBar(e.detail);
+        });
+    }
     // ── Render frequency list ─────────────────────────────────────────────────
     function renderFreqs() {
         const list = document.getElementById('sdr-freq-list');

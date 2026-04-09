@@ -130,7 +130,6 @@ function buildSdrPanel(mountTarget?: HTMLElement) {
                                 <svg id="sdr-rec-icon" width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg>
                             </button>
                         </div>
-                        <span class="sdr-rec-timer" id="sdr-rec-timer"></span>
                     </div>
 
                     <!-- Mode -->
@@ -462,7 +461,6 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
 
     // Recording refs
     const recBtn           = document.getElementById('sdr-rec-btn')           as HTMLButtonElement;
-    const recTimer         = document.getElementById('sdr-rec-timer')         as HTMLSpanElement;
     const clipsSearch      = document.getElementById('sdr-clips-search')      as HTMLInputElement;
     const clipsList        = document.getElementById('sdr-clips-list')        as HTMLDivElement;
     const clipsEmpty       = document.getElementById('sdr-clips-empty')       as HTMLDivElement;
@@ -586,7 +584,6 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         if (_recTimerInterval) { clearInterval(_recTimerInterval); _recTimerInterval = null; }
         recBtn.classList.remove('sdr-rec-btn--active');
         _setRecBtnIcon(false);
-        recTimer.textContent = '';
         if (!window._SdrAudio) return;
         const radioId = getSelectedRadioId();
         const radioName = radioId ? (_knownRadios.find(r => r.id === radioId) || {} as any).name || '' : '';
@@ -1064,7 +1061,6 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
             clipsCount.textContent = '';
             recBtn.classList.add('sdr-rec-btn--active');
             _setRecBtnIcon(true);
-            if (recTimer) recTimer.textContent = _recSquelchOpen ? '0:00' : '0:00 WAIT';
             _removeLiveRecRow();
             _liveRecRow = _createLiveRecRow(metadata, _recStartEpoch, _recSquelchOpen);
             clipsEmpty.style.display = 'none';
@@ -1074,7 +1070,6 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
                     ? _recPausedMs + (Date.now() - _recPauseStart)
                     : _recPausedMs;
                 const s = Math.floor((Date.now() - _recStartEpoch - pausedSoFar) / 1000);
-                if (recTimer) recTimer.textContent = _recSquelchOpen ? _fmtDuration(s) : _fmtDuration(s) + ' WAIT';
                 _updateLiveRecRow(s);
             }, 1000);
         } else {
@@ -1094,7 +1089,12 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
     }
 
     let _signalSmoothed = -120;
-    function updateSignalBar(dbfs: number) {
+    function updateSignalBar(dbfs: number, squelchOpen?: boolean) {
+        if (squelchOpen === false) {
+            _signalSmoothed = -120;
+            for (let i = 0; i < SIGNAL_SEGS; i++) _segEls[i].classList.remove('sdr-signal-seg--on');
+            return;
+        }
         const alpha = dbfs > _signalSmoothed ? 0.3 : 0.05;
         _signalSmoothed += alpha * (dbfs - _signalSmoothed);
         const lit = Math.round(Math.max(0, Math.min(SIGNAL_SEGS, ((_signalSmoothed + 120) / 120) * SIGNAL_SEGS)));
@@ -1518,6 +1518,16 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
     };
 
     window._SdrControls = { setStatus, applyStatus, getSelectedRadioId, updateSignalBar };
+
+    // ── In tab mode, sdr-mini-boot drives connection/signal via custom events ──
+    if (_tabMode) {
+        document.addEventListener('sdr-mini:connected', (e: Event) => {
+            setStatus((e as CustomEvent<boolean>).detail);
+        });
+        document.addEventListener('sdr-mini:signal', (e: Event) => {
+            if (_sdrPlaying) updateSignalBar((e as CustomEvent<number>).detail);
+        });
+    }
 
     // ── Render frequency list ─────────────────────────────────────────────────
 

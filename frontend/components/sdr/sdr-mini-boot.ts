@@ -161,8 +161,10 @@
                     _radioCache.set(first.id, first);
                 }
             }
-            if ((window as any)._SdrMiniPlayer?.populateRadios) {
-                (window as any)._SdrMiniPlayer.populateRadios(radios);
+            // Cache radios so sdr-radio-tab can populate the dropdown after it mounts
+            (window as any)._sdrCachedRadios = radios;
+            if ((window as any)._sdrPopulateRadios) {
+                (window as any)._sdrPopulateRadios(radios);
             }
         } catch (e) {
             console.warn('[SDR mini] Could not load radios:', e);
