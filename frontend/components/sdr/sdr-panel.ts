@@ -1517,7 +1517,14 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         });
         _deviceMenuEl.appendChild(placeholder);
 
-        radios.filter(r => r.enabled).forEach(r => {
+        if (radios.length === 0) {
+            const noneItem = document.createElement('div');
+            noneItem.className = 'sdr-device-menu-item sdr-device-menu-placeholder';
+            noneItem.textContent = 'no radios online';
+            _deviceMenuEl.appendChild(noneItem);
+        }
+
+        radios.forEach(r => {
             const item = document.createElement('div');
             item.className = 'sdr-device-menu-item';
             item.textContent = r.name;
@@ -1562,13 +1569,50 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         _deviceMenuOpen = false;
     }
 
+    async function openDeviceMenuWithCheck() {
+        // Show the menu immediately with a loading state while we probe each radio
+        if (!_deviceMenuEl) return;
+        positionDeviceMenu();
+        _deviceMenuEl.classList.add('sdr-device-menu--open');
+        deviceDropdown.classList.add('sdr-device-dropdown--open');
+        _deviceMenuOpen = true;
+
+        // Show a transient "checking..." item while probing
+        const checkingItem = document.createElement('div');
+        checkingItem.className = 'sdr-device-menu-item sdr-device-menu-placeholder';
+        checkingItem.textContent = 'checking radios…';
+        _deviceMenuEl.innerHTML = '';
+        _deviceMenuEl.appendChild(checkingItem);
+
+        const enabledRadios = _knownRadios.filter(r => r.enabled);
+        const results = await Promise.allSettled(
+            enabledRadios.map(r =>
+                fetch(`/api/sdr/status/${r.id}`)
+                    .then(res => res.ok ? res.json() : Promise.reject())
+                    .then(data => data.connected ? r : null)
+                    .catch(() => null)
+            )
+        );
+        const onlineRadios = results
+            .map(r => (r.status === 'fulfilled' ? r.value : null))
+            .filter((r): r is SdrRadio => r !== null);
+
+        // If the user closed the menu while we were checking, don't reopen it
+        if (!_deviceMenuOpen) return;
+
+        buildDeviceMenu(onlineRadios);
+        // Re-open after rebuild since buildDeviceMenu replaces the element
+        positionDeviceMenu();
+        _deviceMenuEl!.classList.add('sdr-device-menu--open');
+    }
+
     deviceDropdown.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (_deviceMenuOpen) closeDeviceMenu(); else openDeviceMenu();
+        if (_deviceMenuOpen) closeDeviceMenu(); else openDeviceMenuWithCheck();
     });
 
     deviceDropdown.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (_deviceMenuOpen) closeDeviceMenu(); else openDeviceMenu(); }
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (_deviceMenuOpen) closeDeviceMenu(); else openDeviceMenuWithCheck(); }
         if (e.key === 'Escape') closeDeviceMenu();
     });
 
