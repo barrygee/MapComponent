@@ -121,6 +121,10 @@
                 ws.send(JSON.stringify({ cmd: 'squelch', squelch_dbfs: savedSettings.squelch }));
             if (savedSettings.bwHz != null)
                 ws.send(JSON.stringify({ cmd: 'sample_rate', rate_hz: savedSettings.bwHz }));
+            // Sync _sdrPlaying global with persisted session state
+            if (sessionStorage.getItem('sdrPlaying') === '1') {
+                _sdrPlaying = true;
+            }
         });
         ws.addEventListener('close', () => {
             _sdrConnected = false;

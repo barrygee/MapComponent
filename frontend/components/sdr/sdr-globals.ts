@@ -30,3 +30,5 @@ var _sdrCurrentBwHz: number = 10_000;
 var _sdrScanActive: boolean = false;
 // @ts-ignore
 var _sdrScanLocked: boolean = false;
+// @ts-ignore
+var _sdrPlaying: boolean = false;

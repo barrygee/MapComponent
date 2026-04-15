@@ -133,6 +133,10 @@
                 ws.send(JSON.stringify({ cmd: 'tune', frequency_hz: lastFreqHz }));
                 ws.send(JSON.stringify({ cmd: 'mode', mode: lastMode }));
             }
+            // Sync _sdrPlaying global with persisted session state
+            if (sessionStorage.getItem('sdrPlaying') === '1') {
+                _sdrPlaying = true;
+            }
         });
 
         ws.addEventListener('close', () => {

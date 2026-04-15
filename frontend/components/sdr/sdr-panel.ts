@@ -571,13 +571,15 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         } catch (_e) {}
     }
 
-    // Restore persisted settings on non-SDR pages (SDR page gets state from server).
-    // Pre-seed radioSelect.value so _sdrPopulateRadios can restore the dropdown label.
+    // Restore persisted settings on all pages — freq/mode/gain are user settings that should
+    // survive navigation. On the SDR page the server may also send a status update, but
+    // _restoreSettings ensures the input is pre-filled immediately on load.
+    _restoreSettings();
     if (_tabMode) {
         const savedRadioId = sessionStorage.getItem('sdrLastRadioId');
         if (savedRadioId) radioSelect.value = savedRadioId;
-        _restoreSettings();
     }
+
 
     function sendCmd(obj: object) {
         if (_sdrSocket && _sdrSocket.readyState === WebSocket.OPEN) {
@@ -676,6 +678,8 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
     }
 
     function setPlayingState(playing: boolean) {
+        _sdrPlaying = playing;
+        sessionStorage.setItem('sdrPlaying', playing ? '1' : '0');
         freqTuneBtn.disabled = playing;
         freqStopBtn.disabled = !playing;
         recBtn.disabled = !playing;
@@ -683,6 +687,7 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
     }
 
     function tune() {
+        if (!getSelectedRadioId()) return;
         const hz = parseFreqMhz(freqInput.value);
         if (!hz) return;
         _sdrCurrentFreqHz = hz;
@@ -1184,11 +1189,12 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         if (window._SdrAudio) window._SdrAudio.stop();
         setPlayingState(false);
         setStatus(false);
-        setRadioControlsDisabled(true);
 
         if (!isNaN(id) && id > 0) {
+            setRadioControlsDisabled(false);
             radioSelect.dispatchEvent(new CustomEvent('sdr-radio-selected', { bubbles: true, detail: { radioId: id } }));
         } else {
+            setRadioControlsDisabled(true);
             document.dispatchEvent(new CustomEvent('sdr-radio-deselected'));
         }
     });
@@ -1420,8 +1426,13 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         connDot.className = 'sdr-conn-dot ' + (isOn ? 'sdr-dot-on' : 'sdr-dot-off');
         connDot.title = isOn ? 'Connected' : 'Disconnected';
         if (connected) {
-            setPlayingState(false);
-            setRadioControlsDisabled(false);
+            if (_sdrPlaying) {
+                freqTuneBtn.disabled = true;
+                freqStopBtn.disabled = false;
+                recBtn.disabled = false;
+            } else {
+                setPlayingState(false);
+            }
         } else {
             setPlayingState(false);
             setRadioControlsDisabled(true);
@@ -1563,7 +1574,9 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
 
     (window as any)._sdrPopulateRadios = function(radios: SdrRadio[]) {
         _knownRadios = radios;
-        const current = radioSelect.value;
+        // Read the saved id from sessionStorage directly — radioSelect.value may be '' if
+        // options hadn't been added yet when it was pre-seeded.
+        const current = radioSelect.value || sessionStorage.getItem('sdrLastRadioId') || '';
         while (radioSelect.options.length > 0) radioSelect.remove(0);
         const defOpt = document.createElement('option');
         defOpt.value = '';
@@ -1581,10 +1594,31 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
             if (chosen) {
                 deviceDropdownText.textContent = chosen.name;
                 deviceDropdownText.classList.add('sdr-device-dropdown-text--chosen');
+                setRadioControlsDisabled(false);
+                // Restore playing state now that the radio is confirmed available.
+                if (sessionStorage.getItem('sdrPlaying') === '1') {
+                    _sdrPlaying = true;
+                    freqTuneBtn.disabled = true;
+                    freqStopBtn.disabled = false;
+                    recBtn.disabled = false;
+                    // One-shot: first interaction resumes audio (browser autoplay policy).
+                    const resumeAudioOnce = () => {
+                        panel.removeEventListener('click', resumeAudioOnce);
+                        panel.removeEventListener('keydown', resumeAudioOnce);
+                        if (window._SdrAudio) {
+                            window._SdrAudio.initAudio(getSelectedRadioId() ?? undefined);
+                            window._SdrAudio.setMode(_sdrCurrentMode);
+                            window._SdrAudio.setBandwidthHz(defaultBwHz(_sdrCurrentMode));
+                        }
+                    };
+                    panel.addEventListener('click', resumeAudioOnce);
+                    panel.addEventListener('keydown', resumeAudioOnce);
+                }
             } else {
                 // Previously selected radio no longer exists — clear the display
                 deviceDropdownText.textContent = '— select radio —';
                 deviceDropdownText.classList.remove('sdr-device-dropdown-text--chosen');
+                setRadioControlsDisabled(true);
             }
         }
         buildDeviceMenu(radios);

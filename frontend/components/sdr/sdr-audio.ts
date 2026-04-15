@@ -328,7 +328,11 @@
             await _ctx.resume();
         }
         if (_radioId != null && !_iqSocket) {
+            // IQ socket not yet open — open it now
             _openIqSocket(_radioId);
+        } else if (_iqSocket && _iqSocket.readyState === WebSocket.OPEN && _worklet) {
+            // IQ socket was opened by start() before the worklet existed — send reset now
+            _worklet.port.postMessage({ type: 'reset' });
         }
     }
 
