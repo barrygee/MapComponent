@@ -266,6 +266,10 @@
         _iqSocket = ws;
 
         ws.addEventListener('open', () => {
+            // Resume AudioContext if Safari suspended it during navigation
+            if (_ctx && _ctx.state === 'suspended') {
+                _ctx.resume().catch(() => {});
+            }
             if (_worklet) _worklet.port.postMessage({ type: 'reset' });
         });
 
@@ -300,10 +304,10 @@
 
         ws.addEventListener('close', () => {
             _iqSocket = null;
-            // Auto-reconnect after 1.5s — handles retune-triggered drops
+            // Auto-reconnect after 500ms — handles retune-triggered drops and Safari suspension
             _iqReconnectTimer = setTimeout(() => {
                 if (_radioId === radioId) _openIqSocket(radioId);
-            }, 1500);
+            }, 500);
         });
 
         ws.addEventListener('error', () => {
@@ -328,7 +332,6 @@
             await _ctx.resume();
         }
         if (_radioId != null && !_iqSocket) {
-            // IQ socket not yet open — open it now
             _openIqSocket(_radioId);
         } else if (_iqSocket && _iqSocket.readyState === WebSocket.OPEN && _worklet) {
             // IQ socket was opened by start() before the worklet existed — send reset now
@@ -476,6 +479,14 @@
             return null;
         }
     }
+
+    // Resume AudioContext and IQ socket after Safari BFCache restore or page suspension
+    window.addEventListener('pageshow', (e) => {
+        if (e.persisted) {
+            if (_ctx && _ctx.state === 'suspended') _ctx.resume().catch(() => {});
+            if (_radioId != null && !_iqSocket) _openIqSocket(_radioId);
+        }
+    });
 
     window._SdrAudio = { start, initAudio, stop, setRadioId, setMode, setSquelch, setVolume, setBandwidthHz, startRecording, stopRecording };
 })();

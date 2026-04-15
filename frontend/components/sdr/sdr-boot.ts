@@ -126,16 +126,23 @@
         });
 
         ws.addEventListener('open', () => {
-            if (window._SdrAudio)    window._SdrAudio.start(radioId);
             const lastFreqHz = parseInt(sessionStorage.getItem('sdrLastFreqHz') || '0', 10);
             const lastMode   = sessionStorage.getItem('sdrLastMode') || 'AM';
             if (lastFreqHz > 0) {
                 ws.send(JSON.stringify({ cmd: 'tune', frequency_hz: lastFreqHz }));
                 ws.send(JSON.stringify({ cmd: 'mode', mode: lastMode }));
             }
-            // Sync _sdrPlaying global with persisted session state
             if (sessionStorage.getItem('sdrPlaying') === '1') {
                 _sdrPlaying = true;
+                if (window._SdrAudio) {
+                    window._SdrAudio.initAudio(radioId).then(() => {
+                        if (window._SdrAudio) window._SdrAudio.setMode(lastMode);
+                    }).catch(() => {
+                        if (window._SdrAudio) window._SdrAudio.start(radioId);
+                    });
+                }
+            } else {
+                if (window._SdrAudio) window._SdrAudio.start(radioId);
             }
         });
 
@@ -145,7 +152,7 @@
             if (_reconnectTimer) clearTimeout(_reconnectTimer);
             _reconnectTimer = setTimeout(() => {
                 if (_sdrCurrentRadioId === radioId) void openControlSocket(radioId);
-            }, 3000);
+            }, 500);
         });
 
         ws.addEventListener('error', () => {
@@ -224,12 +231,20 @@
         window._SdrPanel.hide();
     }
 
-    // ── Page visibility — reconnect if socket dropped while hidden ────────────
+    // ── Reconnect when page becomes visible (navigation, tab switch, Safari BFCache) ──
+
+    function _reconnectIfNeeded() {
+        if (_sdrCurrentRadioId && !_sdrConnected) {
+            void openControlSocket(_sdrCurrentRadioId);
+        }
+    }
 
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && _sdrCurrentRadioId && !_sdrConnected) {
-            openControlSocket(_sdrCurrentRadioId);
-        }
+        if (document.visibilityState === 'visible') _reconnectIfNeeded();
+    });
+
+    window.addEventListener('pageshow', (e) => {
+        if (e.persisted) _reconnectIfNeeded();
     });
 
     // ── Boot sequence ─────────────────────────────────────────────────────────

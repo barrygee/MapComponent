@@ -1563,18 +1563,7 @@ function buildSdrPanel(mountTarget) {
                     freqTuneBtn.disabled = true;
                     freqStopBtn.disabled = false;
                     recBtn.disabled = false;
-                    // One-shot: first interaction resumes audio (browser autoplay policy).
-                    const resumeAudioOnce = () => {
-                        panel.removeEventListener('click', resumeAudioOnce);
-                        panel.removeEventListener('keydown', resumeAudioOnce);
-                        if (window._SdrAudio) {
-                            window._SdrAudio.initAudio(getSelectedRadioId() ?? undefined);
-                            window._SdrAudio.setMode(_sdrCurrentMode);
-                            window._SdrAudio.setBandwidthHz(defaultBwHz(_sdrCurrentMode));
-                        }
-                    };
-                    panel.addEventListener('click', resumeAudioOnce);
-                    panel.addEventListener('keydown', resumeAudioOnce);
+                    // Audio is resumed directly by the boot scripts when the socket reconnects.
                 }
             }
             else {

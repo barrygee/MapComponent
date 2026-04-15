@@ -109,8 +109,6 @@
             }
         });
         ws.addEventListener('open', () => {
-            if (window._SdrAudio)
-                window._SdrAudio.start(radioId);
             const lastFreqHz = savedSettings.freqHz || parseInt(sessionStorage.getItem('sdrLastFreqHz') || '0', 10);
             const lastMode = savedSettings.mode || sessionStorage.getItem('sdrLastMode') || 'AM';
             if (lastFreqHz > 0)
@@ -121,9 +119,26 @@
                 ws.send(JSON.stringify({ cmd: 'squelch', squelch_dbfs: savedSettings.squelch }));
             if (savedSettings.bwHz != null)
                 ws.send(JSON.stringify({ cmd: 'sample_rate', rate_hz: savedSettings.bwHz }));
-            // Sync _sdrPlaying global with persisted session state
             if (sessionStorage.getItem('sdrPlaying') === '1') {
                 _sdrPlaying = true;
+                // Restoring an active session — init audio immediately (user already gave gesture on prior page)
+                if (window._SdrAudio) {
+                    window._SdrAudio.initAudio(radioId).then(() => {
+                        if (window._SdrAudio) {
+                            window._SdrAudio.setMode(lastMode);
+                            const bwHz = parseInt(savedSettings.bwHz || sessionStorage.getItem('sdrLastBwHz') || '200000', 10);
+                            window._SdrAudio.setBandwidthHz(bwHz);
+                        }
+                    }).catch(() => {
+                        // Autoplay blocked — audio will start on next user interaction
+                        if (window._SdrAudio)
+                            window._SdrAudio.start(radioId);
+                    });
+                }
+            }
+            else {
+                if (window._SdrAudio)
+                    window._SdrAudio.start(radioId);
             }
         });
         ws.addEventListener('close', () => {
@@ -135,7 +150,7 @@
             _reconnectTimer = setTimeout(() => {
                 if (_sdrCurrentRadioId === radioId)
                     void openControlSocket(radioId);
-            }, 3000);
+            }, 500);
         });
         ws.addEventListener('error', () => {
             _sdrConnected = false;
@@ -199,10 +214,19 @@
     }
     // Expose so sdr-radio-tab can call after the panel is mounted
     window._sdrLoadRadios = loadRadios;
-    // ── Reconnect on tab focus if socket dropped ──────────────────────────────
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && _sdrCurrentRadioId && !_sdrConnected) {
+    // ── Reconnect when page becomes visible (navigation, tab switch, Safari BFCache) ──
+    function _reconnectIfNeeded() {
+        if (_sdrCurrentRadioId && !_sdrConnected) {
             void openControlSocket(_sdrCurrentRadioId);
         }
+    }
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible')
+            _reconnectIfNeeded();
+    });
+    // pageshow fires on Safari after BFCache restore where visibilitychange may not fire
+    window.addEventListener('pageshow', (e) => {
+        if (e.persisted)
+            _reconnectIfNeeded();
     });
 })();
