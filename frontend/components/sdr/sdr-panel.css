@@ -313,6 +313,20 @@
     color: rgba(255, 255, 255, 0.25);
 }
 
+.sdr-device-menu-item-host {
+    display: block;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    text-transform: none;
+    color: rgba(255, 255, 255, 0.35);
+    margin-top: 2px;
+}
+
+.sdr-device-menu-item:hover .sdr-device-menu-item-host {
+    color: rgba(255, 255, 255, 0.55);
+}
+
 /* ---- Mode — pill buttons ---- */
 .sdr-mode-pills {
     display: flex;

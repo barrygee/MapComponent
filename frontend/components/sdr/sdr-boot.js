@@ -44,6 +44,8 @@
     let _reconnectTimer = null;
     let _activeRadioId = null;
     let _radioCache = new Map();
+    // Track whether this radio's backend session has been initialised.
+    // Stored in sessionStorage so it survives page navigations within the same tab.
     function _markInitialised(radioId) { sessionStorage.setItem(`sdrInit_${radioId}`, '1'); }
     function _isInitialised(radioId) { return sessionStorage.getItem(`sdrInit_${radioId}`) === '1'; }
     async function openControlSocket(radioId) {
@@ -130,6 +132,8 @@
         ws.addEventListener('open', () => {
             const lastFreqHz = parseInt(sessionStorage.getItem('sdrLastFreqHz') || '0', 10);
             const lastMode = sessionStorage.getItem('sdrLastMode') || 'AM';
+            // Only send radio commands on the very first connect in this browser session.
+            // Page navigations reuse the same backend session — sending tune/mode would reset the radio.
             if (!_isInitialised(radioId)) {
                 _markInitialised(radioId);
                 if (lastFreqHz > 0) {
