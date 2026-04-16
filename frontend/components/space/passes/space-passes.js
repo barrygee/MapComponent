@@ -15,6 +15,11 @@ window._SpacePassesPanel = (() => {
     let _open = false;
     let _injected = false;
     let _clearPreviewTimer = null;
+    // Currently expanded pass card norad id
+    let _expandedNoradId = null;
+    // Per-item state for sat info fetch / tick
+    let _itemFetchAbort = null;
+    let _itemTickInterval = null;
     function _scheduleClearPreview() {
         if (_clearPreviewTimer)
             clearTimeout(_clearPreviewTimer);
@@ -36,7 +41,7 @@ window._SpacePassesPanel = (() => {
     let _hours = 24;
     let _filtersExpanded = false;
     let _refreshInterval = null;
-    let _tickInterval = null;
+    let _listTickInterval = null;
     let _locationPollInterval = null;
     let _fetchAbort = null;
     const _CATEGORY_ORDER = [
@@ -81,6 +86,23 @@ window._SpacePassesPanel = (() => {
         const minutes = Math.floor(sec / 60);
         const seconds = sec % 60;
         return `${minutes}m ${seconds}s`;
+    }
+    function _formatTime(utc) {
+        return new Date(utc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    function _formatDate(utc) {
+        return new Date(utc).toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+    // ---- Clear per-item accordion state ----
+    function _clearItemState() {
+        if (_itemFetchAbort) {
+            _itemFetchAbort.abort();
+            _itemFetchAbort = null;
+        }
+        if (_itemTickInterval) {
+            clearInterval(_itemTickInterval);
+            _itemTickInterval = null;
+        }
     }
     // ---- Inject HTML into #msb-pane-passes ----
     function _injectHTML() {
@@ -334,12 +356,209 @@ window._SpacePassesPanel = (() => {
         status.textContent = `${satCount} SATELLITES · UPDATED ${timeStr}`;
         status.classList.remove('spp-loading');
     }
+    // ---- Collapse any currently expanded pass card ----
+    function _collapseExpanded() {
+        const list = document.getElementById('spp-list');
+        if (!list)
+            return;
+        const expanded = list.querySelector('.spp-pass-card.spp-expanded');
+        if (expanded) {
+            expanded.classList.remove('spp-expanded');
+            const body = expanded.querySelector('.spp-acc-body');
+            if (body)
+                body.remove();
+        }
+        _expandedNoradId = null;
+        _clearItemState();
+    }
+    // ---- Build accordion body for a pass card ----
+    function _buildPassAccordionBody(noradId, name) {
+        const body = document.createElement('div');
+        body.className = 'spp-acc-body';
+        // Live telemetry
+        const liveData = document.createElement('div');
+        liveData.className = 'spp-acc-live';
+        liveData.dataset['noradId'] = noradId;
+        const fields = [
+            ['ALT', 'spp-live-alt'],
+            ['VEL', 'spp-live-vel'],
+            ['HDG', 'spp-live-hdg'],
+            ['LAT', 'spp-live-lat'],
+            ['LON', 'spp-live-lon'],
+        ];
+        fields.forEach(([lbl, id]) => {
+            const row = document.createElement('div');
+            row.className = 'spp-acc-live-row';
+            const labelEl = document.createElement('span');
+            labelEl.className = 'spp-acc-live-label';
+            labelEl.textContent = lbl;
+            const valueEl = document.createElement('span');
+            valueEl.className = 'spp-acc-live-value';
+            valueEl.id = id;
+            valueEl.textContent = '—';
+            row.appendChild(labelEl);
+            row.appendChild(valueEl);
+            liveData.appendChild(row);
+        });
+        // Track button
+        const trackBtn = document.createElement('button');
+        trackBtn.className = 'spp-acc-track-btn';
+        trackBtn.textContent = 'TRACK SATELLITE';
+        trackBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (issControl)
+                issControl.switchSatellite(noradId, name);
+            close();
+        });
+        // Status
+        const status = document.createElement('div');
+        status.className = 'spp-acc-status';
+        status.textContent = 'COMPUTING PASSES…';
+        // Pass list (upcoming passes for this specific sat)
+        const satPassList = document.createElement('div');
+        satPassList.className = 'spp-acc-pass-list';
+        satPassList.dataset['noradId'] = noradId;
+        body.appendChild(liveData);
+        body.appendChild(trackBtn);
+        body.appendChild(status);
+        body.appendChild(satPassList);
+        return body;
+    }
+    function _renderSatPassesInAccordion(satPassList, statusEl, passes, computedAt) {
+        const computedDate = new Date(computedAt);
+        statusEl.textContent = `NEXT 24H · UPDATED ${computedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        statusEl.classList.remove('spp-acc-status-loading');
+        satPassList.innerHTML = '';
+        if (!passes.length) {
+            satPassList.innerHTML = `<div class="spp-acc-no-passes">No passes in the next 24 hours.</div>`;
+            return;
+        }
+        const now = Date.now();
+        passes.forEach((pass, i) => {
+            const card = document.createElement('div');
+            card.className = 'spp-acc-pass-card';
+            card.dataset['aosMs'] = String(pass.aos_unix_ms);
+            card.dataset['losMs'] = String(pass.los_unix_ms);
+            const isNow = now >= pass.aos_unix_ms && now <= pass.los_unix_ms;
+            const num = document.createElement('div');
+            num.className = 'spp-acc-pass-num';
+            num.textContent = String(i + 1).padStart(2, '0');
+            const times = document.createElement('div');
+            times.className = 'spp-acc-pass-times';
+            const aosRow = document.createElement('div');
+            aosRow.className = 'spp-acc-pass-aos-row';
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'spp-acc-pass-date';
+            dateSpan.textContent = _formatDate(pass.aos_utc);
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'spp-acc-pass-time';
+            timeSpan.textContent = _formatTime(pass.aos_utc);
+            aosRow.appendChild(dateSpan);
+            aosRow.appendChild(timeSpan);
+            const losRow = document.createElement('div');
+            losRow.className = 'spp-acc-pass-los';
+            losRow.textContent = `LOS ${_formatTime(pass.los_utc)} · ${_formatDuration(pass.duration_s)}`;
+            times.appendChild(aosRow);
+            times.appendChild(losRow);
+            const meta = document.createElement('div');
+            meta.className = 'spp-acc-pass-meta';
+            const countdown = document.createElement('div');
+            countdown.className = 'spp-acc-pass-countdown' + (isNow ? ' spp-in-progress' : '');
+            countdown.textContent = isNow ? 'NOW' : _formatCountdown(pass.aos_unix_ms - now);
+            const maxElEl = document.createElement('div');
+            maxElEl.className = 'spp-acc-pass-maxel';
+            maxElEl.textContent = `MAX ${pass.max_elevation_deg.toFixed(1)}°`;
+            meta.appendChild(countdown);
+            meta.appendChild(maxElEl);
+            card.appendChild(num);
+            card.appendChild(times);
+            card.appendChild(meta);
+            satPassList.appendChild(card);
+        });
+        _startItemTick(satPassList);
+    }
+    function _startItemTick(satPassList) {
+        if (_itemTickInterval)
+            clearInterval(_itemTickInterval);
+        _itemTickInterval = setInterval(() => {
+            const now = Date.now();
+            satPassList.querySelectorAll('.spp-acc-pass-card').forEach(el => {
+                const aosMs = parseInt(el.dataset['aosMs'] || '0', 10);
+                const losMs = parseInt(el.dataset['losMs'] || '0', 10);
+                const cd = el.querySelector('.spp-acc-pass-countdown');
+                if (!cd)
+                    return;
+                if (now >= aosMs && now <= losMs) {
+                    cd.textContent = 'NOW';
+                    cd.classList.add('spp-in-progress');
+                }
+                else if (now > losMs) {
+                    cd.textContent = 'PASSED';
+                    cd.classList.remove('spp-in-progress');
+                }
+                else {
+                    cd.classList.remove('spp-in-progress');
+                    cd.textContent = _formatCountdown(aosMs - now);
+                }
+            });
+        }, 1000);
+    }
+    async function _fetchAndPopulateAccordion(noradId, body) {
+        _clearItemState();
+        _itemFetchAbort = new AbortController();
+        const abort = _itemFetchAbort;
+        const satPassList = body.querySelector('.spp-acc-pass-list');
+        const statusEl = body.querySelector('.spp-acc-status');
+        if (!satPassList || !statusEl)
+            return;
+        if (!spaceUserLocationCenter) {
+            statusEl.textContent = 'SET LOCATION TO CALCULATE PASSES';
+            return;
+        }
+        const [lon, lat] = spaceUserLocationCenter;
+        statusEl.textContent = 'COMPUTING PASSES…';
+        statusEl.classList.add('spp-acc-status-loading');
+        try {
+            const url = `/api/space/satellite/${encodeURIComponent(noradId)}/passes?lat=${lat}&lon=${lon}&hours=24&min_el=0`;
+            const resp = await fetch(url, { signal: abort.signal });
+            if (abort.signal.aborted)
+                return;
+            if (!resp.ok) {
+                statusEl.textContent = 'COULD NOT LOAD PASSES';
+                statusEl.classList.remove('spp-acc-status-loading');
+                return;
+            }
+            const data = await resp.json();
+            _renderSatPassesInAccordion(satPassList, statusEl, data.passes || [], data.computed_at);
+        }
+        catch (e) {
+            if (e instanceof Error && e.name === 'AbortError')
+                return;
+            statusEl.textContent = 'NETWORK ERROR';
+            statusEl.classList.remove('spp-acc-status-loading');
+        }
+    }
+    // ---- Update live telemetry in expanded pass accordion ----
+    function updateExpandedPosition(p) {
+        const set = (id, val) => {
+            const el = document.getElementById(id);
+            if (el)
+                el.textContent = val;
+        };
+        set('spp-live-alt', `${p.alt_km} km`);
+        set('spp-live-vel', `${p.velocity_kms} km/s`);
+        set('spp-live-hdg', `${p.track_deg}°`);
+        set('spp-live-lat', `${p.lat}°`);
+        set('spp-live-lon', `${p.lon}°`);
+    }
     // ---- Render ----
     function _renderPasses(passes) {
         const list = document.getElementById('spp-list');
         if (!list)
             return;
         list.innerHTML = '';
+        _expandedNoradId = null;
+        _clearItemState();
         if (!passes.length) {
             list.innerHTML = `<div class="spp-message">No passes found. Try broader categories, lower elevation, or longer window.</div>`;
             return;
@@ -365,6 +584,9 @@ window._SpacePassesPanel = (() => {
                     ? _formatCountdown(msUntil)
                     : new Date(pass.aos_unix_ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
+            // Card header row (always visible)
+            const cardHeader = document.createElement('div');
+            cardHeader.className = 'spp-pass-card-header';
             const info = document.createElement('div');
             info.className = 'spp-pass-info';
             const primary = document.createElement('div');
@@ -385,24 +607,41 @@ window._SpacePassesPanel = (() => {
             detail.textContent = `${_formatDuration(pass.duration_s)} · ${pass.max_elevation_deg.toFixed(1)}°`;
             meta.appendChild(aosEl);
             meta.appendChild(detail);
-            card.appendChild(info);
-            card.appendChild(meta);
+            const chevron = document.createElement('span');
+            chevron.className = 'spp-pass-chevron';
+            chevron.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+            cardHeader.appendChild(info);
+            cardHeader.appendChild(meta);
+            cardHeader.appendChild(chevron);
+            card.appendChild(cardHeader);
             card.addEventListener('mouseenter', () => { _cancelClearPreview(); if (issControl)
                 issControl.previewSatellite(pass.norad_id, pass.name || pass.norad_id); });
             card.addEventListener('mouseleave', () => { _scheduleClearPreview(); });
             card.addEventListener('click', () => {
-                if (issControl)
-                    issControl.switchSatellite(pass.norad_id, pass.name || pass.norad_id);
-                close();
+                const isExpanded = card.classList.contains('spp-expanded');
+                // Collapse whatever was open
+                _collapseExpanded();
+                if (!isExpanded) {
+                    _expandedNoradId = pass.norad_id;
+                    card.classList.add('spp-expanded');
+                    const body = _buildPassAccordionBody(pass.norad_id, pass.name || pass.norad_id);
+                    card.appendChild(body);
+                    // Select the satellite for live telemetry
+                    if (issControl)
+                        issControl.switchSatellite(pass.norad_id, pass.name || pass.norad_id);
+                    // Fetch sat-specific passes
+                    void _fetchAndPopulateAccordion(pass.norad_id, body);
+                    card.scrollIntoView({ block: 'nearest' });
+                }
             });
             list.appendChild(card);
         });
-        _startCountdownTick();
+        _startListCountdownTick();
     }
-    function _startCountdownTick() {
-        if (_tickInterval)
-            clearInterval(_tickInterval);
-        _tickInterval = setInterval(() => {
+    function _startListCountdownTick() {
+        if (_listTickInterval)
+            clearInterval(_listTickInterval);
+        _listTickInterval = setInterval(() => {
             const now = Date.now();
             document.querySelectorAll('.spp-pass-card').forEach(el => {
                 const aosMs = parseInt(el.dataset['aosMs'] || '0', 10);
@@ -439,11 +678,12 @@ window._SpacePassesPanel = (() => {
         if (_refreshInterval)
             clearInterval(_refreshInterval);
         _refreshInterval = setInterval(() => { void _fetchPasses(); }, 5 * 60 * 1000);
-        if (!_tickInterval)
-            _startCountdownTick();
+        if (!_listTickInterval)
+            _startListCountdownTick();
     }
     function close() {
         _open = false;
+        _collapseExpanded();
         if (_refreshInterval) {
             clearInterval(_refreshInterval);
             _refreshInterval = null;
@@ -492,6 +732,15 @@ window._SpacePassesPanel = (() => {
                 if (_injected)
                     void _fetchPasses();
             }
+        });
+        // Forward live telemetry into the expanded pass accordion
+        document.addEventListener('sat-position-update', (e) => {
+            if (!_expandedNoradId)
+                return;
+            const { noradId, position } = e.detail;
+            if (noradId !== _expandedNoradId)
+                return;
+            updateExpandedPosition(position);
         });
     }
     return { open, close, toggle, init };

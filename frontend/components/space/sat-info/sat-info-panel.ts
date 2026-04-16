@@ -428,6 +428,11 @@ window._SatInfoPanel = (() => {
         set('sip-live-hdg', `${p.track_deg}°`);
         set('sip-live-lat', `${p.lat}°`);
         set('sip-live-lon', `${p.lon}°`);
+
+        // Broadcast to inline accordions in search and passes panels
+        document.dispatchEvent(new CustomEvent('sat-position-update', {
+            detail: { noradId: _currentNoradId, position: p }
+        }));
     }
 
     function init(): void {
@@ -435,9 +440,20 @@ window._SatInfoPanel = (() => {
         if (sidebar) _injectHTML();
         else document.addEventListener('DOMContentLoaded', () => { _injectHTML(); });
 
+        // Update internal state (for telemetry broadcast) when a satellite is selected,
+        // but do NOT auto-show the panel — inline accordions handle display now.
         document.addEventListener('satellite-selected', (e: Event) => {
             const { noradId, name } = (e as CustomEvent<{ noradId: string; name: string }>).detail;
-            show(noradId, name);
+            _currentNoradId = noradId;
+            // Update name labels in case panel is manually opened
+            const nameEl    = _getNameEl();
+            const noradEl   = _getNoradEl();
+            const bodyName  = document.getElementById('sip-body-name');
+            const bodyNorad = document.getElementById('sip-body-norad');
+            if (nameEl)    nameEl.textContent    = name;
+            if (noradEl)   noradEl.textContent   = `NORAD ${noradId}`;
+            if (bodyName)  bodyName.textContent  = name;
+            if (bodyNorad) bodyNorad.textContent = `NORAD ${noradId}`;
         });
     }
 

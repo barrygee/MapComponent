@@ -1,7 +1,6 @@
 /* ============================================================
    SPACE FILTER PANEL
    Search input and results hosted inside the map sidebar search pane.
-   The outer floating #space-filter-panel container is no longer used —
    #space-filter-input-wrap and #space-filter-results are injected
    directly into #msb-pane-search by space-filter.ts.
 
@@ -71,12 +70,11 @@
 
 /* ---- Results list ---- */
 #space-filter-results {
-    max-height: 340px;
+    flex: 1;
     overflow-y: auto;
     scrollbar-width: none;
     display: flex;
     flex-direction: column;
-    gap: 1px;
 }
 
 #space-filter-results::-webkit-scrollbar {
@@ -90,29 +88,46 @@
     color: var(--color-accent);
     padding: 18px 28px 5px 24px;
     text-transform: uppercase;
+    flex-shrink: 0;
 }
 
 .space-filter-section-label:first-child {
     padding-top: 34px;
 }
 
+/* ============================================================
+   RESULT ITEM — accordion card
+   ============================================================ */
+
 .space-filter-result-item {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 13px 28px 13px 24px;
-    border-bottom: none;
-    transition: background 0.12s;
+    flex-direction: column;
+    position: relative;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     cursor: pointer;
+    transition: background 0.12s;
 }
 
 .space-filter-result-item:last-child {
     border-bottom: none;
 }
 
+/* Header row: info text + chevron */
+.space-filter-result-item > .space-filter-result-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 13px 52px 13px 24px; /* right padding makes room for chevron */
+    min-width: 0;
+}
+
 .space-filter-result-item:hover,
 .space-filter-result-item.keyboard-focused {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.space-filter-result-item.sfr-expanded {
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .space-filter-result-item.keyboard-focused {
@@ -120,18 +135,8 @@
     outline-offset: -1px;
 }
 
-.space-filter-result-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    cursor: pointer;
-}
-
 .space-filter-result-icon {
     display: none;
-    cursor: pointer;
 }
 
 .space-filter-result-primary {
@@ -154,52 +159,219 @@
     white-space: nowrap;
 }
 
-.space-filter-result-badge {
+/* Chevron — absolute-positioned to the right of the header row */
+.sfr-item-chevron {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 44px; /* matches item header height */
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.25);
+    transition: transform 0.2s ease, color 0.15s;
+    transform: rotate(-90deg);
+    pointer-events: none;
+}
+
+.space-filter-result-item.sfr-expanded .sfr-item-chevron {
+    transform: rotate(0deg);
+    color: var(--color-accent);
+}
+
+/* ============================================================
+   ACCORDION BODY — inline expanded sat info
+   ============================================================ */
+
+.sfr-accordion-body {
+    display: flex;
+    flex-direction: column;
+    animation: sfr-expand 0.18s ease;
+}
+
+@keyframes sfr-expand {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Live telemetry — matches item row padding */
+.sfr-acc-live {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 28px 10px 24px;
+    gap: 2px;
+}
+
+.sfr-acc-live-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    line-height: 1.6;
+}
+
+.sfr-acc-live-label {
+    font-family: var(--font-primary);
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.1em;
-    color: rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    min-width: 28px;
     flex-shrink: 0;
-    white-space: nowrap;
 }
 
-.space-filter-action-btn {
+.sfr-acc-live-value {
+    font-family: var(--font-primary);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* Track button */
+.sfr-acc-track-btn {
+    margin: 10px 24px 10px 24px;
     background: none;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     cursor: pointer;
-    padding: 6px 0;
-    flex-shrink: 0;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.15s;
-}
-
-.space-filter-action-btn:hover {
-    color: #fff;
-}
-
-.space-filter-select-btn {
-    font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+    font-family: var(--font-primary);
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.45);
+    padding: 6px 12px;
+    text-transform: uppercase;
+    transition: color 0.12s, border-color 0.12s;
+    align-self: flex-start;
+}
+
+.sfr-acc-track-btn:hover {
     color: #fff;
-    background: #000;
-    border: none;
-    padding: 0 10px;
-    height: 28px;
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+/* Status line */
+.sfr-acc-status {
+    padding: 8px 24px 4px 24px;
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.22);
+    text-transform: uppercase;
+}
+
+.sfr-acc-status.sfr-acc-status-loading {
+    color: var(--color-accent);
+}
+
+/* No-passes message */
+.sfr-acc-no-passes {
+    padding: 8px 24px 12px 24px;
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.22);
+    text-transform: uppercase;
+}
+
+/* Pass cards inside accordion */
+.sfr-acc-pass-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.sfr-acc-pass-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 24px;
+}
+
+.sfr-acc-pass-card:last-child {
+    padding-bottom: 14px;
+}
+
+.sfr-acc-pass-num {
+    display: none;
+}
+
+.sfr-acc-pass-times {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sfr-acc-pass-aos-row {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+}
+
+.sfr-acc-pass-date {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.28);
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.sfr-acc-pass-time {
+    font-family: var(--font-primary);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #fff;
+}
+
+.sfr-acc-pass-los {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.07em;
+    color: rgba(255, 255, 255, 0.28);
+    text-transform: uppercase;
+}
+
+.sfr-acc-pass-meta {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.sfr-acc-pass-countdown {
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--color-accent);
     white-space: nowrap;
     text-transform: uppercase;
-    transition: color 0.15s, background 0.15s;
 }
 
-.space-filter-select-btn:hover {
-    background: #111;
-    color: var(--color-accent) !important;
+.sfr-acc-pass-countdown.sfr-in-progress {
+    color: #ff9900;
 }
 
+.sfr-acc-pass-maxel {
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.07em;
+    color: rgba(255, 255, 255, 0.32);
+    white-space: nowrap;
+    text-transform: uppercase;
+}
+
+/* ---- No results / loading ---- */
 .space-filter-no-results {
     padding: 20px 18px;
     font-size: 10px;
@@ -209,4 +381,3 @@
     text-align: center;
     text-transform: uppercase;
 }
-

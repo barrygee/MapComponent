@@ -16,6 +16,11 @@
 window._SpaceFilterPanel = (() => {
     let _open = false;
     let _clearPreviewTimer = null;
+    // Currently expanded item in the search list
+    let _expandedNoradId = null;
+    // Per-item state for passes fetch / tick
+    let _itemFetchAbort = null;
+    let _itemTickInterval = null;
     function _scheduleClearPreview() {
         if (_clearPreviewTimer)
             clearTimeout(_clearPreviewTimer);
@@ -62,7 +67,6 @@ window._SpaceFilterPanel = (() => {
     function _getInput() { return document.getElementById('space-filter-input'); }
     function _getResults() { return document.getElementById('space-filter-results'); }
     function _getClearBtn() { return document.getElementById('space-filter-clear-btn'); }
-    const _SAT_ICON = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="10" width="4" height="4" fill="currentColor"/><rect x="2" y="10" width="7" height="4" fill="currentColor" opacity="0.5"/><rect x="15" y="10" width="7" height="4" fill="currentColor" opacity="0.5"/><line x1="12" y1="2" x2="12" y2="8" stroke="currentColor" stroke-width="1.5" opacity="0.5"/><line x1="12" y1="16" x2="12" y2="22" stroke="currentColor" stroke-width="1.5" opacity="0.5"/></svg>`;
     const _CATEGORY_LABELS = {
         space_station: 'STATION',
         amateur: 'AMATEUR',
@@ -74,11 +78,6 @@ window._SpaceFilterPanel = (() => {
         active: 'ACTIVE',
         unknown: 'UNKN',
     };
-    function _categoryBadge(cat) {
-        if (!cat)
-            return '';
-        return _CATEGORY_LABELS[cat] || cat.toUpperCase().slice(0, 6);
-    }
     function _matchesQuery(query, ...fields) {
         const lq = query.toLowerCase();
         return fields.some(f => f && f.toLowerCase().includes(lq));
@@ -128,12 +127,239 @@ window._SpaceFilterPanel = (() => {
         active: 'ACTIVE',
         unknown: 'UNKNOWN',
     };
-    function _renderSatItem(sat, container, doSelect) {
+    // ---- Helpers ----
+    function _formatCountdown(ms) {
+        const totalSec = Math.max(0, Math.floor(ms / 1000));
+        const hours = Math.floor(totalSec / 3600);
+        const minutes = Math.floor((totalSec % 3600) / 60);
+        const seconds = totalSec % 60;
+        if (hours > 0)
+            return `IN ${hours}h ${minutes}m`;
+        if (minutes > 0)
+            return `IN ${minutes}m ${seconds}s`;
+        return `IN ${seconds}s`;
+    }
+    function _formatDuration(sec) {
+        const minutes = Math.floor(sec / 60);
+        const seconds = sec % 60;
+        return `${minutes}m ${seconds}s`;
+    }
+    function _formatTime(utc) {
+        return new Date(utc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    function _formatDate(utc) {
+        return new Date(utc).toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+    // ---- Stop any in-progress accordion content fetch/tick ----
+    function _clearItemState() {
+        if (_itemFetchAbort) {
+            _itemFetchAbort.abort();
+            _itemFetchAbort = null;
+        }
+        if (_itemTickInterval) {
+            clearInterval(_itemTickInterval);
+            _itemTickInterval = null;
+        }
+    }
+    // ---- Render the expanded accordion body for a sat item ----
+    function _buildAccordionBody(noradId, name) {
+        const body = document.createElement('div');
+        body.className = 'sfr-accordion-body';
+        // Live telemetry
+        const liveData = document.createElement('div');
+        liveData.className = 'sfr-acc-live';
+        liveData.dataset['noradId'] = noradId;
+        const fields = [
+            ['ALT', 'sfr-live-alt'],
+            ['VEL', 'sfr-live-vel'],
+            ['HDG', 'sfr-live-hdg'],
+            ['LAT', 'sfr-live-lat'],
+            ['LON', 'sfr-live-lon'],
+        ];
+        fields.forEach(([lbl, id]) => {
+            const row = document.createElement('div');
+            row.className = 'sfr-acc-live-row';
+            const labelEl = document.createElement('span');
+            labelEl.className = 'sfr-acc-live-label';
+            labelEl.textContent = lbl;
+            const valueEl = document.createElement('span');
+            valueEl.className = 'sfr-acc-live-value';
+            valueEl.id = id;
+            valueEl.textContent = '—';
+            row.appendChild(labelEl);
+            row.appendChild(valueEl);
+            liveData.appendChild(row);
+        });
+        // Track button
+        const trackBtn = document.createElement('button');
+        trackBtn.className = 'sfr-acc-track-btn';
+        trackBtn.textContent = 'TRACK SATELLITE';
+        trackBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (issControl)
+                issControl.switchSatellite(noradId, name);
+            close();
+        });
+        // Status
+        const status = document.createElement('div');
+        status.className = 'sfr-acc-status';
+        status.textContent = 'COMPUTING PASSES…';
+        // Pass list
+        const passList = document.createElement('div');
+        passList.className = 'sfr-acc-pass-list';
+        passList.dataset['noradId'] = noradId;
+        body.appendChild(liveData);
+        body.appendChild(trackBtn);
+        body.appendChild(status);
+        body.appendChild(passList);
+        return body;
+    }
+    function _renderAccordionPasses(passList, statusEl, passes, computedAt) {
+        const computedDate = new Date(computedAt);
+        statusEl.textContent = `NEXT 24H · UPDATED ${computedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        statusEl.classList.remove('sfr-acc-status-loading');
+        passList.innerHTML = '';
+        if (!passes.length) {
+            passList.innerHTML = `<div class="sfr-acc-no-passes">No passes in the next 24 hours.</div>`;
+            return;
+        }
+        const now = Date.now();
+        passes.forEach((pass, i) => {
+            const card = document.createElement('div');
+            card.className = 'sfr-acc-pass-card';
+            card.dataset['aosMs'] = String(pass.aos_unix_ms);
+            card.dataset['losMs'] = String(pass.los_unix_ms);
+            const isNow = now >= pass.aos_unix_ms && now <= pass.los_unix_ms;
+            const num = document.createElement('div');
+            num.className = 'sfr-acc-pass-num';
+            num.textContent = String(i + 1).padStart(2, '0');
+            const times = document.createElement('div');
+            times.className = 'sfr-acc-pass-times';
+            const aosRow = document.createElement('div');
+            aosRow.className = 'sfr-acc-pass-aos-row';
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'sfr-acc-pass-date';
+            dateSpan.textContent = _formatDate(pass.aos_utc);
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'sfr-acc-pass-time';
+            timeSpan.textContent = _formatTime(pass.aos_utc);
+            aosRow.appendChild(dateSpan);
+            aosRow.appendChild(timeSpan);
+            const losRow = document.createElement('div');
+            losRow.className = 'sfr-acc-pass-los';
+            losRow.textContent = `LOS ${_formatTime(pass.los_utc)} · ${_formatDuration(pass.duration_s)}`;
+            times.appendChild(aosRow);
+            times.appendChild(losRow);
+            const meta = document.createElement('div');
+            meta.className = 'sfr-acc-pass-meta';
+            const countdown = document.createElement('div');
+            countdown.className = 'sfr-acc-pass-countdown' + (isNow ? ' sfr-in-progress' : '');
+            countdown.textContent = isNow ? 'NOW' : _formatCountdown(pass.aos_unix_ms - now);
+            const maxEl = document.createElement('div');
+            maxEl.className = 'sfr-acc-pass-maxel';
+            maxEl.textContent = `MAX ${pass.max_elevation_deg.toFixed(1)}°`;
+            meta.appendChild(countdown);
+            meta.appendChild(maxEl);
+            card.appendChild(num);
+            card.appendChild(times);
+            card.appendChild(meta);
+            passList.appendChild(card);
+        });
+        _startItemTick(passList);
+    }
+    function _startItemTick(passList) {
+        if (_itemTickInterval)
+            clearInterval(_itemTickInterval);
+        _itemTickInterval = setInterval(() => {
+            const now = Date.now();
+            passList.querySelectorAll('.sfr-acc-pass-card').forEach(el => {
+                const aosMs = parseInt(el.dataset['aosMs'] || '0', 10);
+                const losMs = parseInt(el.dataset['losMs'] || '0', 10);
+                const cd = el.querySelector('.sfr-acc-pass-countdown');
+                if (!cd)
+                    return;
+                if (now >= aosMs && now <= losMs) {
+                    cd.textContent = 'NOW';
+                    cd.classList.add('sfr-in-progress');
+                }
+                else if (now > losMs) {
+                    cd.textContent = 'PASSED';
+                    cd.classList.remove('sfr-in-progress');
+                }
+                else {
+                    cd.classList.remove('sfr-in-progress');
+                    cd.textContent = _formatCountdown(aosMs - now);
+                }
+            });
+        }, 1000);
+    }
+    async function _fetchAndPopulateAccordion(noradId, body) {
+        _clearItemState();
+        _itemFetchAbort = new AbortController();
+        const abort = _itemFetchAbort;
+        const passList = body.querySelector('.sfr-acc-pass-list');
+        const statusEl = body.querySelector('.sfr-acc-status');
+        if (!passList || !statusEl)
+            return;
+        if (!spaceUserLocationCenter) {
+            statusEl.textContent = 'SET LOCATION TO CALCULATE PASSES';
+            return;
+        }
+        const [lon, lat] = spaceUserLocationCenter;
+        statusEl.textContent = 'COMPUTING PASSES…';
+        statusEl.classList.add('sfr-acc-status-loading');
+        try {
+            const url = `/api/space/satellite/${encodeURIComponent(noradId)}/passes?lat=${lat}&lon=${lon}&hours=24&min_el=0`;
+            const resp = await fetch(url, { signal: abort.signal });
+            if (abort.signal.aborted)
+                return;
+            if (!resp.ok) {
+                statusEl.textContent = 'COULD NOT LOAD PASSES';
+                statusEl.classList.remove('sfr-acc-status-loading');
+                return;
+            }
+            const data = await resp.json();
+            _renderAccordionPasses(passList, statusEl, data.passes || [], data.computed_at);
+        }
+        catch (e) {
+            if (e instanceof Error && e.name === 'AbortError')
+                return;
+            statusEl.textContent = 'NETWORK ERROR';
+            statusEl.classList.remove('sfr-acc-status-loading');
+        }
+    }
+    // ---- Collapse any currently expanded item ----
+    function _collapseExpanded() {
+        const container = _getResults();
+        if (!container)
+            return;
+        const expanded = container.querySelector('.space-filter-result-item.sfr-expanded');
+        if (expanded) {
+            expanded.classList.remove('sfr-expanded');
+            const body = expanded.querySelector('.sfr-accordion-body');
+            if (body)
+                body.remove();
+        }
+        _expandedNoradId = null;
+        _clearItemState();
+    }
+    // ---- Update live telemetry in expanded accordion ----
+    function updateExpandedPosition(p) {
+        const set = (id, val) => {
+            const el = document.getElementById(id);
+            if (el)
+                el.textContent = val;
+        };
+        set('sfr-live-alt', `${p.alt_km} km`);
+        set('sfr-live-vel', `${p.velocity_kms} km/s`);
+        set('sfr-live-hdg', `${p.track_deg}°`);
+        set('sfr-live-lat', `${p.lat}°`);
+        set('sfr-live-lon', `${p.lon}°`);
+    }
+    function _renderSatItem(sat, container) {
         const item = document.createElement('div');
         item.className = 'space-filter-result-item';
-        const icon = document.createElement('div');
-        icon.className = 'space-filter-result-icon';
-        icon.innerHTML = _SAT_ICON;
+        item.dataset['noradId'] = sat.norad_id;
         const info = document.createElement('div');
         info.className = 'space-filter-result-info';
         const primary = document.createElement('div');
@@ -141,23 +367,39 @@ window._SpaceFilterPanel = (() => {
         primary.textContent = sat.name || sat.norad_id;
         const secondary = document.createElement('div');
         secondary.className = 'space-filter-result-secondary';
-        secondary.textContent = 'NORAD ' + sat.norad_id;
+        const catLabel = sat.category ? (_CATEGORY_LABELS[sat.category] || sat.category.toUpperCase()) : '';
+        secondary.textContent = catLabel ? `${catLabel} · NORAD ${sat.norad_id}` : `NORAD ${sat.norad_id}`;
         info.appendChild(primary);
         info.appendChild(secondary);
-        const selectBtn = document.createElement('button');
-        selectBtn.className = 'space-filter-action-btn space-filter-select-btn';
-        selectBtn.textContent = 'SELECT';
-        selectBtn.addEventListener('mousedown', e => e.stopPropagation());
-        selectBtn.addEventListener('click', (e) => { e.stopPropagation(); doSelect(); });
-        item.addEventListener('mouseenter', () => { _cancelClearPreview(); if (issControl)
-            issControl.previewSatellite(sat.norad_id, sat.name || sat.norad_id); });
+        const chevron = document.createElement('span');
+        chevron.className = 'sfr-item-chevron';
+        chevron.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        item.addEventListener('mouseenter', () => {
+            _cancelClearPreview();
+            if (issControl)
+                issControl.previewSatellite(sat.norad_id, sat.name || sat.norad_id);
+        });
         item.addEventListener('mouseleave', () => { _scheduleClearPreview(); });
-        item.appendChild(icon);
+        item.addEventListener('click', () => {
+            const isExpanded = item.classList.contains('sfr-expanded');
+            // Collapse whatever was open
+            _collapseExpanded();
+            if (!isExpanded) {
+                // Expand this item
+                _expandedNoradId = sat.norad_id;
+                item.classList.add('sfr-expanded');
+                const body = _buildAccordionBody(sat.norad_id, sat.name || sat.norad_id);
+                item.appendChild(body);
+                // Select the satellite for tracking / live telemetry
+                if (issControl)
+                    issControl.switchSatellite(sat.norad_id, sat.name || sat.norad_id);
+                // Fetch passes into the accordion
+                void _fetchAndPopulateAccordion(sat.norad_id, body);
+                item.scrollIntoView({ block: 'nearest' });
+            }
+        });
         item.appendChild(info);
-        item.appendChild(selectBtn);
-        info.addEventListener('click', doSelect);
-        icon.addEventListener('click', doSelect);
-        item._selectAction = doSelect;
+        item.appendChild(chevron);
         container.appendChild(item);
     }
     function _renderResults(results, query) {
@@ -165,6 +407,8 @@ window._SpaceFilterPanel = (() => {
         if (!container)
             return;
         container.innerHTML = '';
+        _expandedNoradId = null;
+        _clearItemState();
         if (!_loaded) {
             const el = document.createElement('div');
             el.className = 'space-filter-no-results';
@@ -201,14 +445,7 @@ window._SpaceFilterPanel = (() => {
             lbl.className = 'space-filter-section-label';
             lbl.textContent = catLabel;
             container.appendChild(lbl);
-            display.forEach(sat => {
-                const doSelect = () => {
-                    if (issControl)
-                        issControl.switchSatellite(sat.norad_id, sat.name || sat.norad_id);
-                    close();
-                };
-                _renderSatItem(sat, container, doSelect);
-            });
+            display.forEach(sat => { _renderSatItem(sat, container); });
         });
     }
     async function _loadSatellites() {
@@ -248,6 +485,7 @@ window._SpaceFilterPanel = (() => {
     }
     function close() {
         _open = false;
+        _collapseExpanded();
         const btn = _getFilterBtn();
         if (btn) {
             btn.classList.remove('active');
@@ -340,8 +578,7 @@ window._SpaceFilterPanel = (() => {
             else if (e.key === 'Enter') {
                 e.preventDefault();
                 if (focused) {
-                    if (focused._selectAction)
-                        focused._selectAction();
+                    focused.click();
                 }
                 else {
                     items[0].classList.add('keyboard-focused');
@@ -357,6 +594,15 @@ window._SpaceFilterPanel = (() => {
                 input.focus();
             });
         }
+        // Forward live telemetry into the expanded search accordion
+        document.addEventListener('sat-position-update', (e) => {
+            if (!_expandedNoradId)
+                return;
+            const { noradId, position } = e.detail;
+            if (noradId !== _expandedNoradId)
+                return;
+            updateExpandedPosition(position);
+        });
     }
     return { open, close, toggle, init };
 })();

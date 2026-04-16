@@ -349,12 +349,13 @@
 }
 
 /* ============================================================
-   VISIBILITY — hidden when .sip-hidden is present
+   VISIBILITY — the bottom sat-info panel is superseded by
+   inline accordions on each list item; keep it hidden.
    ============================================================ */
 
-.sip-toggle.sip-hidden,
-.sip-body.sip-hidden {
-    display: none;
+.sip-toggle,
+.sip-body {
+    display: none !important;
 }
 
 /* ============================================================
