@@ -113,7 +113,9 @@ def compute_ground_track(tle_line1: str, tle_line2: str) -> dict:
       - orbit1:   0..92   minutes  → properties.track = 'orbit1'  (current orbit)
       - orbit2:  92..184  minutes  → properties.track = 'orbit2'  (next orbit)
 
-    Splits LineStrings at the antimeridian (±180°) to avoid map wrapping artefacts.
+    Coordinates are unwrapped (longitude accumulates past ±180°) so that
+    MapLibre renderWorldCopies can draw a continuous line across the antimeridian
+    without a gap or split.
     """
     sat = Satrec.twoline2rv(tle_line1, tle_line2)
     jd, fr = _jday_now()
@@ -128,9 +130,9 @@ def compute_ground_track(tle_line1: str, tle_line2: str) -> dict:
         ("orbit1",   0,  92),
         ("orbit2",  92, 184),
     ]:
-        segments: list[list[list[float]]] = []
-        current_segment: list[list[float]] = []
+        coords: list[list[float]] = []
         prev_lon: float | None = None
+        lon_offset: float = 0.0
 
         t = start_min
         while t <= end_min + 1e-9:
@@ -144,25 +146,23 @@ def compute_ground_track(tle_line1: str, tle_line2: str) -> dict:
             t_propagated = now + timedelta(minutes=t)
             lat, lon, _ = _eci_to_geodetic(r, t_propagated)
 
-            # Detect antimeridian crossing (longitude jump > 180°)
-            if prev_lon is not None and abs(lon - prev_lon) > 180:
-                if current_segment:
-                    segments.append(current_segment)
-                current_segment = []
+            # Accumulate a longitude offset to keep the track continuous across
+            # the antimeridian — avoids splitting the line and the resulting gap.
+            if prev_lon is not None:
+                diff = lon - prev_lon
+                if diff > 180:
+                    lon_offset -= 360
+                elif diff < -180:
+                    lon_offset += 360
 
-            current_segment.append([round(lon, 4), round(lat, 4)])
+            coords.append([round(lon + lon_offset, 4), round(lat, 4)])
             prev_lon = lon
             t += time_step_min
 
-        if current_segment:
-            segments.append(current_segment)
-
-        for seg in segments:
-            if len(seg) < 2:
-                continue
+        if len(coords) >= 2:
             features.append({
                 "type": "Feature",
-                "geometry": {"type": "LineString", "coordinates": seg},
+                "geometry": {"type": "LineString", "coordinates": coords},
                 "properties": {"track": track_type},
             })
 

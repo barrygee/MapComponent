@@ -279,6 +279,7 @@ const _sentinelMap = new maplibregl.Map({
     attributionControl: false,
     fadeDuration: 0,
     cooperativeGestures: false,
+    renderWorldCopies: true,
     transformRequest: (url) => ({ url: url.startsWith('/') ? _mapOrigin + url : url }),
     padding: { top: 0, bottom: 0, left: 260, right: 0 },
 });

@@ -34,8 +34,10 @@ class RangeRingsControl extends SentinelControlBase {
     initRings() {
         const center = rangeRingCenter ?? [this.map.getCenter().lng, this.map.getCenter().lat];
         const { lines } = window.MapComponent.buildRingsGeoJSON(center[0], center[1]);
-        if (this.map.getLayer('range-rings-lines'))  this.map.removeLayer('range-rings-lines');
-        if (this.map.getSource('range-rings-lines')) this.map.removeSource('range-rings-lines');
+        if (this.map.getLayer('range-rings-lines'))
+            this.map.removeLayer('range-rings-lines');
+        if (this.map.getSource('range-rings-lines'))
+            this.map.removeSource('range-rings-lines');
         this.map.addSource('range-rings-lines', { type: 'geojson', data: lines });
         this.map.addLayer({
             id: 'range-rings-lines',
