@@ -329,14 +329,14 @@ def compute_footprint(lat: float, lon: float, alt_km: float) -> list[list[float]
       radius_rad = arccos(Re / (Re + alt_km))
     Returns 181 points forming a closed great-circle ring.
 
-    Longitudes are unwrapped using shortest-path differences so the ring stays
-    continuous in both mercator (renderWorldCopies) and globe projection.
+    Longitudes are normalised to [-180, 180].  The frontend splits the ring at
+    antimeridian crossings as needed per projection mode.
     """
     radius_rad = math.acos(_RE_KM / (_RE_KM + alt_km))
     lat_rad = math.radians(lat)
     lon_rad = math.radians(lon)
 
-    raw: list[tuple[float, float]] = []
+    points = []
     for i in range(181):
         bearing_rad = math.radians(i * 2)
         lat2 = math.asin(
@@ -347,23 +347,12 @@ def compute_footprint(lat: float, lon: float, alt_km: float) -> list[list[float]
             math.sin(bearing_rad) * math.sin(radius_rad) * math.cos(lat_rad),
             math.cos(radius_rad) - math.sin(lat_rad) * math.sin(lat2)
         )
-        lon2_deg = math.degrees(lon2_rad)
-        # Normalise to [-180, 180]
-        lon2_deg = (lon2_deg + 180) % 360 - 180
-        raw.append((lon2_deg, math.degrees(lat2)))
+        lon2_deg = (math.degrees(lon2_rad) + 180) % 360 - 180
+        points.append([round(lon2_deg, 4), round(math.degrees(lat2), 4)])
 
-    # Unwrap using shortest-path differences so consecutive points stay
-    # connected across the antimeridian.
-    points: list[list[float]] = []
-    prev_lon_raw: float | None = None
-    unwrapped_lon: float = 0.0
-    for lon_raw, lat_pt in raw:
-        if prev_lon_raw is None:
-            unwrapped_lon = lon_raw
-        else:
-            diff = (lon_raw - prev_lon_raw + 180) % 360 - 180
-            unwrapped_lon += diff
-        points.append([round(unwrapped_lon, 4), round(lat_pt, 4)])
-        prev_lon_raw = lon_raw
-
+    # GeoJSON exterior rings must be counter-clockwise so the Polygon fill
+    # covers the inside of the circle (the visibility footprint), not the
+    # complement (the rest of the world).  The bearing loop above produces a
+    # clockwise ring, so reverse it here.
+    points.reverse()
     return points

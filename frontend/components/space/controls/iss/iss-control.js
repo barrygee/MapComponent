@@ -79,18 +79,46 @@ class IssControl extends SentinelControlBase {
     static _normLon(lon) {
         return ((lon % 360) + 540) % 360 - 180;
     }
+    // Unwrap a raw [-180,180] coord array using shortest-path differences so
+    // consecutive points stay connected (same algorithm as the backend track).
+    // Produces a continuous ring suitable for Polygon / mercator LineString.
+    static _unwrapRing(coords) {
+        const out = [];
+        let prev = null;
+        let acc = 0;
+        for (const [lon, lat] of coords) {
+            if (prev === null) {
+                acc = lon;
+            }
+            else {
+                acc += ((lon - prev + 180) % 360 - 180);
+            }
+            out.push([acc, lat]);
+            prev = lon;
+        }
+        return out;
+    }
     static _splitRingForGlobe(coords) {
         const segments = [];
         let seg = [];
-        let prev = null;
+        let prevNorm = null;
+        let prevLat = null;
         for (const [lon, lat] of coords) {
             const norm = IssControl._normLon(lon);
-            if (prev !== null && ((prev > 90 && norm < -90) || (prev < -90 && norm > 90))) {
+            if (prevNorm !== null && prevLat !== null &&
+                ((prevNorm > 90 && norm < -90) || (prevNorm < -90 && norm > 90))) {
+                // Interpolate the antimeridian crossing lat so segments share the
+                // boundary point — this closes the visual gap on the globe.
+                const crossLon = prevNorm > 0 ? 180 : -180;
+                const t = (crossLon - prevNorm) / (norm + (prevNorm > 0 ? 360 : -360) - prevNorm);
+                const crossLat = prevLat + t * (lat - prevLat);
+                seg.push([crossLon, crossLat]);
                 segments.push(seg);
-                seg = [];
+                seg = [[-crossLon, crossLat]];
             }
             seg.push([norm, lat]);
-            prev = norm;
+            prevNorm = norm;
+            prevLat = lat;
         }
         if (seg.length)
             segments.push(seg);
@@ -354,11 +382,15 @@ class IssControl extends SentinelControlBase {
                     }],
             };
             this._trackGeojson = ground_track;
+            // Unwrap the raw [-180,180] footprint ring so consecutive points
+            // stay connected across the antimeridian — required for Polygon
+            // fill and mercator LineString to render without gaps or crossings.
+            const fpUnwrapped = IssControl._unwrapRing(footprint);
             this._footprintGeojson = {
                 type: 'FeatureCollection',
                 features: [
-                    { type: 'Feature', geometry: { type: 'LineString', coordinates: footprint }, properties: {} },
-                    { type: 'Feature', geometry: { type: 'Polygon', coordinates: [footprint] }, properties: {} },
+                    { type: 'Feature', geometry: { type: 'LineString', coordinates: fpUnwrapped }, properties: {} },
+                    { type: 'Feature', geometry: { type: 'Polygon', coordinates: [fpUnwrapped] }, properties: {} },
                 ],
             };
             // Push to map sources (skip while a filter hover preview is active)
@@ -902,11 +934,12 @@ class IssControl extends SentinelControlBase {
                         },
                     }],
             };
+            const fpUnwrapped2 = IssControl._unwrapRing(footprint);
             const footprintGeo = {
                 type: 'FeatureCollection',
                 features: [
-                    { type: 'Feature', geometry: { type: 'LineString', coordinates: footprint }, properties: {} },
-                    { type: 'Feature', geometry: { type: 'Polygon', coordinates: [footprint] }, properties: {} },
+                    { type: 'Feature', geometry: { type: 'LineString', coordinates: fpUnwrapped2 }, properties: {} },
+                    { type: 'Feature', geometry: { type: 'Polygon', coordinates: [fpUnwrapped2] }, properties: {} },
                 ],
             };
             const issSource = this.map.getSource('iss-live');
