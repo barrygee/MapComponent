@@ -1582,9 +1582,12 @@ const activeFreq   = document.getElementById('sdr-active-freq')    as HTMLSpanEl
         const enabledRadios = _knownRadios.filter(r => r.enabled);
         const results = await Promise.allSettled(
             enabledRadios.map(r =>
-                fetch(`/api/sdr/status/${r.id}`)
-                    .then(res => res.ok ? res.json() : Promise.reject())
-                    .then(data => data.connected ? r : null)
+                fetch(`/api/sdr/connect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ radio_id: r.id }),
+                })
+                    .then(res => res.ok ? r : null)
                     .catch(() => null)
             )
         );

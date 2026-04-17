@@ -1531,9 +1531,12 @@ function buildSdrPanel(mountTarget) {
         _deviceMenuEl.innerHTML = '';
         _deviceMenuEl.appendChild(checkingItem);
         const enabledRadios = _knownRadios.filter(r => r.enabled);
-        const results = await Promise.allSettled(enabledRadios.map(r => fetch(`/api/sdr/status/${r.id}`)
-            .then(res => res.ok ? res.json() : Promise.reject())
-            .then(data => data.connected ? r : null)
+        const results = await Promise.allSettled(enabledRadios.map(r => fetch(`/api/sdr/connect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ radio_id: r.id }),
+        })
+            .then(res => res.ok ? r : null)
             .catch(() => null)));
         const onlineRadios = results
             .map(r => (r.status === 'fulfilled' ? r.value : null))
