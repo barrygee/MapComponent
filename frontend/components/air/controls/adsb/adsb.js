@@ -198,6 +198,7 @@ class AdsbLiveControl {
     }
     onRemove() {
         this._stopPolling();
+        this._eventsAdded = false;
         if (this.container && this.container.parentNode)
             this.container.parentNode.removeChild(this.container);
         this.map = undefined;

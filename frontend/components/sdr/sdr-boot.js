@@ -332,8 +332,12 @@
         }, 0);
 
         // Do NOT stop audio — radio keeps playing seamlessly across domains
-        window._domainTeardown = null;
     };
+
+    // Register with router so repeated visits call the correct handlers
+    if (typeof window._registerDomain === 'function') {
+        window._registerDomain('sdr', window._domainMount, window._domainTeardown);
+    }
 
     // ── One-time setup on first SDR visit ─────────────────────────────────────
     loadRadios();

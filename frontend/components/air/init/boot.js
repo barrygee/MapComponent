@@ -18,11 +18,17 @@ window._domainMount = function () {
     if (sideMenu) sideMenu.style.display = '';
 
     // ---- 1. Restore 3D pitch ----
-    map.once('load', () => {
+    if (map.isStyleLoaded()) {
         if (typeof window._is3DActive === 'function' && window._is3DActive()) {
             map.easeTo({ pitch: 45, duration: 400 });
         }
-    });
+    } else {
+        map.once('style.load', () => {
+            if (typeof window._is3DActive === 'function' && window._is3DActive()) {
+                map.easeTo({ pitch: 45, duration: 400 });
+            }
+        });
+    }
 
     // ---- 2. Panel initialisation ----
     window._MapSidebar.init({ trackingEmptyText: 'No tracked aircraft' });
@@ -56,13 +62,17 @@ window._domainTeardown = function () {
      airportsControl, militaryBasesControl, adsbControl, adsbLabelsControl, clearControl]
         .forEach(function (c) { if (c) { try { map.removeControl(c); } catch (e) {} } });
 
-    // Remove map layers/sources added by air controls
-    ['adsb-live', 'adsb-trails-source', 'range-rings-lines', 'airports',
-     'military-bases', 'aara', 'awacs']
-        .forEach(function (id) {
-            try { map.removeLayer(id); } catch (e) {}
-            try { map.removeSource(id); } catch (e) {}
-        });
+    // Remove layers first, then sources (MapLibre rejects removeSource while a layer uses it)
+    ['adsb-trails', 'adsb-bracket', 'adsb-icons',
+     'range-rings-lines',
+     'awacs-fill', 'awacs-outline',
+     'aara-fill', 'aara-outline']
+        .forEach(function (id) { try { map.removeLayer(id); } catch (e) {} });
+    ['adsb-live', 'adsb-trails-source',
+     'range-rings-lines',
+     'airports', 'military-bases',
+     'awacs-orbits', 'aara-zones']
+        .forEach(function (id) { try { map.removeSource(id); } catch (e) {} });
 
     // Clear the search pane so the next domain can inject its own filter UI
     const searchPane = document.getElementById('msb-pane-search');
@@ -72,8 +82,6 @@ window._domainTeardown = function () {
     if (window.MapComponent && window.MapComponent.clearStyleLoadCallbacks) {
         window.MapComponent.clearStyleLoadCallbacks();
     }
-
-    window._domainTeardown = null;
 };
 
 // Self-call on initial load (router calls _domainMount on repeat visits)

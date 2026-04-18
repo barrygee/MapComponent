@@ -61,6 +61,8 @@ function _startStarfield() {
     _draw();
 
     var _resizeHandler = function () { _resize(); _seed(); _draw(); };
+    // Remove any previous listener before adding the new one (repeat mount guard)
+    if (canvas._resizeHandler) window.removeEventListener('resize', canvas._resizeHandler);
     window.addEventListener('resize', _resizeHandler);
 
     var _lastBearing = 0;
@@ -123,12 +125,41 @@ window._domainMount = function () {
         window._SatInfoPanel.init();
     }
 
-    // ---- 2b. Sync space overlay states from backend (after controls are ready) ----
-    map.once('load', function () {
+    // ---- 2b. Re-add controls and re-init layers on each mount ----
+    // Scripts load once (router caches them), so controls are removed on teardown
+    // but not re-constructed. Re-add them here so this.map is set, then init layers.
+    if (daynightControl && !daynightControl.map) {
+        map.addControl(daynightControl, 'top-right');
+        daynightControl.initLayers();
+        daynightControl._fetch();
+    }
+    if (issControl && !issControl.map) {
+        map.addControl(issControl, 'top-right');
+        issControl.initLayers();
+        if (!issControl.issVisible) issControl.toggleIss();
+        issControl._fetch();
+        issControl._startPolling();
+    }
+    if (spaceNamesControl && !spaceNamesControl.map) {
+        map.addControl(spaceNamesControl, 'top-right');
+        spaceNamesControl.applyNamesVisibility();
+    }
+    if (typeof _spaceGlobeActive !== 'undefined' && _spaceGlobeActive) {
+        try { map.setProjection({ type: 'globe' }); } catch (e) {}
+    }
+
+    // ---- 2c. Sync space overlay states from backend (after controls are ready) ----
+    if (map.isStyleLoaded()) {
         if (typeof _syncSpaceOverlayStatesFromBackend === 'function') {
             _syncSpaceOverlayStatesFromBackend();
         }
-    });
+    } else {
+        map.once('style.load', function () {
+            if (typeof _syncSpaceOverlayStatesFromBackend === 'function') {
+                _syncSpaceOverlayStatesFromBackend();
+            }
+        });
+    }
 
     // ---- 3. Starfield backdrop ----
     _startStarfield();
@@ -151,25 +182,42 @@ window._domainTeardown = function () {
     const spaceSideMenu = document.getElementById('space-side-menu');
     if (spaceSideMenu) spaceSideMenu.style.display = 'none';
 
+    // Stop ISS polling before removing controls
+    if (issControl && issControl._stopPolling) issControl._stopPolling();
+
+    // Remove space map layers/sources so they don't bleed into other domains
+    ['iss-track-orbit1', 'iss-track-orbit2', 'iss-track-past', 'iss-track-future',
+     'iss-footprint-fill', 'iss-footprint',
+     'iss-footprint-fill-outer', 'iss-footprint-fill-mid', 'iss-footprint-fill-inner', 'iss-footprint-fill-core',
+     'iss-bracket', 'iss-icon', 'daynight-fill'].forEach(function (id) {
+        try { map.removeLayer(id); } catch (e) {}
+    });
+    ['iss-track-source', 'iss-footprint-source', 'iss-live', 'daynight-source'].forEach(function (id) {
+        try { if (map.getSource(id)) map.removeSource(id); } catch (e) {}
+    });
+
     // Remove space controls from the map
     [daynightControl, issControl, spaceNamesControl].forEach(function (c) {
         if (c) { try { map.removeControl(c); } catch (e) {} }
     });
 
-    // Stop ISS polling if the control supports it
-    if (issControl && issControl._stopPolling) issControl._stopPolling();
-
     // Clear the search pane so the next domain can inject its own filter UI
     const searchPane = document.getElementById('msb-pane-search');
     if (searchPane) searchPane.innerHTML = '';
+
+    // Reset globe projection to mercator so other domains render correctly
+    try { map.setProjection({ type: 'mercator' }); } catch (e) {}
 
     // Clear style-load callbacks so the next domain starts clean
     if (window.MapComponent && window.MapComponent.clearStyleLoadCallbacks) {
         window.MapComponent.clearStyleLoadCallbacks();
     }
-
-    window._domainTeardown = null;
 };
+
+// Register with router so repeated visits call the correct handlers
+if (typeof window._registerDomain === 'function') {
+    window._registerDomain('space', window._domainMount, window._domainTeardown);
+}
 
 // Self-call on initial load (router calls _domainMount on repeat visits)
 window._domainMount();

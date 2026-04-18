@@ -63,22 +63,46 @@
     // Map domains use #map; SDR uses #sdr-root
     var MAP_DOMAINS = { air: true, space: true, sea: true, land: true };
 
-    // Scripts loaded at least once — never injected again
+    // Scripts loaded at least once — never re-injected
     var _loadedScripts = new Set();
-    // No scripts are re-injected — each script loads exactly once.
-    // template.js is shared between air/sea/land but only injected on first visit
-    // to any of those domains. _domainMount reads body[data-domain] dynamically.
-    var _sharedScripts = new Set();
     // Domains whose full script list has been loaded
     var _loadedDomains = new Set();
+
+    // Per-domain mount/teardown registry — boot files register here instead of
+    // overwriting window._domainMount, which breaks when scripts only load once.
+    var _domainHandlers = {};
+
+    // Boot files call this to register their handlers.
+    window._registerDomain = function (domain, mount, teardown) {
+        _domainHandlers[domain] = { mount: mount, teardown: teardown };
+    };
+
+    // sea/land share template.js with air (which only executes once).
+    // Register minimal handlers for them directly here so they are always correct.
+    // _runNoUrlCheck is exposed by template.js on window so the URL overlay works.
+    (function () {
+        function _seaLandMount() {
+            var ns = document.body.dataset.domain;
+            if (typeof window._Notifications !== 'undefined') window._Notifications.init();
+            if (typeof window._Tracking !== 'undefined') window._Tracking.init();
+            if (typeof window._MapSidebar !== 'undefined') window._MapSidebar.init({ trackingEmptyText: 'No tracked contacts' });
+            if (ns && typeof window._runNoUrlCheck === 'function') window._runNoUrlCheck(ns);
+        }
+        function _seaLandTeardown() {
+            if (window.MapComponent && window.MapComponent.clearStyleLoadCallbacks) {
+                window.MapComponent.clearStyleLoadCallbacks();
+            }
+        }
+        _domainHandlers['sea']  = { mount: _seaLandMount, teardown: _seaLandTeardown };
+        _domainHandlers['land'] = { mount: _seaLandMount, teardown: _seaLandTeardown };
+    })();
 
     var _currentDomain = null;
 
     // ── Script loader: serial, deduped ────────────────────────────────────────
     function _loadScript(src) {
         return new Promise(function (resolve, reject) {
-            // Skip if already loaded, unless it's a shared script used by multiple domains
-            if (_loadedScripts.has(src) && !_sharedScripts.has(src)) {
+            if (_loadedScripts.has(src)) {
                 resolve();
                 return;
             }
@@ -150,8 +174,11 @@
             return;
         }
 
-        // Teardown current domain
-        if (typeof window._domainTeardown === 'function') {
+        // Teardown current domain using the registered handler
+        if (_currentDomain && _domainHandlers[_currentDomain] && _domainHandlers[_currentDomain].teardown) {
+            try { _domainHandlers[_currentDomain].teardown(); } catch (e) { console.error('[router] teardown error:', e); }
+        } else if (_currentDomain && typeof window._domainTeardown === 'function') {
+            console.warn('[router] no registered teardown for', _currentDomain, '— falling back to window._domainTeardown');
             try { window._domainTeardown(); } catch (e) { console.error('[router] teardown error:', e); }
         }
 
@@ -176,8 +203,10 @@
 
         _currentDomain = domain;
 
-        // Mount domain
-        if (typeof window._domainMount === 'function') {
+        // Mount domain using the registered handler (registered by boot files via _registerDomain)
+        if (_domainHandlers[domain] && _domainHandlers[domain].mount) {
+            try { _domainHandlers[domain].mount(); } catch (e) { console.error('[router] mount error:', e); }
+        } else if (typeof window._domainMount === 'function') {
             try { window._domainMount(); } catch (e) { console.error('[router] mount error:', e); }
         }
     }

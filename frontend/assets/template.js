@@ -65,7 +65,8 @@
 })();
 
 // ---- No-URL overlay check (runs per domain mount) ----
-function _runNoUrlCheck(ns) {
+// Exposed on window so sea/land handlers in router.js can call it on repeat visits.
+window._runNoUrlCheck = function _runNoUrlCheck(ns) {
     const overlay = document.getElementById('no-url-overlay');
     const msgEl   = document.getElementById('no-url-overlay-msg');
     const btn     = document.getElementById('no-url-overlay-btn');
@@ -155,28 +156,34 @@ function _runNoUrlCheck(ns) {
         }).catch(function () { _check(); });
     }
 
-    // Wire settings button (guard duplicate)
+    // Wire settings button (guard duplicate).
+    // Event listeners use window._runNoUrlCheck with the live domain so they
+    // always recheck the domain currently displayed, not the one at wire-time.
     if (!btn._noUrlWired) {
         btn._noUrlWired = true;
         btn.addEventListener('click', function () {
             if (window._SettingsPanel && window._SettingsPanel.openSection) {
-                window._SettingsPanel.openSection(btn.dataset.section || ns);
+                window._SettingsPanel.openSection(btn.dataset.section || document.body.dataset.domain);
             } else if (window._SettingsPanel) {
                 window._SettingsPanel.open();
             }
         });
-        window.addEventListener('sentinel:connectivityModeChanged', _check);
-        window.addEventListener('sentinel:sourceOverrideChanged', _check);
+        function _recheckCurrent() {
+            var d = document.body.dataset.domain;
+            if (d && typeof window._runNoUrlCheck === 'function') window._runNoUrlCheck(d);
+        }
+        window.addEventListener('sentinel:connectivityModeChanged', _recheckCurrent);
+        window.addEventListener('sentinel:sourceOverrideChanged', _recheckCurrent);
         window.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') setTimeout(_check, 100);
+            if (e.key === 'Escape') setTimeout(_recheckCurrent, 100);
         });
         document.addEventListener('click', function (e) {
-            if (e.target && e.target.id === 'settings-apply-btn') setTimeout(_check, 100);
+            if (e.target && e.target.id === 'settings-apply-btn') setTimeout(_recheckCurrent, 100);
         });
     }
 
     _checkWithBackend();
-}
+};
 
 // If a domain boot already set _domainMount (e.g. air/boot.js), compose with it.
 // Otherwise define it fresh (sea/land have no other boot).
@@ -200,8 +207,15 @@ function _runNoUrlCheck(ns) {
         if (window.MapComponent && window.MapComponent.clearStyleLoadCallbacks) {
             window.MapComponent.clearStyleLoadCallbacks();
         }
-        window._domainTeardown = null;
     };
+
+    // Register the composed handlers for the current domain with the router.
+    // Runs once per domain's script load — captures air+template compose for air,
+    // or the fresh template-only functions for sea/land.
+    if (typeof window._registerDomain === 'function') {
+        var _d = document.body.dataset.domain;
+        if (_d) window._registerDomain(_d, window._domainMount, window._domainTeardown);
+    }
 
     // Self-call only for domains with no prior boot (sea/land).
     // For air, boot.js already self-called _domainMount(); calling again would double-mount.
