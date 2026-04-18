@@ -147,6 +147,7 @@ window._MapSidebar = (() => {
         }
         catch (_e) { }
     }
+    let _tabsWired = false;
     function init(opts) {
         // Set domain-specific empty-state labels
         const alertsEmpty = document.getElementById('msb-alerts-empty');
@@ -155,7 +156,9 @@ window._MapSidebar = (() => {
             alertsEmpty.textContent = (opts && opts.alertsEmptyText) || 'No alerts';
         if (trackingEmpty)
             trackingEmpty.textContent = (opts && opts.trackingEmptyText) || 'No tracked items';
-        // Wire tab clicks (called once from each domain's boot)
+        // Wire tab clicks only once — subsequent domain visits must not re-add listeners
+        if (_tabsWired) return;
+        _tabsWired = true;
         const tabs = _getTabs();
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {

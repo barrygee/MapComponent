@@ -1940,11 +1940,9 @@ function buildSdrPanel(mountTarget) {
     window._sdrPanelReload = reloadData;
     reloadData();
 }
-// ── Auto-invoke on the SDR page; expose for tab-mode use on other pages ────
+// Always expose for external callers (sdr-boot _domainMount, sdr-radio-tab)
+window._buildSdrPanel = buildSdrPanel;
+// Auto-invoke panel mode on initial SDR page load
 if (document.body.dataset['domain'] === 'sdr') {
     buildSdrPanel();
-}
-else {
-    // Available for sdr-radio-tab to call with a mount target
-    window._buildSdrPanel = buildSdrPanel;
 }

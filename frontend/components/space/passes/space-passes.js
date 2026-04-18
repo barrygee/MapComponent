@@ -14,6 +14,7 @@
 window._SpacePassesPanel = (() => {
     let _open = false;
     let _injected = false;
+    let _eventsWired = false;
     let _clearPreviewTimer = null;
     // Currently expanded pass card norad id
     let _expandedNoradId = null;
@@ -725,6 +726,8 @@ window._SpacePassesPanel = (() => {
                     _showNoLocation();
             });
         }
+        if (_eventsWired) return;
+        _eventsWired = true;
         // Re-fetch whenever the PASSES tab is activated
         document.addEventListener('click', (e) => {
             const targetElement = e.target;

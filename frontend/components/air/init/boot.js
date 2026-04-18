@@ -1,43 +1,80 @@
 "use strict";
 // ============================================================
 // BOOT / PAGE INITIALISATION
-// The final script in the air page load order.
+// The final script in the air domain load order.
 //
-// Responsibilities:
-//   1. Start the GPS watchPosition watcher
-//   2. Restore 3D pitch state from localStorage
-//   3. Initialise notifications, tracking, and filter panels
-//   4. Register the global Ctrl+F / Cmd+F filter shortcut
-//   5. Play the SENTINEL logo animation
+// Exposes:
+//   window._domainMount()    — called by router on every air visit
+//   window._domainTeardown() — called by router before leaving air
 //
-// Dependencies: setUserLocation, window._Notifications, window._Tracking,
-//               window._FilterPanel, map (global alias)
+// Dependencies: window._Notifications, window._Tracking,
+//               window._FilterPanel, window._MapSidebar, map (global alias)
 // ============================================================
 /// <reference path="../globals.d.ts" />
-// ---- 1. GPS watcher ----
-if ('geolocation' in navigator) {
-    console.log('[location] registering watchPosition');
-    navigator.geolocation.watchPosition(setUserLocation, (error) => { console.error('[location] watchPosition error:', error.code, error.message); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 });
-}
-else {
-    console.warn('[location] geolocation not available in navigator');
-}
-// ---- 2. Restore 3D pitch ----
-map.once('load', () => {
-    if (typeof window._is3DActive === 'function' && window._is3DActive()) {
-        map.easeTo({ pitch: 45, duration: 400 });
+
+window._domainMount = function () {
+    // ---- 0. Restore air side-menu visibility ----
+    const sideMenu = document.getElementById('side-menu');
+    if (sideMenu) sideMenu.style.display = '';
+
+    // ---- 1. Restore 3D pitch ----
+    map.once('load', () => {
+        if (typeof window._is3DActive === 'function' && window._is3DActive()) {
+            map.easeTo({ pitch: 45, duration: 400 });
+        }
+    });
+
+    // ---- 2. Panel initialisation ----
+    window._MapSidebar.init({ trackingEmptyText: 'No tracked aircraft' });
+    window._Notifications.init();
+    window._Tracking.init();
+    window._FilterPanel.init();
+
+    // ---- 3. Global filter shortcut (register only once) ----
+    if (!window._airFilterShortcutRegistered) {
+        window._airFilterShortcutRegistered = true;
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                window._FilterPanel.toggle();
+            }
+        });
     }
-});
-// ---- 3. Panel initialisation ----
-window._MapSidebar.init({ trackingEmptyText: 'No tracked aircraft' });
-window._Notifications.init();
-window._Tracking.init();
-window._FilterPanel.init();
-// ---- 4. Global filter shortcut ----
-document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        window._FilterPanel.toggle();
+};
+
+window._domainTeardown = function () {
+    // Hide the air side-menu panel (persists on body between domain visits)
+    const sideMenu = document.getElementById('side-menu');
+    if (sideMenu) sideMenu.style.display = 'none';
+
+    // Stop ADS-B polling and interpolation
+    if (adsbControl && adsbControl._stopPolling) adsbControl._stopPolling();
+    if (adsbControl && adsbControl._stopInterpolation) adsbControl._stopInterpolation();
+
+    // Remove all air map controls
+    [roadsControl, namesControl, rangeRingsControl, aarControl, awacsControl,
+     airportsControl, militaryBasesControl, adsbControl, adsbLabelsControl, clearControl]
+        .forEach(function (c) { if (c) { try { map.removeControl(c); } catch (e) {} } });
+
+    // Remove map layers/sources added by air controls
+    ['adsb-live', 'adsb-trails-source', 'range-rings-lines', 'airports',
+     'military-bases', 'aara', 'awacs']
+        .forEach(function (id) {
+            try { map.removeLayer(id); } catch (e) {}
+            try { map.removeSource(id); } catch (e) {}
+        });
+
+    // Clear the search pane so the next domain can inject its own filter UI
+    const searchPane = document.getElementById('msb-pane-search');
+    if (searchPane) searchPane.innerHTML = '';
+
+    // Clear style-load callbacks so next domain starts clean
+    if (window.MapComponent && window.MapComponent.clearStyleLoadCallbacks) {
+        window.MapComponent.clearStyleLoadCallbacks();
     }
-});
-// ---- 5. Logo animation — loaded via shared/init/logo-animation.js ----
+
+    window._domainTeardown = null;
+};
+
+// Self-call on initial load (router calls _domainMount on repeat visits)
+window._domainMount();

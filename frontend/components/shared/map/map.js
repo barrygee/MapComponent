@@ -356,6 +356,7 @@ window.MapComponent = {
         }
     },
     isOnline: () => _mapConnState,
+    clearStyleLoadCallbacks: () => { _styleLoadCallbacks.length = 0; },
     generateGeodesicCircle,
     buildRingsGeoJSON,
     computeCentroid,

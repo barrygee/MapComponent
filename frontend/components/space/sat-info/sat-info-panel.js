@@ -19,6 +19,7 @@ window._SatInfoPanel = (() => {
     let _injected = false;
     let _expanded = false;
     let _currentNoradId = null;
+    let _eventsWired = false;
     let _fetchAbort = null;
     let _tickInterval = null;
     let _locationPoll = null;
@@ -406,6 +407,8 @@ window._SatInfoPanel = (() => {
             _injectHTML();
         else
             document.addEventListener('DOMContentLoaded', () => { _injectHTML(); });
+        if (_eventsWired) return;
+        _eventsWired = true;
         // Update internal state (for telemetry broadcast) when a satellite is selected,
         // but do NOT auto-show the panel — inline accordions handle display now.
         document.addEventListener('satellite-selected', (e) => {

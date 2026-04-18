@@ -9,6 +9,11 @@
 //   4. Load stored frequencies and groups into the panel
 //   5. Open WebSocket when a radio is selected
 //   6. Route incoming WebSocket messages to controls + audio
+//
+// In SPA mode:
+//   window._domainMount()    — called by router on every SDR visit
+//   window._domainTeardown() — called by router before leaving SDR
+//                              (does NOT stop audio — radio keeps playing)
 // ============================================================
 /// <reference path="./globals.d.ts" />
 (function sdrBoot() {
@@ -22,7 +27,6 @@
             setTimeout(hideMapSidebar, 50);
         }
     }
-    hideMapSidebar();
     // ── Re-wire the footer sidebar toggle button ──────────────────────────────
     function rewireSidebarToggleBtn() {
         const btn = document.getElementById('map-sidebar-btn');
@@ -39,8 +43,17 @@
         });
         fresh.classList.toggle('msb-btn-active', window._SdrPanel.isVisible());
     }
-    rewireSidebarToggleBtn();
-    // ── WebSocket management ──────────────────────���───────────────────────────
+    // ── Restore default sidebar button wiring (called on teardown) ────────────
+    function restoreSidebarToggleBtn() {
+        const btn = document.getElementById('map-sidebar-btn');
+        if (!btn) return;
+        const fresh = btn.cloneNode(true);
+        btn.parentNode.replaceChild(fresh, btn);
+        fresh.addEventListener('click', () => {
+            if (window._MapSidebar) window._MapSidebar.toggle();
+        });
+    }
+    // ── WebSocket management ──────────────────────────────────────────────────
     let _reconnectTimer = null;
     let _activeRadioId = null;
     let _radioCache = new Map();
@@ -253,15 +266,7 @@
             console.warn('[SDR] Could not load frequencies:', e);
         }
     }
-    // ── Panel initial visibility ───────────────────────────────────────────────
-    const panelShouldBeOpen = sessionStorage.getItem('sdrPanelOpen') !== '0';
-    if (panelShouldBeOpen) {
-        window._SdrPanel.show();
-    }
-    else {
-        window._SdrPanel.hide();
-    }
-    // ── Reconnect when page becomes visible (navigation, tab switch, Safari BFCache) ──
+    // ── Reconnect when page becomes visible (tab switch, Safari BFCache) ──────
     function _reconnectIfNeeded() {
         if (_sdrCurrentRadioId && !_sdrConnected) {
             void openControlSocket(_sdrCurrentRadioId);
@@ -275,7 +280,65 @@
         if (e.persisted)
             _reconnectIfNeeded();
     });
-    // ── Boot sequence ─────────────────────────────────────────────────────────
+
+    // ── Per-visit mount: UI setup for each SDR domain entry ──────────────────
+    window._domainMount = function () {
+        // Build or restore the standalone SDR panel.
+        // In SPA mode sdr-panel.js may have loaded while domain was not 'sdr',
+        // so buildSdrPanel() was not auto-invoked — call it if not yet built.
+        const existingPanel = document.getElementById('sdr-panel');
+        if (!existingPanel && typeof buildSdrPanel === 'function') {
+            buildSdrPanel();
+        } else if (existingPanel) {
+            existingPanel.style.display = '';
+        }
+
+        hideMapSidebar();
+        rewireSidebarToggleBtn();
+
+        // Restore panel visibility
+        const panelShouldBeOpen = sessionStorage.getItem('sdrPanelOpen') !== '0';
+        if (window._SdrPanel) {
+            if (panelShouldBeOpen) {
+                window._SdrPanel.show();
+            } else {
+                window._SdrPanel.hide();
+            }
+        }
+
+        // Reconnect control socket if a radio was previously selected
+        if (_sdrCurrentRadioId && !_sdrConnected) {
+            void openControlSocket(_sdrCurrentRadioId);
+        }
+    };
+
+    // ── Teardown: restore shell state when leaving SDR ────────────────────────
+    window._domainTeardown = function () {
+        // Show the map sidebar again for other domains
+        const sidebar = document.getElementById('map-sidebar');
+        if (sidebar) sidebar.style.display = '';
+
+        // Hide the standalone SDR panel (it lives on body, not inside #sdr-root)
+        const sdrPanel = document.getElementById('sdr-panel');
+        if (sdrPanel) sdrPanel.style.display = 'none';
+
+        // Restore the sidebar toggle button to its default wiring
+        restoreSidebarToggleBtn();
+
+        // Mount the SDR radio tab into the map-sidebar RADIO pane for the arriving domain
+        // (deferred so body[data-domain] is updated by the router before mount checks it)
+        setTimeout(function () {
+            if (typeof window._mountSdrRadioTab === 'function') window._mountSdrRadioTab();
+        }, 0);
+
+        // Do NOT stop audio — radio keeps playing seamlessly across domains
+        window._domainTeardown = null;
+    };
+
+    // ── One-time setup on first SDR visit ─────────────────────────────────────
     loadRadios();
     loadFrequencies();
+
+    // Mount UI for this first visit
+    window._domainMount();
 })();

@@ -47,3 +47,9 @@ window.addEventListener('sentinel:setUserLocation', function (e) {
     const detail = e.detail;
     setSpaceUserLocation({ coords: { longitude: detail.longitude, latitude: detail.latitude }, _fromCache: false, _manual: true });
 });
+// Receive GPS updates from the singleton gps-watcher (replaces space-boot.js watchPosition)
+window.addEventListener('sentinel:gpsPosition', function (e) {
+    if (document.body.dataset.domain === 'space') {
+        setSpaceUserLocation(e.detail);
+    }
+});

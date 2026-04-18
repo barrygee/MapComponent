@@ -27,7 +27,14 @@
     <link rel="stylesheet" href="/frontend/components/shared/settings/settings.css">
     <link rel="stylesheet" href="/frontend/components/docs/docs.css">
     <link rel="stylesheet" href="/frontend/components/sdr/sdr-panel.css">
-    {% block head %}{% endblock %}
+    <!-- Domain CSS: pre-loaded for all domains -->
+    <link rel="stylesheet" href="/frontend/components/air/overlay/side-menu.css">
+    <link rel="stylesheet" href="/frontend/components/air/air-filter/air-filter.css">
+    <link rel="stylesheet" href="/frontend/components/space/overlay/space-side-menu.css">
+    <link rel="stylesheet" href="/frontend/components/space/controls/iss/iss-control.css">
+    <link rel="stylesheet" href="/frontend/components/space/space-filter/space-filter.css">
+    <link rel="stylesheet" href="/frontend/components/space/passes/space-passes.css">
+    <link rel="stylesheet" href="/frontend/components/space/sat-info/sat-info-panel.css">
     <script>
     // Earliest possible AudioContext creation — runs before any external scripts.
     // When the user navigated here by clicking a nav link, Chrome transfers user
@@ -58,7 +65,31 @@
         </nav>
     </header>
 
-    {% block content %}{% endblock %}
+    <!-- Permanent shell DOM — all domains share these elements -->
+    <!-- Map canvas: shown for air/space/sea/land, hidden for sdr -->
+    <div id="map"></div>
+    <!-- SDR root: shown only for sdr domain -->
+    <div id="sdr-root" style="display:none"></div>
+    <!-- Space starfield: shown only for space domain -->
+    <canvas id="space-starfield" aria-hidden="true" style="display:none"></canvas>
+    <!-- No-URL overlay: shown by domain boot when no data source is configured -->
+    <div id="no-url-overlay" class="no-url-overlay hidden">
+        <div class="no-url-overlay-box">
+            <div class="no-url-overlay-domain" id="no-url-overlay-domain"></div>
+            <div class="no-url-overlay-title">No Data Source Configured</div>
+            <div class="no-url-overlay-msg" id="no-url-overlay-msg"></div>
+            <button class="no-url-overlay-btn" id="no-url-overlay-btn">Open Settings</button>
+        </div>
+    </div>
+    <!-- No-TLE overlay: shown by space boot when satellite data is missing -->
+    <div id="no-tle-overlay" class="no-url-overlay hidden">
+        <div class="no-url-overlay-box">
+            <div class="no-url-overlay-domain">SPACE</div>
+            <div class="no-url-overlay-title">No TLE Data Available</div>
+            <div class="no-url-overlay-msg">The satellite database is empty. Import TLE data to enable tracking.</div>
+            <button class="no-url-overlay-btn" id="no-tle-overlay-btn">Open Space Settings</button>
+        </div>
+    </div>
 
     <!-- ── Docs panel (overlay, same layer as settings) ────────────────────── -->
     <div id="docs-panel">
@@ -189,6 +220,11 @@
     <!-- Map component -->
     <script src="/frontend/components/shared/map/map.js"></script>
 
+    <!-- Shared user-location module (used by air + space domain scripts) -->
+    <script src="/frontend/components/shared/user-location/user-location-shared.js"></script>
+    <!-- Singleton GPS watcher — fires sentinel:gpsPosition event -->
+    <script src="/frontend/components/shared/user-location/gps-watcher.js"></script>
+
     <!-- SDR globals + audio (global — available on all pages) -->
     <script src="/frontend/components/sdr/sdr-globals.js"></script>
     <script src="/frontend/components/sdr/sdr-audio.js"></script>
@@ -225,7 +261,8 @@
     })();
     </script>
 
-    {% block scripts %}{% endblock %}
+    <!-- SPA router — intercepts nav clicks, loads domain scripts, manages transitions -->
+    <script src="/frontend/components/shared/router/router.js"></script>
 
 
 </body>

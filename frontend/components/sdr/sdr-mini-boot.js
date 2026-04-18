@@ -11,9 +11,9 @@
 // ============================================================
 /// <reference path="./globals.d.ts" />
 (function sdrMiniBoot() {
-    // Skip on the SDR page — sdr-boot.js handles the full panel there
-    if (document.body.dataset['domain'] === 'sdr')
-        return;
+    // On the SDR page, sdr-boot.js handles the full panel.
+    // We still run here to expose window._sdrLoadRadios, but skip socket management.
+    const _isSdrDomain = () => document.body.dataset['domain'] === 'sdr';
     let _reconnectTimer = null;
     let _activeRadioId = null;
     let _radioCache = new Map();
@@ -165,6 +165,7 @@
     }
     // ── Radio selection events (fired by mini player when user hits play) ─────
     document.addEventListener('sdr-radio-selected', (e) => {
+        if (_isSdrDomain()) return; // sdr-boot.js handles this on the SDR page
         const { radioId } = e.detail;
         if (radioId)
             void openControlSocket(radioId);
@@ -195,6 +196,7 @@
         if (window._sdrPopulateRadios) {
             window._sdrPopulateRadios(radios);
         }
+        if (_isSdrDomain()) return; // sdr-boot.js manages connections on the SDR page
         const savedId = parseInt(sessionStorage.getItem('sdrLastRadioId') || '0', 10);
         if (savedId > 0) {
             const match = radios.find(r => r.id === savedId && r.enabled);
@@ -241,6 +243,7 @@
         }
     }
     document.addEventListener('visibilitychange', () => {
+        if (_isSdrDomain()) return;
         if (document.visibilityState === 'visible')
             _reconnectIfNeeded();
     });

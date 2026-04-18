@@ -9,28 +9,28 @@
 // ============================================================
 /// <reference path="./globals.d.ts" />
 (function initSdrRadioTab() {
-    // Only run on non-SDR pages
-    if (document.body.dataset['domain'] === 'sdr')
-        return;
+    // Mount the SDR panel into the map-sidebar RADIO pane on non-SDR pages.
+    // This function is called at shell load time AND exposed as window._mountSdrRadioTab
+    // so the router can call it when navigating to a non-SDR domain from SDR.
     function mount() {
+        // Skip on SDR page — sdr-boot.js builds the standalone panel there
+        if (document.body.dataset['domain'] === 'sdr') return;
         const pane = document.getElementById('msb-pane-radio');
-        if (!pane)
-            return;
-        // _buildSdrPanel is exposed by sdr-panel.js on non-SDR pages
+        if (!pane) return;
+        // Only mount if the pane is empty (avoid double-mounting on repeat visits)
+        if (pane.children.length > 0) return;
         if (typeof window._buildSdrPanel === 'function') {
             window._buildSdrPanel(pane);
         }
-        // Now that the panel is mounted and _sdrPopulateRadios is registered,
-        // fetch radios and auto-connect. This guarantees no race condition.
         if (typeof window._sdrLoadRadios === 'function') {
             window._sdrLoadRadios();
         }
     }
-    // Mount after DOM is ready
+    window._mountSdrRadioTab = mount;
+    // Mount after DOM is ready on initial page load
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', mount);
-    }
-    else {
+    } else {
         mount();
     }
 })();

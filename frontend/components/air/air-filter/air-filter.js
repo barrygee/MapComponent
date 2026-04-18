@@ -13,32 +13,26 @@
 /// <reference path="../../types.ts" />
 window._FilterPanel = (() => {
     let _open = false;
+    let _eventsWired = false;
+    const _FILTER_HTML = `<div id="filter-input-wrap">` +
+        `<svg id="filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+        `<circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>` +
+        `<line x1="8.5" y1="8.5" x2="12" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>` +
+        `</svg>` +
+        `<input id="filter-input" type="text" placeholder="CALLSIGN · ICAO · SQUAWK" autocomplete="off" spellcheck="false" />` +
+        `<button id="filter-clear-btn" aria-label="Clear filter">✕</button>` +
+        `</div>` +
+        `<div id="filter-results"></div>`;
     // ---- Inject filter HTML into the map sidebar search pane ----
-    (function _injectHTML() {
+    // Called from init() so it re-injects after teardown clears the pane.
+    function _injectHTML() {
         if (document.getElementById('filter-input-wrap'))
             return;
-        const html = `<div id="filter-input-wrap">` +
-            `<svg id="filter-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
-            `<circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>` +
-            `<line x1="8.5" y1="8.5" x2="12" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>` +
-            `</svg>` +
-            `<input id="filter-input" type="text" placeholder="CALLSIGN · ICAO · SQUAWK" autocomplete="off" spellcheck="false" />` +
-            `<button id="filter-clear-btn" aria-label="Clear filter">✕</button>` +
-            `</div>` +
-            `<div id="filter-results"></div>`;
         const pane = document.getElementById('msb-pane-search');
         if (pane) {
-            pane.insertAdjacentHTML('afterbegin', html);
+            pane.insertAdjacentHTML('afterbegin', _FILTER_HTML);
         }
-        else {
-            // Fallback: sidebar not yet available — retry on DOMContentLoaded
-            document.addEventListener('DOMContentLoaded', () => {
-                const searchPane = document.getElementById('msb-pane-search');
-                if (searchPane && !document.getElementById('filter-input-wrap'))
-                    searchPane.insertAdjacentHTML('afterbegin', html);
-            });
-        }
-    })();
+    }
     function _getPanel() { return document.getElementById('msb-pane-search'); }
     function _getInput() { return document.getElementById('filter-input'); }
     function _getResults() { return document.getElementById('filter-results'); }
@@ -352,10 +346,15 @@ window._FilterPanel = (() => {
         catch (e) { }
     }
     function init() {
+        // Re-inject HTML if the pane was cleared by domain teardown
+        _injectHTML();
         const input = _getInput();
         const clearBtn = _getClearBtn();
         if (!input)
             return;
+        // Wire document-level events only once across all domain visits
+        if (_eventsWired) return;
+        _eventsWired = true;
         // Populate results whenever the search tab becomes active
         document.addEventListener('msb-tab-switch', (e) => {
             const { tab } = e.detail;
