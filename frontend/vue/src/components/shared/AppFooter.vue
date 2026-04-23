@@ -29,7 +29,7 @@
         </svg>
         <span id="tracking-count">{{ trackingCount || '' }}</span>
       </button>
-      <button v-if="!isSdrRoute" id="radio-mini-btn" aria-label="Toggle radio player" data-tooltip="RADIO"
+      <button id="radio-mini-btn" aria-label="Toggle radio player" data-tooltip="RADIO"
         @click="emit('open-radio-tab')">
         <svg width="17" height="17" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <rect x="1" y="5" width="13" height="9" rx="1" stroke="currentColor" stroke-width="1.1"/>
@@ -67,7 +67,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
 import { useNotificationsStore } from '@/stores/notifications'
@@ -83,13 +82,11 @@ const emit = defineEmits<{
   'toggle-docs': []
 }>()
 
-const route = useRoute()
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
 const notificationsStore = useNotificationsStore()
 const trackingStore = useTrackingStore()
 
-const isSdrRoute = computed(() => route.path.startsWith('/sdr'))
 const notifCount = computed(() => notificationsStore.unreadCount)
 const trackingCount = computed(() => trackingStore.count)
 const sidebarOpen = computed(() => props.sidebarOpen ?? false)

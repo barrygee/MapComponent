@@ -104,8 +104,6 @@ export class AdsbLiveControl implements maplibregl.IControl {
     _hideGroundVehicles = false
     _hideTowers         = false
 
-    private _spriteReady: Promise<void> = Promise.resolve()
-
     constructor(
         airStore: AirStore,
         notificationsStore: NotificationsStore,
@@ -172,25 +170,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const isPlaneExpr = ['all', ['!', isGndExpr], ['!', isTowerExpr]]
 
         if (this._allHidden) {
-            const trackedHex = this._followEnabled && this._selectedHex ? this._selectedHex : null
-            if (trackedHex) {
-                const trackedFilter = ['==', ['get', 'hex'], trackedHex]
-                ;['adsb-bracket', 'adsb-icons'].forEach(id => {
-                    if (!this.map.getLayer(id)) return
-                    this.map.setLayoutProperty(id, 'visibility', 'visible')
-                    this.map.setFilter(id, trackedFilter as maplibregl.FilterSpecification)
-                })
-            } else {
-                ;['adsb-bracket', 'adsb-icons'].forEach(id => {
-                    if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', 'none')
-                })
-            }
             return
         }
-
-        ;['adsb-bracket', 'adsb-icons'].forEach(id => {
-            if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', 'visible')
-        })
 
         const typeFiltering = this._typeFilter !== 'all'
         const showGnd    = this.visible && !typeFiltering && !this._hideGroundVehicles
@@ -214,8 +195,6 @@ export class AdsbLiveControl implements maplibregl.IControl {
             ? ['==', ['get', 'hex'], '']
             : conditions.length === 1 ? conditions[0] : ['any', ...conditions]
 
-        if (this.map.getLayer('adsb-bracket')) this.map.setFilter('adsb-bracket', filter as maplibregl.FilterSpecification)
-        if (this.map.getLayer('adsb-icons'))   this.map.setFilter('adsb-icons',   filter as maplibregl.FilterSpecification)
     }
 
     // ---- MapLibre IControl lifecycle ----
@@ -238,16 +217,11 @@ export class AdsbLiveControl implements maplibregl.IControl {
         this.button.onmouseout  = () => { this.button.style.background = '#000' }
         this.container.appendChild(this.button)
 
-        if (this.visible) this._fetch()
-
-        this._spriteReady.then(() => {
-            if (!this.map) return
-            if (this.map.isStyleLoaded()) {
-                this.initLayers()
-            } else {
-                this.map.once('style.load', () => this.initLayers())
-            }
-        })
+        if (this.map.isStyleLoaded()) {
+            this.initLayers()
+        } else {
+            this.map.once('style.load', () => this.initLayers())
+        }
 
         return this.container
     }
@@ -268,141 +242,12 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
     // ---- Canvas sprite factories ----
 
-    private _createRadarBlip(color = '#ffffff', scale = 1): ImageData {
-        const canvasSize = 64, centerX = canvasSize / 2, centerY = canvasSize / 2
-        const canvas = document.createElement('canvas')
-        canvas.width = canvas.height = canvasSize
-        const ctx = canvas.getContext('2d')!
-        const apexVertex        = { x: centerX,     y: centerY - 13 }
-        const bottomRightVertex = { x: centerX + 9, y: centerY + 10 }
-        const bottomLeftVertex  = { x: centerX - 9, y: centerY + 10 }
-        const triangleCentroidX = (apexVertex.x + bottomRightVertex.x + bottomLeftVertex.x) / 3
-        const triangleCentroidY = (apexVertex.y + bottomRightVertex.y + bottomLeftVertex.y) / 3
-        const scaleFromCentroid = (v: { x: number; y: number }) => ({
-            x: triangleCentroidX + (v.x - triangleCentroidX) * scale,
-            y: triangleCentroidY + (v.y - triangleCentroidY) * scale,
-        })
-        const scaledApex        = scaleFromCentroid(apexVertex)
-        const scaledBottomRight = scaleFromCentroid(bottomRightVertex)
-        const scaledBottomLeft  = scaleFromCentroid(bottomLeftVertex)
-        ctx.beginPath(); ctx.moveTo(scaledApex.x, scaledApex.y); ctx.lineTo(scaledBottomRight.x, scaledBottomRight.y); ctx.lineTo(scaledBottomLeft.x, scaledBottomLeft.y)
-        ctx.closePath(); ctx.fillStyle = color; ctx.fill()
-        return ctx.getImageData(0, 0, canvasSize, canvasSize)
-    }
-
-    private _createBracket(color = '#c8ff00'): ImageData {
-        const canvasSize = 64
-        const canvas = document.createElement('canvas')
-        canvas.width = canvas.height = canvasSize
-        const ctx = canvas.getContext('2d')!
-        const left = 4, top = 4, right = 60, bottom = 56, cornerArmLength = 10
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.10)'
-        ctx.fillRect(left, top, right - left, bottom - top)
-        ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineCap = 'square'
-        ctx.beginPath(); ctx.moveTo(left + cornerArmLength, top);    ctx.lineTo(left,  top);    ctx.lineTo(left,  top    + cornerArmLength); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(right - cornerArmLength, top);   ctx.lineTo(right, top);    ctx.lineTo(right, top    + cornerArmLength); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(left + cornerArmLength, bottom);  ctx.lineTo(left,  bottom); ctx.lineTo(left,  bottom - cornerArmLength); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(right - cornerArmLength, bottom); ctx.lineTo(right, bottom); ctx.lineTo(right, bottom - cornerArmLength); ctx.stroke()
-        return ctx.getImageData(0, 0, canvasSize, canvasSize)
-    }
-
-    private _createMilBracket(): ImageData {
-        const canvasSize = 64
-        const canvas = document.createElement('canvas')
-        canvas.width = canvas.height = canvasSize
-        const ctx = canvas.getContext('2d')!
-        const left = 4, top = 4, right = 60, bottom = 56, cornerArmLength = 10
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.10)'
-        ctx.fillRect(left, top, right - left, bottom - top)
-        ctx.strokeStyle = '#c8ff00'; ctx.lineWidth = 3; ctx.lineCap = 'square'
-        ctx.beginPath(); ctx.moveTo(left + cornerArmLength, top);    ctx.lineTo(left,  top);    ctx.lineTo(left,  top    + cornerArmLength); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(right - cornerArmLength, top);   ctx.lineTo(right, top);    ctx.lineTo(right, top    + cornerArmLength); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(left + cornerArmLength, bottom);  ctx.lineTo(left,  bottom); ctx.lineTo(left,  bottom - cornerArmLength); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(right - cornerArmLength, bottom); ctx.lineTo(right, bottom); ctx.lineTo(right, bottom - cornerArmLength); ctx.stroke()
-        return ctx.getImageData(0, 0, canvasSize, canvasSize)
-    }
-
-    private _createTowerBlip(scale = 1.1): ImageData {
-        const canvasSize = 64
-        const canvas = document.createElement('canvas')
-        canvas.width = canvas.height = canvasSize
-        const ctx = canvas.getContext('2d')!
-        ctx.beginPath(); ctx.arc(canvasSize / 2, canvasSize / 2, 9 * scale, 0, Math.PI * 2)
-        ctx.fillStyle = '#ffffff'; ctx.fill()
-        return ctx.getImageData(0, 0, canvasSize, canvasSize)
-    }
-
-    private _createGroundVehicleBlip(color = '#ffffff', scale = 1.1): ImageData {
-        const canvasSize = 64
-        const canvas = document.createElement('canvas')
-        canvas.width = canvas.height = canvasSize
-        const ctx = canvas.getContext('2d')!
-        const halfSquareSize = 9 * scale, centerX = canvasSize / 2, centerY = canvasSize / 2
-        ctx.fillStyle = color
-        ctx.fillRect(centerX - halfSquareSize, centerY - halfSquareSize, halfSquareSize * 2, halfSquareSize * 2)
-        return ctx.getImageData(0, 0, canvasSize, canvasSize)
-    }
-
-    private _createUAVBlip(color = '#ffffff', scale = 1.1): ImageData {
-        const canvasSize = 64, centerX = canvasSize / 2, centerY = canvasSize / 2
-        const canvas = document.createElement('canvas')
-        canvas.width = canvas.height = canvasSize
-        const ctx = canvas.getContext('2d')!
-        const apexVertex        = { x: centerX,     y: centerY - 13 }
-        const bottomRightVertex = { x: centerX + 9, y: centerY + 10 }
-        const bottomLeftVertex  = { x: centerX - 9, y: centerY + 10 }
-        const triangleCentroidX = (apexVertex.x + bottomRightVertex.x + bottomLeftVertex.x) / 3
-        const triangleCentroidY = (apexVertex.y + bottomRightVertex.y + bottomLeftVertex.y) / 3
-        const scaleFromCentroid = (v: { x: number; y: number }) => ({
-            x: triangleCentroidX + (v.x - triangleCentroidX) * scale,
-            y: triangleCentroidY + (v.y - triangleCentroidY) * scale,
-        })
-        const scaledApex        = scaleFromCentroid(apexVertex)
-        const scaledBottomRight = scaleFromCentroid(bottomRightVertex)
-        const scaledBottomLeft  = scaleFromCentroid(bottomLeftVertex)
-        ctx.beginPath(); ctx.moveTo(scaledApex.x, scaledApex.y); ctx.lineTo(scaledBottomRight.x, scaledBottomRight.y); ctx.lineTo(scaledBottomLeft.x, scaledBottomLeft.y)
-        ctx.closePath(); ctx.fillStyle = color; ctx.fill()
-        const crosshairHalfSize = 4.5 * scale
-        ctx.strokeStyle = '#000000'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'
-        ctx.beginPath()
-        ctx.moveTo(triangleCentroidX - crosshairHalfSize, triangleCentroidY - crosshairHalfSize); ctx.lineTo(triangleCentroidX + crosshairHalfSize, triangleCentroidY + crosshairHalfSize)
-        ctx.moveTo(triangleCentroidX + crosshairHalfSize, triangleCentroidY - crosshairHalfSize); ctx.lineTo(triangleCentroidX - crosshairHalfSize, triangleCentroidY + crosshairHalfSize)
-        ctx.stroke()
-        return ctx.getImageData(0, 0, canvasSize, canvasSize)
-    }
-
-    // ---- Sprite registration ----
-
-    _registerIcons(): void {
-        const _addOrUpdate = (name: string, data: ImageData, options: { pixelRatio: number; sdf: boolean }) => {
-            if (this.map.hasImage(name)) {
-                this.map.updateImage(name, data)
-            } else {
-                this.map.addImage(name, data, options)
-            }
-        }
-
-        _addOrUpdate('adsb-bracket',          this._createBracket(),                         { pixelRatio: 2, sdf: false })
-        _addOrUpdate('adsb-bracket-mil',       this._createMilBracket(),                      { pixelRatio: 2, sdf: false })
-        _addOrUpdate('adsb-bracket-emerg',     this._createBracket('#ff2222'),                { pixelRatio: 2, sdf: false })
-        _addOrUpdate('adsb-bracket-emerg-gnd', this._createBracket('#ff2222'),                { pixelRatio: 2, sdf: false })
-        _addOrUpdate('adsb-blip',              this._createRadarBlip('#ffffff',         1.1), { pixelRatio: 2, sdf: false })
-        _addOrUpdate('adsb-blip-mil',          this._createRadarBlip('#c8ff00',         1.1), { pixelRatio: 2, sdf: false })
-        _addOrUpdate('adsb-blip-emerg',        this._createRadarBlip('#ff2222',         1.1), { pixelRatio: 2, sdf: false })
-        _addOrUpdate('adsb-blip-uav',          this._createUAVBlip('#ffffff',           1.1), { pixelRatio: 2, sdf: false })
-        _addOrUpdate('adsb-blip-gnd',          this._createGroundVehicleBlip('#ffffff', 1.1), { pixelRatio: 2, sdf: false })
-        _addOrUpdate('adsb-blip-emerg-gnd',    this._createGroundVehicleBlip('#ff2222', 1.1), { pixelRatio: 2, sdf: false })
-        _addOrUpdate('adsb-blip-tower',        this._createTowerBlip(1.1),                    { pixelRatio: 2, sdf: false })
-    }
-
     // ---- Map layer initialisation ----
 
     initLayers(): void {
         const layerVisibility = this.visible ? 'visible' : 'none'
 
-        ;['adsb-icons', 'adsb-bracket', 'adsb-trails'].forEach(id => {
-            if (this.map.getLayer(id)) this.map.removeLayer(id)
-        })
+        if (this.map.getLayer('adsb-trails')) this.map.removeLayer('adsb-trails')
 
         if (this._hoverHideTimer) { clearTimeout(this._hoverHideTimer); this._hoverHideTimer = null }
         for (const t of Object.values(this._parkedTimers)) clearTimeout(t)
@@ -442,8 +287,6 @@ export class AdsbLiveControl implements maplibregl.IControl {
         this._landedAt          = {}
         this._prevSquawk        = {}
 
-        this._registerIcons()
-
         this.map.addSource('adsb-trails-source', { type: 'geojson', data: this._trailsGeojson as GeoJSON.GeoJSON })
         this.map.addLayer({
             id: 'adsb-trails', type: 'circle', source: 'adsb-trails-source',
@@ -458,62 +301,6 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
         this.map.addSource('adsb-live', { type: 'geojson', data: this._geojson as GeoJSON.GeoJSON })
 
-        this.map.addLayer({
-            id: 'adsb-bracket', type: 'symbol', source: 'adsb-live',
-            filter: ['all',
-                ['!', ['match', ['get', 'category'], ['A0', 'B0', 'C0'], true, false]],
-                ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
-            ] as maplibregl.FilterSpecification,
-            layout: {
-                visibility: layerVisibility,
-                'icon-image': ['case',
-                    ['==', ['get', 'squawkEmerg'], 1], 'adsb-bracket-emerg',
-                    ['boolean', ['get', 'military'], false], 'adsb-bracket-mil',
-                    ['==', ['get', 'category'], 'C1'], 'adsb-bracket-emerg-gnd',
-                    'adsb-bracket',
-                ] as maplibregl.ExpressionSpecification,
-                'icon-size': 0.75,
-                'icon-rotation-alignment': 'viewport',
-                'icon-pitch-alignment':    'viewport',
-                'icon-allow-overlap':      true,
-                'icon-ignore-placement':   true,
-            },
-            paint: {
-                'icon-opacity': ['case', ['==', ['get', 'stale'], 1], 0.3, 1] as maplibregl.ExpressionSpecification,
-                'icon-opacity-transition': { duration: 0 },
-            } as Record<string, unknown>,
-        })
-
-        this.map.addLayer({
-            id: 'adsb-icons', type: 'symbol', source: 'adsb-live',
-            filter: ['all',
-                ['!', ['match', ['get', 'category'], ['A0', 'B0', 'C0'], true, false]],
-                ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]],
-            ] as maplibregl.FilterSpecification,
-            layout: {
-                visibility: layerVisibility,
-                'icon-image': ['case',
-                    ['==', ['get', 'squawkEmerg'], 1],                    'adsb-blip-emerg',
-                    ['boolean', ['get', 'military'], false],               'adsb-blip-mil',
-                    ['==', ['get', 'category'], 'B6'],                     'adsb-blip-uav',
-                    ['==', ['get', 'category'], 'C1'],                     'adsb-blip-emerg-gnd',
-                    ['==', ['get', 'category'], 'C2'],                     'adsb-blip-gnd',
-                    ['==', ['get', 'category'], 'C3'],                     'adsb-blip-tower',
-                    ['==', ['get', 't'], 'TWR'],                           'adsb-blip-tower',
-                    'adsb-blip',
-                ] as maplibregl.ExpressionSpecification,
-                'icon-size': 0.75,
-                'icon-rotate': ['get', 'track'] as maplibregl.ExpressionSpecification,
-                'icon-rotation-alignment': 'map',
-                'icon-pitch-alignment':    'map',
-                'icon-allow-overlap':      true,
-                'icon-ignore-placement':   true,
-            },
-            paint: {
-                'icon-opacity': ['case', ['==', ['get', 'stale'], 1], 0.3, 1] as maplibregl.ExpressionSpecification,
-                'icon-opacity-transition': { duration: 0 },
-            } as Record<string, unknown>,
-        })
 
         this._geojson              = _savedGeojson
         this._trailsGeojson        = _savedTrailsGeojson
@@ -547,14 +334,12 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 this._applySelection()
             }
 
-            this.map.on('click', 'adsb-bracket', handleAircraftClick)
-            this.map.on('click', 'adsb-icons',   handleAircraftClick)
 
             this.map.on('click', (e: maplibregl.MapMouseEvent) => {
                 if (_clickHandled) { _clickHandled = false; return }
                 if (this._followEnabled) return
                 if (this._selectedHex) {
-                    const hits = this.map.queryRenderedFeatures(e.point, { layers: ['adsb-bracket', 'adsb-icons'] })
+                    const hits = this.map.queryRenderedFeatures(e.point, { layers: [] })
                     if (!hits.length) { this._selectedHex = null; this._applySelection() }
                 }
             })
@@ -571,10 +356,6 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 this._hideHoverTag()
             }
 
-            this.map.on('mouseenter', 'adsb-bracket', handleHoverEnter)
-            this.map.on('mouseleave', 'adsb-bracket', handleHoverLeave)
-            this.map.on('mouseenter', 'adsb-icons',   handleHoverEnter)
-            this.map.on('mouseleave', 'adsb-icons',   handleHoverLeave)
             this.map.on('zoomend', () => this._updateCallsignMarkers())
         }
 
@@ -959,7 +740,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
     // ---- Callsign label markers ----
 
     private _makeArrowSvg(color: string, track: number): string {
-        return `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;background:#000;flex-shrink:0"><svg class="adsb-arrow" width="10" height="10" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;display:block" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="${color}"/></svg></span>`
+        return `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;background:#000;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;display:block;overflow:visible" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
     }
 
     private _buildCallsignLabelEl(props: AircraftProperties): HTMLElement {
@@ -971,7 +752,6 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const track    = props.track ?? 0
 
         const el = document.createElement('div')
-        el.className = 'adsb-label-box'
         el.style.cssText = [
             isEmerg ? 'background:rgba(180,0,0,0.85)' : 'background:rgba(0,0,0,0.5)',
             'color:#ffffff', "font-family:'Barlow Condensed','Barlow',sans-serif",
@@ -986,6 +766,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const box = el
 
         const nameSpan = document.createElement('span')
+        nameSpan.className = 'adsb-label-name'
         nameSpan.textContent = callsign
         nameSpan.style.cssText = isEmerg ? 'color:#ff4040 !important' : 'color:#ffffff !important'
         box.appendChild(nameSpan)
@@ -1086,22 +867,20 @@ export class AdsbLiveControl implements maplibregl.IControl {
             if (this._callsignMarkers[hex]) {
                 this._callsignMarkers[hex].setLngLat(lngLat)
                 const labelEl = this._callsignMarkers[hex].getElement()
-                const box     = labelEl.querySelector('.adsb-label-box') as HTMLElement || labelEl
+                const box     = labelEl
                 const raw     = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || f.properties.hex || ''
                 const isEmerg = f.properties.squawkEmerg === 1
                 const isMil   = !!f.properties.military
-                // update arrow
-                const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
-                const track = f.properties.track ?? 0
-                const arrowSvg = labelEl.querySelector('.adsb-arrow') as SVGElement | null
-                if (arrowSvg) {
-                    arrowSvg.style.transform = `rotate(${track}deg)`
-                    const poly = arrowSvg.querySelector('polygon')
-                    if (poly) poly.setAttribute('fill', arrowColor)
-                }
                 box.style.background = isEmerg ? 'rgba(180,0,0,0.85)' : 'rgba(0,0,0,0.5)'
                 labelEl.style.opacity = isDim ? '0.3' : '1'
-                const nameSpan = box.querySelector('span:not(.sqk-badge):not(.mil-model-badge)') as HTMLElement || box
+                const arrowSvg = box.querySelector('.adsb-arrow') as SVGElement | null
+                if (arrowSvg) {
+                    const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
+                    arrowSvg.style.transform = `rotate(${f.properties.track ?? 0}deg)`
+                    const poly = arrowSvg.querySelector('polygon')
+                    if (poly) poly.setAttribute('stroke', arrowColor)
+                }
+                const nameSpan = box.querySelector('.adsb-label-name') as HTMLElement || box
                 nameSpan.textContent = raw || 'UNKNOWN'
                 nameSpan.style.cssText = isDim ? 'color:rgba(255,255,255,0.45) !important' : 'color:#ffffff !important'
                 if (isMil) {
@@ -1155,10 +934,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 const labelEl = this._buildCallsignLabelEl(f.properties)
                 if (isDim) {
                     labelEl.style.opacity = '0.3'
-                    const nameSpan = labelEl.querySelector('span:not(.sqk-badge):not(.mil-model-badge)') as HTMLElement | null
+                    const nameSpan = labelEl.querySelector('.adsb-label-name') as HTMLElement | null
                     if (nameSpan) nameSpan.style.color = 'rgba(255,255,255,0.45)'
                 }
-                const marker = new maplibregl.Marker({ element: labelEl, anchor: 'left', offset: [0, 0] })
+                const marker = new maplibregl.Marker({ element: labelEl, anchor: 'left', offset: [14, 0] })
                     .setLngLat(lngLat).addTo(this.map)
                 this._callsignMarkers[hex] = marker
             }
@@ -1548,9 +1327,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
     private _raiseLayers(): void {
         if (!this.map) return
-        ;['adsb-trails', 'adsb-bracket', 'adsb-icons'].forEach(id => {
-            if (this.map.getLayer(id)) this.map.moveLayer(id)
-        })
+        if (this.map.getLayer('adsb-trails')) this.map.moveLayer('adsb-trails')
     }
 
     // ---- Tracking state persistence ----

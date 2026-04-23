@@ -17,7 +17,7 @@
 
   <RouterView />
 
-  <MapSidebar v-if="!isSdrRoute" ref="sidebarRef">
+  <MapSidebar ref="sidebarRef">
     <template #radio>
       <SdrTabPanel />
     </template>
@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import MapSidebar from '@/components/shared/MapSidebar.vue'
 import AppFooter from '@/components/shared/AppFooter.vue'
@@ -52,6 +52,10 @@ const { start: startGps } = useUserLocation()
 onMounted(() => { startGps() })
 
 const isSdrRoute = computed(() => route.path.startsWith('/sdr'))
+
+watch(isSdrRoute, (isSdr) => {
+  if (isSdr) sidebarRef.value?.openRadioTab()
+})
 
 const sidebarRef = ref<InstanceType<typeof MapSidebar> | null>(null)
 const docsRef    = ref<InstanceType<typeof DocsPanel>   | null>(null)
