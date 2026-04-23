@@ -5,9 +5,9 @@ function _buildElement(cssClass: string): HTMLElement {
     wrapper.className = cssClass
     wrapper.innerHTML = `
         <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" overflow="visible">
-            <circle cx="30" cy="30" r="20"
-                fill="none" stroke="#c8ff00" stroke-width="1.5"
-                stroke-dasharray="125.6" stroke-dashoffset="125.6"
+            <circle cx="30" cy="30" r="14"
+                fill="none" stroke="#c8ff00" stroke-width="2"
+                stroke-dasharray="87.96" stroke-dashoffset="87.96"
                 style="animation: marker-circle-draw 0.6s ease forwards" />
             <circle cx="30" cy="30" r="4"
                 fill="white"
