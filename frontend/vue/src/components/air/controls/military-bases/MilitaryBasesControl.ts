@@ -71,53 +71,6 @@ export class MilitaryBasesToggleControl extends SentinelControlBase {
         super.onRemove();
     }
 
-    _buildMilitaryBasesPanelHTML(p: MilitaryBaseProperties, coords: LngLat): string {
-        const lat = coords[1].toFixed(4);
-        const lng = coords[0].toFixed(4);
-        const fields: [string, string][] = [
-            ['ICAO', p.icao || '—'],
-            ['LAT',  lat],
-            ['LON',  lng],
-        ];
-        const fieldsHTML = fields.map(([lbl, val]) =>
-            `<div class="adsb-sb-field">` +
-            `<span class="adsb-sb-label">${lbl}</span>` +
-            `<span class="adsb-sb-value">${val}</span>` +
-            `</div>`
-        ).join('');
-        return `<div class="adsb-sb-header">` +
-            `<span class="adsb-sb-label-tag">MIL BASE</span>` +
-            `<button class="adsb-sb-untrack-btn" id="apt-panel-close">CLOSE</button>` +
-            `</div>` +
-            `<div class="adsb-sb-header" style="border-top:none;border-bottom:1px solid rgba(255,255,255,0.08);height:auto;padding:8px 14px 9px">` +
-            `<span class="adsb-sb-callsign" style="color:#ffffff">${p.name.toUpperCase()}</span>` +
-            `</div>` +
-            `<div class="adsb-sb-fields">${fieldsHTML}</div>`;
-    }
-
-    _showMilitaryBasesPanel(p: MilitaryBaseProperties, coords: LngLat, fromSearch = false): void {
-        let bar = document.getElementById('adsb-status-bar');
-        if (!bar) {
-            bar = document.createElement('div');
-            bar.id = 'adsb-status-bar';
-            const trackingPanel = document.getElementById('tracking-panel');
-            if (trackingPanel) trackingPanel.appendChild(bar);
-            else               document.body.appendChild(bar);
-        }
-        bar.dataset['apt'] = '1';
-        bar.innerHTML      = this._buildMilitaryBasesPanelHTML(p, coords);
-        bar.classList.add('adsb-sb-visible');
-        if (!fromSearch) {}
-
-        bar.querySelector('#apt-panel-close')!.addEventListener('click', (e: Event) => {
-            e.stopPropagation();
-            bar!.classList.remove('adsb-sb-visible');
-            delete bar!.dataset['apt'];
-            const is3D = this._is3DActive();
-            this.map.flyTo({ center: [-4.4815, 54.1453], zoom: 6, pitch: is3D ? 45 : 0, bearing: 0, duration: 800 });
-        });
-    }
-
     initLayers(): void {
         if (this.map.getSource('military-bases')) this.map.removeSource('military-bases');
         this.map.addSource('military-bases', { type: 'geojson', data: MILITARY_BASES_DATA });
@@ -143,7 +96,6 @@ export class MilitaryBasesToggleControl extends SentinelControlBase {
                     const easeOpts: maplibregl.EaseToOptions = { center: coords, zoom: 16, duration: 800 };
                     if (pitch !== undefined) easeOpts.pitch = pitch;
                     this.map.easeTo(easeOpts);
-                    this._showMilitaryBasesPanel(baseProperties, coords);
                 });
 
                 let hintPanel: HTMLDivElement | null = null;

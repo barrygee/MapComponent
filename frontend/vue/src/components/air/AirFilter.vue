@@ -318,13 +318,6 @@ function selectAirport(r: AirportResult) {
 
 function selectMil(r: MilResult) {
   fitBoundsWithPadding(r.bounds)
-  if (props.militaryBasesControl) {
-    props.militaryBasesControl._showMilitaryBasesPanel(
-      { icao: r.icao, name: r.name, bounds: r.bounds },
-      r.coords,
-      true,
-    )
-  }
 }
 
 // ---- Notifications (bell button) ----
