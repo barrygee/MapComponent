@@ -40,8 +40,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useNotificationsStore } from '@/stores/notifications'
-import { useTrackingStore } from '@/stores/tracking'
 import NotificationsPanel from './NotificationsPanel.vue'
 import TrackingPanel from './TrackingPanel.vue'
 
@@ -52,16 +50,13 @@ type SidebarTab = 'search' | 'alerts' | 'tracking' | 'passes' | 'radio'
 const SS_KEY = 'sentinel_sidebar_open'
 const SS_TAB_KEY = 'sentinel_sidebar_tab'
 
-const notificationsStore = useNotificationsStore()
-const trackingStore = useTrackingStore()
-
 const open = ref(_restoreOpen())
 const activeTab = ref<SidebarTab>(_restoreTab())
 
 const tabs = computed(() => [
   { id: 'search' as SidebarTab,   label: 'SEARCH',   badge: undefined },
-  { id: 'alerts' as SidebarTab,   label: 'ALERTS',   badge: notificationsStore.unreadCount },
-  { id: 'tracking' as SidebarTab, label: 'TRACKING', badge: trackingStore.count },
+  { id: 'alerts' as SidebarTab,   label: 'ALERTS',   badge: undefined },
+  { id: 'tracking' as SidebarTab, label: 'TRACKING', badge: undefined },
   { id: 'passes' as SidebarTab,   label: 'PASSES',   badge: undefined },
   { id: 'radio' as SidebarTab,    label: 'RADIO',    badge: undefined },
 ])
