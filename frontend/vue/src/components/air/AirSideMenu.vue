@@ -154,21 +154,6 @@
       </button>
     </div>
 
-    <!-- Group 4: clear all overlays -->
-    <div class="sm-group">
-      <button
-        class="sm-btn"
-        :class="{ active: cleared }"
-        data-tooltip="HIDE LAYERS"
-        @click="toggleClear"
-        style="opacity:0.3;color:#ffffff"
-        :style="cleared ? 'opacity:1;color:#c8ff00' : 'opacity:0.3;color:#ffffff'"
-      >
-        <span class="sm-icon" style="--sm-icon-size:14px">✕</span>
-        <span class="sm-label">HIDE LAYERS</span>
-      </button>
-    </div>
-
     <!-- Group 5: filter mode flyout + filter button -->
     <div class="sm-group" style="position:relative">
       <button
