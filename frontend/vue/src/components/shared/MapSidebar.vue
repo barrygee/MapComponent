@@ -428,16 +428,15 @@ body[data-domain="sdr"] #msb-pane-radio {
 }
 
 #msb-alerts-empty {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding: 20px 14px;
     font-family: var(--font-primary);
     font-size: 10px;
     font-weight: 400;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.18);
+    text-align: center;
+    width: 100%;
 }
 
 #msb-pane-tracking {
@@ -452,7 +451,7 @@ body[data-domain="sdr"] #msb-pane-radio {
 }
 
 #msb-tracking-empty {
-    padding: 20px 14px;
+    padding: 7px 14px;
     font-family: var(--font-primary);
     font-size: 10px;
     font-weight: 400;

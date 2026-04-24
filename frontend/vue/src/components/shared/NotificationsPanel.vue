@@ -1,7 +1,7 @@
 <template>
-  <div v-if="store.visible.length === 0" id="msb-alerts-empty">No alerts</div>
   <div id="notif-list-wrap">
     <div id="notif-list" ref="listRef">
+      <div v-if="store.visible.length === 0" id="msb-alerts-empty">No alerts</div>
       <TransitionGroup name="notif">
         <div
           v-for="item in store.visible"

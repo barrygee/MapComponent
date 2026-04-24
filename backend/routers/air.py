@@ -62,10 +62,11 @@ async def get_aircraft_near_point(
     """Proxy the airplanes.live /v2/point endpoint with a SQLite write-through cache.
 
     Cache strategy:
-      - HIT:   fresh row exists (within adsb_ttl_ms = 5s) → return immediately
-      - MISS:  no row or expired → fetch upstream, upsert row, return fresh data
-      - STALE: upstream failed but stale row within adsb_stale_ms = 30s → serve old data
-      - 503:   upstream failed and no usable stale entry
+      - HIT:    fresh row exists (within adsb_ttl_ms) → return immediately
+      - MISS:   no row or expired → fetch upstream, upsert row, return fresh data
+      - RATED:  upstream returned 429 → serve existing cache row regardless of age
+      - STALE:  upstream failed (non-429) but row within adsb_stale_ms → serve old data
+      - 503:    upstream failed and no usable cached entry
     """
     # Build a deterministic cache key from the query parameters
     cache_key = f"{lat:.4f}_{lon:.4f}_{radius}"
@@ -88,10 +89,16 @@ async def get_aircraft_near_point(
         raise HTTPException(status_code=503, detail="ADS-B upstream unavailable")
 
     data: dict | None = None
+    rate_limited = False
     for base_url in filter(None, [primary_url, fallback_url]):
         try:
             data = await adsb_service.fetch_aircraft(lat, lon, radius, base_url)
+            rate_limited = False
             break
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429:
+                rate_limited = True
+            continue
         except httpx.HTTPError:
             continue
 
@@ -119,6 +126,10 @@ async def get_aircraft_near_point(
         await db.commit()
 
         return JSONResponse(content=data, headers={"X-Cache": "MISS"})
+
+    # Rate-limited: serve whatever we have cached, regardless of age
+    if rate_limited and row:
+        return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "RATED"})
 
     # All upstreams failed — serve stale data if still within the stale window
     if row and is_within_stale(row.fetched_at, settings.adsb_stale_ms):
@@ -224,7 +235,7 @@ async def remove_tracked_aircraft(hex: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AirTracking).where(AirTracking.hex == hex))
     row = result.scalar_one_or_none()
     if not row:
-        raise HTTPException(status_code=404, detail="Aircraft not tracked")
+        return JSONResponse({"status": "removed"})
     await db.delete(row)
     await db.commit()
     return JSONResponse({"status": "removed"})

@@ -5,10 +5,10 @@ class Settings(BaseSettings):
     # Path to the SQLite database file (relative to the project root)
     db_path: str = "backend/sentinel.db"
 
-    # How long ADS-B aircraft data is considered fresh (5 seconds)
-    adsb_ttl_ms: int = 5000
-    # How long a stale ADS-B response can still be served if the upstream fails (30 seconds)
-    adsb_stale_ms: int = 30000
+    # How long ADS-B aircraft data is considered fresh (10 seconds — matches airplanes.live rate limit)
+    adsb_ttl_ms: int = 10000
+    # How long a stale ADS-B response can still be served if the upstream fails (60 seconds)
+    adsb_stale_ms: int = 60000
 
     # Base URL for the airplanes.live ADS-B API
     adsb_upstream_base: str = "https://api.airplanes.live/v2"
