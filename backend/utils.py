@@ -17,7 +17,11 @@ def _valid_url(url: object) -> str | None:
     return None
 
 
-async def resolve_domain_urls(domain: str, db: AsyncSession) -> tuple[str | None, str | None]:
+async def resolve_domain_urls(
+    domain: str,
+    db: AsyncSession,
+    online_default: str | None = None,
+) -> tuple[str | None, str | None]:
     """Return (primary_url, fallback_url) for a given domain based on connectivity mode and override.
 
     Resolves effective mode:
@@ -28,8 +32,9 @@ async def resolve_domain_urls(domain: str, db: AsyncSession) -> tuple[str | None
     When effective mode is 'offgrid':  primary = offgrid URL,  fallback = online URL
 
     Args:
-        domain: Domain namespace string, e.g. 'air' or 'space'.
-        db:     Active async database session.
+        domain:         Domain namespace string, e.g. 'air' or 'space'.
+        db:             Active async database session.
+        online_default: Fallback online URL used when the DB has no onlineUrl configured.
     """
     result = await db.execute(
         select(UserSettings).where(
@@ -54,7 +59,7 @@ async def resolve_domain_urls(domain: str, db: AsyncSession) -> tuple[str | None
     else:
         effective_mode = settings_map.get("app.connectivityMode", "online") or "online"
 
-    online = _valid_url(settings_map.get(f"{domain}.onlineUrl"))
+    online = _valid_url(settings_map.get(f"{domain}.onlineUrl")) or _valid_url(online_default)
 
     # offgridSource is stored as {"url": "http://..."} by the frontend settings panel
     offgrid_raw = settings_map.get(f"{domain}.offgridSource")

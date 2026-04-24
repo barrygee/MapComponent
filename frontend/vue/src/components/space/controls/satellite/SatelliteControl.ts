@@ -105,7 +105,13 @@ export class SatelliteControl extends SentinelControlBase {
 
     onRemove(): void {
         this._stopPolling()
-        this._stopFollowing()
+        // Deactivate (not unregister) so the tracked sat stays visible in the
+        // tracking panel as a read-only item when navigating to another section.
+        if (this._followEnabled) {
+            this._followEnabled = false
+            if (this._trackingNotifId) { this._notificationsStore.dismiss(this._trackingNotifId); this._trackingNotifId = null }
+            this._trackingStore.deactivate('space')
+        }
         this._hideHoverTagNow()
         this._hideLabel()
         if (this._passNotifTimeout)    { clearTimeout(this._passNotifTimeout);     this._passNotifTimeout = null }
@@ -353,9 +359,15 @@ export class SatelliteControl extends SentinelControlBase {
                 this._updateHoverTagContent(position)
             }
             if (this._followEnabled && !this._previewNoradId) {
-                if (this._labelMarker) this._labelMarker.setLngLat([position.lon, position.lat])
-                this.map.easeTo({ center: [position.lon, position.lat], duration: 150, easing: (t: number) => t })
-                this._updateStatusBar(position)
+                if (!this._labelMarker) {
+                    // First position after a satellite switch — re-initialise the follow UI and tracking panel
+                    this._followEnabled = false
+                    this._startFollowing()
+                } else {
+                    this._labelMarker.setLngLat([position.lon, position.lat])
+                    this.map.easeTo({ center: [position.lon, position.lat], duration: 150, easing: (t: number) => t })
+                    this._updateStatusBar(position)
+                }
             }
 
             // Emit for SatInfoPanel — include noradId so accordions can match without tracking satellite-selected
@@ -770,8 +782,10 @@ export class SatelliteControl extends SentinelControlBase {
     switchSatellite(noradId: string, name: string): void {
         if (this._previewAbort) { this._previewAbort.abort(); this._previewAbort = null }
         this._previewNoradId = null
+        const wasFollowing = this._followEnabled
         if (this._followEnabled) this._stopFollowing()
         this._hideHoverTagNow(); this._hideLabel()
+        if (wasFollowing) this._followEnabled = true  // re-arm so _fetch resumes following on first position
         if (this._passNotifTimeout)    { clearTimeout(this._passNotifTimeout);     this._passNotifTimeout = null }
         if (this._passRefreshInterval) { clearInterval(this._passRefreshInterval); this._passRefreshInterval = null }
         this._passNotifEnabled = false; this._lastFiredPassAos = 0

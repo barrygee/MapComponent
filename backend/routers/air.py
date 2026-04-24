@@ -70,7 +70,7 @@ async def get_aircraft_near_point(
     # Build a deterministic cache key from the query parameters
     cache_key = f"{lat:.4f}_{lon:.4f}_{radius}"
 
-    primary_url, fallback_url = await resolve_domain_urls("air", db)
+    primary_url, fallback_url = await resolve_domain_urls("air", db, online_default=settings.adsb_upstream_base)
 
     # Look up any existing cache row for this key
     result = await db.execute(select(AdsbCache).where(AdsbCache.cache_key == cache_key))
@@ -78,13 +78,12 @@ async def get_aircraft_near_point(
 
     # Return immediately if the cached data is still within its TTL,
     # but only when there is a primary source to fetch from. If primary_url
-    # is None (e.g. offline mode with no offline source configured) we skip
-    # the cache so callers get a 503 rather than stale online data.
+    # is None (offgrid mode with no offgrid source configured) we skip
+    # the cache so callers get a 503 rather than stale data.
     if row and is_fresh(row.expires_at) and primary_url is not None:
         return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "HIT"})
 
-    # If primary_url is None the effective mode is offline with no offline source —
-    # do not fall back to the online URL, just serve a 503.
+    # offgrid mode with no offgrid source configured — nothing to fetch
     if primary_url is None:
         raise HTTPException(status_code=503, detail="ADS-B upstream unavailable")
 
