@@ -333,10 +333,13 @@ function onSatPositionUpdate(e: Event): void {
 async function loadSatellites(): Promise<void> {
   try {
     const resp = await fetch('/api/space/tle/list')
-    if (!resp.ok) return
+    if (!resp.ok) { loaded.value = true; return }
     const data = await resp.json() as { satellites?: SatEntry[] }
-    if (data.satellites) { satellites.value = data.satellites; loaded.value = true }
-  } catch {}
+    satellites.value = data.satellites ?? []
+    loaded.value = true
+  } catch {
+    loaded.value = true
+  }
 }
 
 function isNow(pass: SatPass): boolean {
