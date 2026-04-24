@@ -282,6 +282,7 @@ function startItemTick(): void {
 
 function trackSat(sat: SatEntry): void {
   props.satelliteControl?.switchSatellite(sat.norad_id, sat.name || sat.norad_id)
+  props.satelliteControl?.startFollowing()
   collapseExpanded()
 }
 

@@ -838,6 +838,14 @@ export class SatelliteControl extends SentinelControlBase {
         }
     }
 
+    startFollowing(): void {
+        if (this._lastPosition) {
+            this._startFollowing()
+        } else {
+            this._followEnabled = true
+        }
+    }
+
     toggleTrack(): void {
         this.trackVisible = !this.trackVisible
         const trackVis = (this.issVisible && this.trackVisible) ? 'visible' : 'none'
