@@ -61,6 +61,7 @@ export class SatelliteControl extends SentinelControlBase {
     private _lastFiredPassAos   = 0
     _previewNoradId:            string | null = null
     private _previewAbort:      AbortController | null = null
+    private _previewPositions:  Map<string, IssPosition> = new Map()
 
     constructor(
         spaceStore: SpaceStore,
@@ -691,6 +692,7 @@ export class SatelliteControl extends SentinelControlBase {
             if (abort.signal.aborted || this._previewNoradId !== noradId) return
 
             const { position, ground_track, footprint } = data
+            this._previewPositions.set(noradId, position)
             const fpUnwrapped2 = SatelliteControl._unwrapRing(footprint as [number, number][])
             const footprintGeo: GeoJSON.FeatureCollection = {
                 type: 'FeatureCollection',
@@ -779,19 +781,20 @@ export class SatelliteControl extends SentinelControlBase {
     }
 
     // ---- Satellite switching ----
-    switchSatellite(noradId: string, name: string): void {
+    switchSatellite(noradId: string, name: string, follow = false): void {
         if (this._previewAbort) { this._previewAbort.abort(); this._previewAbort = null }
         this._previewNoradId = null
-        const wasFollowing = this._followEnabled
         if (this._followEnabled) this._stopFollowing()
         this._hideHoverTagNow(); this._hideLabel()
-        if (wasFollowing) this._followEnabled = true  // re-arm so _fetch resumes following on first position
+        if (follow) this._followEnabled = true
         if (this._passNotifTimeout)    { clearTimeout(this._passNotifTimeout);     this._passNotifTimeout = null }
         if (this._passRefreshInterval) { clearInterval(this._passRefreshInterval); this._passRefreshInterval = null }
         this._passNotifEnabled = false; this._lastFiredPassAos = 0
 
+        const isSameSat = this._activeNoradId === noradId
         this._activeNoradId = noradId; this._activeSatName = name
-        this._lastPosition = null; this._trackingRestored = true
+        if (!isSameSat) this._lastPosition = this._previewPositions.get(noradId) ?? null
+        this._trackingRestored = true
 
         if (!this.issVisible) {
             this.issVisible = true
@@ -804,6 +807,9 @@ export class SatelliteControl extends SentinelControlBase {
 
         this._restorePassNotifState()
         if (this._passNotifEnabled) this._startPassNotifPolling()
+        if (follow && this._lastPosition) {
+            this._startFollowing()
+        }
         this._stopPolling(); this._fetch(); this._startPolling()
 
         // Notify filter/passes panels
@@ -835,14 +841,6 @@ export class SatelliteControl extends SentinelControlBase {
             this._activeNoradId = '25544'; this._activeSatName = 'ISS'
         } else {
             this._fetch(); this._startPolling()
-        }
-    }
-
-    startFollowing(): void {
-        if (this._lastPosition) {
-            this._startFollowing()
-        } else {
-            this._followEnabled = true
         }
     }
 
