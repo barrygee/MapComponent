@@ -277,7 +277,6 @@ async function fetchAccordionPasses(noradId: string): Promise<void> {
 
 function trackSat(pass: SatPass): void {
   props.satelliteControl?.switchSatellite(pass.norad_id, pass.name || pass.norad_id, true)
-  collapseExpanded()
 }
 
 function onMouseEnter(pass: SatPass): void {
