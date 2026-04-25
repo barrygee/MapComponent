@@ -98,10 +98,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
+import { useAppStore } from '@/stores/app'
 import * as settingsApi from '@/services/settingsApi'
 import SettingRow from './settings/SettingRow.vue'
 
 const store = useSettingsStore()
+const appStore = useAppStore()
 
 const activeSection = ref('app')
 const searchQuery = ref('')
@@ -157,7 +159,10 @@ const ALL_SETTINGS: SettingItem[] = [
   { section: 'app', sectionLabel: 'App Settings', id: 'config-current', label: 'Application Config', desc: 'Settings currently stored in the database', type: 'config-current' },
 ]
 
-const visibleSections = computed(() => NAV_SECTIONS)
+const DOMAIN_SECTIONS = new Set(['air', 'space', 'sea', 'land', 'sdr'])
+const visibleSections = computed(() =>
+  NAV_SECTIONS.filter(s => !DOMAIN_SECTIONS.has(s.key) || appStore.enabledDomains.includes(s.key))
+)
 
 const sectionHeading = computed(() => {
   if (searchQuery.value.trim()) return 'SEARCH RESULTS'
@@ -174,9 +179,10 @@ const searchResults = computed<SettingItem[]>(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return []
   return ALL_SETTINGS.filter(s =>
-    s.label.toLowerCase().includes(q) ||
+    (!DOMAIN_SECTIONS.has(s.section) || appStore.enabledDomains.includes(s.section)) &&
+    (s.label.toLowerCase().includes(q) ||
     s.desc.toLowerCase().includes(q) ||
-    s.sectionLabel.toLowerCase().includes(q)
+    s.sectionLabel.toLowerCase().includes(q))
   )
 })
 

@@ -45,8 +45,10 @@ import DocsPanel from '@/components/shared/DocsPanel.vue'
 import SdrTabPanel from '@/components/sdr/SdrTabPanel.vue'
 import { useUserLocation } from '@/composables/useUserLocation'
 import { useDocumentEvent } from '@/composables/useDocumentEvent'
+import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
+const appStore = useAppStore()
 const { start: startGps } = useUserLocation()
 
 onMounted(() => { startGps() })
@@ -69,11 +71,15 @@ const docsRef    = ref<InstanceType<typeof DocsPanel>   | null>(null)
 
 const sidebarOpen = computed(() => sidebarRef.value?.open ?? false)
 
-const navDomains: [string, string][] = [
+const ALL_NAV_DOMAINS: [string, string][] = [
   ['air',   'AIR'],
   ['space', 'SPACE'],
   ['sea',   'SEA'],
   ['land',  'LAND'],
   ['sdr',   'SDR'],
 ]
+
+const navDomains = computed(() =>
+  ALL_NAV_DOMAINS.filter(([d]) => appStore.enabledDomains.includes(d))
+)
 </script>

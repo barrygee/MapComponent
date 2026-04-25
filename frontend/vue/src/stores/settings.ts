@@ -31,7 +31,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   async function loadAll() {
     try {
-      const res = await fetch('/api/settings/')
+      const res = await fetch('/api/settings')
       if (res.ok) {
         const data = await res.json()
         allSettings.value = data

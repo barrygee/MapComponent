@@ -27,11 +27,11 @@
     }
   },
   "sea": {
-    "enabled": true,
+    "enabled": false,
     "sourceOverride": "auto"
   },
   "land": {
-    "enabled": true,
+    "enabled": false,
     "sourceOverride": "auto"
   },
   "sdr": {

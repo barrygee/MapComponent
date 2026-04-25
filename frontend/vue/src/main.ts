@@ -29,4 +29,23 @@ try {
   }
 } catch {}
 
-app.mount('#app')
+// Load per-domain enabled state from backend before first render.
+const ALL_DOMAINS = ['air', 'space', 'sea', 'land', 'sdr'] as const
+// Domains that are ON by default when the DB has no explicit enabled key for them.
+const DOMAINS_ON_BY_DEFAULT = new Set(['air', 'space', 'sdr'])
+;(async () => {
+  try {
+    const res = await fetch('/api/settings')
+    if (res.ok) {
+      const data = await res.json() as Record<string, Record<string, unknown>>
+      const enabled = ALL_DOMAINS.filter(d => {
+        const val = data[d]?.enabled
+        if (typeof val === 'boolean') return val
+        // Key absent from DB — fall back to per-domain default.
+        return DOMAINS_ON_BY_DEFAULT.has(d)
+      })
+      if (enabled.length > 0) appStore.setEnabledDomains(enabled)
+    }
+  } catch {}
+  app.mount('#app')
+})()

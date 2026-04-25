@@ -4,6 +4,7 @@ import SpaceView from '@/components/space/SpaceView.vue'
 import SeaView from '@/components/sea/SeaView.vue'
 import LandView from '@/components/land/LandView.vue'
 import SdrView from '@/components/sdr/SdrView.vue'
+import { useAppStore } from '@/stores/app'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,6 +18,16 @@ const router = createRouter({
     { path: '/docs/',  redirect: '/air/'    },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
+})
+
+router.beforeEach((to) => {
+  const domain = to.meta?.domain as string | undefined
+  if (!domain) return
+  const appStore = useAppStore()
+  if (!appStore.enabledDomains.includes(domain)) {
+    const first = appStore.firstEnabledDomain()
+    return `/${first}/`
+  }
 })
 
 router.afterEach((to) => {

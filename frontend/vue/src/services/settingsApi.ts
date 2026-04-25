@@ -25,7 +25,7 @@ export async function put(ns: string, key: string, value: unknown): Promise<void
 
 export async function getAll(): Promise<Record<string, Record<string, unknown>> | null> {
   try {
-    const res = await fetch(`${BASE}/`)
+    const res = await fetch(BASE)
     if (!res.ok) return null
     return await res.json() as Record<string, Record<string, unknown>>
   } catch (e) {
