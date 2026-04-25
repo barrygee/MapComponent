@@ -44,11 +44,15 @@ import SettingsPanel from '@/components/shared/SettingsPanel.vue'
 import DocsPanel from '@/components/shared/DocsPanel.vue'
 import SdrTabPanel from '@/components/sdr/SdrTabPanel.vue'
 import { useUserLocation } from '@/composables/useUserLocation'
+import { useDocumentEvent } from '@/composables/useDocumentEvent'
 
 const route = useRoute()
 const { start: startGps } = useUserLocation()
 
 onMounted(() => { startGps() })
+
+useDocumentEvent('air-open-search', () => sidebarRef.value?.switchTab('search'))
+useDocumentEvent('open-space-search', () => sidebarRef.value?.switchTab('search'))
 
 const isSdrRoute = computed(() => route.path.startsWith('/sdr'))
 

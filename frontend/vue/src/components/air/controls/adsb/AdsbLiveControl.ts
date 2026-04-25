@@ -235,6 +235,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
         if (this.map.getLayer('adsb-bracket')) this.map.setFilter('adsb-bracket', filter as maplibregl.FilterSpecification)
         if (this.map.getLayer('adsb-icons'))   this.map.setFilter('adsb-icons',   filter as maplibregl.FilterSpecification)
+        if (this.labelsVisible && this.map.getLayer('adsb-icons')) this.map.setLayoutProperty('adsb-icons', 'visibility', 'none')
     }
 
     // ---- MapLibre IControl lifecycle ----
