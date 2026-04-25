@@ -137,7 +137,7 @@ const ALL_SETTINGS: SettingItem[] = [
   { section: 'app', sectionLabel: 'App Settings', id: 'connectivity-mode', label: 'Connectivity Mode', desc: 'Use online or off grid data sources across the app', type: 'connectivity-toggle' },
   { section: 'app', sectionLabel: 'App Settings', id: 'app-connectivity-probe', label: 'Connectivity Probe URL', desc: 'URL polled every 2 seconds to detect internet access', type: 'probe-url' },
   { section: 'app', sectionLabel: 'App Settings', id: 'location', label: 'My Location', desc: 'Set a fixed latitude / longitude for your position', type: 'location' },
-  { section: 'air', sectionLabel: 'AIR', id: 'air-label-fields', label: 'Label Data Points', desc: 'Choose which data fields appear inline with the callsign on aircraft labels', type: 'air-label-fields', groupLabel: 'LABELS' },
+  { section: 'air', sectionLabel: 'AIR', id: 'air-tag-fields', label: 'Label Data Points', desc: 'Choose which data fields appear on aircraft labels for civil and military aircraft', type: 'air-tag-fields', groupLabel: 'LABELS' },
   { section: 'air', sectionLabel: 'AIR', id: 'air-source-override', label: 'Source Override', desc: 'Override the app-level connectivity mode for this domain', type: 'source-override', ns: 'air', groupLabel: 'DATA SOURCES' },
   { section: 'air', sectionLabel: 'AIR', id: 'air-online-source', label: 'Online Data Source', desc: 'URL for live air data feed', type: 'online-source', ns: 'air', defaultUrl: 'https://api.airplanes.live/v2' },
   { section: 'air', sectionLabel: 'AIR', id: 'air-offline-source', label: 'Off Grid Data Source', desc: 'Local server URL and port for air data', type: 'offline-source', ns: 'air', defaultUrl: '' },

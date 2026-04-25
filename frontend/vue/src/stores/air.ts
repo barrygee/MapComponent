@@ -20,10 +20,20 @@ export interface AdsbLabelFields {
   mil: AdsbLabelField[]
 }
 
+export type AdsbTagField = 'alt' | 'spd' | 'hdg' | 'typ' | 'reg' | 'sqk' | 'cat'
+
+export interface AdsbTagFields {
+  civil: AdsbTagField[]
+  mil: AdsbTagField[]
+}
+
 const LS_KEY = 'overlayStates'
 const LS_LABEL_FIELDS_KEY = 'adsbLabelFields'
+const LS_TAG_FIELDS_KEY = 'adsbTagFields_v2'
 
+const ALL_TAG_FIELDS: AdsbTagField[] = ['alt', 'spd', 'hdg', 'typ', 'reg', 'sqk', 'cat']
 const DEFAULT_LABEL_FIELDS: AdsbLabelFields = { civil: ['type'], mil: ['type'] }
+const DEFAULT_TAG_FIELDS: AdsbTagFields = { civil: [], mil: ['typ'] }
 
 const DEFAULTS: OverlayStates = {
   adsb: true,
@@ -40,6 +50,7 @@ const DEFAULTS: OverlayStates = {
 export const useAirStore = defineStore('air', () => {
   const overlayStates = ref<OverlayStates>(_loadOverlayStates())
   const adsbLabelFields = ref<AdsbLabelFields>(_loadLabelFields())
+  const adsbTagFields = ref<AdsbTagFields>(_loadTagFields())
   const filterQuery = ref('')
   const filterOpen = ref(false)
   const mapCenter = ref<[number, number] | null>(null)
@@ -54,6 +65,11 @@ export const useAirStore = defineStore('air', () => {
   function setAdsbLabelFields(fields: AdsbLabelFields) {
     adsbLabelFields.value = fields
     try { localStorage.setItem(LS_LABEL_FIELDS_KEY, JSON.stringify(fields)) } catch {}
+  }
+
+  function setAdsbTagFields(fields: AdsbTagFields) {
+    adsbTagFields.value = fields
+    try { localStorage.setItem(LS_TAG_FIELDS_KEY, JSON.stringify(fields)) } catch {}
   }
 
   function setFilter(query: string) {
@@ -74,7 +90,7 @@ export const useAirStore = defineStore('air', () => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(overlayStates.value)) } catch {}
   }
 
-  return { overlayStates, adsbLabelFields, filterQuery, filterOpen, mapCenter, mapZoom, pitch, setOverlay, setAdsbLabelFields, setFilter, toggleFilter, saveMapState }
+  return { overlayStates, adsbLabelFields, adsbTagFields, filterQuery, filterOpen, mapCenter, mapZoom, pitch, setOverlay, setAdsbLabelFields, setAdsbTagFields, setFilter, toggleFilter, saveMapState }
 })
 
 function _loadOverlayStates(): OverlayStates {
@@ -100,4 +116,20 @@ function _loadLabelFields(): AdsbLabelFields {
     }
   } catch {}
   return { ...DEFAULT_LABEL_FIELDS }
+}
+
+function _loadTagFields(): AdsbTagFields {
+  try {
+    const raw = localStorage.getItem(LS_TAG_FIELDS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return {
+          civil: Array.isArray(parsed.civil) ? parsed.civil : [],
+          mil:   Array.isArray(parsed.mil)   ? parsed.mil   : ['typ'],
+        }
+      }
+    }
+  } catch {}
+  return { ...DEFAULT_TAG_FIELDS }
 }

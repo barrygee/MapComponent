@@ -106,6 +106,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
     private _labelFields: { civil: string[]; mil: string[] } = { civil: ['type'], mil: ['type'] }
     private _onLabelFieldsChanged: ((e: Event) => void) | null = null
+    private _tagFields: { civil: string[]; mil: string[] } = { civil: [], mil: ['typ'] }
+    private _onTagFieldsChanged: ((e: Event) => void) | null = null
 
     constructor(
         airStore: AirStore,
@@ -126,6 +128,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         this._geojson       = { type: 'FeatureCollection', features: [] }
         this._trailsGeojson = { type: 'FeatureCollection', features: [] }
         this._labelFields   = this._loadLabelFields()
+        this._tagFields     = { civil: [...airStore.adsbTagFields.civil], mil: [...airStore.adsbTagFields.mil] }
     }
 
     private _loadLabelFields(): { civil: string[]; mil: string[] } {
@@ -268,6 +271,14 @@ export class AdsbLiveControl implements maplibregl.IControl {
         }
         window.addEventListener('adsb:labelFieldsChanged', this._onLabelFieldsChanged)
 
+        this._onTagFieldsChanged = (e: Event) => {
+            const detail = (e as CustomEvent).detail as { civil: string[]; mil: string[] }
+            if (detail) this._tagFields = detail
+            this._clearCallsignMarkers()
+            if (this.labelsVisible) this._updateCallsignMarkers()
+        }
+        window.addEventListener('adsb:tagFieldsChanged', this._onTagFieldsChanged)
+
         return this.container
     }
 
@@ -278,6 +289,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
         if (this._onLabelFieldsChanged) {
             window.removeEventListener('adsb:labelFieldsChanged', this._onLabelFieldsChanged)
             this._onLabelFieldsChanged = null
+        }
+        if (this._onTagFieldsChanged) {
+            window.removeEventListener('adsb:tagFieldsChanged', this._onTagFieldsChanged)
+            this._onTagFieldsChanged = null
         }
         if (this.container && this.container.parentNode) this.container.parentNode.removeChild(this.container)
         ;(this.map as unknown) = undefined
@@ -967,7 +982,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
     // ---- Callsign label markers ----
 
     private _makeArrowSvg(color: string, track: number): string {
-        return `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;background:#000;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;display:block;overflow:visible" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
+        return `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;background:#000;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
     }
 
     private _buildCallsignLabelEl(props: AircraftProperties): HTMLElement {
@@ -977,9 +992,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const isMil    = !!props.military
         const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
         const track    = props.track ?? 0
-        const fields   = isMil ? this._labelFields.mil : this._labelFields.civil
-        const showType = fields.includes('type')
-        const showAlt  = fields.includes('alt')
+        const fields   = isMil ? this._tagFields.mil : this._tagFields.civil
+        const has      = (f: string) => fields.includes(f)
+        const showType = has('typ')
+        const showAlt  = has('alt')
 
         const el = document.createElement('div')
         el.style.cssText = [
@@ -995,9 +1011,16 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
         const arrowWrap = document.createElement('span')
         arrowWrap.className = 'adsb-arrow-wrap'
-        arrowWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0;margin-right:8px'
-        arrowWrap.innerHTML = `<svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;display:block;overflow:visible" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg>`
+        arrowWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0;margin-right:4px'
+        arrowWrap.innerHTML = `<svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg>`
         el.appendChild(arrowWrap)
+
+        const dimBadge = (label: string, value: string, color: string) => {
+            const b = document.createElement('span')
+            b.style.cssText = `background:rgba(0,0,0,0.5);color:${color} !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;gap:4px;`
+            b.innerHTML = `<span style="opacity:0.45;font-weight:600;font-size:9px;letter-spacing:.12em">${label}</span><span>${value}</span>`
+            return b
+        }
 
         if (!isMil) {
             const nameSpan = document.createElement('span')
@@ -1015,11 +1038,30 @@ export class AdsbLiveControl implements maplibregl.IControl {
             }
             if (showAlt && props.alt_baro && props.alt_baro !== 0) {
                 box.style.paddingRight = '0'
-                const altBadge = document.createElement('span')
+                const altBadge = dimBadge('ALT', this._formatAltBadge(props.alt_baro as number), 'rgba(255,255,255,0.7)')
                 altBadge.className = 'civil-alt-badge'
-                altBadge.textContent = this._formatAltBadge(props.alt_baro as number)
-                altBadge.style.cssText = 'background:rgba(0,0,0,0.5);color:rgba(255,255,255,0.7) !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;'
                 box.insertBefore(altBadge, box.querySelector('.sqk-badge') || null)
+            }
+            if (has('spd') && props.gs != null) {
+                box.style.paddingRight = '0'
+                box.insertBefore(dimBadge('SPD', Math.round(props.gs) + 'kt', 'rgba(255,255,255,0.7)'), box.querySelector('.sqk-badge') || null)
+            }
+            if (has('hdg') && props.track != null) {
+                box.style.paddingRight = '0'
+                box.insertBefore(dimBadge('HDG', Math.round(props.track) + '°', 'rgba(255,255,255,0.7)'), box.querySelector('.sqk-badge') || null)
+            }
+            if (has('reg') && props.r) {
+                box.style.paddingRight = '0'
+                box.insertBefore(dimBadge('REG', props.r, 'rgba(255,255,255,0.7)'), box.querySelector('.sqk-badge') || null)
+            }
+            if (has('sqk') && props.squawk) {
+                box.style.paddingRight = '0'
+                box.insertBefore(dimBadge('SQK', props.squawk, 'rgba(255,255,255,0.7)'), box.querySelector('.sqk-badge') || null)
+            }
+            const catLbl = this._categoryLabel(props.category)
+            if (has('cat') && catLbl) {
+                box.style.paddingRight = '0'
+                box.insertBefore(dimBadge('CAT', catLbl, 'rgba(255,255,255,0.7)'), box.querySelector('.sqk-badge') || null)
             }
         } else {
             const nameSpan = document.createElement('span')
@@ -1039,11 +1081,30 @@ export class AdsbLiveControl implements maplibregl.IControl {
             }
             if (showAlt && props.alt_baro && props.alt_baro !== 0) {
                 box.style.paddingRight = '0'
-                const altBadge = document.createElement('span')
+                const altBadge = dimBadge('ALT', this._formatAltBadge(props.alt_baro as number), '#c8ff00')
                 altBadge.className = 'mil-alt-badge'
-                altBadge.textContent = this._formatAltBadge(props.alt_baro as number)
-                altBadge.style.cssText = 'background:rgba(0,0,0,0.5);color:#c8ff00 !important;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;'
                 box.insertBefore(altBadge, box.querySelector('.mil-trk-btn') || box.querySelector('.sqk-badge') || null)
+            }
+            if (has('spd') && props.gs != null) {
+                box.style.paddingRight = '0'
+                box.insertBefore(dimBadge('SPD', Math.round(props.gs) + 'kt', '#c8ff00'), box.querySelector('.mil-trk-btn') || box.querySelector('.sqk-badge') || null)
+            }
+            if (has('hdg') && props.track != null) {
+                box.style.paddingRight = '0'
+                box.insertBefore(dimBadge('HDG', Math.round(props.track) + '°', '#c8ff00'), box.querySelector('.mil-trk-btn') || box.querySelector('.sqk-badge') || null)
+            }
+            if (has('reg') && props.r) {
+                box.style.paddingRight = '0'
+                box.insertBefore(dimBadge('REG', props.r, '#c8ff00'), box.querySelector('.mil-trk-btn') || box.querySelector('.sqk-badge') || null)
+            }
+            if (has('sqk') && props.squawk) {
+                box.style.paddingRight = '0'
+                box.insertBefore(dimBadge('SQK', props.squawk, '#c8ff00'), box.querySelector('.mil-trk-btn') || box.querySelector('.sqk-badge') || null)
+            }
+            const catLbl = this._categoryLabel(props.category)
+            if (has('cat') && catLbl) {
+                box.style.paddingRight = '0'
+                box.insertBefore(dimBadge('CAT', catLbl, '#c8ff00'), box.querySelector('.mil-trk-btn') || box.querySelector('.sqk-badge') || null)
             }
             if (isTracked) {
                 const trkBtn = document.createElement('button')
@@ -1140,8 +1201,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 const raw     = (f.properties.flight || '').trim() || (f.properties.r || '').trim() || f.properties.hex || ''
                 const isEmerg = f.properties.squawkEmerg === 1
                 const isMil   = !!f.properties.military
-                const lfields = isMil ? this._labelFields.mil : this._labelFields.civil
-                const showType = lfields.includes('type')
+                const lfields = isMil ? this._tagFields.mil : this._tagFields.civil
+                const showType = lfields.includes('typ')
                 const showAlt  = lfields.includes('alt')
                 box.style.background = isEmerg ? 'rgba(180,0,0,0.85)' : 'rgba(0,0,0,0.5)'
                 labelEl.style.opacity = isDim ? '0.3' : '1'

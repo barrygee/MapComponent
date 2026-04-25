@@ -17,6 +17,7 @@
     <SpaceTleSatListControl v-else-if="item.type === 'space-tle-satlist'" />
     <SpaceHoverPreviewControl v-else-if="item.type === 'space-hover-preview'" @stage="emit('stage', item.id, $event)" />
     <AdsbLabelFieldsControl v-else-if="item.type === 'air-label-fields'" @stage="emit('stage', item.id, $event)" />
+    <AdsbTagFieldsControl v-else-if="item.type === 'air-tag-fields'" @stage="emit('stage', item.id, $event)" />
     <SdrDevicesControl v-else-if="item.type === 'sdr-devices'" />
     <ConfigCurrentControl v-else-if="item.type === 'config-current'" @stage="emit('stage', item.id, $event)" />
   </div>
@@ -37,6 +38,7 @@ import SpaceTleUncatControl from './SpaceTleUncatControl.vue'
 import SpaceTleSatListControl from './SpaceTleSatListControl.vue'
 import SpaceHoverPreviewControl from './SpaceHoverPreviewControl.vue'
 import AdsbLabelFieldsControl from './AdsbLabelFieldsControl.vue'
+import AdsbTagFieldsControl from './AdsbTagFieldsControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import ConfigCurrentControl from './ConfigCurrentControl.vue'
 
