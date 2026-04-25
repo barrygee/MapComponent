@@ -13,7 +13,17 @@ export interface OverlayStates {
   awacs: boolean
 }
 
+export type AdsbLabelField = 'type' | 'alt'
+
+export interface AdsbLabelFields {
+  civil: AdsbLabelField[]
+  mil: AdsbLabelField[]
+}
+
 const LS_KEY = 'overlayStates'
+const LS_LABEL_FIELDS_KEY = 'adsbLabelFields'
+
+const DEFAULT_LABEL_FIELDS: AdsbLabelFields = { civil: ['type'], mil: ['type'] }
 
 const DEFAULTS: OverlayStates = {
   adsb: true,
@@ -29,6 +39,7 @@ const DEFAULTS: OverlayStates = {
 
 export const useAirStore = defineStore('air', () => {
   const overlayStates = ref<OverlayStates>(_loadOverlayStates())
+  const adsbLabelFields = ref<AdsbLabelFields>(_loadLabelFields())
   const filterQuery = ref('')
   const filterOpen = ref(false)
   const mapCenter = ref<[number, number] | null>(null)
@@ -38,6 +49,11 @@ export const useAirStore = defineStore('air', () => {
   function setOverlay(key: keyof OverlayStates, visible: boolean) {
     overlayStates.value[key] = visible
     _persist()
+  }
+
+  function setAdsbLabelFields(fields: AdsbLabelFields) {
+    adsbLabelFields.value = fields
+    try { localStorage.setItem(LS_LABEL_FIELDS_KEY, JSON.stringify(fields)) } catch {}
   }
 
   function setFilter(query: string) {
@@ -58,7 +74,7 @@ export const useAirStore = defineStore('air', () => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(overlayStates.value)) } catch {}
   }
 
-  return { overlayStates, filterQuery, filterOpen, mapCenter, mapZoom, pitch, setOverlay, setFilter, toggleFilter, saveMapState }
+  return { overlayStates, adsbLabelFields, filterQuery, filterOpen, mapCenter, mapZoom, pitch, setOverlay, setAdsbLabelFields, setFilter, toggleFilter, saveMapState }
 })
 
 function _loadOverlayStates(): OverlayStates {
@@ -68,4 +84,20 @@ function _loadOverlayStates(): OverlayStates {
   } catch {
     return { ...DEFAULTS }
   }
+}
+
+function _loadLabelFields(): AdsbLabelFields {
+  try {
+    const raw = localStorage.getItem(LS_LABEL_FIELDS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return {
+          civil: Array.isArray(parsed.civil) ? parsed.civil : DEFAULT_LABEL_FIELDS.civil,
+          mil:   Array.isArray(parsed.mil)   ? parsed.mil   : DEFAULT_LABEL_FIELDS.mil,
+        }
+      }
+    }
+  } catch {}
+  return { ...DEFAULT_LABEL_FIELDS }
 }
