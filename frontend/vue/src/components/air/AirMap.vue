@@ -169,7 +169,17 @@ function onStyleLoaded(m: MapLibreGlMap) {
     awacs:         awacsControl,
   })
 
-  // Controls are driven via AirSideMenu — no map UI buttons needed
+  // Initialise each control (onAdd sets this.map and triggers layer/source setup).
+  // The returned container elements are discarded — AirSideMenu owns the UI buttons.
+  adsbControl.onAdd(m)
+  adsbLabelsControl.onAdd(m)
+  rangeRingsControl.onAdd(m)
+  roadsControl.onAdd(m)
+  namesControl.onAdd(m)
+  airportsControl.onAdd(m)
+  militaryBasesControl.onAdd(m)
+  aaraControl.onAdd(m)
+  awacsControl.onAdd(m)
 
   // Restore 3D pitch after initial load
   if (_tiltActive) m.easeTo({ pitch: 45, duration: 400 })

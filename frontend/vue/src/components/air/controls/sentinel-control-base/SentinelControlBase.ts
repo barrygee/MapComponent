@@ -46,6 +46,7 @@ export abstract class SentinelControlBase implements maplibregl.IControl {
     }
 
     protected setButtonActive(active: boolean): void {
+        if (!this.button) return
         this.button.style.opacity = active ? '1'       : '0.3'
         this.button.style.color   = active ? '#c8ff00' : '#ffffff'
     }
