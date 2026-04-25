@@ -234,8 +234,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
             : conditions.length === 1 ? conditions[0] : ['any', ...conditions]
 
         if (this.map.getLayer('adsb-bracket')) this.map.setFilter('adsb-bracket', filter as maplibregl.FilterSpecification)
-        if (this.map.getLayer('adsb-icons'))   this.map.setFilter('adsb-icons',   filter as maplibregl.FilterSpecification)
-        if (this.labelsVisible && this.map.getLayer('adsb-icons')) this.map.setLayoutProperty('adsb-icons', 'visibility', 'none')
+        if (this.map.getLayer('adsb-icons')) {
+            this.map.setFilter('adsb-icons', filter as maplibregl.FilterSpecification)
+            if (this.labelsVisible) this.map.setLayoutProperty('adsb-icons', 'visibility', 'none')
+        }
     }
 
     // ---- MapLibre IControl lifecycle ----
@@ -600,7 +602,6 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
         this._raiseLayers()
         this._applyTypeFilter()
-        if (this.labelsVisible && this.map.getLayer('adsb-icons')) this.map.setLayoutProperty('adsb-icons', 'visibility', 'none')
         if (this._geojson.features.length) this._interpolate()
         if (this.visible && !this._pollInterval && this._effectiveMode() !== 'offgrid') this._startPolling()
     }
@@ -650,10 +651,15 @@ export class AdsbLiveControl implements maplibregl.IControl {
                     ? `<span style="background:#4d6600;color:#c8ff00;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 4px;">${props.t.toUpperCase()}</span>`
                     : `<span style="background:#002244;color:#00aaff;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 4px;">${props.t.toUpperCase()}</span>`
                 : ''
+            const isEmerg  = props.squawkEmerg === 1 || (props.emergency && props.emergency !== 'none')
+            const isMil    = !!props.military
+            const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
+            const track    = props.track ?? 0
+            const arrowSvg = `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;background:#000;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
             const hasBadge = !!props.t
-            return `<div style="background:rgb(10,13,20);color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:13px;font-weight:400;padding:1px ${hasBadge ? '0' : '8px'} 1px 8px;white-space:nowrap;user-select:none">` +
+            return `<div style="background:rgb(10,13,20);color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:13px;font-weight:400;padding:1px ${hasBadge ? '0' : '8px'} 1px 0;white-space:nowrap;user-select:none">` +
                 `<div style="display:flex;align-items:stretch;gap:4px">` +
-                `<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:${callsignColor};pointer-events:none;align-self:center">${callsign}</span>` +
+                `${arrowSvg}<span style="font-size:13px;font-weight:400;letter-spacing:.12em;color:${callsignColor};pointer-events:none;align-self:center">${callsign}</span>` +
                 `${typeBadge}${trkBtn}</div></div>`
         }
 
@@ -991,7 +997,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const callsign = raw || 'UNKNOWN'
         const isEmerg  = props.squawkEmerg === 1
         const isMil    = !!props.military
-        const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#00aaff'
+        const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
         const track    = props.track ?? 0
         const fields   = isMil ? this._tagFields.mil : this._tagFields.civil
         const has      = (f: string) => fields.includes(f)
@@ -1209,7 +1215,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 labelEl.style.opacity = isDim ? '0.3' : '1'
                 const arrowSvg = box.querySelector('.adsb-arrow') as SVGElement | null
                 if (arrowSvg) {
-                    const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#00aaff'
+                    const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
                     arrowSvg.style.transform = `rotate(${f.properties.track ?? 0}deg)`
                     const poly = arrowSvg.querySelector('polygon')
                     if (poly) poly.setAttribute('stroke', arrowColor)
