@@ -258,7 +258,6 @@ const filterModes = [
   { value: 'all',  label: 'ALL' },
   { value: 'civil', label: 'CIVIL' },
   { value: 'mil',  label: 'MILITARY' },
-  { value: 'none', label: 'NONE' },
 ] as const
 
 // ---- Map access helpers ----
@@ -359,21 +358,14 @@ function startHideFlyout() {
 function isFilterModeActive(mode: string): boolean {
   const c = getAdsb()
   if (!c) return false
-  if (mode === 'none') return c._allHidden
   return !c._allHidden && c._typeFilter === mode
 }
 
 function setFilterMode(mode: string) {
   const c = getAdsb()
   if (!c) return
-  if (mode === 'none') {
-    const isHiding = !c._allHidden
-    if (!isHiding) c.setTypeFilter('all')
-    c.setAllHidden(isHiding)
-  } else {
-    if (c._allHidden) c.setAllHidden(false)
-    c.setTypeFilter(mode as 'all' | 'civil' | 'mil')
-  }
+  if (c._allHidden) c.setAllHidden(false)
+  c.setTypeFilter(mode as 'all' | 'civil' | 'mil')
   _saveFilter()
 }
 

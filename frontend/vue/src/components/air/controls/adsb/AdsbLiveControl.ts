@@ -990,7 +990,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const callsign = raw || 'UNKNOWN'
         const isEmerg  = props.squawkEmerg === 1
         const isMil    = !!props.military
-        const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
+        const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#00aaff'
         const track    = props.track ?? 0
         const fields   = isMil ? this._tagFields.mil : this._tagFields.civil
         const has      = (f: string) => fields.includes(f)
@@ -1208,7 +1208,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 labelEl.style.opacity = isDim ? '0.3' : '1'
                 const arrowSvg = box.querySelector('.adsb-arrow') as SVGElement | null
                 if (arrowSvg) {
-                    const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
+                    const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#00aaff'
                     arrowSvg.style.transform = `rotate(${f.properties.track ?? 0}deg)`
                     const poly = arrowSvg.querySelector('polygon')
                     if (poly) poly.setAttribute('stroke', arrowColor)
