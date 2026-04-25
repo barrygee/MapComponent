@@ -1699,8 +1699,9 @@ window.addEventListener('sentinel:locationChanged', (e: Event) => {
 }
 
 .settings-config-preview--textarea {
-    resize: vertical;
+    resize: none;
     width: 100%;
+    min-height: 520px;
     box-sizing: border-box;
     outline: none;
     caret-color: var(--color-accent);
