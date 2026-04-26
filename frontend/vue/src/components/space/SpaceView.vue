@@ -40,10 +40,12 @@ const spaceMapRef    = ref<InstanceType<typeof SpaceMap> | null>(null)
 const spaceFilterRef = ref<InstanceType<typeof SpaceFilter> | null>(null)
 const spacePassesRef = ref<InstanceType<typeof SpacePasses> | null>(null)
 const teleportReady = ref(!!document.getElementById('msb-pane-search'))
+let _unmounted = false
 
 if (!teleportReady.value) {
   onMounted(() => {
     function poll() {
+      if (_unmounted) return
       if (document.getElementById('msb-pane-search')) { teleportReady.value = true }
       else requestAnimationFrame(poll)
     }
@@ -65,7 +67,11 @@ const stopWatch = watch(
   () => spaceMapRef.value?.satelliteControlReactive ?? null,
   (ctrl) => { if (ctrl) { satelliteControl.value = ctrl; stopWatch() } },
 )
-onBeforeUnmount(() => stopWatch())
+onBeforeUnmount(() => {
+  stopWatch()
+  _unmounted = true
+  teleportReady.value = false
+})
 
 const { location: userLocation } = useUserLocation()
 
