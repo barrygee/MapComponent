@@ -11,8 +11,8 @@
 
     <!-- Group 2: zoom / go-to-location nav -->
     <div class="sm-group" id="ssm-group-nav">
-      <button class="sm-nav-btn" title="Zoom in"   data-tooltip="Zoom in"   @click="props.mapRef?.getMap()?.zoomIn()">+</button>
-      <button class="sm-nav-btn" title="Zoom out"  data-tooltip="Zoom out"  @click="props.mapRef?.getMap()?.zoomOut()">−</button>
+      <button class="sm-nav-btn" title="Zoom in"   data-tooltip="Zoom in"   @click="mapRef.value?.getMap()?.zoomIn()">+</button>
+      <button class="sm-nav-btn" title="Zoom out"  data-tooltip="Zoom out"  @click="mapRef.value?.getMap()?.zoomOut()">−</button>
       <button class="sm-nav-btn" title="Go to my location" data-tooltip="Go to my location"
         :class="{ active: locActive }"
         @click="goToLocation"
@@ -53,7 +53,7 @@
     <div class="sm-group" id="ssm-group-globe">
       <button class="sm-btn" data-tooltip="GLOBE"
         :class="{ active: globeActive }"
-        @click="props.mapRef?.toggleGlobe()"
+        @click="mapRef.value?.toggleGlobe()"
       >
         <span class="sm-icon" v-html="GLOBE_SVG" />
         <span class="sm-label">GLOBE</span>
@@ -78,7 +78,10 @@ import { useSpaceStore } from '@/stores/space'
 import { useUserLocation } from '@/composables/useUserLocation'
 import type SpaceMap from './SpaceMap.vue'
 
-const props = defineProps<{ mapRef: InstanceType<typeof SpaceMap> | null }>()
+// markRaw proxy from SpaceView — .current is non-reactive, preventing re-renders during teardown
+const props = defineProps<{ mapRef: { current: InstanceType<typeof SpaceMap> | null } }>()
+
+const mapRef = { get value() { return props.mapRef.current } }
 
 const spaceStore = useSpaceStore()
 const { location: userLocation } = useUserLocation()
@@ -131,15 +134,15 @@ function goToLocation(): void {
 }
 
 function toggleTrack(): void {
-  props.mapRef?.getSatelliteControl()?.toggleTrack()
+  mapRef.value?.getSatelliteControl()?.toggleTrack()
 }
 
 function toggleFootprint(): void {
-  props.mapRef?.getSatelliteControl()?.toggleFootprint()
+  mapRef.value?.getSatelliteControl()?.toggleFootprint()
 }
 
 function toggleDaynight(): void {
-  props.mapRef?.getDaynightControl()?.toggleDaynight()
+  mapRef.value?.getDaynightControl()?.toggleDaynight()
 }
 
 function openSearch(): void {
@@ -148,16 +151,6 @@ function openSearch(): void {
 </script>
 
 <style>
-#space-starfield {
-    position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 0;
-    pointer-events: none;
-    background: #000;
-}
-
 #space-side-menu {
     position: fixed;
     top: 80px;

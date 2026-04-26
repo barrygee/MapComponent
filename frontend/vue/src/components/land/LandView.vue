@@ -23,12 +23,14 @@ import NoUrlOverlay from '@/components/shared/NoUrlOverlay.vue'
 const appStore = useAppStore()
 const mapRef = ref<InstanceType<typeof MapLibreMap> | null>(null)
 
+let _map: Map | null = null
+
 const styleUrl = computed(() => appStore.isOnline ? '/assets/fiord-online.json' : '/assets/fiord.json')
 
 useConnectivity((online) => {
-  mapRef.value?.getMap()?.setStyle(online ? '/assets/fiord-online.json' : '/assets/fiord.json')
+  _map?.setStyle(online ? '/assets/fiord-online.json' : '/assets/fiord.json')
 })
 
-function onMapCreated(_map: Map) {}
+function onMapCreated(m: Map) { _map = m }
 function onStyleLoaded(_map: Map) {}
 </script>

@@ -72,7 +72,7 @@
         class="sm-btn"
         :class="{ active: airStore.overlayStates.rangeRings }"
         data-tooltip="RANGE RING"
-        @click="mapRef?.getRangeRings()?.handleClickPublic()"
+        @click="mapRef.value?.getRangeRings()?.handleClickPublic()"
       >
         <span class="sm-icon" style="--sm-icon-size:16px">◎</span>
         <span class="sm-label">RANGE RING</span>
@@ -83,7 +83,7 @@
         class="sm-btn"
         :class="{ active: airStore.overlayStates.aara }"
         data-tooltip="A2A REFUELING"
-        @click="mapRef?.getAara()?.toggle()"
+        @click="mapRef.value?.getAara()?.toggle()"
       >
         <span class="sm-icon" style="--sm-icon-size:16px">=</span>
         <span class="sm-label">A2A REFUELING</span>
@@ -94,7 +94,7 @@
         class="sm-btn"
         :class="{ active: airStore.overlayStates.awacs }"
         data-tooltip="AWACS"
-        @click="mapRef?.getAwacs()?.toggle()"
+        @click="mapRef.value?.getAwacs()?.toggle()"
       >
         <span class="sm-icon" style="--sm-icon-size:16px">○</span>
         <span class="sm-label">AWACS</span>
@@ -114,7 +114,7 @@
         class="sm-btn sm-expanded-only"
         :class="{ active: airStore.overlayStates.airports }"
         data-tooltip="AIRPORTS"
-        @click="mapRef?.getAirports()?.toggle()"
+        @click="mapRef.value?.getAirports()?.toggle()"
       >
         <span class="sm-icon" style="--sm-icon-size:8px">CVL</span>
         <span class="sm-label">AIRPORTS</span>
@@ -125,7 +125,7 @@
         class="sm-btn sm-expanded-only"
         :class="{ active: airStore.overlayStates.militaryBases }"
         data-tooltip="MILITARY BASES"
-        @click="mapRef?.getMilBases()?.toggle()"
+        @click="mapRef.value?.getMilBases()?.toggle()"
       >
         <span class="sm-icon" style="--sm-icon-size:8px">MIL</span>
         <span class="sm-label">MILITARY BASES</span>
@@ -136,7 +136,7 @@
         class="sm-btn sm-expanded-only"
         :class="{ active: airStore.overlayStates.names }"
         data-tooltip="LOCATIONS"
-        @click="mapRef?.getNamesControl()?.handleClickPublic()"
+        @click="mapRef.value?.getNamesControl()?.handleClickPublic()"
       >
         <span class="sm-icon" style="--sm-icon-size:14px">N</span>
         <span class="sm-label">LOCATIONS</span>
@@ -147,7 +147,7 @@
         class="sm-btn sm-expanded-only"
         :class="{ active: airStore.overlayStates.roads }"
         data-tooltip="ROADS"
-        @click="mapRef?.getRoadsControl()?.handleClickPublic()"
+        @click="mapRef.value?.getRoadsControl()?.handleClickPublic()"
       >
         <span class="sm-icon" style="--sm-icon-size:14px">R</span>
         <span class="sm-label">ROADS</span>
@@ -222,10 +222,14 @@ import { useAirStore } from '@/stores/air'
 import { useUserLocation } from '@/composables/useUserLocation'
 import type AirMap from './AirMap.vue'
 
-// AirMap exposes typed methods via defineExpose — we accept InstanceType<typeof AirMap> | null
+// Receives a markRaw proxy so Vue never re-renders this component when the map
+// mounts/unmounts — accessing .current is non-reactive by design.
 const props = defineProps<{
-  mapRef: InstanceType<typeof AirMap> | null
+  mapRef: { current: InstanceType<typeof AirMap> | null }
 }>()
+
+// Non-reactive accessor — reads through the proxy at call-time only
+const mapRef = { get value() { return props.mapRef.current } }
 
 const airStore = useAirStore()
 const { location: userLocation } = useUserLocation()
@@ -239,9 +243,7 @@ const hideTowers = ref(false)
 const flyoutOpen = ref(false)
 let flyoutTimer: ReturnType<typeof setTimeout> | null = null
 
-const planesOn = computed(() =>
-  airStore.overlayStates.adsb && !(props.mapRef?.getAdsbControl?.()?._allHidden ?? false)
-)
+const planesOn = computed(() => airStore.overlayStates.adsb)
 
 // ---- SVG constants ----
 const LOC_SVG = `<svg width="15" height="15" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="7.5" stroke="#c8ff00" stroke-width="1.8"/><circle cx="10" cy="10" r="2" fill="white"/></svg>`
@@ -262,14 +264,14 @@ const filterModes = [
 
 // ---- Map access helpers ----
 function getMap() {
-  const m = props.mapRef as { getMap?: () => import('maplibre-gl').Map | null } | null
+  const m = mapRef.value as { getMap?: () => import('maplibre-gl').Map | null } | null
   return m?.getMap?.() ?? null
 }
 function getAdsb() {
-  return props.mapRef?.getAdsbControl?.() as import('./controls/adsb/AdsbLiveControl').AdsbLiveControl | null ?? null
+  return mapRef.value?.getAdsbControl?.() as import('./controls/adsb/AdsbLiveControl').AdsbLiveControl | null ?? null
 }
 function getAdsbLabels() {
-  return props.mapRef?.getAdsbLabels?.() as import('./controls/adsb-labels/AdsbLabelsToggleControl').AdsbLabelsToggleControl | null ?? null
+  return mapRef.value?.getAdsbLabels?.() as import('./controls/adsb-labels/AdsbLabelsToggleControl').AdsbLabelsToggleControl | null ?? null
 }
 
 // ---- Location ----
@@ -311,7 +313,7 @@ function toggleLabels() {
 
 // ---- 3D ----
 function toggle3D() {
-  const airMap = props.mapRef as { set3DActive?: (v: boolean) => void } | null
+  const airMap = mapRef.value as { set3DActive?: (v: boolean) => void } | null
   tiltActive.value = !tiltActive.value
   airMap?.set3DActive?.(tiltActive.value)
 }
@@ -320,7 +322,7 @@ function tiltBy(delta: number) {
   const m = getMap()
   if (!m) return
   const newPitch = Math.min(Math.max(m.getPitch() + delta, 0), 85)
-  const airMap = props.mapRef as { setTargetPitch?: (p: number) => void } | null
+  const airMap = mapRef.value as { setTargetPitch?: (p: number) => void } | null
   airMap?.setTargetPitch?.(newPitch)
   m.easeTo({ pitch: newPitch, duration: 300 })
 }
@@ -339,7 +341,7 @@ function resetBearing() {
 
 // ---- Clear overlays ----
 function toggleClear() {
-  const ctrl = props.mapRef?.getClearControl?.() as import('./controls/clear-overlays/ClearOverlaysControl').ClearOverlaysControl | null ?? null
+  const ctrl = mapRef.value?.getClearControl?.() as import('./controls/clear-overlays/ClearOverlaysControl').ClearOverlaysControl | null ?? null
   if (!ctrl) return
   ctrl.toggle()
   cleared.value = ctrl._cleared

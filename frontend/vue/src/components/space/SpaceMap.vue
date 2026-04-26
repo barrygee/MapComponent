@@ -10,7 +10,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useDocumentEvent } from '@/composables/useDocumentEvent'
 import type { Map as MapLibreGlMap } from 'maplibre-gl'
 import { useAppStore } from '@/stores/app'
@@ -38,6 +38,9 @@ const STYLE_OFFLINE = '/assets/fiord.json'
 
 const styleUrl = computed(() => appStore.isOnline ? STYLE_ONLINE : STYLE_OFFLINE)
 
+// Cached map instance — plain variable, never reactive
+let _map: MapLibreGlMap | null = null
+
 const satelliteControlRef = shallowRef<SatelliteControl | null>(null)
 let satelliteControl: SatelliteControl | null = null
 let daynightControl: DaynightControl | null = null
@@ -54,7 +57,7 @@ function getUserLocation(): [number, number] | null {
 }
 
 useConnectivity((online) => {
-  const m = mapRef.value?.getMap()
+  const m = _map
   if (!m) return
   m.setStyle(online ? STYLE_ONLINE : STYLE_OFFLINE)
   m.once('style.load', () => {
@@ -65,15 +68,19 @@ useConnectivity((online) => {
 })
 
 function onMapCreated(m: MapLibreGlMap) {
+  _map = m
   startLocation()
   _locationMarker.addTo(m)
+}
+
+onMounted(() => {
   watch(userLocation, (loc) => {
     if (loc) _locationMarker.update(loc.lon, loc.lat)
   }, { immediate: true })
-}
+})
 
 function onGoToLocation(): void {
-  const m = mapRef.value?.getMap()
+  const m = _map
   const loc = userLocation.value
   if (!m || !loc) return
   if (globeActiveLocal.value) {
@@ -96,7 +103,7 @@ function onStyleLoaded(m: MapLibreGlMap) {
     getUserLocation,
     null,
   )
-  satelliteControlRef.value = satelliteControl
+  void nextTick(() => { satelliteControlRef.value = satelliteControl })
   daynightControl = new DaynightControl(spaceStore)
   namesControl    = new SpaceNamesToggleControl(spaceStore, is3DActive)
 
@@ -120,7 +127,7 @@ function toggleGlobe(): void {
   globeActiveLocal.value = newVal
   spaceStore.setGlobe(newVal)
   document.body.classList.toggle('globe-active', newVal)
-  const m = mapRef.value?.getMap()
+  const m = _map
   if (m) {
     try { (m as unknown as { setProjection: (p: object) => void }).setProjection({ type: newVal ? 'globe' : 'mercator' }) } catch {}
   }
@@ -129,11 +136,16 @@ function toggleGlobe(): void {
 }
 
 onBeforeUnmount(() => {
-  const m = mapRef.value?.getMap()
+  const m = _map
   if (m) {
     const center = m.getCenter()
     spaceStore.saveMapState([center.lng, center.lat], m.getZoom())
   }
+  _map = null
+  satelliteControl = null
+  daynightControl  = null
+  namesControl     = null
+  satelliteControlRef.value = null
   document.body.classList.remove('globe-active')
 })
 
@@ -144,7 +156,7 @@ defineExpose({
   getNamesControl:   () => namesControl,
   isGlobeActive:     () => globeActiveLocal.value,
   toggleGlobe,
-  getMap:            () => mapRef.value?.getMap() ?? null,
+  getMap:            () => _map,
 })
 </script>
 

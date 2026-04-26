@@ -13,7 +13,7 @@
 <script setup lang="ts">
 // IMPORTANT: Map instance is stored in a plain variable — never in ref/reactive.
 // All IControl subclasses receive Pinia store refs instead of window.* globals.
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import type { Map as MapLibreGlMap } from 'maplibre-gl'
 import { useAppStore } from '@/stores/app'
 import { useAirStore } from '@/stores/air'
@@ -62,6 +62,9 @@ const getUserLocation = (): [number, number] | null =>
 
 const _locationMarker = new UserLocationMarker('user-location-marker')
 
+// Cached map instance — plain variable, never reactive
+let _map: MapLibreGlMap | null = null
+
 // Control instances — plain variables, initialised in onStyleLoaded
 let adsbControl:         AdsbLiveControl | null            = null
 let adsbLabelsControl:   AdsbLabelsToggleControl | null    = null
@@ -91,7 +94,7 @@ defineExpose({
   getNamesControl, getAirports, getMilBases, getAara, getAwacs, getClearControl,
   is3DActive, getTargetPitch,
   set3DActive(active: boolean) {
-    const m = mapRef.value?.getMap()
+    const m = _map
     if (!m) return
     _tiltActive = active
     localStorage.setItem('sentinel_3d', active ? '1' : '0')
@@ -106,11 +109,11 @@ defineExpose({
     }
   },
   setTargetPitch(p: number) { _targetPitch = p },
-  getMap: () => mapRef.value?.getMap() ?? null,
+  getMap: () => _map,
 })
 
 useConnectivity((online) => {
-  const m = mapRef.value?.getMap()
+  const m = _map
   if (!m) return
   m.setStyle(online ? STYLE_ONLINE : STYLE_OFFLINE)
   // Re-init layers after style reload, clear aircraft
@@ -127,9 +130,9 @@ useConnectivity((online) => {
 })
 
 function onMapCreated(m: MapLibreGlMap) {
+  _map = m
   startLocation()
   _locationMarker.addTo(m)
-  _watchUserLocation()
 }
 
 function onStyleLoaded(m: MapLibreGlMap) {
@@ -186,19 +189,39 @@ function onStyleLoaded(m: MapLibreGlMap) {
 
 }
 
-function _watchUserLocation() {
+onMounted(() => {
   watch(userLocation, (loc) => {
     if (!loc) return
     rangeRingsControl?.updateCenter(loc.lon, loc.lat)
     _locationMarker.update(loc.lon, loc.lat)
   }, { immediate: true })
-}
+})
 
 onBeforeUnmount(() => {
-  const m = mapRef.value?.getMap()
+  const m = _map
   if (m) {
     const center = m.getCenter()
     airStore.saveMapState([center.lng, center.lat], m.getZoom(), m.getPitch())
   }
+  _map = null
+  adsbControl?.onRemove()
+  adsbLabelsControl?.onRemove()
+  rangeRingsControl?.onRemove()
+  roadsControl?.onRemove()
+  namesControl?.onRemove()
+  airportsControl?.onRemove()
+  militaryBasesControl?.onRemove()
+  aaraControl?.onRemove()
+  awacsControl?.onRemove()
+  adsbControl         = null
+  adsbLabelsControl   = null
+  rangeRingsControl   = null
+  roadsControl        = null
+  namesControl        = null
+  airportsControl     = null
+  militaryBasesControl = null
+  aaraControl         = null
+  awacsControl        = null
+  clearControl        = null
 })
 </script>

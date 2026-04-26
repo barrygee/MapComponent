@@ -38,6 +38,8 @@ onMounted(() => {
     attributionControl: false,
   })
 
+  map.on('load', () => { map?.resize() })
+
   map.on('style.load', () => {
     if (map) emit('style-loaded', map)
   })
@@ -65,6 +67,7 @@ defineExpose({ getMap })
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 1;
 }
 
 #map {

@@ -1,9 +1,9 @@
 <template>
   <div id="map-wrap" data-domain="air">
     <AirMap ref="airMapRef" />
-    <AirSideMenu :map-ref="airMapRef" />
+    <AirSideMenu :map-ref="airMapProxy" />
     <NoUrlOverlay domain="air" />
-    <Teleport to="#msb-pane-search">
+    <Teleport v-if="teleportReady" to="#msb-pane-search">
       <AirFilter
         :adsb-control="adsbControlRef"
         :airports-control="airportsControlRef"
@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue'
+import { ref, shallowRef, markRaw, onMounted } from 'vue'
 import AirMap from './AirMap.vue'
 import { useDocumentEvent } from '@/composables/useDocumentEvent'
 import AirSideMenu from './AirSideMenu.vue'
@@ -28,6 +28,24 @@ import type { MilitaryBasesToggleControl } from './controls/military-bases/Milit
 
 const airMapRef    = ref<InstanceType<typeof AirMap> | null>(null)
 const airFilterRef = ref<InstanceType<typeof AirFilter> | null>(null)
+const teleportReady = ref(!!document.getElementById('msb-pane-search'))
+
+// msb-pane-search lives in MapSidebar which mounts after RouterView in App.vue;
+// poll until it exists so the Teleport never activates against a null target.
+if (!teleportReady.value) {
+  onMounted(() => {
+    function poll() {
+      if (document.getElementById('msb-pane-search')) { teleportReady.value = true }
+      else requestAnimationFrame(poll)
+    }
+    requestAnimationFrame(poll)
+  })
+}
+
+// Stable proxy passed to AirSideMenu — markRaw prevents Vue from tracking
+// mutations, so nulling airMapRef during unmount never triggers a re-render
+// of AirSideMenu while it is also being torn down.
+const airMapProxy = markRaw({ get current() { return airMapRef.value } })
 
 // Reactive refs for controls — updated once the map signals data is ready
 
