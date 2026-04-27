@@ -670,10 +670,14 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const isMil      = !!props.military
         const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
         const heading    = props.track ?? 0
+        const leftFacing = this._isLeftFacing(heading)
         const arrowSvg   = `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${heading}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
         const callsignSpan = `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>`
+        const inner = leftFacing
+            ? `${trkBtn}${bellBtn}${callsignSpan}${arrowSvg}`
+            : `${arrowSvg}${callsignSpan}${bellBtn}${trkBtn}`
         return `<div style="background:#000000;color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:stretch;gap:0;white-space:nowrap;user-select:none;cursor:pointer">` +
-            `${arrowSvg}${callsignSpan}${bellBtn}${trkBtn}</div>`
+            `${inner}</div>`
     }
 
     private _buildTrackingFields(props: AircraftProperties): TrackingField[] {
@@ -742,7 +746,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 newEl.innerHTML = this._buildTagHTML(taggedFeature.properties)
                 this._wireTagButton(newEl)
                 if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null }
-                this._tagMarker = new maplibregl.Marker({ element: newEl, anchor: 'top-left', offset: [14, -13] })
+                const untrackLeft = this._isLeftFacing(taggedFeature.properties.track ?? 0)
+                const untrackAnchor = (untrackLeft ? 'right' : 'left') as 'right' | 'left'
+                const untrackOffset: [number, number] = untrackLeft ? [-14, 0] : [14, 0]
+                this._tagMarker = new maplibregl.Marker({ element: newEl, anchor: untrackAnchor, offset: untrackOffset })
                     .setLngLat(coords).addTo(this.map)
             }
         }
@@ -871,8 +878,9 @@ export class AdsbLiveControl implements maplibregl.IControl {
                         anchor = trkLeft2 ? 'right' : 'left'
                         offset = trkLeft2 ? [-14, 0] : [14, 0]
                     } else {
-                        anchor = 'top-left'
-                        offset = [14, -13]
+                        const unfollowLeft = this._isLeftFacing(taggedFeature.properties.track ?? 0)
+                        anchor = unfollowLeft ? 'right' : 'left'
+                        offset = unfollowLeft ? [-14, 0] : [14, 0]
                     }
                     this._tagMarker = new maplibregl.Marker({ element: newEl, anchor, offset })
                         .setLngLat(coords).addTo(this.map)
@@ -916,8 +924,9 @@ export class AdsbLiveControl implements maplibregl.IControl {
             anchor = trkLeft3 ? 'right' : 'left'
             offset = trkLeft3 ? [-14, 0] : [14, 0]
         } else {
-            anchor = 'top-left'
-            offset = [14, -13]
+            const rebuildLeft = this._isLeftFacing(taggedFeature.properties.track ?? 0)
+            anchor = rebuildLeft ? 'right' : 'left'
+            offset = rebuildLeft ? [-14, 0] : [14, 0]
         }
         this._tagMarker = new maplibregl.Marker({ element: newEl, anchor, offset })
             .setLngLat(coords).addTo(this.map)
@@ -934,7 +943,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
         el.innerHTML = this._buildTagHTML(feature.properties)
         this._wireTagButton(el)
         const coords = this._interpolatedCoords(feature.properties.hex) || feature.geometry.coordinates
-        this._tagMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -13] })
+        const selLeft = this._isLeftFacing(feature.properties.track ?? 0)
+        const selAnchor = (selLeft ? 'right' : 'left') as 'right' | 'left'
+        const selOffset: [number, number] = selLeft ? [-14, 0] : [14, 0]
+        this._tagMarker = new maplibregl.Marker({ element: el, anchor: selAnchor, offset: selOffset })
             .setLngLat(coords).addTo(this.map)
         if (this._allHidden) el.style.visibility = 'hidden'
         this._tagHex = feature.properties.hex
@@ -966,7 +978,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
         })
         el.addEventListener('mouseleave', () => this._hideHoverTag())
         this._wireTagButton(el, hex)
-        this._hoverMarker = new maplibregl.Marker({ element: el, anchor: 'top-left', offset: [14, -13] })
+        const hoverLeftFacing = this._isLeftFacing(feature.properties.track ?? 0)
+        const hoverAnchor = fromLabel ? (hoverLeftFacing ? 'right' : 'left') as 'right' | 'left' : 'top-left' as 'top-left'
+        const hoverOffset: [number, number] = fromLabel ? (hoverLeftFacing ? [-14, 0] : [14, 0]) : [14, -13]
+        this._hoverMarker = new maplibregl.Marker({ element: el, anchor: hoverAnchor, offset: hoverOffset })
             .setLngLat(coords).addTo(this.map)
         this._hoverHex       = hex
         this._hoverFromLabel = fromLabel
