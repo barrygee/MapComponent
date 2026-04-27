@@ -1018,7 +1018,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             'font-size:13px', 'font-weight:400', 'letter-spacing:.12em',
             'text-transform:uppercase', 'box-sizing:border-box',
             'display:flex', 'align-items:center', 'gap:0',
-            leftFacing ? 'padding:1px 0 1px 6px' : 'padding:1px 6px 1px 0', 'cursor:pointer', 'white-space:nowrap', 'user-select:none',
+            'padding:1px 0', 'cursor:pointer', 'white-space:nowrap', 'user-select:none',
         ].join(';')
         el.dataset.dir = leftFacing ? 'left' : 'right'
 
@@ -1027,8 +1027,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const arrowWrap = document.createElement('span')
         arrowWrap.className = 'adsb-arrow-wrap'
         arrowWrap.style.cssText = leftFacing
-            ? 'display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0;margin-left:4px'
-            : 'display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0;margin-right:4px'
+            ? 'display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0'
+            : 'display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0'
         arrowWrap.innerHTML = `<svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg>`
         const badgeColor  = isEmerg ? '#ff4040' : isMil ? '#c8ff00' : 'rgba(255,255,255,0.7)'
         const nameColor   = isEmerg ? '#ff4040' : isMil ? '#c8ff00' : '#ffffff'
@@ -1048,9 +1048,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             const s = document.createElement('span')
             s.className = 'adsb-label-name'
             s.textContent = callsign
-            s.style.cssText = side === 'left'
-                ? `color:${nameColor} !important;padding-right:6px`
-                : `color:${nameColor} !important;padding-left:6px`
+            s.style.cssText = `color:${nameColor} !important;padding:0 6px`
             return s
         }
 
@@ -1217,18 +1215,12 @@ export class AdsbLiveControl implements maplibregl.IControl {
                     box.dataset.dir = newDir
                     const arrowWrap = box.querySelector('.adsb-arrow-wrap') as HTMLElement | null
                     if (arrowWrap) {
+                        arrowWrap.style.marginLeft = ''
+                        arrowWrap.style.marginRight = newDir === 'right' ? '4px' : ''
                         if (newDir === 'left') {
-                            arrowWrap.style.marginRight = ''
-                            arrowWrap.style.marginLeft = '4px'
                             box.appendChild(arrowWrap)
-                            box.style.paddingLeft = '6px'
-                            box.style.paddingRight = '0'
                         } else {
-                            arrowWrap.style.marginLeft = ''
-                            arrowWrap.style.marginRight = '4px'
                             box.insertBefore(arrowWrap, box.firstChild)
-                            box.style.paddingLeft = '0'
-                            box.style.paddingRight = '6px'
                         }
                     }
                 }
@@ -1236,7 +1228,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 nameSpan.textContent = raw || 'UNKNOWN'
                 if (isMil) {
                     const dimColor = isDim ? 'color:rgba(255,255,255,0.45) !important' : 'color:#ffffff !important'
-                    nameSpan.style.cssText = dimColor + ';padding-right:6px'
+                    const namePad = ';padding:0 6px 0 3px'
+                    nameSpan.style.cssText = dimColor + namePad
                     const isTracked = this._followEnabled && hex === this._tagHex
                     const hasBadge  = showType && !!f.properties.t
                     // alt badge
@@ -1275,7 +1268,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
                     } else if (!isTracked && trkBtn) { trkBtn.remove() }
                 } else {
                     const dimColor = isDim ? 'color:rgba(255,255,255,0.45) !important' : 'color:#ffffff !important'
-                    nameSpan.style.cssText = dimColor + ';padding-right:6px'
+                    const namePad = ';padding:0 6px 0 3px'
+                    nameSpan.style.cssText = dimColor + namePad
                     let civilBadge = box.querySelector('.civil-model-badge') as HTMLElement | null
                     if (showType && f.properties.t) {
                         if (!civilBadge) {
