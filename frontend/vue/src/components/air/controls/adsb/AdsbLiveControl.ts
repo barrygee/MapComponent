@@ -793,6 +793,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                             this._notifEnabled.delete(hex)
                             if (this._trackingNotifIds) delete this._trackingNotifIds[hex]
                             this._rebuildTagForHex(hex)
+                            this._updateCallsignMarkers()
                         }},
                     })
                 }

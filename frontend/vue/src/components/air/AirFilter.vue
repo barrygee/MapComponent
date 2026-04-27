@@ -348,6 +348,7 @@ function toggleNotif(hex: string) {
           c._notifEnabled.delete(hex)
           if (c._trackingNotifIds) delete c._trackingNotifIds[hex]
           c._rebuildTagForHex(hex)
+          notifEnabled.value = new Set(c._notifEnabled)
         },
       },
     })
