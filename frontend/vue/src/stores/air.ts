@@ -20,7 +20,7 @@ export interface AdsbLabelFields {
   mil: AdsbLabelField[]
 }
 
-export type AdsbTagField = 'alt' | 'spd' | 'hdg' | 'typ' | 'reg' | 'sqk' | 'cat'
+export type AdsbTagField = 'css' | 'alt' | 'spd' | 'hdg' | 'typ' | 'reg' | 'sqk' | 'cat'
 
 export interface AdsbTagFields {
   civil: AdsbTagField[]
@@ -31,9 +31,9 @@ const LS_KEY = 'overlayStates'
 const LS_LABEL_FIELDS_KEY = 'adsbLabelFields'
 const LS_TAG_FIELDS_KEY = 'adsbTagFields_v2'
 
-const ALL_TAG_FIELDS: AdsbTagField[] = ['alt', 'spd', 'hdg', 'typ', 'reg', 'sqk', 'cat']
+const ALL_TAG_FIELDS: AdsbTagField[] = ['css', 'alt', 'spd', 'hdg', 'typ', 'reg', 'sqk', 'cat']
 const DEFAULT_LABEL_FIELDS: AdsbLabelFields = { civil: ['type'], mil: ['type'] }
-const DEFAULT_TAG_FIELDS: AdsbTagFields = { civil: [], mil: ['typ'] }
+const DEFAULT_TAG_FIELDS: AdsbTagFields = { civil: ['css'], mil: ['css', 'typ'] }
 
 const DEFAULTS: OverlayStates = {
   adsb: true,
@@ -124,10 +124,9 @@ function _loadTagFields(): AdsbTagFields {
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return {
-          civil: Array.isArray(parsed.civil) ? parsed.civil : [],
-          mil:   Array.isArray(parsed.mil)   ? parsed.mil   : ['typ'],
-        }
+        const civil = Array.isArray(parsed.civil) ? parsed.civil : ['css']
+        const mil   = Array.isArray(parsed.mil)   ? parsed.mil   : ['css', 'typ']
+        return { civil, mil }
       }
     }
   } catch {}

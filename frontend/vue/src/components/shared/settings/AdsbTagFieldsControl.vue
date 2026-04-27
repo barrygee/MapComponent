@@ -49,6 +49,7 @@ const fields = ref<AdsbTagFields>({
 })
 
 const OPTIONS: Array<{ value: AdsbTagField; abbr: string; label: string }> = [
+  { value: 'css', abbr: 'CSS', label: 'Callsign' },
   { value: 'alt', abbr: 'ALT', label: 'Altitude' },
   { value: 'spd', abbr: 'SPD', label: 'Speed' },
   { value: 'hdg', abbr: 'HDG', label: 'Heading' },

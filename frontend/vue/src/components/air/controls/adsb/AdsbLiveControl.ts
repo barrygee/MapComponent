@@ -633,6 +633,9 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const isEmergency   = props.squawkEmerg === 1 || (props.emergency && props.emergency !== 'none')
         const callsignColor = isEmergency ? '#ff4040' : '#ffffff'
         const isTracked     = this._followEnabled && props.hex === this._tagHex
+        const isMilProps    = !!props.military
+        const tfieldsProps  = isMilProps ? this._tagFields.mil : this._tagFields.civil
+        const showCallsign  = tfieldsProps.includes('css')
         const notifOn       = this._notifEnabled.has(props.hex)
         const trkColor      = isTracked ? '#c8ff00' : 'rgba(255,255,255,0.3)'
         const trkBtnText    = isTracked ? 'TRACKING' : 'TRACK'
@@ -658,13 +661,13 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 : ''
             const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
             const track    = props.track ?? 0
-            const arrowSvg = `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
-            const callsignSpan = `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>`
+            const arrowSvg = `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:26px;align-self:stretch;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
+            const callsignSpan = showCallsign ? `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>` : ''
             const leftFacing = this._isLeftFacing(track)
             const inner = leftFacing
                 ? `${trkBtn}${bellBtn}${typeBadge}${callsignSpan}${arrowSvg}`
                 : `${arrowSvg}${callsignSpan}${typeBadge}${bellBtn}${trkBtn}`
-            return `<div style="background:#000000;color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:stretch;gap:0;white-space:nowrap;user-select:none;cursor:pointer">${inner}</div>`
+            return `<div style="background:#000000;color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:stretch;gap:0;white-space:nowrap;user-select:none;cursor:pointer;min-height:26px">${inner}</div>`
         }
 
         const isEmerg    = props.squawkEmerg === 1 || (props.emergency && props.emergency !== 'none')
@@ -672,12 +675,12 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
         const heading    = props.track ?? 0
         const leftFacing = this._isLeftFacing(heading)
-        const arrowSvg   = `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${heading}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
-        const callsignSpan = `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>`
+        const arrowSvg   = `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:26px;align-self:stretch;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${heading}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
+        const callsignSpan = showCallsign ? `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>` : ''
         const inner = leftFacing
             ? `${trkBtn}${bellBtn}${callsignSpan}${arrowSvg}`
             : `${arrowSvg}${callsignSpan}${bellBtn}${trkBtn}`
-        return `<div style="background:#000000;color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:stretch;gap:0;white-space:nowrap;user-select:none;cursor:pointer">` +
+        return `<div style="background:#000000;color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:stretch;gap:0;white-space:nowrap;user-select:none;cursor:pointer;min-height:26px">` +
             `${inner}</div>`
     }
 
@@ -1028,6 +1031,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const track    = props.track ?? 0
         const fields   = isMil ? this._tagFields.mil : this._tagFields.civil
         const has      = (f: string) => fields.includes(f)
+        const showCallsign = has('css')
         const showType = has('typ')
         const showAlt  = has('alt')
 
@@ -1042,6 +1046,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             'text-transform:uppercase', 'box-sizing:border-box',
             'display:flex', 'align-items:stretch', 'gap:0',
             'padding:0', 'cursor:pointer', 'white-space:nowrap', 'user-select:none',
+            'min-height:26px', 'min-width:26px',
         ].join(';')
         el.dataset.dir = leftFacing ? 'left' : 'right'
         el.dataset.notif = notifOn ? '1' : '0'
@@ -1050,9 +1055,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
         const arrowWrap = document.createElement('span')
         arrowWrap.className = 'adsb-arrow-wrap'
-        arrowWrap.style.cssText = leftFacing
-            ? 'display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0'
-            : 'display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0'
+        arrowWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;width:26px;align-self:stretch;flex-shrink:0'
         arrowWrap.innerHTML = `<svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg>`
         const badgeColor  = isEmerg ? '#ff4040' : isMil ? '#c8ff00' : 'rgba(255,255,255,0.7)'
         const nameColor   = isEmerg ? '#ff4040' : '#ffffff'
@@ -1068,7 +1071,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
             return b
         }
 
-        const makeCallsign = (side: 'left' | 'right') => {
+        const makeCallsign = (_side: 'left' | 'right') => {
+            if (!showCallsign) return null
             const s = document.createElement('span')
             s.className = 'adsb-label-name'
             s.textContent = callsign
@@ -1269,11 +1273,11 @@ export class AdsbLiveControl implements maplibregl.IControl {
                         .setLngLat(lngLat).addTo(this.map)
                     continue
                 }
-                const nameSpan = box.querySelector('.adsb-label-name') as HTMLElement || box
-                nameSpan.textContent = raw || 'UNKNOWN'
+                const nameSpan = box.querySelector('.adsb-label-name') as HTMLElement | null
+                if (nameSpan) nameSpan.textContent = raw || 'UNKNOWN'
                 if (isMil) {
                     const dimColor = isDim ? 'color:rgba(255,255,255,0.45) !important' : 'color:#ffffff !important'
-                    nameSpan.style.cssText = dimColor + ';padding:3px 6px;display:flex;align-items:center;'
+                    if (nameSpan) nameSpan.style.cssText = dimColor + ';padding:3px 6px;display:flex;align-items:center;'
                     const isTracked = this._followEnabled && hex === this._tagHex
                     const hasBadge  = showType && !!f.properties.t
                     // alt badge
@@ -1311,7 +1315,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                     } else if (!isTracked && trkBtn) { trkBtn.remove() }
                 } else {
                     const dimColor = isDim ? 'color:rgba(255,255,255,0.45) !important' : 'color:#ffffff !important'
-                    nameSpan.style.cssText = dimColor + ';padding:3px 6px;display:flex;align-items:center;'
+                    if (nameSpan) nameSpan.style.cssText = dimColor + ';padding:3px 6px;display:flex;align-items:center;'
                     let civilBadge = box.querySelector('.civil-model-badge') as HTMLElement | null
                     if (showType && f.properties.t) {
                         if (!civilBadge) {
