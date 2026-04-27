@@ -1013,7 +1013,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
         const el = document.createElement('div')
         el.style.cssText = [
-            isEmerg ? 'background:rgba(180,0,0,0.85)' : 'background:rgba(0,0,0,0.5)',
+            isEmerg ? 'background:rgba(180,0,0,0.85)' : 'background:#000000',
             'color:#ffffff', "font-family:'Barlow Condensed','Barlow',sans-serif",
             'font-size:14px', 'font-weight:400', 'letter-spacing:.12em',
             'text-transform:uppercase', 'box-sizing:border-box',
@@ -1031,7 +1031,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             : 'display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;flex-shrink:0'
         arrowWrap.innerHTML = `<svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg>`
         const badgeColor  = isEmerg ? '#ff4040' : isMil ? '#c8ff00' : 'rgba(255,255,255,0.7)'
-        const nameColor   = isEmerg ? '#ff4040' : isMil ? '#c8ff00' : '#ffffff'
+        const nameColor   = isEmerg ? '#ff4040' : '#ffffff'
         const typeBg      = isMil ? '#4d6600' : '#002244'
         const typeColor   = isMil ? '#c8ff00' : '#00aaff'
         const catLbl      = this._categoryLabel(props.category)
@@ -1039,7 +1039,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
         const dimBadge = (label: string, value: string) => {
             const b = document.createElement('span')
-            b.style.cssText = `background:rgba(0,0,0,0.5);color:${badgeColor} !important;font-size:12px;font-weight:700;padding:0 7px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;gap:4px;`
+            b.style.cssText = `background:#000000;color:${badgeColor} !important;font-size:12px;font-weight:700;padding:0 7px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;gap:4px;`
             b.innerHTML = `<span style="opacity:0.45;font-weight:600;font-size:10px;letter-spacing:.12em">${label}</span><span>${value}</span>`
             return b
         }
@@ -1201,7 +1201,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 const lfields = isMil ? this._tagFields.mil : this._tagFields.civil
                 const showType = lfields.includes('typ')
                 const showAlt  = lfields.includes('alt')
-                box.style.background = isEmerg ? 'rgba(180,0,0,0.85)' : 'rgba(0,0,0,0.5)'
+                box.style.background = isEmerg ? 'rgba(180,0,0,0.85)' : '#000000'
                 labelEl.style.opacity = isDim ? '0.3' : '1'
                 const arrowSvg = box.querySelector('.adsb-arrow') as SVGElement | null
                 if (arrowSvg) {
@@ -1227,7 +1227,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 const nameSpan = box.querySelector('.adsb-label-name') as HTMLElement || box
                 nameSpan.textContent = raw || 'UNKNOWN'
                 if (isMil) {
-                    const dimColor = isDim ? 'color:rgba(255,255,255,0.45) !important' : 'color:#c8ff00 !important'
+                    const dimColor = isDim ? 'color:rgba(255,255,255,0.45) !important' : 'color:#ffffff !important'
                     nameSpan.style.cssText = dimColor + ';padding:3px 6px;display:flex;align-items:center;'
                     const isTracked = this._followEnabled && hex === this._tagHex
                     const hasBadge  = showType && !!f.properties.t
@@ -1237,7 +1237,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                         if (!altBadge) {
                             altBadge = document.createElement('span')
                             altBadge.className = 'mil-alt-badge'
-                            altBadge.style.cssText = 'background:rgba(0,0,0,0.5);color:#c8ff00 !important;font-size:12px;font-weight:700;padding:0 7px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;gap:4px;'
+                            altBadge.style.cssText = 'background:#000000;color:#c8ff00 !important;font-size:12px;font-weight:700;padding:0 7px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;gap:4px;'
                             altBadge.innerHTML = '<span style="opacity:0.45;font-weight:600;font-size:10px;letter-spacing:.12em">ALT</span><span></span>'
                             box.insertBefore(altBadge, box.querySelector('.mil-trk-btn') || box.querySelector('.sqk-badge') || null)
                         }
