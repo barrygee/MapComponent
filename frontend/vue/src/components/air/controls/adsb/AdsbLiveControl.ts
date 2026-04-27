@@ -1212,17 +1212,21 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 }
                 const newDir = this._isLeftFacing(f.properties.track ?? 0) ? 'left' : 'right'
                 if (box.dataset.dir !== newDir) {
-                    box.dataset.dir = newDir
-                    const arrowWrap = box.querySelector('.adsb-arrow-wrap') as HTMLElement | null
-                    if (arrowWrap) {
-                        arrowWrap.style.marginLeft = ''
-                        arrowWrap.style.marginRight = newDir === 'right' ? '4px' : ''
-                        if (newDir === 'left') {
-                            box.appendChild(arrowWrap)
-                        } else {
-                            box.insertBefore(arrowWrap, box.firstChild)
-                        }
+                    // Direction changed — anchor must change too, so recreate the marker
+                    this._callsignMarkers[hex].remove()
+                    delete this._callsignMarkers[hex]
+                    const labelEl2 = this._buildCallsignLabelEl(f.properties)
+                    if (isDim) {
+                        labelEl2.style.opacity = '0.3'
+                        const nameSpan2 = labelEl2.querySelector('.adsb-label-name') as HTMLElement | null
+                        if (nameSpan2) nameSpan2.style.color = 'rgba(255,255,255,0.45)'
                     }
+                    const isLeftFacing2 = this._isLeftFacing(f.properties.track ?? 0)
+                    const anchor2 = (isLeftFacing2 ? 'right' : 'left') as 'right' | 'left'
+                    const offset2: [number, number] = isLeftFacing2 ? [-14, 0] : [14, 0]
+                    this._callsignMarkers[hex] = new maplibregl.Marker({ element: labelEl2, anchor: anchor2, offset: offset2 })
+                        .setLngLat(lngLat).addTo(this.map)
+                    continue
                 }
                 const nameSpan = box.querySelector('.adsb-label-name') as HTMLElement || box
                 nameSpan.textContent = raw || 'UNKNOWN'
@@ -1316,7 +1320,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
                     const nameSpan = labelEl.querySelector('.adsb-label-name') as HTMLElement | null
                     if (nameSpan) nameSpan.style.color = 'rgba(255,255,255,0.45)'
                 }
-                const marker = new maplibregl.Marker({ element: labelEl, anchor: 'left', offset: [14, 0] })
+                const isLeftFacing = this._isLeftFacing(f.properties.track ?? 0)
+                const anchor = (isLeftFacing ? 'right' : 'left') as 'right' | 'left'
+                const markerOffset: [number, number] = isLeftFacing ? [-14, 0] : [14, 0]
+                const marker = new maplibregl.Marker({ element: labelEl, anchor, offset: markerOffset })
                     .setLngLat(lngLat).addTo(this.map)
                 this._callsignMarkers[hex] = marker
             }
