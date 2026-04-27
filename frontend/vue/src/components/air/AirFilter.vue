@@ -95,7 +95,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useDocumentEvent } from '@/composables/useDocumentEvent'
-import { AIRPORTS_DATA, type AirportProperties } from './controls/airports/AirportsControl'
+import { AIRPORTS_DATA } from './controls/airports/AirportsControl'
 import { MILITARY_BASES_DATA } from './controls/military-bases/MilitaryBasesControl'
 import type { AdsbLiveControl } from './controls/adsb/AdsbLiveControl'
 import type { AirportsToggleControl } from './controls/airports/AirportsControl'
@@ -305,13 +305,6 @@ function fitBoundsWithPadding(bounds: [number, number, number, number]) {
 
 function selectAirport(r: AirportResult) {
   fitBoundsWithPadding(r.bounds)
-  if (props.airportsControl) {
-    props.airportsControl._showAirportPanel(
-      { icao: r.icao, iata: r.iata, name: r.name, bounds: r.bounds, freqs: { tower: '', radar: '', approach: '', atis: '' } } as AirportProperties,
-      r.coords,
-      true,
-    )
-  }
 }
 
 function selectMil(r: MilResult) {
