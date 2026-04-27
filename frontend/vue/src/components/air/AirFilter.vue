@@ -512,6 +512,10 @@ defineExpose({
     color: #c8ff00;
 }
 
+.filter-bell-btn.filter-bell-btn--active:hover {
+    color: #c8ff00 !important;
+}
+
 .filter-track-btn {
     font-family: 'Barlow Condensed', 'Barlow', sans-serif;
     font-size: 9px;

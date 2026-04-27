@@ -638,7 +638,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const trkBtnText    = isTracked ? 'TRACKING' : 'TRACK'
         const trkBtn = `<button class="tag-follow-btn" style="background:none;border:none;cursor:pointer;padding:0 12px;color:${trkColor};font-family:'Barlow Condensed','Barlow',sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1;display:flex;align-items:center;align-self:stretch;touch-action:manipulation;-webkit-tap-highlight-color:transparent">${trkBtnText}</button>`
         const bellColor = notifOn ? '#c8ff00' : 'rgba(255,255,255,0.3)'
-        const bellBtn = `<button class="tag-notif-btn" data-hex="${props.hex}" style="background:none;border:none;cursor:pointer;padding:0 6px;color:${bellColor};display:flex;align-items:center;align-self:stretch;touch-action:manipulation;-webkit-tap-highlight-color:transparent" aria-label="Toggle notifications">` +
+        const bellHoverHandlers = notifOn ? `onmouseenter="this.style.color='#c8ff00'" onmouseleave="this.style.color='#c8ff00'"` : ''
+        const bellBtn = `<button class="tag-notif-btn" data-hex="${props.hex}" ${bellHoverHandlers} style="background:none;border:none;cursor:pointer;padding:0 6px;color:${bellColor};display:flex;align-items:center;align-self:stretch;touch-action:manipulation;-webkit-tap-highlight-color:transparent" aria-label="Toggle notifications">` +
             `<svg width="11" height="11" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block">` +
             `<path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor"/>` +
             `<path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/>` +
@@ -661,8 +662,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
             const callsignSpan = `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>`
             const leftFacing = this._isLeftFacing(track)
             const inner = leftFacing
-                ? `${trkBtn}${typeBadge}${callsignSpan}${arrowSvg}`
-                : `${arrowSvg}${callsignSpan}${typeBadge}${trkBtn}`
+                ? `${trkBtn}${bellBtn}${typeBadge}${callsignSpan}${arrowSvg}`
+                : `${arrowSvg}${callsignSpan}${typeBadge}${bellBtn}${trkBtn}`
             return `<div style="background:#000000;color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:stretch;gap:0;white-space:nowrap;user-select:none;cursor:pointer">${inner}</div>`
         }
 
@@ -800,6 +801,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 const slash = bellBtn.querySelector('line')
                 if (slash) slash.setAttribute('display', nowEnabled ? 'none' : 'inline')
                 this._rebuildTagForHex(hex)
+                this._updateCallsignMarkers()
             })
         }
 
@@ -1029,6 +1031,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const showAlt  = has('alt')
 
         const leftFacing = this._isLeftFacing(track)
+        const notifOn    = this._notifEnabled.has(props.hex)
 
         const el = document.createElement('div')
         el.style.cssText = [
@@ -1040,6 +1043,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             'padding:0', 'cursor:pointer', 'white-space:nowrap', 'user-select:none',
         ].join(';')
         el.dataset.dir = leftFacing ? 'left' : 'right'
+        el.dataset.notif = notifOn ? '1' : '0'
 
         const box = el
 
@@ -1116,13 +1120,27 @@ export class AdsbLiveControl implements maplibregl.IControl {
             return btn
         }
 
+        const makeNotifBell = () => {
+            if (!notifOn || isTracked) return null
+            const btn = document.createElement('button')
+            btn.className = 'tag-notif-btn'
+            btn.dataset['hex'] = props.hex
+            btn.setAttribute('aria-label', 'Toggle notifications')
+            btn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 6px;color:#c8ff00;display:flex;align-items:center;align-self:stretch;touch-action:manipulation;-webkit-tap-highlight-color:transparent;'
+            btn.addEventListener('mouseenter', () => { btn.style.color = '#c8ff00' })
+            btn.addEventListener('mouseleave', () => { btn.style.color = '#c8ff00' })
+            btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block"><path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor"/><path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/></svg>`
+            return btn
+        }
+
         const append = (...nodes: (HTMLElement | null)[]) => {
             for (const n of nodes) if (n) el.appendChild(n)
         }
 
         if (leftFacing) {
-            // 1–189°: trk, cat, reg, spd, hdg, alt, sqk, type, callsign, arrow
+            // 1–189°: trk, bell, cat, reg, spd, hdg, alt, sqk, type, callsign, arrow
             append(makeTrackBtn())
+            append(makeNotifBell())
             if (has('cat') && catLbl)          append(dimBadge('CAT', catLbl))
             if (has('reg') && props.r)         append(dimBadge('REG', props.r))
             if (has('spd') && props.gs != null) append(dimBadge('SPD', Math.round(props.gs) + 'kt'))
@@ -1134,7 +1152,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             append(makeCallsign('left'))
             el.appendChild(arrowWrap)
         } else {
-            // 190–360/0°: arrow, callsign, type, sqk, alt, hdg, spd, reg, cat, trk
+            // 190–360/0°: arrow, callsign, type, sqk, alt, hdg, spd, reg, cat, bell, trk
             el.appendChild(arrowWrap)
             append(makeCallsign('right'))
             append(makeType())
@@ -1145,6 +1163,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             if (has('spd') && props.gs != null) append(dimBadge('SPD', Math.round(props.gs) + 'kt'))
             if (has('reg') && props.r)         append(dimBadge('REG', props.r))
             if (has('cat') && catLbl)          append(dimBadge('CAT', catLbl))
+            append(makeNotifBell())
             append(makeTrackBtn())
         }
         el.addEventListener('mouseenter', () => {
@@ -1231,8 +1250,9 @@ export class AdsbLiveControl implements maplibregl.IControl {
                     if (poly) poly.setAttribute('stroke', arrowColor)
                 }
                 const newDir = this._isLeftFacing(f.properties.track ?? 0) ? 'left' : 'right'
-                if (box.dataset.dir !== newDir) {
-                    // Direction changed — anchor must change too, so recreate the marker
+                const newNotif = this._notifEnabled.has(hex) ? '1' : '0'
+                if (box.dataset.dir !== newDir || box.dataset.notif !== newNotif) {
+                    // Direction or notification state changed — recreate the marker
                     this._callsignMarkers[hex].remove()
                     delete this._callsignMarkers[hex]
                     const labelEl2 = this._buildCallsignLabelEl(f.properties)
