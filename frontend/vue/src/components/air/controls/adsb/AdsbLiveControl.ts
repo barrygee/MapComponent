@@ -636,9 +636,9 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const notifOn       = this._notifEnabled.has(props.hex)
         const trkColor      = isTracked ? '#c8ff00' : 'rgba(255,255,255,0.3)'
         const trkBtnText    = isTracked ? 'TRACKING' : 'TRACK'
-        const trkBtn = `<button class="tag-follow-btn" style="background:none;border:none;cursor:pointer;padding:8px 12px;color:${trkColor};font-family:'Barlow Condensed','Barlow',sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1;touch-action:manipulation;-webkit-tap-highlight-color:transparent">${trkBtnText}</button>`
+        const trkBtn = `<button class="tag-follow-btn" style="background:none;border:none;cursor:pointer;padding:5px 12px;color:${trkColor};font-family:'Barlow Condensed','Barlow',sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1;touch-action:manipulation;-webkit-tap-highlight-color:transparent">${trkBtnText}</button>`
         const bellColor = notifOn ? '#c8ff00' : 'rgba(255,255,255,0.3)'
-        const bellBtn = `<button class="tag-notif-btn" data-hex="${props.hex}" style="background:none;border:none;cursor:pointer;padding:8px 6px;color:${bellColor};line-height:1;touch-action:manipulation;-webkit-tap-highlight-color:transparent" aria-label="Toggle notifications">` +
+        const bellBtn = `<button class="tag-notif-btn" data-hex="${props.hex}" style="background:none;border:none;cursor:pointer;padding:5px 6px;color:${bellColor};line-height:1;touch-action:manipulation;-webkit-tap-highlight-color:transparent" aria-label="Toggle notifications">` +
             `<svg width="11" height="11" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">` +
             `<path d="M6.5 1C4.015 1 2 3.015 2 5.5V9H1v1h11V9h-1V5.5C11 3.015 8.985 1 6.5 1Z" fill="currentColor"/>` +
             `<path d="M5 10.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1" fill="none"/>` +
@@ -684,8 +684,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
             `<span style="opacity:0.5;min-width:34px;letter-spacing:.05em">${lbl}</span>` +
             `<span>${val}</span></div>`
         ).join('')
-        return `<div style="background:rgb(10,13,20);color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;padding:6px 14px 9px;white-space:nowrap;user-select:none">` +
-            `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;font-size:15px;letter-spacing:.12em;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
+        return `<div style="background:rgb(10,13,20);color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;padding:4px 14px 7px;white-space:nowrap;user-select:none">` +
+            `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;font-size:15px;letter-spacing:.12em;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.12)">` +
             `<span style="font-size:13px;font-weight:400;pointer-events:none;color:${callsignColor}">${callsign}</span>` +
             `<div style="display:flex;align-items:center;gap:0">${bellBtn}${trkBtn}</div></div>` +
             `<div style="pointer-events:none">` + rowsHTML + `</div></div>`
