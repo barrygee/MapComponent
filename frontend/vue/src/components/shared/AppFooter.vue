@@ -32,7 +32,6 @@
 
     </div>
     <div id="footer-center">
-      <span id="conn-status" :class="connStatusClass">{{ connStatusText }}</span>
     </div>
     <div id="footer-right">
       <button id="docs-btn" aria-label="Documentation" data-tooltip="DOCUMENTATION"
@@ -57,7 +56,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useTrackingStore } from '@/stores/tracking'
@@ -71,7 +69,6 @@ const emit = defineEmits<{
   'toggle-docs': []
 }>()
 
-const appStore = useAppStore()
 const settingsStore = useSettingsStore()
 const notificationsStore = useNotificationsStore()
 const trackingStore = useTrackingStore()
@@ -80,12 +77,4 @@ const notifCount = computed(() => notificationsStore.unreadCount)
 const trackingCount = computed(() => trackingStore.count)
 const sidebarOpen = computed(() => props.sidebarOpen ?? false)
 
-const connStatusClass = computed(() => {
-  const mode = appStore.connectivityMode
-  const forced = mode === 'online' || mode === 'offgrid'
-  if (forced) return mode === 'online' ? 'conn-online conn-mode-forced' : 'conn-offline conn-mode-forced'
-  return appStore.isOnline ? 'conn-online' : 'conn-offline'
-})
-
-const connStatusText = computed(() => appStore.isOnline ? '● ONLINE' : '● OFF GRID')
 </script>

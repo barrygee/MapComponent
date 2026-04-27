@@ -380,9 +380,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const canvas = document.createElement('canvas')
         canvas.width = canvas.height = canvasSize
         const ctx = canvas.getContext('2d')!
-        const halfSquareSize = 9 * scale, centerX = canvasSize / 2, centerY = canvasSize / 2
-        ctx.fillStyle = color
-        ctx.fillRect(centerX - halfSquareSize, centerY - halfSquareSize, halfSquareSize * 2, halfSquareSize * 2)
+        ctx.beginPath(); ctx.arc(canvasSize / 2, canvasSize / 2, 9 * scale, 0, Math.PI * 2)
+        ctx.strokeStyle = color; ctx.lineWidth = 3 * scale; ctx.stroke()
         return ctx.getImageData(0, 0, canvasSize, canvasSize)
     }
 
@@ -516,17 +515,21 @@ export class AdsbLiveControl implements maplibregl.IControl {
             layout: {
                 visibility: layerVisibility,
                 'icon-image': ['case',
-                    ['==', ['get', 'squawkEmerg'], 1],              'adsb-blip-emerg',
-                    ['boolean', ['get', 'military'], false],         'adsb-blip-mil',
-                    ['==', ['get', 'category'], 'B6'],               'adsb-blip-uav',
                     ['==', ['get', 'category'], 'C1'],               'adsb-blip-emerg-gnd',
                     ['==', ['get', 'category'], 'C2'],               'adsb-blip-gnd',
                     ['==', ['get', 'category'], 'C3'],               'adsb-blip-tower',
                     ['==', ['get', 't'], 'TWR'],                     'adsb-blip-tower',
+                    ['==', ['get', 'squawkEmerg'], 1],               'adsb-blip-emerg',
+                    ['boolean', ['get', 'military'], false],          'adsb-blip-mil',
+                    ['==', ['get', 'category'], 'B6'],               'adsb-blip-uav',
                     'adsb-blip',
                 ] as maplibregl.ExpressionSpecification,
                 'icon-size': 0.75,
-                'icon-rotate': ['get', 'track'] as maplibregl.ExpressionSpecification,
+                'icon-rotate': ['case',
+                    ['match', ['get', 'category'], ['C1', 'C2', 'C3', 'C4', 'C5'], true, false], 0,
+                    ['==', ['get', 't'], 'TWR'], 0,
+                    ['get', 'track'],
+                ] as maplibregl.ExpressionSpecification,
                 'icon-rotation-alignment': 'map',
                 'icon-pitch-alignment':    'map',
                 'icon-allow-overlap':      true,
@@ -659,7 +662,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 : ''
             const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
             const track    = props.track ?? 0
-            const arrowSvg = `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:26px;align-self:stretch;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
+            const arrowSvg = this._makeArrowSvg(arrowColor, track, props.category, props.t)
             const callsignSpan = showCallsign ? `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>` : ''
             const leftFacing = this._isLeftFacing(track)
             const inner = leftFacing
@@ -673,7 +676,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
         const heading    = props.track ?? 0
         const leftFacing = this._isLeftFacing(heading)
-        const arrowSvg   = `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:26px;align-self:stretch;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${heading}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
+        const arrowSvg   = this._makeArrowSvg(arrowColor, heading, props.category, props.t)
         const callsignSpan = showCallsign ? `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>` : ''
         const inner = leftFacing
             ? `${trkBtn}${bellBtn}${callsignSpan}${arrowSvg}`
@@ -1016,8 +1019,19 @@ export class AdsbLiveControl implements maplibregl.IControl {
         return t >= 1 && t <= 189
     }
 
-    private _makeArrowSvg(color: string, track: number): string {
-        return `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;background:#000;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/></svg></span>`
+    private _makeArrowSvg(color: string, track: number, category?: string, type?: string): string {
+        const cat = (category || '').toUpperCase()
+        const isTwr = (type || '').toUpperCase() === 'TWR'
+        let shape: string
+        if (cat === 'C1' || cat === 'C2') {
+            shape = `<circle cx="6" cy="6" r="3.5" fill="none" stroke="${color}" stroke-width="1.5"/>`
+        } else if (cat === 'C3' || cat === 'C4' || cat === 'C5' || isTwr) {
+            shape = `<circle cx="6" cy="6" r="3.5" fill="${color}" stroke="none"/>`
+        } else {
+            shape = `<polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`
+        }
+        const noRotate = cat === 'C1' || cat === 'C2' || cat === 'C3' || cat === 'C4' || cat === 'C5' || isTwr
+        return `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;background:#000;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${noRotate ? 0 : track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg">${shape}</svg></span>`
     }
 
     private _buildCallsignLabelEl(props: AircraftProperties): HTMLElement {
@@ -1054,7 +1068,23 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const arrowWrap = document.createElement('span')
         arrowWrap.className = 'adsb-arrow-wrap'
         arrowWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;width:26px;align-self:stretch;flex-shrink:0'
-        arrowWrap.innerHTML = `<svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg"><polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/></svg>`
+        {
+            const cat = (props.category || '').toUpperCase()
+            const isTwr = (props.t || '').toUpperCase() === 'TWR'
+            let shape: string
+            let rotate: number
+            if (cat === 'C1' || cat === 'C2') {
+                shape = `<circle cx="6" cy="6" r="3.5" fill="none" stroke="${arrowColor}" stroke-width="1.5"/>`
+                rotate = 0
+            } else if (cat === 'C3' || cat === 'C4' || cat === 'C5' || isTwr) {
+                shape = `<circle cx="6" cy="6" r="3.5" fill="${arrowColor}" stroke="none"/>`
+                rotate = 0
+            } else {
+                shape = `<polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/>`
+                rotate = track
+            }
+            arrowWrap.innerHTML = `<svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${rotate}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg">${shape}</svg>`
+        }
         const badgeColor  = isEmerg ? '#ff4040' : isMil ? '#c8ff00' : 'rgba(255,255,255,0.7)'
         const nameColor   = isEmerg ? '#ff4040' : '#ffffff'
         const typeBg      = isEmerg ? '#4d0000' : isMil ? '#4d6600' : '#002244'
@@ -1248,9 +1278,19 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 const arrowSvg = box.querySelector('.adsb-arrow') as SVGElement | null
                 if (arrowSvg) {
                     const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
-                    arrowSvg.style.transform = `rotate(${f.properties.track ?? 0}deg)`
-                    const poly = arrowSvg.querySelector('polygon')
-                    if (poly) poly.setAttribute('stroke', arrowColor)
+                    const cat = (f.properties.category || '').toUpperCase()
+                    const isTwr = (f.properties.t || '').toUpperCase() === 'TWR'
+                    const isSolidCircle = cat === 'C3' || cat === 'C4' || cat === 'C5' || isTwr
+                    const isGndOrTower = ['C1','C2','C3','C4','C5'].includes(cat) || isTwr
+                    arrowSvg.style.transform = `rotate(${isGndOrTower ? 0 : (f.properties.track ?? 0)}deg)`
+                    const shape = arrowSvg.querySelector('polygon, rect, circle') as SVGElement | null
+                    if (shape) {
+                        if (isSolidCircle) {
+                            shape.setAttribute('fill', arrowColor)
+                        } else {
+                            shape.setAttribute('stroke', arrowColor)
+                        }
+                    }
                 }
                 const newDir = this._isLeftFacing(f.properties.track ?? 0) ? 'left' : 'right'
                 const newNotif = this._notifEnabled.has(hex) ? '1' : '0'
