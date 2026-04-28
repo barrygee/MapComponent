@@ -111,6 +111,7 @@ export class AaraToggleControl extends SentinelControlBase {
     }
 
     initLayers(): void {
+        if (this.map.getSource('aara-zones')) return
         const layerVisibility = this.visible ? 'visible' : 'none'
 
         this.map.addSource('aara-zones', { type: 'geojson', data: AARA_ZONES })
@@ -171,7 +172,7 @@ export class AaraToggleControl extends SentinelControlBase {
         this.visible = !this.visible
         const layerVisibility = this.visible ? 'visible' : 'none'
         ;['aara-fill', 'aara-outline'].forEach(id => {
-            try { this.map.setLayoutProperty(id, 'visibility', layerVisibility) } catch (e) {}
+            if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', layerVisibility)
         })
         if (this._labelMarkers) {
             if (this.visible) this._labelMarkers.forEach(m => m.addTo(this.map))

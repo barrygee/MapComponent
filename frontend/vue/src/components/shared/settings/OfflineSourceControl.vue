@@ -19,6 +19,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import * as settingsApi from '@/services/settingsApi'
+import { offgridKey } from '@/utils/domainKeys'
 
 const props = defineProps<{ ns: string; defaultUrl: string }>()
 const emit = defineEmits<{
@@ -26,7 +27,8 @@ const emit = defineEmits<{
   commit: []
 }>()
 
-const LS_KEY = `sentinel_${props.ns}_offgridSource`
+const _key   = offgridKey(props.ns)
+const LS_KEY = `sentinel_${props.ns}_${_key}`
 const urlValue = ref('')
 
 const noDefault = props.defaultUrl === ''
@@ -48,14 +50,14 @@ try {
 
 onMounted(async () => {
   const data = await settingsApi.getNamespace(props.ns)
-  if (!data?.offgridSource) return
-  const backendVal = data.offgridSource as { url?: string }
+  if (!data?.[_key]) return
+  const backendVal = data[_key] as { url?: string }
   if (backendVal.url && !isPlaceholder(backendVal.url) && !urlValue.value) {
     urlValue.value = backendVal.url
     try { localStorage.setItem(LS_KEY, JSON.stringify(backendVal)) } catch {}
   } else if (noDefault && backendVal.url && isPlaceholder(backendVal.url)) {
     try { localStorage.removeItem(LS_KEY) } catch {}
-    settingsApi.put(props.ns, 'offgridSource', { url: '' })
+    settingsApi.put(props.ns, _key, { url: '' })
   } else if (!noDefault) {
     try { localStorage.setItem(LS_KEY, JSON.stringify(backendVal)) } catch {}
   }
@@ -67,7 +69,7 @@ function onInput(): void {
     if (url) new URL(url)
     const val = { url }
     try { localStorage.setItem(LS_KEY, JSON.stringify(val)) } catch {}
-    settingsApi.put(props.ns, 'offgridSource', val)
+    settingsApi.put(props.ns, _key, val)
   })
 }
 </script>

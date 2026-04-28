@@ -64,6 +64,7 @@ const _locationMarker = new UserLocationMarker('user-location-marker')
 
 // Cached map instance — plain variable, never reactive
 let _map: MapLibreGlMap | null = null
+let _currentStyleUrl: string | null = null
 
 // Control instances — plain variables, initialised in onStyleLoaded
 let adsbControl:         AdsbLiveControl | null            = null
@@ -115,16 +116,24 @@ defineExpose({
 useConnectivity((online) => {
   const m = _map
   if (!m) return
-  m.setStyle(online ? STYLE_ONLINE : STYLE_OFFLINE)
+  const targetStyle = online ? STYLE_ONLINE : STYLE_OFFLINE
+  if (_currentStyleUrl === targetStyle) {
+    // Style already correct — just update adsb state without a reload
+    adsbControl?.handleConnectivityChange()
+    return
+  }
+  _currentStyleUrl = targetStyle
+  m.setStyle(targetStyle)
   // Re-init layers after style reload, clear aircraft
   m.once('style.load', () => {
     roadsControl?._applyVisibility()
     namesControl?._applyVisibility()
+    rangeRingsControl?._initRings()
     airportsControl?.initLayers()
     militaryBasesControl?.initLayers()
     aaraControl?.initLayers()
     awacsControl?.initLayers()
-    adsbControl?.clearAircraft()
+    adsbControl?.initLayers()
     adsbControl?.handleConnectivityChange()
   })
 })
@@ -137,6 +146,7 @@ function onMapCreated(m: MapLibreGlMap) {
 
 function onStyleLoaded(m: MapLibreGlMap) {
   if (adsbControl) return // already initialised (style reload handled by connectivity hook)
+  _currentStyleUrl = styleUrl.value
 
   adsbLabelsControl = new AdsbLabelsToggleControl(airStore, null)
 

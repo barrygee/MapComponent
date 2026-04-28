@@ -59,10 +59,13 @@ async def resolve_domain_urls(
     else:
         effective_mode = settings_map.get("app.connectivityMode", "online") or "online"
 
-    online = _valid_url(settings_map.get(f"{domain}.onlineUrl")) or _valid_url(online_default)
+    _online_key  = {"air": "onlineDataSourceURL"}.get(domain, "onlineUrl")
+    _offgrid_key = {"air": "offgridDataSourceURL"}.get(domain, "offgridSource")
 
-    # offgridSource is stored as {"url": "http://..."} by the frontend settings panel
-    offgrid_raw = settings_map.get(f"{domain}.offgridSource")
+    online = _valid_url(settings_map.get(f"{domain}.{_online_key}")) or _valid_url(online_default)
+
+    # offgrid source is stored as {"url": "http://..."} by the frontend settings panel
+    offgrid_raw = settings_map.get(f"{domain}.{_offgrid_key}")
     if isinstance(offgrid_raw, dict):
         offgrid = _valid_url(offgrid_raw.get("url"))
     else:

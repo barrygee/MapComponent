@@ -7,7 +7,10 @@
   "air": {
     "enabled": true,
     "sourceOverride": "auto",
-    "onlineUrl": "https://api.airplanes.live/v2",
+    "onlineDataSourceURL": "https://api.airplanes.live/v2",
+    "offgridDataSourceURL": {
+      "url": ""
+    },
     "labelDataPoints": {
       "civil": { "callsign": true, "altitude": false, "speed": false, "heading": false, "aircraftType": false, "registration": false, "squawk": false, "category": false },
       "mil":   { "callsign": true, "altitude": false, "speed": false, "heading": false, "aircraftType": true,  "registration": false, "squawk": false, "category": false }

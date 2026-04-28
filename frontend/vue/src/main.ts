@@ -55,6 +55,14 @@ const DEFAULT_LABEL_DATA_POINTS = {
       })
       if (enabled.length > 0) appStore.setEnabledDomains(enabled)
 
+      // Sync connectivity mode from backend — backend is authoritative so a mode
+      // set from another session doesn't get overridden by a stale localStorage value.
+      const backendMode = data.app?.connectivityMode as string | undefined
+      if (backendMode && (['auto', 'online', 'offgrid'] as string[]).includes(backendMode)) {
+        try { localStorage.setItem('sentinel_app_connectivityMode', backendMode) } catch {}
+        appStore.setConnectivityMode(backendMode as ConnectivityMode)
+      }
+
       // Hydrate labelDataPoints from API into store before first render.
       const remote = data.air?.labelDataPoints as AdsbTagFields | undefined
       if (remote && typeof remote === 'object' && !Array.isArray(remote) &&

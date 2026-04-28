@@ -95,6 +95,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
     private _lastFetchTime   = 0
     private _isFetching      = false
+    private _fetchAbort: AbortController | null = null
     private _fetchFailCount  = 0
 
     private _emergencySquawks: Set<string> = new Set(['7700', '7600', '7500'])
@@ -1562,6 +1563,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
     private async _fetch(): Promise<void> {
         if (!this.map || this._isFetching) return
         this._isFetching = true
+        this._fetchAbort = new AbortController()
 
         let lat: number | undefined, lon: number | undefined
         const cached = localStorage.getItem('userLocation')
@@ -1575,7 +1577,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
         try {
             const url  = `${origin}/api/air/adsb/point/${lat!.toFixed(4)}/${lon!.toFixed(4)}/250`
-            const resp = await fetch(url)
+            const resp = await fetch(url, { signal: this._fetchAbort.signal })
             if (!this.map) return
             if (!resp.ok) {
                 if (resp.status === 429) {
@@ -1788,6 +1790,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             this._fetchFailCount = 0
 
         } catch(e) {
+            if (e instanceof DOMException && e.name === 'AbortError') return
             this._fetchFailCount++
             if (this._fetchFailCount >= 3) {
                 this._fetchFailCount = 0; this._isFetching = false; this._stopFetching()
@@ -1796,6 +1799,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             }
             console.warn('ADS-B fetch error:', e)
         } finally {
+            this._fetchAbort = null
             this._isFetching = false
         }
     }
@@ -1926,6 +1930,9 @@ export class AdsbLiveControl implements maplibregl.IControl {
     // ---- Public clear method (called by AirMap.vue on connectivity change) ----
 
     clearAircraft(): void {
+        this._fetchAbort?.abort()
+        this._fetchAbort = null
+        this._isFetching = false
         this._stopPolling()
         if (this._hoverHideTimer) { clearTimeout(this._hoverHideTimer); this._hoverHideTimer = null }
         for (const t of Object.values(this._parkedTimers)) clearTimeout(t)

@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
 
@@ -37,5 +37,20 @@ export function useConnectivity(onModeChange?: (online: boolean) => void) {
 
   onUnmounted(() => {
     if (timer !== null) clearInterval(timer)
+  })
+
+  // React immediately when the user changes the connectivity mode setting.
+  // Always fire onModeChange unconditionally — probe() only fires it when isOnline
+  // actually changes, so switching offgrid while already "offline" would be a no-op.
+  watch(() => appStore.connectivityMode, (mode) => {
+    if (mode === 'offgrid') {
+      appStore.setOnline(false)
+      onModeChange?.(false)
+    } else if (mode === 'online') {
+      appStore.setOnline(true)
+      onModeChange?.(true)
+    } else {
+      probe()
+    }
   })
 }

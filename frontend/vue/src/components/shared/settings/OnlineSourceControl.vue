@@ -19,6 +19,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import * as settingsApi from '@/services/settingsApi'
+import { onlineKey } from '@/utils/domainKeys'
 
 const props = defineProps<{ ns: string; defaultUrl: string }>()
 const emit = defineEmits<{
@@ -26,7 +27,8 @@ const emit = defineEmits<{
   commit: []
 }>()
 
-const LS_KEY = `sentinel_${props.ns}_onlineUrl`
+const _key   = onlineKey(props.ns)
+const LS_KEY = `sentinel_${props.ns}_${_key}`
 const urlValue = ref('')
 
 const noDefault = props.defaultUrl === ''
@@ -44,14 +46,14 @@ try {
 
 onMounted(async () => {
   const data = await settingsApi.getNamespace(props.ns)
-  if (!data?.onlineUrl) return
-  const backendVal = data.onlineUrl as string
+  if (!data?.[_key]) return
+  const backendVal = data[_key] as string
   if (backendVal && !isPlaceholder(backendVal) && !urlValue.value) {
     urlValue.value = backendVal
     try { localStorage.setItem(LS_KEY, backendVal) } catch {}
   } else if (noDefault && backendVal && isPlaceholder(backendVal)) {
     try { localStorage.removeItem(LS_KEY) } catch {}
-    settingsApi.put(props.ns, 'onlineUrl', '')
+    settingsApi.put(props.ns, _key, '')
   }
 })
 
@@ -61,10 +63,10 @@ function onInput(): void {
     if (val) {
       new URL(val)
       try { localStorage.setItem(LS_KEY, val) } catch {}
-      settingsApi.put(props.ns, 'onlineUrl', val)
+      settingsApi.put(props.ns, _key, val)
     } else {
       try { localStorage.removeItem(LS_KEY) } catch {}
-      settingsApi.put(props.ns, 'onlineUrl', '')
+      settingsApi.put(props.ns, _key, '')
     }
   })
 }

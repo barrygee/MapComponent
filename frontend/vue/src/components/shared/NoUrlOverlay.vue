@@ -14,6 +14,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useDocumentEvent } from '@/composables/useDocumentEvent'
 import { useAppStore } from '@/stores/app'
 import { useSettingsStore } from '@/stores/settings'
+import { onlineKey, offgridKey } from '@/utils/domainKeys'
 
 const props = defineProps<{ domain: string }>()
 
@@ -22,9 +23,21 @@ const settingsStore = useSettingsStore()
 
 const hasUrl = ref(true)
 
+function _readSourceOverride(): string {
+  try { return localStorage.getItem(`sentinel_${props.domain}_sourceOverride`) || 'auto' } catch { return 'auto' }
+}
+
+const _sourceOverride = ref(_readSourceOverride())
+
+function _effectiveMode(): string {
+  const override = _sourceOverride.value
+  if (override !== 'auto') return override
+  return appStore.connectivityMode
+}
+
 const message = computed(() => {
-  const mode = appStore.connectivityMode === 'offgrid' ? 'Off Grid' : 'Online'
-  const setting = appStore.connectivityMode === 'offgrid' ? 'Off Grid Data Source' : 'Online Data Source'
+  const mode = _effectiveMode() === 'offgrid' ? 'Off Grid' : 'Online'
+  const setting = _effectiveMode() === 'offgrid' ? 'Off Grid Data Source' : 'Online Data Source'
   return `${mode} mode is active but no ${setting} URL has been set for ${props.domain.toUpperCase()}. Configure a URL in settings or switch connectivity mode to continue.`
 })
 
@@ -40,41 +53,45 @@ function _lsGet(key: string): string {
 }
 
 function check() {
-  const ns   = props.domain
-  const mode = appStore.connectivityMode
+  const ns    = props.domain
+  const mode  = _effectiveMode()
+  const _oKey = offgridKey(ns)
+  const _nKey = onlineKey(ns)
 
   if (mode === 'offgrid') {
-    const raw = _lsGet(`sentinel_${ns}_offgridSource`)
+    const raw = _lsGet(`sentinel_${ns}_${_oKey}`)
     if (!raw) { hasUrl.value = false; return }
     try {
       const src = JSON.parse(raw)
       hasUrl.value = !!(src?.url && !_isPlaceholder(src.url))
     } catch { hasUrl.value = false }
   } else {
-    const url = _lsGet(`sentinel_${ns}_onlineUrl`)
+    const url = _lsGet(`sentinel_${ns}_${_nKey}`)
     hasUrl.value = url.length > 0 && !_isPlaceholder(url)
   }
 }
 
 async function checkWithBackend() {
-  const ns   = props.domain
-  const mode = appStore.connectivityMode
+  const ns    = props.domain
+  const mode  = _effectiveMode()
+  const _oKey = offgridKey(ns)
+  const _nKey = onlineKey(ns)
   try {
     const res  = await fetch(`/api/settings/${ns}`)
     if (!res.ok) { check(); return }
     const data = await res.json() as Record<string, unknown>
     let backendUrl = ''
     if (mode === 'offgrid') {
-      const src = data['offgridSource'] as { url?: string } | undefined
+      const src = data[_oKey] as { url?: string } | undefined
       backendUrl = src?.url ?? ''
     } else {
-      backendUrl = (data['onlineUrl'] as string) ?? ''
+      backendUrl = (data[_nKey] as string) ?? ''
     }
     if (backendUrl && !_isPlaceholder(backendUrl)) {
       hasUrl.value = true
-      const lsKey = mode === 'offgrid' ? `sentinel_${ns}_offgridSource` : `sentinel_${ns}_onlineUrl`
+      const lsKey = mode === 'offgrid' ? `sentinel_${ns}_${_oKey}` : `sentinel_${ns}_${_nKey}`
       try {
-        localStorage.setItem(lsKey, mode === 'offgrid' ? JSON.stringify(data['offgridSource']) : backendUrl)
+        localStorage.setItem(lsKey, mode === 'offgrid' ? JSON.stringify(data[_oKey]) : backendUrl)
       } catch {}
     } else {
       hasUrl.value = false
@@ -86,9 +103,13 @@ function openSettings() {
   settingsStore.openPanel(props.domain)
 }
 
-function onSettingsClosed() { checkWithBackend() }
+function onSettingsClosed() {
+  _sourceOverride.value = _readSourceOverride()
+  checkWithBackend()
+}
 
 watch(() => appStore.connectivityMode, () => { checkWithBackend() })
+watch(_sourceOverride, () => { checkWithBackend() })
 
 onMounted(() => {
   checkWithBackend()

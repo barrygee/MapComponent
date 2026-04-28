@@ -89,7 +89,7 @@ def _build_default_settings() -> list[tuple[str, str, object]]:
     rows = _parse_config_file(_CONFIG_PATH)
     # Allow env/config.py values to override the JSON file for API URLs
     overrides = {
-        ("air",   "onlineUrl"): settings.adsb_upstream_base,
+        ("air",   "onlineDataSourceURL"): settings.adsb_upstream_base,
         ("space", "onlineUrl"): settings.celestrak_iss_url,
     }
     result = []
@@ -158,10 +158,37 @@ async def seed_default_settings() -> None:
     """Insert default URL settings on startup — only if a row does not already exist."""
     from backend.models import UserSettings  # avoid circular import
 
+    # Rename air domain keys introduced in the onlineDataSourceURL/offgridDataSourceURL refactor.
+    _RENAMES = [
+        ("air", "onlineUrl",     "onlineDataSourceURL"),
+        ("air", "offgridSource", "offgridDataSourceURL"),
+    ]
+    async with AsyncSessionLocal() as session:
+        for namespace, old_key, new_key in _RENAMES:
+            old_result = await session.execute(
+                select(UserSettings).where(
+                    UserSettings.namespace == namespace,
+                    UserSettings.key == old_key,
+                )
+            )
+            old_row = old_result.scalar_one_or_none()
+            if old_row is None:
+                continue
+            new_result = await session.execute(
+                select(UserSettings).where(
+                    UserSettings.namespace == namespace,
+                    UserSettings.key == new_key,
+                )
+            )
+            if new_result.scalar_one_or_none() is None:
+                old_row.key = new_key
+            else:
+                await session.delete(old_row)
+        await session.commit()
+
     # Remove stale placeholder URL rows that were seeded in earlier versions.
     # sea/land have no built-in default URLs; users must configure them.
     _OBSOLETE_KEYS = [
-        ("air",   "offgridSource"),
         ("space", "offgridSource"),
         ("sea",   "onlineUrl"),
         ("sea",   "offgridSource"),

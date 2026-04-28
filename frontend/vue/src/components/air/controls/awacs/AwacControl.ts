@@ -110,6 +110,7 @@ export class AwacToggleControl extends SentinelControlBase {
     protected handleClick(): void { this.toggle() }
 
     initLayers(): void {
+        if (this.map.getSource('awacs-orbits')) return
         this.map.addSource('awacs-orbits', { type: 'geojson', data: AWACS_ORBITS as GeoJSON.GeoJSON })
 
         const layerVisibility = this.visible ? 'visible' : 'none'
@@ -135,7 +136,7 @@ export class AwacToggleControl extends SentinelControlBase {
         this.visible = !this.visible
         const layerVisibility = this.visible ? 'visible' : 'none'
         ;['awacs-fill', 'awacs-outline'].forEach(id => {
-            try { this.map.setLayoutProperty(id, 'visibility', layerVisibility) } catch (e) {}
+            if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', layerVisibility)
         })
         this.setButtonActive(this.visible)
         this._airStore.setOverlay('awacs', this.visible)
