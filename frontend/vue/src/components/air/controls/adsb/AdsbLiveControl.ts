@@ -1510,7 +1510,12 @@ export class AdsbLiveControl implements maplibregl.IControl {
             let coords: [number, number]
 
             if (pos) {
-                coords = [pos.lon, pos.lat]
+                const elapsedSec = (now - pos.lastSeen) / 1000
+                if (pos.track != null && pos.gs > 0) {
+                    coords = this._deadReckon(pos.lon, pos.lat, pos.track, pos.gs, elapsedSec)
+                } else {
+                    coords = [pos.lon, pos.lat]
+                }
             } else {
                 coords = f.geometry.coordinates
             }
@@ -1623,8 +1628,12 @@ export class AdsbLiveControl implements maplibregl.IControl {
                     if (!existing) {
                         this._lastPositions[hex] = { lon: a.lon!, lat: a.lat!, gs: a.gs ?? 0, track: a.track ?? null, lastSeen, prevLon: a.lon!, prevLat: a.lat!, prevSeen: lastSeen, interpLon: a.lon!, interpLat: a.lat! }
                     } else {
-                        existing.lon      = a.lon!
-                        existing.lat      = a.lat!
+                        const prevElapsed = (lastSeen - existing.lastSeen) / 1000
+                        const [curLon, curLat] = (existing.track != null && existing.gs > 0)
+                            ? this._deadReckon(existing.lon, existing.lat, existing.track, existing.gs, prevElapsed)
+                            : [existing.lon, existing.lat]
+                        existing.lon      = curLon
+                        existing.lat      = curLat
                         existing.gs       = a.gs ?? 0
                         existing.track    = a.track ?? null
                         existing.lastSeen = lastSeen
