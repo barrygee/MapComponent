@@ -4,10 +4,10 @@
       <span class="settings-connectivity-label">OFF GRID</span>
       <button
         class="settings-connectivity-track"
-        :class="{ 'is-online': isOnline }"
+        :class="{ 'is-online': offGrid }"
         role="switch"
-        :aria-checked="isOnline"
-        aria-label="Toggle connectivity mode"
+        :aria-checked="offGrid"
+        aria-label="Toggle off grid mode"
         @click="toggle"
       ><span class="settings-connectivity-thumb"></span></button>
     </div>
@@ -38,15 +38,15 @@ const emit = defineEmits<{ stage: [fn: () => Promise<unknown> | void] }>()
 const LS_KEY = 'sentinel_app_connectivityMode'
 const DOMAIN_NAMESPACES = ['air', 'space', 'sea', 'land']
 
-const isOnline = ref(true)
+const offGrid = ref(false)
 const warningVisible = ref(false)
 
 try {
-  isOnline.value = (localStorage.getItem(LS_KEY) ?? 'online') !== 'offgrid'
+  offGrid.value = (localStorage.getItem(LS_KEY) ?? 'online') === 'offgrid'
 } catch {}
 
 const overrideConflicts = computed(() => {
-  const appMode = isOnline.value ? 'online' : 'offgrid'
+  const appMode = offGrid.value ? 'offgrid' : 'online'
   return DOMAIN_NAMESPACES.flatMap(ns => {
     let override = 'auto'
     try { override = localStorage.getItem('sentinel_' + ns + '_sourceOverride') ?? 'auto' } catch {}
@@ -67,29 +67,29 @@ function resetAllOverrides(): void {
   })
 }
 
-function applyMode(mode: string): void {
-  isOnline.value = mode === 'online'
-  try { localStorage.setItem(LS_KEY, mode) } catch {}
-  settingsApi.put('app', 'connectivityMode', mode)
-  appStore.setConnectivityMode(mode as ConnectivityMode)
-}
-
 function toggle(): void {
-  const newMode = isOnline.value ? 'offgrid' : 'online'
-  if (hasOverrides()) {
-    warningVisible.value = true
-    resetAllOverrides()
-    window.dispatchEvent(new CustomEvent('sentinel:sourceOverrideChanged'))
-  }
-  applyMode(newMode)
+  offGrid.value = !offGrid.value
+  const newMode = offGrid.value ? 'offgrid' : 'online'
+  const needsOverrideReset = hasOverrides()
+  if (needsOverrideReset) warningVisible.value = true
+  emit('stage', () => {
+    if (needsOverrideReset) {
+      resetAllOverrides()
+      window.dispatchEvent(new CustomEvent('sentinel:sourceOverrideChanged'))
+    }
+    try { localStorage.setItem(LS_KEY, newMode) } catch {}
+    settingsApi.put('app', 'connectivityMode', newMode)
+    appStore.setConnectivityMode(newMode as ConnectivityMode)
+  })
 }
 
 onMounted(async () => {
   const data = await settingsApi.getNamespace('app')
   if (data?.connectivityMode) {
     const backendMode = data.connectivityMode as string
-    if ((backendMode === 'offgrid') === isOnline.value) {
-      isOnline.value = backendMode === 'online'
+    const backendOffGrid = backendMode === 'offgrid'
+    if (backendOffGrid !== offGrid.value) {
+      offGrid.value = backendOffGrid
       try { localStorage.setItem(LS_KEY, backendMode) } catch {}
       appStore.setConnectivityMode(backendMode as ConnectivityMode)
     }

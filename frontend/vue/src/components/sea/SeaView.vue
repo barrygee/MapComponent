@@ -24,6 +24,7 @@ const appStore = useAppStore()
 const mapRef = ref<InstanceType<typeof MapLibreMap> | null>(null)
 
 let _map: Map | null = null
+let _initialStyleUrl: string | null = null
 
 const styleUrl = computed(() => appStore.isOnline ? '/assets/fiord-online.json' : '/assets/fiord.json')
 
@@ -31,6 +32,12 @@ useConnectivity((online) => {
   _map?.setStyle(online ? '/assets/fiord-online.json' : '/assets/fiord.json')
 })
 
-function onMapCreated(m: Map) { _map = m }
-function onStyleLoaded(_map: Map) {}
+function onMapCreated(m: Map) { _map = m; _initialStyleUrl = styleUrl.value }
+function onStyleLoaded(m: Map) {
+  const desiredStyle = styleUrl.value
+  if (_initialStyleUrl !== null && _initialStyleUrl !== desiredStyle) {
+    m.setStyle(desiredStyle)
+  }
+  _initialStyleUrl = null
+}
 </script>

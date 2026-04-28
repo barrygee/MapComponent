@@ -140,13 +140,13 @@ useConnectivity((online) => {
 
 function onMapCreated(m: MapLibreGlMap) {
   _map = m
+  _currentStyleUrl = styleUrl.value
   startLocation()
   _locationMarker.addTo(m)
 }
 
 function onStyleLoaded(m: MapLibreGlMap) {
   if (adsbControl) return // already initialised (style reload handled by connectivity hook)
-  _currentStyleUrl = styleUrl.value
 
   adsbLabelsControl = new AdsbLabelsToggleControl(airStore, null)
 
@@ -196,6 +196,26 @@ function onStyleLoaded(m: MapLibreGlMap) {
 
   // Restore 3D pitch after initial load
   if (_tiltActive) m.easeTo({ pitch: 45, duration: 400 })
+
+  // If connectivity mode changed between map creation and style load (e.g. the offgrid
+  // probe fired before _map was set so the callback was a no-op), the map has loaded
+  // the wrong style. Trigger a corrective reload now that controls are initialised.
+  const desiredStyle = styleUrl.value
+  if (_currentStyleUrl !== desiredStyle) {
+    _currentStyleUrl = desiredStyle
+    m.setStyle(desiredStyle)
+    m.once('style.load', () => {
+      roadsControl?._applyVisibility()
+      namesControl?._applyVisibility()
+      rangeRingsControl?._initRings()
+      airportsControl?.initLayers()
+      militaryBasesControl?.initLayers()
+      aaraControl?.initLayers()
+      awacsControl?.initLayers()
+      adsbControl?.initLayers()
+      adsbControl?.handleConnectivityChange()
+    })
+  }
 
 }
 

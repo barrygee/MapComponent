@@ -28,6 +28,9 @@ try {
   const savedMode = localStorage.getItem('sentinel_app_connectivityMode') as ConnectivityMode | null
   if (savedMode && (['auto', 'online', 'offgrid'] as string[]).includes(savedMode)) {
     appStore.setConnectivityMode(savedMode)
+    // Initialise isOnline so styleUrl computes correctly before any component mounts.
+    if (savedMode === 'offgrid') appStore.setOnline(false)
+    else if (savedMode === 'online') appStore.setOnline(true)
   }
 } catch {}
 

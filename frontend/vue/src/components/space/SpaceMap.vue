@@ -67,8 +67,11 @@ useConnectivity((online) => {
   })
 })
 
+let _initialStyleUrl: string | null = null
+
 function onMapCreated(m: MapLibreGlMap) {
   _map = m
+  _initialStyleUrl = styleUrl.value
   startLocation()
   _locationMarker.addTo(m)
 }
@@ -120,6 +123,18 @@ function onStyleLoaded(m: MapLibreGlMap) {
     document.body.classList.add('globe-active')
     try { (m as unknown as { setProjection: (p: object) => void }).setProjection({ type: 'globe' }) } catch {}
   }
+
+  // If connectivity mode changed between map creation and style load, apply the correct style now.
+  const desiredStyle = styleUrl.value
+  if (_initialStyleUrl !== null && _initialStyleUrl !== desiredStyle) {
+    m.setStyle(desiredStyle)
+    m.once('style.load', () => {
+      daynightControl?.initLayers()
+      namesControl?.applyNamesVisibility()
+      satelliteControl?.initLayers()
+    })
+  }
+  _initialStyleUrl = null
 }
 
 function toggleGlobe(): void {
