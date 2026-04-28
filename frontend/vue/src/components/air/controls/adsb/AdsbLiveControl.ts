@@ -106,7 +106,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
     private _labelFields: { civil: string[]; mil: string[] } = { civil: ['type'], mil: ['type'] }
     private _onLabelFieldsChanged: ((e: Event) => void) | null = null
-    private _tagFields: { civil: string[]; mil: string[] } = { civil: [], mil: ['typ'] }
+    private _tagFields: { civil: Record<string, boolean>; mil: Record<string, boolean> } = { civil: {}, mil: { aircraftType: true } }
     private _onTagFieldsChanged: ((e: Event) => void) | null = null
 
     constructor(
@@ -128,7 +128,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         this._geojson       = { type: 'FeatureCollection', features: [] }
         this._trailsGeojson = { type: 'FeatureCollection', features: [] }
         this._labelFields   = this._loadLabelFields()
-        this._tagFields     = { civil: [...airStore.adsbTagFields.civil], mil: [...airStore.adsbTagFields.mil] }
+        this._tagFields     = { civil: { ...airStore.adsbTagFields.civil }, mil: { ...airStore.adsbTagFields.mil } }
     }
 
     private _loadLabelFields(): { civil: string[]; mil: string[] } {
@@ -275,7 +275,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         window.addEventListener('adsb:labelFieldsChanged', this._onLabelFieldsChanged)
 
         this._onTagFieldsChanged = (e: Event) => {
-            const detail = (e as CustomEvent).detail as { civil: string[]; mil: string[] }
+            const detail = (e as CustomEvent).detail as { civil: Record<string, boolean>; mil: Record<string, boolean> }
             if (detail) this._tagFields = detail
             this._clearCallsignMarkers()
             if (this.labelsVisible) this._updateCallsignMarkers()
@@ -636,7 +636,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const isTracked     = this._followEnabled && props.hex === this._tagHex
         const isMilProps    = !!props.military
         const tfieldsProps  = isMilProps ? this._tagFields.mil : this._tagFields.civil
-        const showCallsign  = tfieldsProps.includes('css')
+        const showCallsign  = !!tfieldsProps.callsign
         const notifOn       = this._notifEnabled.has(props.hex)
         const trkColor      = isTracked ? '#c8ff00' : 'rgba(255,255,255,0.3)'
         const trkBtnText    = isTracked ? 'TRACKING' : 'TRACK'
@@ -654,7 +654,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             const isEmerg  = props.squawkEmerg === 1 || (props.emergency && props.emergency !== 'none')
             const isMil    = !!props.military
             const tfields  = isMil ? this._tagFields.mil : this._tagFields.civil
-            const showType = tfields.includes('typ')
+            const showType = !!tfields.aircraftType
             const typeBadge = showType && props.t
                 ? props.military
                     ? `<span style="background:#4d6600;color:#c8ff00;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 4px;">${props.t.toUpperCase()}</span>`
@@ -696,8 +696,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const isMil    = !!props.military
         const tfields  = isMil ? this._tagFields.mil : this._tagFields.civil
         const fields: TrackingField[] = []
-        if (props.r)                           fields.push({ label: 'REG',  value: props.r })
-        if (tfields.includes('typ') && props.t) fields.push({ label: 'TYPE', value: props.t })
+        if (props.r)                                fields.push({ label: 'REG',  value: props.r })
+        if (tfields.aircraftType && props.t)        fields.push({ label: 'TYPE', value: props.t })
         fields.push({ label: 'ALT',  value: altStr + vrtArrow })
         fields.push({ label: 'GS',   value: Math.round(props.gs ?? 0) + ' kt' })
         fields.push({ label: 'HDG',  value: Math.round(props.track ?? 0) + '°' })
@@ -1042,10 +1042,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
         const track    = props.track ?? 0
         const fields   = isMil ? this._tagFields.mil : this._tagFields.civil
-        const has      = (f: string) => fields.includes(f)
-        const showCallsign = has('css')
-        const showType = has('typ')
-        const showAlt  = has('alt')
+        const has      = (f: keyof typeof fields) => !!fields[f]
+        const showCallsign = has('callsign')
+        const showType = has('aircraftType')
+        const showAlt  = has('altitude')
 
         const leftFacing = this._isLeftFacing(track)
         const notifOn    = this._notifEnabled.has(props.hex)
@@ -1125,7 +1125,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         }
 
         const makeSqk = () => {
-            if (!has('sqk') || !props.squawk) return null
+            if (!has('squawk') || !props.squawk) return null
             return dimBadge('SQK', props.squawk)
         }
 
@@ -1174,13 +1174,13 @@ export class AdsbLiveControl implements maplibregl.IControl {
             // 1–189°: trk, bell, cat, reg, spd, hdg, alt, sqk, type, callsign, arrow
             append(makeTrackBtn())
             append(makeNotifBell())
-            if (has('cat') && catLbl)          append(dimBadge('CAT', catLbl))
-            if (has('reg') && props.r)         append(dimBadge('REG', props.r))
-            if (has('spd') && props.gs != null) append(dimBadge('SPD', Math.round(props.gs) + 'kt'))
-            if (has('hdg') && props.track != null) append(dimBadge('HDG', Math.round(props.track) + '°'))
+            if (has('category') && catLbl)          append(dimBadge('CAT', catLbl))
+            if (has('registration') && props.r)     append(dimBadge('REG', props.r))
+            if (has('speed') && props.gs != null)   append(dimBadge('SPD', Math.round(props.gs) + 'kt'))
+            if (has('heading') && props.track != null) append(dimBadge('HDG', Math.round(props.track) + '°'))
             append(makeAlt())
-            if (isEmerg)                       append(makeEmergSqk())
-            else                               append(makeSqk())
+            if (isEmerg)                            append(makeEmergSqk())
+            else                                    append(makeSqk())
             append(makeType())
             append(makeCallsign('left'))
             el.appendChild(arrowWrap)
@@ -1189,13 +1189,13 @@ export class AdsbLiveControl implements maplibregl.IControl {
             el.appendChild(arrowWrap)
             append(makeCallsign('right'))
             append(makeType())
-            if (isEmerg)                       append(makeEmergSqk())
-            else                               append(makeSqk())
+            if (isEmerg)                            append(makeEmergSqk())
+            else                                    append(makeSqk())
             append(makeAlt())
-            if (has('hdg') && props.track != null) append(dimBadge('HDG', Math.round(props.track) + '°'))
-            if (has('spd') && props.gs != null) append(dimBadge('SPD', Math.round(props.gs) + 'kt'))
-            if (has('reg') && props.r)         append(dimBadge('REG', props.r))
-            if (has('cat') && catLbl)          append(dimBadge('CAT', catLbl))
+            if (has('heading') && props.track != null) append(dimBadge('HDG', Math.round(props.track) + '°'))
+            if (has('speed') && props.gs != null)   append(dimBadge('SPD', Math.round(props.gs) + 'kt'))
+            if (has('registration') && props.r)     append(dimBadge('REG', props.r))
+            if (has('category') && catLbl)          append(dimBadge('CAT', catLbl))
             append(makeNotifBell())
             append(makeTrackBtn())
         }
@@ -1271,8 +1271,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 const isEmerg = f.properties.squawkEmerg === 1
                 const isMil   = !!f.properties.military
                 const lfields = isMil ? this._tagFields.mil : this._tagFields.civil
-                const showType = lfields.includes('typ')
-                const showAlt  = lfields.includes('alt')
+                const showType = !!lfields.aircraftType
+                const showAlt  = !!lfields.altitude
                 box.style.background = isEmerg ? 'rgba(180,0,0,0.85)' : '#000000'
                 labelEl.style.opacity = isDim ? '0.3' : '1'
                 const arrowSvg = box.querySelector('.adsb-arrow') as SVGElement | null

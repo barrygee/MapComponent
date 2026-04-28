@@ -6,16 +6,16 @@
         <div class="adsb-tf-header-col adsb-tf-header-col--civil">Civil</div>
         <div class="adsb-tf-header-col adsb-tf-header-col--mil">Military</div>
       </div>
-      <div v-for="opt in OPTIONS" :key="opt.value" class="adsb-tf-row">
+      <div v-for="opt in OPTIONS" :key="opt.key" class="adsb-tf-row">
         <div class="adsb-tf-row-label">
           <span class="adsb-tf-row-abbr">{{ opt.abbr }}</span>
           <span class="adsb-tf-row-name">{{ opt.label }}</span>
         </div>
         <div class="adsb-tf-cell">
           <label class="adsb-tf-check">
-            <input type="checkbox" class="adsb-tf-input" :checked="fields.civil.includes(opt.value)" @change="toggle('civil', opt.value)">
+            <input type="checkbox" class="adsb-tf-input" :checked="fields.civil[opt.key]" @change="toggle('civil', opt.key)">
             <span class="adsb-tf-box">
-              <svg v-if="fields.civil.includes(opt.value)" width="8" height="5" viewBox="0 0 8 5" fill="none">
+              <svg v-if="fields.civil[opt.key]" width="8" height="5" viewBox="0 0 8 5" fill="none">
                 <path d="M1 2.5L3 4.5L7 0.5" stroke="#00aaff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </span>
@@ -23,9 +23,9 @@
         </div>
         <div class="adsb-tf-cell">
           <label class="adsb-tf-check">
-            <input type="checkbox" class="adsb-tf-input" :checked="fields.mil.includes(opt.value)" @change="toggle('mil', opt.value)">
+            <input type="checkbox" class="adsb-tf-input" :checked="fields.mil[opt.key]" @change="toggle('mil', opt.key)">
             <span class="adsb-tf-box adsb-tf-box--mil">
-              <svg v-if="fields.mil.includes(opt.value)" width="8" height="5" viewBox="0 0 8 5" fill="none">
+              <svg v-if="fields.mil[opt.key]" width="8" height="5" viewBox="0 0 8 5" fill="none">
                 <path d="M1 2.5L3 4.5L7 0.5" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </span>
@@ -37,35 +37,53 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useAirStore, type AdsbTagField, type AdsbTagFields } from '@/stores/air'
+import { ref, onMounted } from 'vue'
+import { useAirStore, type AdsbTagFields, type AdsbTagFieldMap } from '@/stores/air'
+import * as settingsApi from '@/services/settingsApi'
 
 const airStore = useAirStore()
 const emit = defineEmits<{ stage: [fn: () => void] }>()
 
 const fields = ref<AdsbTagFields>({
-  civil: [...airStore.adsbTagFields.civil],
-  mil:   [...airStore.adsbTagFields.mil],
+  civil: { ...airStore.adsbTagFields.civil },
+  mil:   { ...airStore.adsbTagFields.mil },
 })
 
-const OPTIONS: Array<{ value: AdsbTagField; abbr: string; label: string }> = [
-  { value: 'css', abbr: 'CSS', label: 'Callsign' },
-  { value: 'alt', abbr: 'ALT', label: 'Altitude' },
-  { value: 'spd', abbr: 'SPD', label: 'Speed' },
-  { value: 'hdg', abbr: 'HDG', label: 'Heading' },
-  { value: 'typ', abbr: 'TYP', label: 'Aircraft Type' },
-  { value: 'reg', abbr: 'REG', label: 'Registration' },
-  { value: 'sqk', abbr: 'SQK', label: 'Squawk' },
-  { value: 'cat', abbr: 'CAT', label: 'Category' },
+const OPTIONS: Array<{ key: keyof AdsbTagFieldMap; abbr: string; label: string }> = [
+  { key: 'callsign',     abbr: 'CSS', label: 'Callsign' },
+  { key: 'altitude',     abbr: 'ALT', label: 'Altitude' },
+  { key: 'speed',        abbr: 'SPD', label: 'Speed' },
+  { key: 'heading',      abbr: 'HDG', label: 'Heading' },
+  { key: 'aircraftType', abbr: 'TYP', label: 'Aircraft Type' },
+  { key: 'registration', abbr: 'REG', label: 'Registration' },
+  { key: 'squawk',       abbr: 'SQK', label: 'Squawk' },
+  { key: 'category',     abbr: 'CAT', label: 'Category' },
 ]
 
-function toggle(group: 'civil' | 'mil', field: AdsbTagField): void {
-  const current = fields.value[group]
-  const next = current.includes(field) ? current.filter(f => f !== field) : [...current, field]
-  fields.value = { ...fields.value, [group]: next }
+onMounted(async () => {
+  const data = await settingsApi.getNamespace('air')
+  const remote = data?.labelDataPoints as AdsbTagFields | undefined
+  if (remote && typeof remote === 'object' && !Array.isArray(remote) &&
+      typeof remote.civil === 'object' && typeof remote.mil === 'object') {
+    fields.value = {
+      civil: { ...airStore.adsbTagFields.civil, ...remote.civil },
+      mil:   { ...airStore.adsbTagFields.mil,   ...remote.mil },
+    }
+    airStore.setAdsbTagFields({ ...fields.value })
+    window.dispatchEvent(new CustomEvent('adsb:tagFieldsChanged', { detail: { ...fields.value } }))
+  }
+})
+
+function toggle(group: 'civil' | 'mil', key: keyof AdsbTagFieldMap): void {
+  fields.value = {
+    ...fields.value,
+    [group]: { ...fields.value[group], [key]: !fields.value[group][key] },
+  }
   airStore.setAdsbTagFields({ ...fields.value })
   window.dispatchEvent(new CustomEvent('adsb:tagFieldsChanged', { detail: { ...fields.value } }))
-  emit('stage', () => {})
+  emit('stage', () => {
+    settingsApi.put('air', 'labelDataPoints', { ...fields.value })
+  })
 }
 </script>
 

@@ -10,6 +10,8 @@ import App from './App.vue'
 import router from './router'
 import { useAppStore } from './stores/app'
 import type { ConnectivityMode } from './stores/app'
+import { useAirStore } from './stores/air'
+import type { AdsbTagFields } from './stores/air'
 
 // Register PMTiles protocol once at app startup — never inside a component.
 const protocol = new pmtiles.Protocol()
@@ -33,6 +35,13 @@ try {
 const ALL_DOMAINS = ['air', 'space', 'sea', 'land', 'sdr'] as const
 // Domains that are ON by default when the DB has no explicit enabled key for them.
 const DOMAINS_ON_BY_DEFAULT = new Set(['air', 'space', 'sdr'])
+const airStore = useAirStore()
+
+const DEFAULT_LABEL_DATA_POINTS = {
+  civil: { callsign: true, altitude: false, speed: false, heading: false, aircraftType: false, registration: false, squawk: false, category: false },
+  mil:   { callsign: true, altitude: false, speed: false, heading: false, aircraftType: true,  registration: false, squawk: false, category: false },
+}
+
 ;(async () => {
   try {
     const res = await fetch('/api/settings')
@@ -45,6 +54,23 @@ const DOMAINS_ON_BY_DEFAULT = new Set(['air', 'space', 'sdr'])
         return DOMAINS_ON_BY_DEFAULT.has(d)
       })
       if (enabled.length > 0) appStore.setEnabledDomains(enabled)
+
+      // Hydrate labelDataPoints from API into store before first render.
+      const remote = data.air?.labelDataPoints as AdsbTagFields | undefined
+      if (remote && typeof remote === 'object' && !Array.isArray(remote) &&
+          typeof remote.civil === 'object' && typeof remote.mil === 'object') {
+        airStore.setAdsbTagFields({
+          civil: { ...DEFAULT_LABEL_DATA_POINTS.civil, ...(remote.civil as object) },
+          mil:   { ...DEFAULT_LABEL_DATA_POINTS.mil,   ...(remote.mil   as object) },
+        })
+      } else {
+        // Seed labelDataPoints into the DB if not yet stored.
+        fetch('/api/settings/air/labelDataPoints', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: DEFAULT_LABEL_DATA_POINTS }),
+        }).catch(() => {})
+      }
     }
   } catch {}
   app.mount('#app')

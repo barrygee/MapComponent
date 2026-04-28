@@ -20,20 +20,31 @@ export interface AdsbLabelFields {
   mil: AdsbLabelField[]
 }
 
-export type AdsbTagField = 'css' | 'alt' | 'spd' | 'hdg' | 'typ' | 'reg' | 'sqk' | 'cat'
-
 export interface AdsbTagFields {
-  civil: AdsbTagField[]
-  mil: AdsbTagField[]
+  civil: AdsbTagFieldMap
+  mil: AdsbTagFieldMap
+}
+
+export interface AdsbTagFieldMap {
+  callsign: boolean
+  altitude: boolean
+  speed: boolean
+  heading: boolean
+  aircraftType: boolean
+  registration: boolean
+  squawk: boolean
+  category: boolean
 }
 
 const LS_KEY = 'overlayStates'
 const LS_LABEL_FIELDS_KEY = 'adsbLabelFields'
-const LS_TAG_FIELDS_KEY = 'adsbTagFields_v2'
+const LS_TAG_FIELDS_KEY = 'adsbTagFields_v3'
 
-const ALL_TAG_FIELDS: AdsbTagField[] = ['css', 'alt', 'spd', 'hdg', 'typ', 'reg', 'sqk', 'cat']
 const DEFAULT_LABEL_FIELDS: AdsbLabelFields = { civil: ['type'], mil: ['type'] }
-const DEFAULT_TAG_FIELDS: AdsbTagFields = { civil: ['css'], mil: ['css', 'typ'] }
+const DEFAULT_TAG_FIELDS: AdsbTagFields = {
+  civil: { callsign: true, altitude: false, speed: false, heading: false, aircraftType: false, registration: false, squawk: false, category: false },
+  mil:   { callsign: true, altitude: false, speed: false, heading: false, aircraftType: true,  registration: false, squawk: false, category: false },
+}
 
 const DEFAULTS: OverlayStates = {
   adsb: true,
@@ -118,17 +129,21 @@ function _loadLabelFields(): AdsbLabelFields {
   return { ...DEFAULT_LABEL_FIELDS }
 }
 
+function _isTagFieldMap(v: unknown): v is AdsbTagFieldMap {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
 function _loadTagFields(): AdsbTagFields {
   try {
     const raw = localStorage.getItem(LS_TAG_FIELDS_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        const civil = Array.isArray(parsed.civil) ? parsed.civil : ['css']
-        const mil   = Array.isArray(parsed.mil)   ? parsed.mil   : ['css', 'typ']
+        const civil = _isTagFieldMap(parsed.civil) ? { ...DEFAULT_TAG_FIELDS.civil, ...parsed.civil } : { ...DEFAULT_TAG_FIELDS.civil }
+        const mil   = _isTagFieldMap(parsed.mil)   ? { ...DEFAULT_TAG_FIELDS.mil,   ...parsed.mil   } : { ...DEFAULT_TAG_FIELDS.mil }
         return { civil, mil }
       }
     }
   } catch {}
-  return { ...DEFAULT_TAG_FIELDS }
+  return { civil: { ...DEFAULT_TAG_FIELDS.civil }, mil: { ...DEFAULT_TAG_FIELDS.mil } }
 }
