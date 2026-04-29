@@ -80,6 +80,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
     private _hoverMarker:     maplibregl.Marker | null = null
     private _hoverHex:        string | null = null
     private _hoverFromLabel   = false
+    private _hoverLabelEl:    HTMLElement | null = null
     private _hoverHideTimer:  ReturnType<typeof setTimeout> | null = null
     private _callsignMarkers: Record<string, maplibregl.Marker> = {}
 
@@ -629,7 +630,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
     // ---- Data tag HTML builders ----
 
-    private _buildTagHTML(props: AircraftProperties): string {
+    private _buildTagHTML(props: AircraftProperties, forceLeftFacing?: boolean, forHover = false): string {
         const raw      = (props.flight || '').trim() || (props.r || '').trim() || (props.hex || '').trim()
         const callsign = raw || 'UNKNOWN'
         const isEmergency   = props.squawkEmerg === 1 || (props.emergency && props.emergency !== 'none')
@@ -667,8 +668,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
             const callsignSpan = showCallsign ? `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>` : ''
             const leftFacing = this._isLeftFacing(track)
             const inner = leftFacing
-                ? `${trkBtn}${bellBtn}${typeBadge}${callsignSpan}${arrowSvg}`
-                : `${arrowSvg}${callsignSpan}${typeBadge}${bellBtn}${trkBtn}`
+                ? `${trkBtn}${typeBadge}${callsignSpan}${arrowSvg}`
+                : `${arrowSvg}${callsignSpan}${typeBadge}${trkBtn}`
             return `<div style="background:#000000;color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:stretch;gap:0;white-space:nowrap;user-select:none;cursor:pointer;min-height:26px">${inner}</div>`
         }
 
@@ -676,12 +677,15 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const isMil      = !!props.military
         const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
         const heading    = props.track ?? 0
-        const leftFacing = this._isLeftFacing(heading)
+        const leftFacing = forceLeftFacing !== undefined ? forceLeftFacing : this._isLeftFacing(heading)
         const arrowSvg   = this._makeArrowSvg(arrowColor, heading, props.category, props.t)
         const callsignSpan = showCallsign ? `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>` : ''
+        const showBell = forHover ? !isTracked : (notifOn && !isTracked)
+        const activeBell = showBell ? bellBtn : ''
+        const activeTrack = (isTracked || forHover) ? trkBtn : ''
         const inner = leftFacing
-            ? `${trkBtn}${bellBtn}${callsignSpan}${arrowSvg}`
-            : `${arrowSvg}${callsignSpan}${bellBtn}${trkBtn}`
+            ? `${activeTrack}${activeBell}${callsignSpan}${arrowSvg}`
+            : `${arrowSvg}${callsignSpan}${activeBell}${activeTrack}`
         return `<div style="background:#000000;color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:stretch;gap:0;white-space:nowrap;user-select:none;cursor:pointer;min-height:26px">` +
             `${inner}</div>`
     }
@@ -970,7 +974,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
     // ---- Hover tag ----
 
-    private _showHoverTag(feature: AircraftGeoFeature, fromLabel = false): void {
+    private _showHoverTag(feature: AircraftGeoFeature, fromLabel = false, labelEl: HTMLElement | null = null, labelDir?: 'left' | 'right'): void {
         if (!feature || !this.map) return
         const hex = feature.properties.hex
         if (hex === this._selectedHex) return
@@ -978,22 +982,27 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const coords = this._interpolatedCoords(hex) || feature.geometry.coordinates
         if (this._hoverHex === hex && this._hoverMarker) { this._hoverMarker.setLngLat(coords); return }
         this._hideHoverTagNow()
-        const el = document.createElement('div')
-        el.innerHTML = this._buildTagHTML(feature.properties)
+        const wrapper = document.createElement('div')
+        // When showing hover tag from a label, use the label's rendered direction to avoid
+        // anchor/layout mismatch if the track crossed the left/right threshold since the
+        // label was last built (crossing threshold flips anchor and causes a visible jump).
+        const hoverLeftFacing = fromLabel && labelDir ? labelDir === 'left' : this._isLeftFacing(feature.properties.track ?? 0)
+        wrapper.innerHTML = this._buildTagHTML(feature.properties, fromLabel ? hoverLeftFacing : undefined, true)
+        const el = wrapper.firstElementChild as HTMLElement
         el.style.pointerEvents = 'auto'
         el.addEventListener('mouseenter', () => {
             if (this._hoverHideTimer) { clearTimeout(this._hoverHideTimer); this._hoverHideTimer = null }
         })
         el.addEventListener('mouseleave', () => this._hideHoverTag())
         this._wireTagButton(el, hex)
-        const hoverLeftFacing = this._isLeftFacing(feature.properties.track ?? 0)
         const hoverAnchor = fromLabel ? (hoverLeftFacing ? 'right' : 'left') as 'right' | 'left' : 'top-left' as 'top-left'
         const hoverOffset: [number, number] = fromLabel ? (hoverLeftFacing ? [-14, 0] : [14, 0]) : [14, -13]
         this._hoverMarker = new maplibregl.Marker({ element: el, anchor: hoverAnchor, offset: hoverOffset })
             .setLngLat(coords).addTo(this.map)
         this._hoverHex       = hex
         this._hoverFromLabel = fromLabel
-        if (this._callsignMarkers[hex]) this._callsignMarkers[hex].getElement().style.visibility = 'hidden'
+        this._hoverLabelEl   = labelEl
+        if (labelEl) labelEl.style.visibility = 'hidden'
     }
 
     private _hideHoverTag(): void {
@@ -1005,10 +1014,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
     }
 
     private _hideHoverTagNow(): void {
-        if (this._hoverHex && this._callsignMarkers[this._hoverHex]) {
-            this._callsignMarkers[this._hoverHex].getElement().style.visibility = ''
-        }
         if (this._hoverMarker) { this._hoverMarker.remove(); this._hoverMarker = null }
+        if (this._hoverLabelEl) { this._hoverLabelEl.style.visibility = this._allHidden ? 'hidden' : ''; this._hoverLabelEl = null }
         this._hoverHex       = null
         this._hoverFromLabel = false
     }
@@ -1032,7 +1039,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             shape = `<polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`
         }
         const noRotate = cat === 'C1' || cat === 'C2' || cat === 'C3' || cat === 'C4' || cat === 'C5' || isTwr
-        return `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:22px;align-self:stretch;background:#000;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${noRotate ? 0 : track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg">${shape}</svg></span>`
+        return `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:26px;align-self:stretch;background:#000;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${noRotate ? 0 : track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg">${shape}</svg></span>`
     }
 
     private _buildCallsignLabelEl(props: AircraftProperties): HTMLElement {
@@ -1201,8 +1208,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
             append(makeTrackBtn())
         }
         el.addEventListener('mouseenter', () => {
-            const hoveredFeature = this._geojson.features.find(f => f.properties.hex === props.hex)
-            if (hoveredFeature) this._showHoverTag(hoveredFeature, true)
+            const feature = this._geojson.features.find(f => f.properties.hex === props.hex)
+            if (feature) this._showHoverTag(feature, true, el, el.dataset.dir as 'left' | 'right' | undefined)
         })
         el.addEventListener('mouseleave', () => this._hideHoverTag())
         el.addEventListener('click', (e) => {
