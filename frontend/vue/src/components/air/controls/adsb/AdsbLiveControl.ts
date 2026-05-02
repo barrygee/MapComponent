@@ -165,12 +165,14 @@ export class AdsbLiveControl implements maplibregl.IControl {
         this._applyTypeFilter()
         this._updateCallsignMarkers()
         const isTracking = this._followEnabled && this._selectedHex
+        const hasSelection = !!this._selectedHex
         const tagEl  = this._tagMarker   ? this._tagMarker.getElement()   : null
-        if (tagEl)  tagEl.style.visibility  = (hidden && !isTracking) ? 'hidden' : ''
+        if (tagEl)  tagEl.style.visibility  = (hidden && !isTracking && !hasSelection) ? 'hidden' : ''
         const hoverEl = this._hoverMarker ? this._hoverMarker.getElement() : null
         if (hoverEl) hoverEl.style.visibility = hidden ? 'hidden' : ''
+        const effectiveTrailHex = this._trailHex ?? this._selectedHex
         ;['adsb-trail-line', 'adsb-trail-dots'].forEach(id => {
-            if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', (!hidden || isTracking) && !!this._trailHex ? 'visible' : 'none')
+            if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', (!hidden || isTracking || hasSelection) && !!effectiveTrailHex ? 'visible' : 'none')
         })
     }
 
@@ -201,17 +203,18 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
         if (this._allHidden) {
             const isTracking = this._followEnabled && this._selectedHex
+            const hasSelection = !!this._selectedHex
             ;['adsb-bracket', 'adsb-icons'].forEach(id => {
                 if (!this.map.getLayer(id)) return
-                if (isTracking) {
-                    const trackedFilter = ['==', ['get', 'hex'], this._selectedHex]
+                if (isTracking || hasSelection) {
+                    const selectedFilter = ['==', ['get', 'hex'], this._selectedHex]
                     this.map.setLayoutProperty(id, 'visibility', 'visible')
-                    this.map.setFilter(id, trackedFilter as maplibregl.FilterSpecification)
+                    this.map.setFilter(id, selectedFilter as maplibregl.FilterSpecification)
                 } else {
                     this.map.setLayoutProperty(id, 'visibility', 'none')
                 }
             })
-            if (this.map.getLayer('adsb-hit')) this.map.setLayoutProperty('adsb-hit', 'visibility', isTracking ? 'visible' : 'none')
+            if (this.map.getLayer('adsb-hit')) this.map.setLayoutProperty('adsb-hit', 'visibility', (isTracking || hasSelection) ? 'visible' : 'none')
             return
         }
 
@@ -602,17 +605,20 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 if (!e.features || !e.features.length) return
                 _clickHandled = true
                 const hex = (e.features[0].properties as AircraftProperties).hex
-                this._selectedHex = (hex === this._selectedHex) ? null : hex
+                this._selectedHex = hex
                 this._hideHoverTag()
                 this._applySelection()
             }
 
 
+            this.map.on('click', 'adsb-hit', handleAircraftClick)
+            this.map.on('click', 'adsb-icons', handleAircraftClick)
+
             this.map.on('click', (e: maplibregl.MapMouseEvent) => {
                 if (_clickHandled) { _clickHandled = false; return }
                 if (this._followEnabled) return
                 if (this._selectedHex) {
-                    const hits = this.map.queryRenderedFeatures(e.point, { layers: [] })
+                    const hits = this.map.queryRenderedFeatures(e.point, { layers: ['adsb-hit', 'adsb-icons'] })
                     if (!hits.length) { this._selectedHex = null; this._applySelection() }
                 }
             })
@@ -702,7 +708,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const tfieldsProps  = isMilProps ? this._tagFields.mil : this._tagFields.civil
         const showCallsign  = !!tfieldsProps.callsign
         const notifOn       = this._notifEnabled.has(props.hex)
-        const trkColor      = isTracked ? '#c8ff00' : 'rgba(255,255,255,0.3)'
+        const trkColor      = isTracked ? (isMilProps ? '#c8ff00' : '#00aaff') : 'rgba(255,255,255,0.3)'
         const trkBtnText    = isTracked ? 'TRACKING' : 'TRACK'
         const trkBtn = `<button class="tag-follow-btn" style="background:none;border:none;cursor:pointer;padding:0 12px;color:${trkColor};font-family:'Barlow Condensed','Barlow',sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;line-height:1;display:flex;align-items:center;align-self:stretch;touch-action:manipulation;-webkit-tap-highlight-color:transparent">${trkBtnText}</button>`
         const bellColor = notifOn ? '#c8ff00' : 'rgba(255,255,255,0.3)'
@@ -1268,7 +1274,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         })
         el.addEventListener('click', (e) => {
             e.stopPropagation()
-            this._selectedHex = (props.hex === this._selectedHex) ? null : props.hex
+            this._selectedHex = props.hex
             this._hideHoverTag()
             this._applySelection()
         })
@@ -1511,7 +1517,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
     private _rebuildTrails(): void {
         if (!this.map) return
-        const hex = this._trailHex
+        const hex = this._trailHex ?? this._selectedHex
         const trailFeatures: TrailGeoFeature[] = []
         const lineFeatures: GeoJSON.Feature<GeoJSON.LineString, { emerg: 0 | 1; military: 0 | 1; hex: string }>[] = []
         const showTrail = !!(hex && this._trails[hex])
