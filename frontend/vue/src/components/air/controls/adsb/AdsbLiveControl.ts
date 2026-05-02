@@ -36,7 +36,7 @@ interface AircraftGeoFeature {
 interface TrailGeoFeature {
     type: 'Feature';
     geometry: { type: 'Point'; coordinates: [number, number] };
-    properties: { alt: number; opacity: number; emerg: 0 | 1; military: 0 | 1 };
+    properties: { alt: number; opacity: number; emerg: 0 | 1; military: 0 | 1; hex: string };
 }
 
 interface LastPosition {
@@ -623,8 +623,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 const hex = (e.features[0].properties as AircraftProperties).hex
                 const hoveredFeature = this._geojson.features.find(f => f.properties.hex === hex)
                 if (hoveredFeature) this._showHoverTag(hoveredFeature)
-                // Show trail on hover if no aircraft is currently selected
-                if (!this._selectedHex && hex) {
+                // Show trail on hover (overrides selected trail temporarily)
+                if (hex) {
                     this._trailHex = hex
                     this._rebuildTrails()
                 }
@@ -632,15 +632,35 @@ export class AdsbLiveControl implements maplibregl.IControl {
             const handleHoverLeave = () => {
                 this.map.getCanvas().style.cursor = ''
                 this._hideHoverTag()
-                // Hide trail on hover-leave unless an aircraft is selected
-                if (!this._selectedHex) {
-                    this._trailHex = null
-                    this._rebuildTrails()
-                }
+                // Restore selected aircraft trail on hover-leave, or clear if none selected
+                this._trailHex = this._selectedHex ?? null
+                this._rebuildTrails()
             }
 
             this.map.on('mouseenter', 'adsb-hit', handleHoverEnter)
             this.map.on('mouseleave', 'adsb-hit', handleHoverLeave)
+
+            const handleTrailHoverEnter = (e: maplibregl.MapLayerMouseEvent) => {
+                if (!e.features || !e.features.length) return
+                const hex = (e.features[0].properties as { hex?: string }).hex
+                if (!hex) return
+                this.map.getCanvas().style.cursor = 'pointer'
+                const hoveredFeature = this._geojson.features.find(f => f.properties.hex === hex)
+                if (hoveredFeature) this._showHoverTag(hoveredFeature)
+                this._trailHex = hex
+                this._rebuildTrails()
+            }
+            const handleTrailHoverLeave = () => {
+                this.map.getCanvas().style.cursor = ''
+                this._hideHoverTag()
+                this._trailHex = this._selectedHex ?? null
+                this._rebuildTrails()
+            }
+
+            this.map.on('mouseenter', 'adsb-trail-line', handleTrailHoverEnter)
+            this.map.on('mouseleave', 'adsb-trail-line', handleTrailHoverLeave)
+            this.map.on('mouseenter', 'adsb-trail-dots', handleTrailHoverEnter)
+            this.map.on('mouseleave', 'adsb-trail-dots', handleTrailHoverLeave)
 
             this.map.on('zoomend', () => this._updateCallsignMarkers())
         }
@@ -1493,7 +1513,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         if (!this.map) return
         const hex = this._trailHex
         const trailFeatures: TrailGeoFeature[] = []
-        const lineFeatures: GeoJSON.Feature<GeoJSON.LineString, { emerg: 0 | 1; military: 0 | 1 }>[] = []
+        const lineFeatures: GeoJSON.Feature<GeoJSON.LineString, { emerg: 0 | 1; military: 0 | 1; hex: string }>[] = []
         const showTrail = !!(hex && this._trails[hex])
 
         if (showTrail && hex) {
@@ -1512,7 +1532,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 trailFeatures.push({
                     type: 'Feature',
                     geometry:   { type: 'Point', coordinates: [tp.lon, tp.lat] },
-                    properties: { alt: tp.alt, opacity: (i + 1) / pointCount, emerg: isEmerg, military: isMil },
+                    properties: { alt: tp.alt, opacity: (i + 1) / pointCount, emerg: isEmerg, military: isMil, hex },
                 })
             }
 
@@ -1524,7 +1544,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 lineFeatures.push({
                     type: 'Feature',
                     geometry:   { type: 'LineString', coordinates: lineCoords },
-                    properties: { emerg: isEmerg, military: isMil },
+                    properties: { emerg: isEmerg, military: isMil, hex },
                 })
             }
         }
