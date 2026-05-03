@@ -93,6 +93,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
     private _parkedTimers: Record<string, ReturnType<typeof setTimeout>> = {}
 
     _notifEnabled:     Set<string>                  = new Set()
+    private _tagClickHandled   = false
     private _trackingRestored  = false
     _trackingNotifIds: Record<string, string> | null = null
 
@@ -192,6 +193,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
     private _applyTypeFilter(): void {
         if (!this.map) return
+        console.debug('[adsb] _applyTypeFilter allHidden=%s selectedHex=%s labelsVisible=%s visible=%s', this._allHidden, this._selectedHex, this.labelsVisible, this.visible)
 
         const baseFilter  = ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]]
         const isGndExpr   = ['match', ['get', 'category'], ['C1', 'C2'], true, false]
@@ -201,20 +203,12 @@ export class AdsbLiveControl implements maplibregl.IControl {
         ]
         const isPlaneExpr = ['all', ['!', isGndExpr], ['!', isTowerExpr]]
 
-        if (this._allHidden) {
-            const isTracking = this._followEnabled && this._selectedHex
-            const hasSelection = !!this._selectedHex
+        if (this._allHidden && !this._selectedHex) {
             ;['adsb-bracket', 'adsb-icons'].forEach(id => {
                 if (!this.map.getLayer(id)) return
-                if (isTracking || hasSelection) {
-                    const selectedFilter = ['==', ['get', 'hex'], this._selectedHex]
-                    this.map.setLayoutProperty(id, 'visibility', 'visible')
-                    this.map.setFilter(id, selectedFilter as maplibregl.FilterSpecification)
-                } else {
-                    this.map.setLayoutProperty(id, 'visibility', 'none')
-                }
+                this.map.setLayoutProperty(id, 'visibility', 'none')
             })
-            if (this.map.getLayer('adsb-hit')) this.map.setLayoutProperty('adsb-hit', 'visibility', (isTracking || hasSelection) ? 'visible' : 'none')
+            if (this.map.getLayer('adsb-hit')) this.map.setLayoutProperty('adsb-hit', 'visibility', 'none')
             return
         }
 
@@ -616,6 +610,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
             this.map.on('click', (e: maplibregl.MapMouseEvent) => {
                 if (_clickHandled) { _clickHandled = false; return }
+                if (this._tagClickHandled) { this._tagClickHandled = false; return }
                 if (this._followEnabled) return
                 if (this._selectedHex) {
                     const hits = this.map.queryRenderedFeatures(e.point, { layers: ['adsb-hit', 'adsb-icons'] })
@@ -645,6 +640,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
             this.map.on('mouseenter', 'adsb-hit', handleHoverEnter)
             this.map.on('mouseleave', 'adsb-hit', handleHoverLeave)
+            this.map.on('mouseenter', 'adsb-icons', handleHoverEnter)
+            this.map.on('mouseleave', 'adsb-icons', handleHoverLeave)
 
             const handleTrailHoverEnter = (e: maplibregl.MapLayerMouseEvent) => {
                 if (!e.features || !e.features.length) return
@@ -720,28 +717,49 @@ export class AdsbLiveControl implements maplibregl.IControl {
             (notifOn ? '' : `<line x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>`) +
             `</svg></button>`
 
-        if (isTracked) {
-            const isEmerg  = props.squawkEmerg === 1 || (props.emergency && props.emergency !== 'none')
-            const isMil    = !!props.military
-            const tfields  = isMil ? this._tagFields.mil : this._tagFields.civil
-            const showType = !!tfields.aircraftType
-            const typeBadge = showType && props.t
-                ? props.military
-                    ? `<span style="background:#4d6600;color:#c8ff00;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 4px;">${props.t.toUpperCase()}</span>`
-                    : `<span style="background:#002244;color:#00aaff;font-size:11px;font-weight:700;padding:0 6px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;margin:-1px 0 -1px 4px;">${props.t.toUpperCase()}</span>`
+        const _dimBadge = (label: string, value: string, badgeColor: string) =>
+            `<span style="background:#000000;color:${badgeColor};font-size:12px;font-weight:700;padding:0 7px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;gap:4px;"><span style="opacity:0.45;font-weight:600;font-size:10px;letter-spacing:.12em">${label}</span><span>${value}</span></span>`
+
+        const _buildDataBadges = (isEmerg: boolean, isMil: boolean, leftFacing: boolean): string => {
+            const tfields   = isMil ? this._tagFields.mil : this._tagFields.civil
+            const has       = (f: keyof typeof tfields) => !!tfields[f]
+            const badgeColor = isEmerg ? '#ff4040' : isMil ? '#c8ff00' : 'rgba(255,255,255,0.7)'
+            const typeBg    = isEmerg ? '#4d0000' : isMil ? '#4d6600' : '#002244'
+            const typeColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#00aaff'
+            const catLbl    = this._categoryLabel(props.category)
+            const altStr    = props.alt_baro && props.alt_baro !== 0 ? this._formatAltBadge(props.alt_baro) : null
+            const sqkBadge  = isEmerg && props.squawk
+                ? `<span style="background:#000;color:#ff2222;font-size:12px;font-weight:700;padding:0 7px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;">${props.squawk}</span>`
+                : (has('squawk') && props.squawk ? _dimBadge('SQK', props.squawk, badgeColor) : '')
+            const typeBadge = has('aircraftType') && props.t
+                ? `<span style="background:${typeBg};color:${typeColor};font-size:12px;font-weight:700;padding:0 7px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;">${props.t.toUpperCase()}</span>`
                 : ''
+            const altBadge  = has('altitude') && altStr ? _dimBadge('ALT', altStr, badgeColor) : ''
+            const hdgBadge  = has('heading') && props.track != null ? _dimBadge('HDG', Math.round(props.track) + '°', badgeColor) : ''
+            const spdBadge  = has('speed') && props.gs != null ? _dimBadge('SPD', Math.round(props.gs) + 'kt', badgeColor) : ''
+            const regBadge  = has('registration') && props.r ? _dimBadge('REG', props.r, badgeColor) : ''
+            const catBadge  = has('category') && catLbl ? _dimBadge('CAT', catLbl, badgeColor) : ''
+            return leftFacing
+                ? `${catBadge}${regBadge}${spdBadge}${hdgBadge}${altBadge}${sqkBadge}${typeBadge}`
+                : `${typeBadge}${sqkBadge}${altBadge}${hdgBadge}${spdBadge}${regBadge}${catBadge}`
+        }
+
+        if (isTracked) {
+            const isEmerg  = !!(props.squawkEmerg === 1 || (props.emergency && props.emergency !== 'none'))
+            const isMil    = !!props.military
             const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
             const track    = props.track ?? 0
             const arrowSvg = this._makeArrowSvg(arrowColor, track, props.category, props.t)
             const callsignSpan = showCallsign ? `<span class="adsb-label-name" style="color:${callsignColor};pointer-events:none;padding:3px 6px;display:flex;align-items:center;">${callsign}</span>` : ''
             const leftFacing = this._isLeftFacing(track)
+            const dataBadges = _buildDataBadges(isEmerg, isMil, leftFacing)
             const inner = leftFacing
-                ? `${trkBtn}${typeBadge}${callsignSpan}${arrowSvg}`
-                : `${arrowSvg}${callsignSpan}${typeBadge}${trkBtn}`
+                ? `${trkBtn}${dataBadges}${callsignSpan}${arrowSvg}`
+                : `${arrowSvg}${callsignSpan}${dataBadges}${trkBtn}`
             return `<div style="background:#000000;color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:stretch;gap:0;white-space:nowrap;user-select:none;cursor:pointer;min-height:26px">${inner}</div>`
         }
 
-        const isEmerg    = props.squawkEmerg === 1 || (props.emergency && props.emergency !== 'none')
+        const isEmerg    = !!(props.squawkEmerg === 1 || (props.emergency && props.emergency !== 'none'))
         const isMil      = !!props.military
         const arrowColor = isEmerg ? '#ff2222' : isMil ? '#c8ff00' : '#ffffff'
         const heading    = props.track ?? 0
@@ -751,9 +769,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const showBell = forHover ? !isTracked : (notifOn && !isTracked)
         const activeBell = showBell ? bellBtn : ''
         const activeTrack = (isTracked || forHover) ? trkBtn : ''
+        const dataBadges = _buildDataBadges(isEmerg, isMil, leftFacing)
         const inner = leftFacing
-            ? `${activeTrack}${activeBell}${callsignSpan}${arrowSvg}`
-            : `${arrowSvg}${callsignSpan}${activeBell}${activeTrack}`
+            ? `${activeTrack}${activeBell}${dataBadges}${callsignSpan}${arrowSvg}`
+            : `${arrowSvg}${callsignSpan}${dataBadges}${activeBell}${activeTrack}`
         return `<div style="background:#000000;color:#fff;font-family:'Barlow Condensed','Barlow',sans-serif;font-size:14px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:stretch;gap:0;white-space:nowrap;user-select:none;cursor:pointer;min-height:26px">` +
             `${inner}</div>`
     }
@@ -998,7 +1017,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         const selOffset: [number, number] = selLeft ? [13, 0] : [-13, 0]
         this._tagMarker = new maplibregl.Marker({ element: el, anchor: selAnchor, offset: selOffset })
             .setLngLat(coords).addTo(this.map)
-        if (this._allHidden) el.style.visibility = 'hidden'
+        if (this._allHidden && !this._selectedHex) el.style.visibility = 'hidden'
         this._tagHex = feature.properties.hex
         this._showStatusBar(feature.properties)
     }
@@ -1040,6 +1059,13 @@ export class AdsbLiveControl implements maplibregl.IControl {
             if (this._hoverHideTimer) { clearTimeout(this._hoverHideTimer); this._hoverHideTimer = null }
         })
         el.addEventListener('mouseleave', () => this._hideHoverTag())
+        el.addEventListener('click', (e) => {
+            if ((e.target as HTMLElement).closest('.tag-follow-btn, .tag-notif-btn')) return
+            this._tagClickHandled = true
+            this._selectedHex = hex
+            this._hideHoverTagNow()
+            this._applySelection()
+        })
         this._wireTagButton(el, hex)
         const hoverAnchor = fromLabel ? (hoverLeftFacing ? 'right' : 'left') as 'right' | 'left' : 'top-left' as 'top-left'
         const hoverOffset: [number, number] = fromLabel ? (hoverLeftFacing ? [13, 0] : [-13, 0]) : [14, -13]
@@ -1260,17 +1286,15 @@ export class AdsbLiveControl implements maplibregl.IControl {
         el.addEventListener('mouseenter', () => {
             const feature = this._geojson.features.find(f => f.properties.hex === props.hex)
             if (feature) this._showHoverTag(feature, true, el, el.dataset.dir as 'left' | 'right' | undefined)
-            if (!this._selectedHex && props.hex) {
+            if (props.hex) {
                 this._trailHex = props.hex
                 this._rebuildTrails()
             }
         })
         el.addEventListener('mouseleave', () => {
             this._hideHoverTag()
-            if (!this._selectedHex) {
-                this._trailHex = null
-                this._rebuildTrails()
-            }
+            this._trailHex = this._selectedHex ?? null
+            this._rebuildTrails()
         })
         el.addEventListener('click', (e) => {
             e.stopPropagation()
@@ -1307,7 +1331,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
             const isTower  = ['C3', 'C4', 'C5'].includes(cat) || (f.properties.t || '').toUpperCase() === 'TWR'
             const iconVisible  = isGnd || isTower || (f.properties.alt_baro > 0) || (zoom >= 10)
             let typeVisible: boolean
-            if (this._allHidden) {
+            if (this._allHidden && !this._selectedHex) {
                 typeVisible = false
             } else if (isGnd) {
                 typeVisible = this._typeFilter === 'all' && !this._hideGroundVehicles
