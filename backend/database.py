@@ -49,6 +49,7 @@ async def create_tables():
             "ALTER TABLE sdr_radios ADD COLUMN bandwidth INTEGER",
             "ALTER TABLE sdr_radios ADD COLUMN rf_gain REAL",
             "ALTER TABLE sdr_radios ADD COLUMN agc INTEGER",
+            "ALTER TABLE air_aircraft ADD COLUMN callsign TEXT NOT NULL DEFAULT ''",
         ]:
             try:
                 await conn.execute(sa_text(col_sql))

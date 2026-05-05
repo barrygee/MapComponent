@@ -164,6 +164,7 @@ class AirAircraft(Base):
     registration = Column(Text, nullable=False, unique=True)  # 'r' field or 'hex' as fallback
     hex          = Column(Text, nullable=False, default="")   # most recent ICAO hex seen
     type_code    = Column(Text, nullable=False, default="")   # most recent 't' field
+    callsign     = Column(Text, nullable=False, default="")   # most recent callsign seen
     first_seen   = Column(Integer, nullable=False)            # Unix ms
     last_seen    = Column(Integer, nullable=False)            # Unix ms
     flight_count = Column(Integer, nullable=False, default=0)

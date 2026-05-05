@@ -745,11 +745,27 @@ watch(() => playbackStore.windowStartMs, (v) => {
   else { _ro?.disconnect(); _ro = null }
 })
 
+let _dateRefreshTimer: ReturnType<typeof setInterval> | null = null
+let _paneObserver: MutationObserver | null = null
+
 onMounted(() => {
   window.addEventListener('mouseup', _onMouseup)
   document.addEventListener('click', _onDocClick)
   document.addEventListener('click', _onDocClickDd)
   fetchAvailableDates()
+  _dateRefreshTimer = setInterval(() => {
+    if (!playbackStore.isActive) fetchAvailableDates()
+  }, 5 * 60 * 1000)
+  // Refresh available dates whenever the playback pane becomes active
+  const pane = document.getElementById('msb-pane-playback')
+  if (pane) {
+    _paneObserver = new MutationObserver(() => {
+      if (pane.classList.contains('msb-pane-active') && !playbackStore.isActive) {
+        fetchAvailableDates()
+      }
+    })
+    _paneObserver.observe(pane, { attributes: true, attributeFilter: ['class'] })
+  }
   if (playbackStore.windowStartMs !== null) {
     nextTick(() => { _initResizeObserver(); _drawTimeline() })
   }
@@ -759,6 +775,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('mouseup', _onMouseup)
   document.removeEventListener('click', _onDocClick)
   document.removeEventListener('click', _onDocClickDd)
+  if (_dateRefreshTimer !== null) clearInterval(_dateRefreshTimer)
+  _paneObserver?.disconnect()
   _ro?.disconnect()
 })
 </script>

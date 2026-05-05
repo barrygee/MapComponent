@@ -22,9 +22,16 @@ export class AirMultiPlaybackControl {
 
     for (const ac of Object.values(aircraft)) {
       if (!ac.snapshots.length) continue
-      const idx = Math.max(0, this._bisectLeft(ac.snapshots, cursorMs))
+
+      const everAirborne = ac.snapshots.some(s => (s.alt_baro != null && s.alt_baro > 100) || (s.gs != null && s.gs > 50))
+      if (!everAirborne) continue
+
+      const idx = this._bisectLeft(ac.snapshots, cursorMs)
+      if (idx < 0) continue
 
       const snap = ac.snapshots[idx]
+      const lastSnap = ac.snapshots[ac.snapshots.length - 1]
+      if (cursorMs > lastSnap.ts) continue
 
       // Dead-reckon from this snapshot to the current cursor position
       const elapsedSec = (cursorMs - snap.ts) / 1000

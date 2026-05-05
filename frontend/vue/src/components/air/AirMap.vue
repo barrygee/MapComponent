@@ -343,6 +343,7 @@ onMounted(() => {
 
   watch(() => playbackStore.status, async (status) => {
     if (status === 'loading') {
+      adsbControl?.pauseLive()
       await _loadMultiPlayback()
     } else if (status === 'idle') {
       _stopPlaybackTimer()
