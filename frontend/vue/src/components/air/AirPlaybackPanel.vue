@@ -1,166 +1,218 @@
 <template>
   <div id="air-playback-panel">
 
-      <!-- ── Setup group ── -->
-      <template v-if="!playbackStore.windowStartMs">
+      <div class="sdr-group-body sdr-group-body-expanded">
 
-        <div class="sdr-group-body sdr-group-body-expanded">
-          <div class="sdr-radio-section">
+        <!-- ── Setup: date + time fields ── -->
+        <div class="sdr-radio-section" :class="{ 'apb-section--locked': isActive }">
 
-            <!-- Date picker -->
-            <label class="sdr-field-label">DATE</label>
-            <div class="apb-cal-wrap" ref="calWrap">
-              <button class="apb-date-btn" :class="{ 'apb-date-btn--chosen': !!pendingDate }" @click="calOpen = !calOpen" type="button">
-                <span>{{ pendingDate ? formatDisplayDate(pendingDate) : 'DD / MM / YYYY' }}</span>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <rect x="1" y="2" width="8" height="7" rx="1" stroke="currentColor" stroke-width="1"/>
-                  <line x1="1" y1="4.5" x2="9" y2="4.5" stroke="currentColor" stroke-width="1"/>
-                  <line x1="3" y1="1" x2="3" y2="3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
-                  <line x1="7" y1="1" x2="7" y2="3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
-                </svg>
-              </button>
-              <div v-if="calOpen" class="apb-cal-popup" @mousedown.stop>
-                <div class="apb-cal-header">
-                  <button class="apb-cal-nav" @click="calPrevMonth" type="button">&#8249;</button>
-                  <span class="apb-cal-month-label">{{ CAL_MONTHS[calViewMonth] }} {{ calViewYear }}</span>
-                  <button class="apb-cal-nav" @click="calNextMonth" type="button">&#8250;</button>
-                </div>
-                <div class="apb-cal-grid">
-                  <span class="apb-cal-dow" v-for="d in ['M','T','W','T','F','S','S']" :key="d + Math.random()">{{ d }}</span>
-                  <button
-                    v-for="cell in calCells" :key="cell.key"
-                    class="apb-cal-cell"
-                    :class="{
-                      'apb-cal-cell--other': cell.other,
-                      'apb-cal-cell--today': cell.today,
-                      'apb-cal-cell--sel':   cell.selected
-                    }"
-                    @click="selectCalDate(cell)"
-                    type="button"
-                  >{{ cell.day }}</button>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          <div class="sdr-radio-section sdr-radio-section--tight">
-            <!-- Start time -->
-            <label class="sdr-field-label">START TIME</label>
-            <div class="apb-time-row">
-              <div class="apb-dd-wrap" ref="startHHWrap">
-                <button class="apb-time-select" :class="{ 'apb-time-select--chosen': startHH !== '' }" @click="toggleDd('startHH')" type="button">
-                  <span>{{ startHH !== '' ? String(startHH).padStart(2, '0') : 'HH' }}</span>
-                  <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0l4 5 4-5z" fill="currentColor"/></svg>
-                </button>
-                <div v-if="openDd === 'startHH'" class="apb-dd-list" @mousedown.stop>
-                  <button v-for="h in 24" :key="h" class="apb-dd-item" :class="{ 'apb-dd-item--sel': startHH === h - 1 }" @click="startHH = h - 1; closeDd()" type="button">{{ String(h - 1).padStart(2, '0') }}</button>
-                </div>
-              </div>
-              <span class="apb-time-colon">:</span>
-              <div class="apb-dd-wrap" ref="startMMWrap">
-                <button class="apb-time-select" :class="{ 'apb-time-select--chosen': startMM !== '' }" @click="toggleDd('startMM')" type="button">
-                  <span>{{ startMM !== '' ? String(startMM).padStart(2, '0') : 'MM' }}</span>
-                  <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0l4 5 4-5z" fill="currentColor"/></svg>
-                </button>
-                <div v-if="openDd === 'startMM'" class="apb-dd-list" @mousedown.stop>
-                  <button v-for="m in 60" :key="m" class="apb-dd-item" :class="{ 'apb-dd-item--sel': startMM === m - 1 }" @click="startMM = m - 1; closeDd()" type="button">{{ String(m - 1).padStart(2, '0') }}</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="sdr-radio-section sdr-radio-section--tight">
-            <!-- End time -->
-            <label class="sdr-field-label">END TIME</label>
-            <div class="apb-time-row">
-              <div class="apb-dd-wrap" ref="endHHWrap">
-                <button class="apb-time-select" :class="{ 'apb-time-select--chosen': endHH !== '' }" @click="toggleDd('endHH')" type="button">
-                  <span>{{ endHH !== '' ? String(endHH).padStart(2, '0') : 'HH' }}</span>
-                  <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0l4 5 4-5z" fill="currentColor"/></svg>
-                </button>
-                <div v-if="openDd === 'endHH'" class="apb-dd-list" @mousedown.stop>
-                  <button v-for="h in 24" :key="h" class="apb-dd-item" :class="{ 'apb-dd-item--sel': endHH === h - 1 }" @click="endHH = h - 1; closeDd()" type="button">{{ String(h - 1).padStart(2, '0') }}</button>
-                </div>
-              </div>
-              <span class="apb-time-colon">:</span>
-              <div class="apb-dd-wrap" ref="endMMWrap">
-                <button class="apb-time-select" :class="{ 'apb-time-select--chosen': endMM !== '' }" @click="toggleDd('endMM')" type="button">
-                  <span>{{ endMM !== '' ? String(endMM).padStart(2, '0') : 'MM' }}</span>
-                  <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0l4 5 4-5z" fill="currentColor"/></svg>
-                </button>
-                <div v-if="openDd === 'endMM'" class="apb-dd-list" @mousedown.stop>
-                  <button v-for="m in 60" :key="m" class="apb-dd-item" :class="{ 'apb-dd-item--sel': endMM === m - 1 }" @click="endMM = m - 1; closeDd()" type="button">{{ String(m - 1).padStart(2, '0') }}</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="sdr-radio-section sdr-radio-section--tight">
-            <button
-              class="apb-load-btn"
-              :disabled="!canLoad || isLoading"
-              @click="loadPlayback"
-            >
-              <svg v-if="isLoading" class="apb-spin" width="11" height="11" viewBox="0 0 12 12" fill="none">
-                <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="20 12" stroke-linecap="round"/>
+          <!-- Start date picker -->
+          <label class="sdr-field-label">START DATE</label>
+          <div class="apb-cal-wrap" ref="calWrap">
+            <button class="apb-date-btn" :class="{ 'apb-date-btn--chosen': !!pendingDate }" @click="!isActive && (calOpen = !calOpen)" type="button" :disabled="isActive">
+              <span>{{ pendingDate ? formatDisplayDate(pendingDate) : 'DD / MM / YYYY' }}</span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <rect x="1" y="2" width="8" height="7" rx="1" stroke="currentColor" stroke-width="1"/>
+                <line x1="1" y1="4.5" x2="9" y2="4.5" stroke="currentColor" stroke-width="1"/>
+                <line x1="3" y1="1" x2="3" y2="3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+                <line x1="7" y1="1" x2="7" y2="3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
               </svg>
-              <span>{{ isLoading ? 'LOADING…' : 'START PLAYBACK' }}</span>
             </button>
-          </div>
-        </div>
-
-      </template>
-
-      <!-- ── Timeline group ── -->
-      <template v-else>
-
-        <div class="sdr-group-body sdr-group-body-expanded">
-
-          <div class="sdr-radio-section">
-            <!-- Play/Pause + transport row -->
-            <div class="apb-transport-row">
-              <button
-                class="apb-transport-btn"
-                @click="playbackStore.status === 'playing' ? playbackStore.pause() : playbackStore.play()"
-              >
-                <svg v-if="playbackStore.status === 'playing'" width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <rect x="1" y="1" width="3" height="8" rx="0.5" fill="currentColor"/>
-                  <rect x="6" y="1" width="3" height="8" rx="0.5" fill="currentColor"/>
-                </svg>
-                <svg v-else width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <polygon points="2,1 9,5 2,9" fill="currentColor"/>
-                </svg>
-              </button>
-              <div class="apb-speed-group">
+            <div v-if="calOpen && !isActive" class="apb-cal-popup" @mousedown.stop>
+              <div class="apb-cal-header">
+                <button class="apb-cal-nav" @click="calPrevMonth" type="button">&#8249;</button>
+                <span class="apb-cal-month-label">{{ CAL_MONTHS[calViewMonth] }} {{ calViewYear }}</span>
+                <button class="apb-cal-nav" @click="calNextMonth" type="button">&#8250;</button>
+              </div>
+              <div class="apb-cal-grid">
+                <span class="apb-cal-dow" v-for="d in ['M','T','W','T','F','S','S']" :key="d + Math.random()">{{ d }}</span>
                 <button
-                  v-for="(s, i) in PLAYBACK_SPEEDS" :key="i"
-                  class="apb-speed-btn"
-                  :class="{ 'apb-speed-btn--active': i === playbackStore.speedIdx }"
-                  @click="playbackStore.speedIdx = i"
-                >{{ s }}×</button>
+                  v-for="cell in calCells" :key="cell.key"
+                  class="apb-cal-cell"
+                  :class="{
+                    'apb-cal-cell--other':    cell.other,
+                    'apb-cal-cell--today':    cell.today,
+                    'apb-cal-cell--sel':      cell.selected,
+                    'apb-cal-cell--disabled': cell.disabled
+                  }"
+                  :disabled="cell.disabled"
+                  @click="selectCalDate(cell)"
+                  type="button"
+                >{{ cell.day }}</button>
               </div>
             </div>
           </div>
 
-          <div class="sdr-radio-section sdr-radio-section--tight">
-            <!-- Timeline canvas -->
-            <div class="apb-timeline-wrap" ref="timelineWrap">
-              <canvas ref="timelineCanvas" class="apb-timeline-canvas"
-                @mousedown="onTimelineMousedown"
-                @mousemove="onTimelineMousemove"
-                @mouseleave="onTimelineMouseleave"
-              />
+        </div>
+
+        <div class="sdr-radio-section sdr-radio-section--tight" :class="{ 'apb-section--locked': isActive }">
+          <!-- Start time -->
+          <label class="sdr-field-label">START TIME</label>
+          <div class="apb-time-row">
+            <div class="apb-dd-wrap" ref="startHHWrap">
+              <button class="apb-time-select" :class="{ 'apb-time-select--chosen': startHH !== '' }" @click="!isActive && toggleDd('startHH')" type="button" :disabled="isActive">
+                <span>{{ startHH !== '' ? String(startHH).padStart(2, '0') : 'hours' }}</span>
+                <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0l4 5 4-5z" fill="currentColor"/></svg>
+              </button>
+              <Teleport v-if="openDd === 'startHH' && ddRect" to="body">
+                <div class="apb-dd-list apb-dd-list--fixed" :style="{ top: ddRect.top + 'px', left: ddRect.left + 'px', width: ddRect.width + 'px' }" @mousedown.stop>
+                  <button v-for="h in 24" :key="h" class="apb-dd-item" :class="{ 'apb-dd-item--sel': startHH === h - 1, 'apb-dd-item--disabled': !isHourAvailable(h - 1) }" :disabled="!isHourAvailable(h - 1)" @click="startHH = h - 1; startMM = ''; closeDd()" type="button">{{ String(h - 1).padStart(2, '0') }}</button>
+                </div>
+              </Teleport>
+            </div>
+            <span class="apb-time-colon">:</span>
+            <div class="apb-dd-wrap" ref="startMMWrap">
+              <button class="apb-time-select" :class="{ 'apb-time-select--chosen': startMM !== '' }" @click="!isActive && toggleDd('startMM')" type="button" :disabled="isActive">
+                <span>{{ startMM !== '' ? String(startMM).padStart(2, '0') : 'minutes' }}</span>
+                <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0l4 5 4-5z" fill="currentColor"/></svg>
+              </button>
+              <Teleport v-if="openDd === 'startMM' && ddRect" to="body">
+                <div class="apb-dd-list apb-dd-list--fixed" :style="{ top: ddRect.top + 'px', left: ddRect.left + 'px', width: ddRect.width + 'px' }" @mousedown.stop>
+                  <button v-for="m in 60" :key="m" class="apb-dd-item"
+                    :class="{ 'apb-dd-item--sel': startMM === m - 1, 'apb-dd-item--disabled': typeof startHH === 'number' && !availableMinutesFor(startHH as number).has(m - 1) }"
+                    :disabled="typeof startHH === 'number' && !availableMinutesFor(startHH as number).has(m - 1)"
+                    @click="startMM = m - 1; closeDd()" type="button">{{ String(m - 1).padStart(2, '0') }}</button>
+                </div>
+              </Teleport>
             </div>
           </div>
+        </div>
 
-          <div class="sdr-radio-section sdr-radio-section--tight">
-            <button class="apb-exit-btn" @click="playbackStore.exit()">STOP PLAYBACK</button>
+        <div class="sdr-radio-section" :class="{ 'apb-section--locked': isActive }">
+
+          <!-- End date picker -->
+          <label class="sdr-field-label">END DATE</label>
+          <div class="apb-cal-wrap" ref="endCalWrap">
+            <button class="apb-date-btn" :class="{ 'apb-date-btn--chosen': !!pendingEndDate }" @click="!isActive && (endCalOpen = !endCalOpen)" type="button" :disabled="isActive">
+              <span>{{ pendingEndDate ? formatDisplayDate(pendingEndDate) : 'DD / MM / YYYY' }}</span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <rect x="1" y="2" width="8" height="7" rx="1" stroke="currentColor" stroke-width="1"/>
+                <line x1="1" y1="4.5" x2="9" y2="4.5" stroke="currentColor" stroke-width="1"/>
+                <line x1="3" y1="1" x2="3" y2="3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+                <line x1="7" y1="1" x2="7" y2="3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <div v-if="endCalOpen && !isActive" class="apb-cal-popup" @mousedown.stop>
+              <div class="apb-cal-header">
+                <button class="apb-cal-nav" @click="endCalPrevMonth" type="button">&#8249;</button>
+                <span class="apb-cal-month-label">{{ CAL_MONTHS[endCalViewMonth] }} {{ endCalViewYear }}</span>
+                <button class="apb-cal-nav" @click="endCalNextMonth" type="button">&#8250;</button>
+              </div>
+              <div class="apb-cal-grid">
+                <span class="apb-cal-dow" v-for="d in ['M','T','W','T','F','S','S']" :key="d + Math.random()">{{ d }}</span>
+                <button
+                  v-for="cell in endCalCells" :key="cell.key"
+                  class="apb-cal-cell"
+                  :class="{
+                    'apb-cal-cell--other':    cell.other,
+                    'apb-cal-cell--today':    cell.today,
+                    'apb-cal-cell--sel':      cell.selected,
+                    'apb-cal-cell--disabled': cell.disabled
+                  }"
+                  :disabled="cell.disabled"
+                  @click="selectEndCalDate(cell)"
+                  type="button"
+                >{{ cell.day }}</button>
+              </div>
+            </div>
           </div>
 
         </div>
 
-      </template>
+        <div class="sdr-radio-section sdr-radio-section--tight" :class="{ 'apb-section--locked': isActive }">
+          <!-- End time -->
+          <label class="sdr-field-label">END TIME</label>
+          <span v-if="endTimeError" class="apb-time-error">{{ endTimeError }}</span>
+          <div class="apb-time-row">
+            <div class="apb-dd-wrap" ref="endHHWrap">
+              <button class="apb-time-select" :class="{ 'apb-time-select--chosen': endHH !== '' }" @click="!isActive && toggleDd('endHH')" type="button" :disabled="isActive">
+                <span>{{ endHH !== '' ? String(endHH).padStart(2, '0') : 'hours' }}</span>
+                <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0l4 5 4-5z" fill="currentColor"/></svg>
+              </button>
+              <Teleport v-if="openDd === 'endHH' && ddRect" to="body">
+                <div class="apb-dd-list apb-dd-list--fixed" :style="{ top: ddRect.top + 'px', left: ddRect.left + 'px', width: ddRect.width + 'px' }" @mousedown.stop>
+                  <button v-for="h in 24" :key="h" class="apb-dd-item" :class="{ 'apb-dd-item--sel': endHH === h - 1, 'apb-dd-item--disabled': !isHourAvailable(h - 1) || (pendingEndDate === pendingDate && typeof startHH === 'number' && h - 1 < startHH) }" :disabled="!isHourAvailable(h - 1) || (pendingEndDate === pendingDate && typeof startHH === 'number' && h - 1 < startHH)" @click="endHH = h - 1; endMM = ''; closeDd()" type="button">{{ String(h - 1).padStart(2, '0') }}</button>
+                </div>
+              </Teleport>
+            </div>
+            <span class="apb-time-colon">:</span>
+            <div class="apb-dd-wrap" ref="endMMWrap">
+              <button class="apb-time-select" :class="{ 'apb-time-select--chosen': endMM !== '' }" @click="!isActive && toggleDd('endMM')" type="button" :disabled="isActive">
+                <span>{{ endMM !== '' ? String(endMM).padStart(2, '0') : 'minutes' }}</span>
+                <svg width="8" height="5" viewBox="0 0 8 5"><path d="M0 0l4 5 4-5z" fill="currentColor"/></svg>
+              </button>
+              <Teleport v-if="openDd === 'endMM' && ddRect" to="body">
+                <div class="apb-dd-list apb-dd-list--fixed" :style="{ top: ddRect.top + 'px', left: ddRect.left + 'px', width: ddRect.width + 'px' }" @mousedown.stop>
+                  <button v-for="m in 60" :key="m" class="apb-dd-item"
+                    :class="{ 'apb-dd-item--sel': endMM === m - 1, 'apb-dd-item--disabled': (typeof endHH === 'number' && !availableMinutesFor(endHH as number).has(m - 1)) || (pendingEndDate === pendingDate && typeof endHH === 'number' && typeof startHH === 'number' && endHH === startHH && typeof startMM === 'number' && m - 1 <= startMM) }"
+                    :disabled="(typeof endHH === 'number' && !availableMinutesFor(endHH as number).has(m - 1)) || (pendingEndDate === pendingDate && typeof endHH === 'number' && typeof startHH === 'number' && endHH === startHH && typeof startMM === 'number' && m - 1 <= startMM)"
+                    @click="endMM = m - 1; closeDd()" type="button">{{ String(m - 1).padStart(2, '0') }}</button>
+                </div>
+              </Teleport>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── START PLAYBACK button (only when not yet active) ── -->
+        <div v-if="!isActive" class="sdr-radio-section sdr-radio-section--tight">
+          <button
+            class="apb-load-btn"
+            :disabled="!canLoad || isLoading"
+            @click="loadPlayback"
+          >
+            <svg v-if="isLoading" class="apb-spin" width="11" height="11" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="20 12" stroke-linecap="round"/>
+            </svg>
+            <span>{{ isLoading ? 'LOADING…' : 'START PLAYBACK' }}</span>
+          </button>
+        </div>
+
+        <!-- ── Timeline group (shown but disabled until active) ── -->
+        <div class="sdr-radio-section" :class="{ 'apb-section--locked': !isActive }">
+          <!-- Play/Pause + transport row -->
+          <div class="apb-transport-row">
+            <button
+              class="apb-transport-btn"
+              :disabled="!isActive"
+              @click="playbackStore.status === 'playing' ? playbackStore.pause() : playbackStore.play()"
+            >
+              <svg v-if="playbackStore.status === 'playing'" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <rect x="1" y="1" width="3" height="8" rx="0.5" fill="currentColor"/>
+                <rect x="6" y="1" width="3" height="8" rx="0.5" fill="currentColor"/>
+              </svg>
+              <svg v-else width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <polygon points="2,1 9,5 2,9" fill="currentColor"/>
+              </svg>
+            </button>
+            <div class="apb-speed-group">
+              <button
+                v-for="(s, i) in PLAYBACK_SPEEDS" :key="i"
+                class="apb-speed-btn"
+                :class="{ 'apb-speed-btn--active': i === playbackStore.speedIdx }"
+                :disabled="!isActive"
+                @click="playbackStore.speedIdx = i"
+              >{{ s }}×</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sdr-radio-section sdr-radio-section--tight" :class="{ 'apb-section--locked': !isActive }">
+          <!-- Timeline canvas -->
+          <div class="apb-timeline-wrap" ref="timelineWrap">
+            <canvas ref="timelineCanvas" class="apb-timeline-canvas"
+              @mousedown="isActive && onTimelineMousedown($event)"
+              @mousemove="isActive && onTimelineMousemove($event)"
+              @mouseleave="isActive && onTimelineMouseleave()"
+            />
+          </div>
+        </div>
+
+        <!-- ── STOP PLAYBACK button (only when active) ── -->
+        <div v-if="isActive" class="sdr-radio-section sdr-radio-section--tight">
+          <button class="apb-exit-btn" @click="playbackStore.exit()">STOP PLAYBACK</button>
+        </div>
+
+      </div>
 
   </div>
 </template>
@@ -173,13 +225,108 @@ const CAL_MONTHS = ['January','February','March','April','May','June','July','Au
 
 const playbackStore = usePlaybackStore()
 
-// ---- Setup form ----
-const pendingDate = ref('')
+// ---- Setup form refs (declared first — referenced by computed below) ----
+const pendingDate    = ref('')
+const pendingEndDate = ref('')
 const startHH     = ref<number | ''>('')
 const startMM     = ref<number | ''>('')
 const endHH       = ref<number | ''>('')
 const endMM       = ref<number | ''>('')
 const isLoading   = ref(false)
+
+// ---- Available recorded periods ----
+interface AvailableDate { date: string; start_ms: number; end_ms: number }
+const availableDates = ref<AvailableDate[]>([])
+const availableDateSet = computed(() => new Set(availableDates.value.map(d => d.date)))
+
+async function fetchAvailableDates(): Promise<void> {
+  try {
+    const res = await fetch('/api/air/recordings/available-dates')
+    if (res.ok) availableDates.value = await res.json()
+  } catch { /* silent */ }
+}
+
+// For a selected date, the recorded start/end times in UTC minutes-of-day
+const selectedDateExtent = computed<{ startMin: number; endMin: number } | null>(() => {
+  if (!pendingDate.value) return null
+  const entry = availableDates.value.find(d => d.date === pendingDate.value)
+  if (!entry) return null
+  const s = new Date(entry.start_ms)
+  const e = new Date(entry.end_ms)
+  return {
+    startMin: s.getUTCHours() * 60 + s.getUTCMinutes(),
+    endMin:   e.getUTCHours() * 60 + e.getUTCMinutes(),
+  }
+})
+
+// Hours that contain at least some recorded data for the selected date
+const availableHours = computed<Set<number>>(() => {
+  const ext = selectedDateExtent.value
+  if (!ext) return new Set()
+  const hours = new Set<number>()
+  for (let h = Math.floor(ext.startMin / 60); h <= Math.floor(ext.endMin / 60); h++) hours.add(h)
+  return hours
+})
+
+function isHourAvailable(h: number): boolean { return availableHours.value.has(h) }
+
+function availableMinutesFor(h: number): Set<number> {
+  const ext = selectedDateExtent.value
+  if (!ext) return new Set()
+  const mins = new Set<number>()
+  const hStart = h * 60
+  const hEnd   = h * 60 + 59
+  if (hEnd < ext.startMin || hStart > ext.endMin) return mins
+  const from = Math.max(0,  ext.startMin - hStart)
+  const to   = Math.min(59, ext.endMin   - hStart)
+  for (let m = from; m <= to; m++) mins.add(m)
+  return mins
+}
+
+// For the selected end date, the recorded end time in UTC minutes-of-day
+const selectedEndDateExtent = computed<{ startMin: number; endMin: number } | null>(() => {
+  if (!pendingEndDate.value) return null
+  const entry = availableDates.value.find(d => d.date === pendingEndDate.value)
+  if (!entry) return null
+  const s = new Date(entry.start_ms)
+  const e = new Date(entry.end_ms)
+  return {
+    startMin: s.getUTCHours() * 60 + s.getUTCMinutes(),
+    endMin:   e.getUTCHours() * 60 + e.getUTCMinutes(),
+  }
+})
+
+// Reset time fields when selected date changes; pre-fill start time from recorded data
+watch(() => pendingDate.value, (iso) => {
+  endHH.value = ''
+  endMM.value = ''
+  pendingEndDate.value = iso  // default end date to same day as start date
+  if (iso) {
+    const d = new Date(iso)
+    endCalViewMonth.value = d.getMonth()
+    endCalViewYear.value  = d.getFullYear()
+  }
+  const ext = selectedDateExtent.value
+  if (ext) {
+    startHH.value = Math.floor(ext.startMin / 60)
+    startMM.value = ext.startMin % 60
+  } else {
+    startHH.value = ''
+    startMM.value = ''
+  }
+})
+
+// Pre-fill end time to latest available time on the selected end date
+watch(() => pendingEndDate.value, () => {
+  const ext = selectedEndDateExtent.value
+  if (ext) {
+    endHH.value = Math.floor(ext.endMin / 60)
+    endMM.value = ext.endMin % 60
+  } else {
+    endHH.value = ''
+    endMM.value = ''
+  }
+})
 
 // ---- Custom dropdowns ----
 type DdKey = 'startHH' | 'startMM' | 'endHH' | 'endMM'
@@ -189,27 +336,51 @@ const startMMWrap = ref<HTMLDivElement | null>(null)
 const endHHWrap   = ref<HTMLDivElement | null>(null)
 const endMMWrap   = ref<HTMLDivElement | null>(null)
 
-function toggleDd(key: DdKey): void { openDd.value = openDd.value === key ? null : key }
-function closeDd(): void { openDd.value = null }
+interface DdRect { top: number; left: number; width: number }
+const ddRect = ref<DdRect | null>(null)
+
+const ddWrapMap: Record<DdKey, () => HTMLDivElement | null> = {
+  startHH: () => startHHWrap.value,
+  startMM: () => startMMWrap.value,
+  endHH:   () => endHHWrap.value,
+  endMM:   () => endMMWrap.value,
+}
+
+function toggleDd(key: DdKey): void {
+  if (openDd.value === key) { openDd.value = null; ddRect.value = null; return }
+  const el = ddWrapMap[key]()
+  if (el) {
+    const r = el.getBoundingClientRect()
+    ddRect.value = { top: r.bottom, left: r.left, width: r.width }
+  }
+  openDd.value = key
+}
+function closeDd(): void { openDd.value = null; ddRect.value = null }
 
 function _onDocClickDd(e: MouseEvent): void {
   const wraps = [startHHWrap.value, startMMWrap.value, endHHWrap.value, endMMWrap.value]
   if (wraps.every(w => !w || !w.contains(e.target as Node))) closeDd()
 }
 
-// ---- Calendar ----
+// ---- Calendar (start date) ----
 const calWrap      = ref<HTMLDivElement | null>(null)
 const calOpen      = ref(false)
 const now          = new Date()
 const calViewMonth = ref(now.getMonth())
 const calViewYear  = ref(now.getFullYear())
 
+// ---- Calendar (end date) ----
+const endCalWrap      = ref<HTMLDivElement | null>(null)
+const endCalOpen      = ref(false)
+const endCalViewMonth = ref(now.getMonth())
+const endCalViewYear  = ref(now.getFullYear())
+
 function formatDisplayDate(iso: string): string {
   const [y, m, d] = iso.split('-')
   return `${d} / ${m} / ${y}`
 }
 
-interface CalCell { key: string; day: number; iso: string; other: boolean; today: boolean; selected: boolean }
+interface CalCell { key: string; day: number; iso: string; other: boolean; today: boolean; selected: boolean; disabled: boolean }
 
 const calCells = computed<CalCell[]>(() => {
   const y = calViewYear.value, m = calViewMonth.value
@@ -220,17 +391,17 @@ const calCells = computed<CalCell[]>(() => {
   for (let i = 0; i < startDow; i++) {
     const d = new Date(y, m, 1 - (startDow - i))
     const iso = toIso(d)
-    cells.push({ key: 'p' + i, day: d.getDate(), iso, other: true, today: iso === todayIso, selected: iso === pendingDate.value })
+    cells.push({ key: 'p' + i, day: d.getDate(), iso, other: true, today: iso === todayIso, selected: iso === pendingDate.value, disabled: !availableDateSet.value.has(iso) })
   }
   const daysInMonth = new Date(y, m + 1, 0).getDate()
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
-    cells.push({ key: 'c' + d, day: d, iso, other: false, today: iso === todayIso, selected: iso === pendingDate.value })
+    cells.push({ key: 'c' + d, day: d, iso, other: false, today: iso === todayIso, selected: iso === pendingDate.value, disabled: !availableDateSet.value.has(iso) })
   }
   const remaining = 42 - cells.length
   for (let i = 1; i <= remaining; i++) {
     const iso = toIso(new Date(y, m + 1, i))
-    cells.push({ key: 'n' + i, day: i, iso, other: true, today: iso === todayIso, selected: iso === pendingDate.value })
+    cells.push({ key: 'n' + i, day: i, iso, other: true, today: iso === todayIso, selected: iso === pendingDate.value, disabled: !availableDateSet.value.has(iso) })
   }
   return cells
 })
@@ -248,7 +419,9 @@ function calNextMonth(): void {
   else calViewMonth.value++
 }
 function selectCalDate(cell: CalCell): void {
+  if (cell.disabled) return
   pendingDate.value = cell.iso
+  if (pendingEndDate.value && pendingEndDate.value < cell.iso) pendingEndDate.value = cell.iso
   if (cell.other) {
     const d = new Date(cell.iso)
     calViewMonth.value = d.getMonth()
@@ -257,8 +430,55 @@ function selectCalDate(cell: CalCell): void {
   calOpen.value = false
 }
 
+const endCalCells = computed<CalCell[]>(() => {
+  const y = endCalViewYear.value, m = endCalViewMonth.value
+  const first = new Date(y, m, 1)
+  const startDow = (first.getDay() + 6) % 7
+  const cells: CalCell[] = []
+  const todayIso = toIso(new Date())
+  for (let i = 0; i < startDow; i++) {
+    const d = new Date(y, m, 1 - (startDow - i))
+    const iso = toIso(d)
+    const beforeStart = !!pendingDate.value && iso < pendingDate.value
+    cells.push({ key: 'p' + i, day: d.getDate(), iso, other: true, today: iso === todayIso, selected: iso === pendingEndDate.value, disabled: !availableDateSet.value.has(iso) || beforeStart })
+  }
+  const daysInMonth = new Date(y, m + 1, 0).getDate()
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+    const beforeStart = !!pendingDate.value && iso < pendingDate.value
+    cells.push({ key: 'c' + d, day: d, iso, other: false, today: iso === todayIso, selected: iso === pendingEndDate.value, disabled: !availableDateSet.value.has(iso) || beforeStart })
+  }
+  const remaining = 42 - cells.length
+  for (let i = 1; i <= remaining; i++) {
+    const iso = toIso(new Date(y, m + 1, i))
+    const beforeStart = !!pendingDate.value && iso < pendingDate.value
+    cells.push({ key: 'n' + i, day: i, iso, other: true, today: iso === todayIso, selected: iso === pendingEndDate.value, disabled: !availableDateSet.value.has(iso) || beforeStart })
+  }
+  return cells
+})
+
+function endCalPrevMonth(): void {
+  if (endCalViewMonth.value === 0) { endCalViewMonth.value = 11; endCalViewYear.value-- }
+  else endCalViewMonth.value--
+}
+function endCalNextMonth(): void {
+  if (endCalViewMonth.value === 11) { endCalViewMonth.value = 0; endCalViewYear.value++ }
+  else endCalViewMonth.value++
+}
+function selectEndCalDate(cell: CalCell): void {
+  if (cell.disabled) return
+  pendingEndDate.value = cell.iso
+  if (cell.other) {
+    const d = new Date(cell.iso)
+    endCalViewMonth.value = d.getMonth()
+    endCalViewYear.value  = d.getFullYear()
+  }
+  endCalOpen.value = false
+}
+
 function _onDocClick(e: MouseEvent): void {
   if (calWrap.value && !calWrap.value.contains(e.target as Node)) calOpen.value = false
+  if (endCalWrap.value && !endCalWrap.value.contains(e.target as Node)) endCalOpen.value = false
 }
 
 const startTotalMin = computed(() =>
@@ -270,22 +490,39 @@ const endTotalMin = computed(() =>
     ? endHH.value * 60 + endMM.value : null
 )
 
+const isActive = computed(() => !!playbackStore.windowStartMs)
+
+const startEpochMin = computed(() => {
+  if (!pendingDate.value || startTotalMin.value === null) return null
+  const base = new Date(pendingDate.value + 'T00:00:00Z').getTime()
+  return base + startTotalMin.value * 60 * 1000
+})
+
+const endEpochMin = computed(() => {
+  if (!pendingEndDate.value || endTotalMin.value === null) return null
+  const base = new Date(pendingEndDate.value + 'T00:00:00Z').getTime()
+  return base + endTotalMin.value * 60 * 1000
+})
+
 const canLoad = computed(() =>
   !!pendingDate.value &&
-  startTotalMin.value !== null &&
-  endTotalMin.value   !== null &&
-  endTotalMin.value > startTotalMin.value
+  !!pendingEndDate.value &&
+  startEpochMin.value !== null &&
+  endEpochMin.value   !== null &&
+  endEpochMin.value > startEpochMin.value
 )
+
+const endTimeError = computed(() => {
+  if (startEpochMin.value === null || endEpochMin.value === null) return null
+  if (endEpochMin.value <= startEpochMin.value) return 'END must be after START'
+  return null
+})
 
 watch(() => playbackStore.status, (s) => {
   if (s === 'idle') {
     isLoading.value = false
-    pendingDate.value = ''
-    startHH.value = ''
-    startMM.value = ''
-    endHH.value   = ''
-    endMM.value   = ''
     calOpen.value = false
+    fetchAvailableDates()
   }
   if (s !== 'loading') isLoading.value = false
 })
@@ -296,9 +533,10 @@ function loadPlayback(): void {
   const sh = startHH.value as number, sm = startMM.value as number
   const eh = endHH.value   as number, em = endMM.value   as number
   const startMs = new Date(`${pendingDate.value}T${String(sh).padStart(2,'0')}:${String(sm).padStart(2,'0')}:00Z`).getTime()
-  const endMs   = new Date(`${pendingDate.value}T${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')}:00Z`).getTime()
+  const endMs   = new Date(`${pendingEndDate.value}T${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')}:00Z`).getTime()
   playbackStore.pendingStartMs = startMs
   playbackStore.pendingEndMs   = endMs
+  playbackStore.activate()
 }
 
 // ---- Timeline canvas ----
@@ -382,7 +620,7 @@ function _drawTimeline(): void {
   const THIRTY   = 30 * 60 * 1000
   const TEN_MIN  = 10 * 60 * 1000
   const tickStart = Math.ceil(start / FIVE_MIN) * FIVE_MIN
-  const labelFont = "600 9px 'Barlow Condensed', 'Barlow', sans-serif"
+  const labelFont = "600 11px 'Barlow Condensed', 'Barlow', sans-serif"
 
   ctx.font = labelFont
   ctx.textAlign = 'center'
@@ -443,7 +681,7 @@ function _drawTimeline(): void {
   ctx.fill()
 
   // Date + time labels
-  ctx.font = "700 10px 'Barlow Condensed', 'Barlow', sans-serif"
+  ctx.font = "700 12px 'Barlow Condensed', 'Barlow', sans-serif"
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   const dateLabelX = Math.min(Math.max(cursorX, 60), W - 100)
@@ -511,6 +749,7 @@ onMounted(() => {
   window.addEventListener('mouseup', _onMouseup)
   document.addEventListener('click', _onDocClick)
   document.addEventListener('click', _onDocClickDd)
+  fetchAvailableDates()
   if (playbackStore.windowStartMs !== null) {
     nextTick(() => { _initResizeObserver(); _drawTimeline() })
   }
@@ -534,6 +773,13 @@ onBeforeUnmount(() => {
     color: rgba(255, 255, 255, 0.5);
 }
 
+/* ---- Locked/disabled section overlay ---- */
+.apb-section--locked {
+    opacity: 0.35;
+    pointer-events: none;
+    user-select: none;
+}
+
 /* ---- Calendar ---- */
 .apb-cal-wrap {
     position: relative;
@@ -548,7 +794,7 @@ onBeforeUnmount(() => {
     border-radius: 2px;
     color: rgba(255, 255, 255, 0.55);
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -614,7 +860,7 @@ onBeforeUnmount(() => {
 
 .apb-cal-month-label {
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.1em;
     color: rgba(255, 255, 255, 0.6);
@@ -629,7 +875,7 @@ onBeforeUnmount(() => {
 
 .apb-cal-dow {
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.1em;
     color: rgba(255, 255, 255, 0.25);
@@ -645,7 +891,7 @@ onBeforeUnmount(() => {
     color: rgba(255, 255, 255, 0.6);
     cursor: pointer;
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.05em;
     padding: 4px 0;
@@ -658,9 +904,22 @@ onBeforeUnmount(() => {
     color: #fff;
 }
 
-.apb-cal-cell--other  { color: rgba(255, 255, 255, 0.2); }
-.apb-cal-cell--today  { color: rgba(200, 255, 0, 0.8); }
-.apb-cal-cell--sel    { background: rgba(255, 255, 255, 0.07); color: #c8ff00; }
+.apb-cal-cell--other    { color: rgba(255, 255, 255, 0.2); }
+.apb-cal-cell--today    { color: rgba(200, 255, 0, 0.8); }
+.apb-cal-cell--sel      { background: rgba(255, 255, 255, 0.07); color: #c8ff00; }
+.apb-cal-cell--disabled { color: rgba(255, 255, 255, 0.12); cursor: not-allowed; pointer-events: none; }
+
+/* ---- Time error ---- */
+.apb-time-error {
+    display: block;
+    font-family: var(--font-primary, 'Barlow', sans-serif);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: rgba(255, 80, 80, 0.85);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
 
 /* ---- Time selects ---- */
 .apb-time-row {
@@ -682,7 +941,7 @@ onBeforeUnmount(() => {
     border-radius: 2px;
     color: rgba(255, 255, 255, 0.55);
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -728,6 +987,49 @@ onBeforeUnmount(() => {
 
 .apb-dd-list::-webkit-scrollbar { display: none; }
 
+:global(.apb-dd-list--fixed) {
+    position: fixed !important;
+    z-index: 99999;
+    background: #13171f;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    max-height: 200px;
+    overflow-y: auto;
+    scrollbar-width: none;
+    box-sizing: border-box;
+}
+
+:global(.apb-dd-list--fixed::-webkit-scrollbar) { display: none; }
+
+:global(.apb-dd-list--fixed .apb-dd-item) {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.65);
+    font-family: var(--font-primary, 'Barlow', sans-serif);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-align: left;
+    padding: 7px 10px;
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+    box-sizing: border-box;
+}
+
+:global(.apb-dd-list--fixed .apb-dd-item:hover) {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+}
+
+:global(.apb-dd-list--fixed .apb-dd-item--sel) { color: #c8ff00; }
+
+:global(.apb-dd-list--fixed .apb-dd-item--disabled) {
+    color: rgba(255, 255, 255, 0.12);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .apb-dd-item {
     display: block;
     width: 100%;
@@ -735,7 +1037,7 @@ onBeforeUnmount(() => {
     border: none;
     color: rgba(255, 255, 255, 0.65);
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.1em;
     text-align: left;
@@ -754,10 +1056,16 @@ onBeforeUnmount(() => {
     color: #c8ff00;
 }
 
+.apb-dd-item--disabled {
+    color: rgba(255, 255, 255, 0.12);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .apb-time-colon {
     color: rgba(255, 255, 255, 0.2);
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 600;
     line-height: 1;
     user-select: none;
@@ -773,7 +1081,7 @@ onBeforeUnmount(() => {
     border-radius: 2px;
     color: #c8ff00;
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.18em;
     text-transform: uppercase;
@@ -838,7 +1146,7 @@ onBeforeUnmount(() => {
     cursor: pointer;
     padding: 0 7px;
     font-family: 'Barlow Condensed', monospace, sans-serif;
-    font-size: 9px;
+    font-size: 11px;
     letter-spacing: 0.05em;
     transition: color 0.12s, border-color 0.12s;
 }
@@ -877,7 +1185,7 @@ onBeforeUnmount(() => {
     border-radius: 2px;
     color: rgba(255, 255, 255, 0.25);
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.18em;
     text-transform: uppercase;

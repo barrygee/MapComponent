@@ -21,8 +21,8 @@ export class AirMultiPlaybackControl {
     const trailLines: Feature[] = []
 
     for (const ac of Object.values(aircraft)) {
-      const idx = this._bisectLeft(ac.snapshots, cursorMs)
-      if (idx < 0) continue
+      if (!ac.snapshots.length) continue
+      const idx = Math.max(0, this._bisectLeft(ac.snapshots, cursorMs))
 
       const snap = ac.snapshots[idx]
       features.push(this._makeAircraftFeature(ac, snap))
@@ -37,6 +37,8 @@ export class AirMultiPlaybackControl {
       }
     }
 
+    if (this._map.getLayer('adsb-icons') && this._map.getLayoutProperty('adsb-icons', 'visibility') === 'none')
+      this._map.setLayoutProperty('adsb-icons', 'visibility', 'visible')
     const empty: FeatureCollection = { type: 'FeatureCollection', features: [] }
     this._setSource('adsb-live',             features.length      ? { type: 'FeatureCollection', features }      : empty)
     this._setSource('adsb-trails-source',    trailDots.length     ? { type: 'FeatureCollection', features: trailDots }  : empty)
@@ -114,7 +116,6 @@ export class AirMultiPlaybackControl {
   }
 
   private _setSource(id: string, data: FeatureCollection): void {
-    const src = this._map.getSource(id) as GeoJSONSource | undefined
-    src?.setData(data)
+    (this._map.getSource(id) as GeoJSONSource | undefined)?.setData(data)
   }
 }

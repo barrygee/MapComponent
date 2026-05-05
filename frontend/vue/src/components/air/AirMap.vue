@@ -308,7 +308,6 @@ async function _loadMultiPlayback(): Promise<void> {
     _multiPlaybackControl = new AirMultiPlaybackControl(_map, adsbControl)
     _multiPlaybackControl.renderAtTime(playbackStore.cursorMs!, playbackStore.aircraft)
     playbackStore.play()
-    // status watcher fires _schedulePlaybackTick when status becomes 'playing'
   } catch { playbackStore.exit() }
 }
 
@@ -319,14 +318,15 @@ function _schedulePlaybackTick(): void {
   const end    = playbackStore.windowEndMs!
   if (cursor >= end) { playbackStore.pause(); return }
 
-  let nextTs = cursor + 1000
+  let nextTs = playbackStore.windowEndMs!
   for (const ac of Object.values(playbackStore.aircraft)) {
     const idx = _bisectAfter(ac.snapshots, cursor)
     if (idx >= 0 && ac.snapshots[idx].ts < nextTs) nextTs = ac.snapshots[idx].ts
   }
-  const delay = Math.max(50, (nextTs - cursor) / PLAYBACK_SPEEDS[playbackStore.speedIdx])
+  const delay = Math.min(500, Math.max(16, (nextTs - cursor) / PLAYBACK_SPEEDS[playbackStore.speedIdx]))
   _playbackTimer = setTimeout(() => {
     playbackStore.seek(nextTs)
+    _multiPlaybackControl?.renderAtTime(nextTs, playbackStore.aircraft)
     if (playbackStore.status === 'playing') _schedulePlaybackTick()
   }, delay)
 }
@@ -352,15 +352,9 @@ onMounted(() => {
     _locationMarker.update(loc.lon, loc.lat)
   }, { immediate: true })
 
-  watch(() => playbackStore.pendingStartMs, async (ms) => {
-    if (ms !== null && playbackStore.status === 'loading') {
-      await _loadMultiPlayback()
-    }
-  })
-
   watch(() => playbackStore.status, async (status) => {
     if (status === 'loading') {
-      // Wait for the user to fill in date/time and click LOAD (pendingStartMs watcher handles the fetch)
+      await _loadMultiPlayback()
     } else if (status === 'idle') {
       _stopPlaybackTimer()
       _multiPlaybackControl?.destroy()
@@ -372,8 +366,13 @@ onMounted(() => {
     }
   })
 
+  watch(() => playbackStore.speedIdx, () => {
+    if (playbackStore.status === 'playing') _schedulePlaybackTick()
+  })
+
   watch(() => playbackStore.cursorMs, (ms) => {
-    if (ms !== null && _multiPlaybackControl)
+    // Handles manual scrubbing (timer tick calls renderAtTime directly)
+    if (ms !== null && _multiPlaybackControl && playbackStore.status !== 'playing')
       _multiPlaybackControl.renderAtTime(ms, playbackStore.aircraft)
   })
 })
