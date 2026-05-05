@@ -163,7 +163,7 @@
             <svg v-if="isLoading" class="apb-spin" width="11" height="11" viewBox="0 0 12 12" fill="none">
               <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="20 12" stroke-linecap="round"/>
             </svg>
-            <span>{{ isLoading ? 'LOADING…' : 'START PLAYBACK' }}</span>
+            <span>{{ isLoading ? 'LOADING…' : 'START REPLAY' }}</span>
           </button>
         </div>
 
@@ -194,7 +194,7 @@
 
         <!-- ── STOP PLAYBACK button (only when active) ── -->
         <div v-if="isActive" class="sdr-radio-section sdr-radio-section--tight">
-          <button class="apb-exit-btn" @click="playbackStore.exit()">STOP PLAYBACK</button>
+          <button class="apb-exit-btn" @click="playbackStore.exit()">STOP REPLAY</button>
         </div>
 
       </div>
@@ -575,10 +575,10 @@ function _drawTimeline(): void {
   const span   = end - start
   if (span <= 0) return
 
-  const PAD_L  = 0
-  const PAD_R  = 0
+  const PAD_L  = 8
+  const PAD_R  = 8
   const trackW = W - PAD_L - PAD_R
-  const trackY = Math.round(H * 0.52)
+  const trackY = Math.round(H * 0.65)
   const tickBaseH  = 7
   const tickMinorH = 4
 
@@ -606,7 +606,7 @@ function _drawTimeline(): void {
   const THIRTY   = 30 * 60 * 1000
   const TEN_MIN  = 10 * 60 * 1000
   const tickStart = Math.ceil(start / FIVE_MIN) * FIVE_MIN
-  const labelFont = "600 11px 'Barlow Condensed', 'Barlow', sans-serif"
+  const labelFont = "600 10px 'Barlow Condensed', 'Barlow', sans-serif"
 
   ctx.font = labelFont
   ctx.textAlign = 'center'
@@ -657,24 +657,20 @@ function _drawTimeline(): void {
   ctx.fill()
   ctx.shadowBlur = 0
 
-  // Date + time labels
-  ctx.font = "700 12px 'Barlow Condensed', 'Barlow', sans-serif"
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  const dateLabelX = Math.min(Math.max(cursorX, 100), W - 100)
-  ctx.textAlign = 'right'
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  ctx.fillText(_fmtDateTime(cursor), dateLabelX - 8, H * 0.22)
+  // Date + time labels: side by side with separator
+  const labelY = trackY - 28
   ctx.textAlign = 'left'
-  ctx.fillStyle = 'rgba(200,255,0,0.9)'
-  ctx.fillText(_fmtHMS(cursor) + ' UTC', dateLabelX + 8, H * 0.22)
-
-  ctx.beginPath()
-  ctx.moveTo(dateLabelX, H * 0.12)
-  ctx.lineTo(dateLabelX, H * 0.34)
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)'
-  ctx.lineWidth = 1
-  ctx.stroke()
+  ctx.textBaseline = 'top'
+  ctx.font = "600 12px 'Barlow Condensed', 'Barlow', sans-serif"
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
+  ctx.fillText(_fmtDateTime(cursor), PAD_L, labelY)
+  const dateW = ctx.measureText(_fmtDateTime(cursor)).width
+  ctx.fillStyle = 'rgba(255,255,255,0.25)'
+  ctx.fillText('   |   ', PAD_L + dateW, labelY)
+  const sepW = ctx.measureText('   |   ').width
+  ctx.font = "300 12px 'Barlow Condensed', 'Barlow', sans-serif"
+  ctx.fillStyle = 'rgba(200,255,0,0.95)'
+  ctx.fillText(_fmtHMS(cursor) + ' UTC', PAD_L + dateW + sepW, labelY)
 }
 
 function _xToMs(x: number): number {
@@ -682,7 +678,10 @@ function _xToMs(x: number): number {
   const W      = canvas.clientWidth
   const start  = playbackStore.windowStartMs!
   const end    = playbackStore.windowEndMs!
-  const frac   = Math.max(0, Math.min(1, x / W))
+  const PAD_L  = 8
+  const PAD_R  = 8
+  const trackW = W - PAD_L - PAD_R
+  const frac   = Math.max(0, Math.min(1, (x - PAD_L) / trackW))
   return Math.round(start + frac * (end - start))
 }
 
@@ -773,12 +772,15 @@ onBeforeUnmount(() => {
 }
 
 #air-playback-panel .sdr-field-label {
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    margin-bottom: 8px;
 }
 
 /* ---- Extra top spacing on first (START DATE) section to match AIRCRAFT gap ---- */
 .apb-section--start-date {
-    padding-top: 28px;
+    padding-top: 32px;
 }
 
 /* ---- Locked/disabled section overlay ---- */
@@ -791,22 +793,22 @@ onBeforeUnmount(() => {
 /* ---- Calendar ---- */
 .apb-cal-wrap {
     position: relative;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
 }
 
 .apb-date-btn {
     width: 100%;
-    height: 34px;
+    height: 36px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 2px;
     color: rgba(255, 255, 255, 0.55);
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    padding: 0 10px;
+    padding: 0 12px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -943,17 +945,17 @@ onBeforeUnmount(() => {
 
 .apb-time-select {
     width: 100%;
-    height: 34px;
+    height: 36px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 2px;
     color: rgba(255, 255, 255, 0.55);
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    padding: 0 10px;
+    padding: 0 12px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1083,15 +1085,15 @@ onBeforeUnmount(() => {
 /* ---- Load button ---- */
 .apb-load-btn {
     width: 100%;
-    height: 34px;
+    height: 36px;
     background: rgba(200, 255, 0, 0.06);
     border: 1px solid rgba(200, 255, 0, 0.45);
     border-radius: 2px;
     color: #c8ff00;
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     cursor: pointer;
     display: flex;
@@ -1156,7 +1158,7 @@ onBeforeUnmount(() => {
 /* ---- Timeline canvas ---- */
 .apb-timeline-wrap {
     width: 100%;
-    height: 60px;
+    height: 96px;
     position: relative;
     cursor: crosshair;
 }
@@ -1170,15 +1172,15 @@ onBeforeUnmount(() => {
 /* ---- Exit button ---- */
 .apb-exit-btn {
     width: 100%;
-    height: 34px;
+    height: 36px;
     background: none;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 2px;
     color: rgba(255, 255, 255, 0.25);
     font-family: var(--font-primary, 'Barlow', sans-serif);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     cursor: pointer;
     display: flex;

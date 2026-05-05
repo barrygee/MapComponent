@@ -65,7 +65,7 @@ const tabs = computed(() => [
   { id: 'alerts' as SidebarTab,   label: 'ALERTS',   badge: undefined },
   { id: 'tracking' as SidebarTab, label: 'TRACKING', badge: undefined },
   { id: 'passes' as SidebarTab,    label: 'PASSES',    badge: undefined },
-  { id: 'playback' as SidebarTab, label: 'PLAYBACK',  badge: undefined },
+  { id: 'playback' as SidebarTab, label: 'REPLAY',    badge: undefined },
   { id: 'radio' as SidebarTab,    label: 'RADIO',     badge: undefined },
 ])
 
