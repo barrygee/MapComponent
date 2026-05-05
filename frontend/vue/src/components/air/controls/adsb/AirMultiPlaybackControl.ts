@@ -25,7 +25,17 @@ export class AirMultiPlaybackControl {
       const idx = Math.max(0, this._bisectLeft(ac.snapshots, cursorMs))
 
       const snap = ac.snapshots[idx]
-      features.push(this._makeAircraftFeature(ac, snap))
+
+      // Dead-reckon from this snapshot to the current cursor position
+      const elapsedSec = (cursorMs - snap.ts) / 1000
+      let coords: [number, number]
+      if (snap.track != null && snap.gs != null && snap.gs > 0 && elapsedSec > 0) {
+        coords = this._deadReckon(snap.lon, snap.lat, snap.track, snap.gs, elapsedSec)
+      } else {
+        coords = [snap.lon, snap.lat]
+      }
+
+      features.push(this._makeAircraftFeature(ac, snap, coords))
 
       const trailStart = Math.max(0, idx - 60)
       const trail = ac.snapshots.slice(trailStart, idx + 1)
@@ -45,7 +55,6 @@ export class AirMultiPlaybackControl {
     this._setSource('adsb-trails-source',     trailDots.length  ? { type: 'FeatureCollection', features: trailDots }    : empty)
     this._setSource('adsb-trail-line-source', trailLines.length ? { type: 'FeatureCollection', features: trailLines }   : empty)
 
-    // Sync feature cache so AdsbLiveControl click/hover tag handlers work during playback
     this._adsbControl.setPlaybackFeatures(features)
   }
 
@@ -55,6 +64,23 @@ export class AirMultiPlaybackControl {
     this._setSource('adsb-trails-source', empty)
     this._setSource('adsb-trail-line-source', empty)
     this._adsbControl.resumeLive()
+  }
+
+  private _deadReckon(lon: number, lat: number, trackDeg: number, gs: number, elapsedSec: number): [number, number] {
+    const distNm  = gs * (elapsedSec / 3600)
+    const angDist = distNm / 3440.065
+    const bearRad = trackDeg * Math.PI / 180
+    const lat1    = lat * Math.PI / 180
+    const lon1    = lon * Math.PI / 180
+    const lat2    = Math.asin(
+      Math.sin(lat1) * Math.cos(angDist) +
+      Math.cos(lat1) * Math.sin(angDist) * Math.cos(bearRad)
+    )
+    const lon2 = lon1 + Math.atan2(
+      Math.sin(bearRad) * Math.sin(angDist) * Math.cos(lat1),
+      Math.cos(angDist) - Math.sin(lat1) * Math.sin(lat2)
+    )
+    return [lon2 * 180 / Math.PI, lat2 * 180 / Math.PI]
   }
 
   private _bisectLeft(snapshots: MultiSnapshot[], ts: number): number {
@@ -67,10 +93,10 @@ export class AirMultiPlaybackControl {
     return result
   }
 
-  private _makeAircraftFeature(ac: PlaybackAircraft, snap: MultiSnapshot): Feature {
+  private _makeAircraftFeature(ac: PlaybackAircraft, snap: MultiSnapshot, coords: [number, number]): Feature {
     return {
       type: 'Feature',
-      geometry: { type: 'Point', coordinates: [snap.lon, snap.lat] },
+      geometry: { type: 'Point', coordinates: coords },
       properties: {
         hex:          ac.hex || ac.registration,
         flight:       ac.callsign,

@@ -311,6 +311,8 @@ async function _loadMultiPlayback(): Promise<void> {
   } catch { playbackStore.exit() }
 }
 
+const PLAYBACK_TICK_MS = 100
+
 function _schedulePlaybackTick(): void {
   _stopPlaybackTimer()
   if (playbackStore.status !== 'playing') return
@@ -318,32 +320,19 @@ function _schedulePlaybackTick(): void {
   const end    = playbackStore.windowEndMs!
   if (cursor >= end) { playbackStore.pause(); return }
 
-  let nextTs = playbackStore.windowEndMs!
-  for (const ac of Object.values(playbackStore.aircraft)) {
-    const idx = _bisectAfter(ac.snapshots, cursor)
-    if (idx >= 0 && ac.snapshots[idx].ts < nextTs) nextTs = ac.snapshots[idx].ts
-  }
-  const delay = Math.min(500, Math.max(16, (nextTs - cursor) / PLAYBACK_SPEEDS[playbackStore.speedIdx]))
   _playbackTimer = setTimeout(() => {
-    playbackStore.seek(nextTs)
-    _multiPlaybackControl?.renderAtTime(nextTs, playbackStore.aircraft)
+    const speed      = PLAYBACK_SPEEDS[playbackStore.speedIdx]
+    const nextCursor = Math.min(end, cursor + PLAYBACK_TICK_MS * speed)
+    playbackStore.seek(nextCursor)
+    _multiPlaybackControl?.renderAtTime(nextCursor, playbackStore.aircraft)
     if (playbackStore.status === 'playing') _schedulePlaybackTick()
-  }, delay)
+  }, PLAYBACK_TICK_MS)
 }
 
 function _stopPlaybackTimer(): void {
   if (_playbackTimer) { clearTimeout(_playbackTimer); _playbackTimer = null }
 }
 
-function _bisectAfter(snapshots: { ts: number }[], ts: number): number {
-  let lo = 0, hi = snapshots.length - 1, result = -1
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1
-    if (snapshots[mid].ts > ts) { result = mid; hi = mid - 1 }
-    else lo = mid + 1
-  }
-  return result
-}
 
 onMounted(() => {
   watch(userLocation, (loc) => {
