@@ -16,6 +16,7 @@
         >{{ tab.badge }}</span>
       </button>
     </div>
+
     <div id="map-sidebar-panes">
       <template v-if="!hideTabs">
         <div class="msb-pane" :class="{ 'msb-pane-active': activeTab === 'search' }" id="msb-pane-search">
@@ -45,6 +46,9 @@
 import { ref, computed, watch } from 'vue'
 import NotificationsPanel from './NotificationsPanel.vue'
 import TrackingPanel from './TrackingPanel.vue'
+import { useAppStore } from '@/stores/app'
+
+const appStore = useAppStore()
 
 const props = withDefaults(defineProps<{ hideTabs?: boolean }>(), { hideTabs: false })
 
@@ -478,5 +482,43 @@ body[data-domain="sdr"] #msb-pane-radio {
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.18);
     text-align: center;
+}
+
+#msb-map-controls {
+    display: flex;
+    flex-shrink: 0;
+    padding: 6px 10px;
+    gap: 6px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+#msb-tracks-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    height: 28px;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--font-primary);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+#msb-tracks-btn:hover {
+    color: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+#msb-tracks-btn.msb-tracks-btn-active {
+    color: var(--color-accent);
+    border-color: rgba(200, 255, 0, 0.3);
+    background: rgba(200, 255, 0, 0.06);
 }
 </style>

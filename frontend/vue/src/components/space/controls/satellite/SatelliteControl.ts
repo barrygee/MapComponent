@@ -56,6 +56,7 @@ export class SatelliteControl extends SentinelControlBase {
 
     private _passNotifEnabled   = false
     private _trackingNotifId:   string | null = null
+    private _onShowTracksChanged: ((e: Event) => void) | null = null
     private _passNotifTimeout:  ReturnType<typeof setTimeout> | null = null
     private _passRefreshInterval: ReturnType<typeof setInterval> | null = null
     private _lastFiredPassAos   = 0
@@ -100,6 +101,16 @@ export class SatelliteControl extends SentinelControlBase {
         this.setButtonActive(this.issVisible)
         if (this.map.isStyleLoaded()) this.initLayers()
         else this.map.once('style.load', () => this.initLayers())
+
+        this._onShowTracksChanged = (e: Event) => {
+            const show = (e as CustomEvent<{ show: boolean }>).detail.show
+            this.trackVisible = show
+            const trackVis = (this.issVisible && this.trackVisible) ? 'visible' : 'none'
+            ;['iss-track-orbit1', 'iss-track-orbit2'].forEach(id => {
+                try { this.map.setLayoutProperty(id, 'visibility', trackVis) } catch {}
+            })
+        }
+        window.addEventListener('sentinel:showTracksChanged', this._onShowTracksChanged)
     }
 
     protected handleClick(): void { this.toggleIss() }
@@ -117,6 +128,10 @@ export class SatelliteControl extends SentinelControlBase {
         this._hideLabel()
         if (this._passNotifTimeout)    { clearTimeout(this._passNotifTimeout);     this._passNotifTimeout = null }
         if (this._passRefreshInterval) { clearInterval(this._passRefreshInterval); this._passRefreshInterval = null }
+        if (this._onShowTracksChanged) {
+            window.removeEventListener('sentinel:showTracksChanged', this._onShowTracksChanged)
+            this._onShowTracksChanged = null
+        }
         super.onRemove()
     }
 
