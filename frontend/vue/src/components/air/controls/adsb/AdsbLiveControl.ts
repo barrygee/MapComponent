@@ -225,16 +225,10 @@ export class AdsbLiveControl implements maplibregl.IControl {
             if (this.map.getLayer('adsb-bracket')) this.map.setFilter('adsb-bracket', isolateFilter as maplibregl.FilterSpecification)
             if (this.map.getLayer('adsb-icons')) {
                 this.map.setFilter('adsb-icons', isolateFilter as maplibregl.FilterSpecification)
-                console.warn('[adsb] adsb-icons filter after set:', JSON.stringify(this.map.getFilter('adsb-icons')))
-                console.warn('[adsb] adsb-icons visibility:', this.map.getLayoutProperty('adsb-icons', 'visibility'))
-                if (this.labelsVisible) this.map.setLayoutProperty('adsb-icons', 'visibility', 'none')
+                // Keep icon visible in isolation mode even when labelsVisible (HTML markers replace symbols
+                // for the full fleet, but we still need the symbol for the isolated aircraft)
+                this.map.setLayoutProperty('adsb-icons', 'visibility', 'visible')
             }
-            setTimeout(() => {
-                if (this.map?.getLayer('adsb-icons')) {
-                    console.warn('[adsb] 200ms later — adsb-icons filter:', JSON.stringify(this.map.getFilter('adsb-icons')))
-                    console.warn('[adsb] 200ms later — adsb-icons visibility:', this.map.getLayoutProperty('adsb-icons', 'visibility'))
-                }
-            }, 200)
             return
         }
 
@@ -1604,10 +1598,12 @@ export class AdsbLiveControl implements maplibregl.IControl {
             const lineCoords: [number, number][] = points.map(p => [p.lon, p.lat])
             const interpCoords = this._interpolatedCoords(hex)
             if (interpCoords) lineCoords.push(interpCoords)
-            if (lineCoords.length >= 2) {
+            // Deduplicate consecutive identical coords to avoid zero-length segments
+            const dedupedCoords = lineCoords.filter((c, i) => i === 0 || c[0] !== lineCoords[i-1][0] || c[1] !== lineCoords[i-1][1])
+            if (dedupedCoords.length >= 2) {
                 lineFeatures.push({
                     type: 'Feature',
-                    geometry:   { type: 'LineString', coordinates: lineCoords },
+                    geometry:   { type: 'LineString', coordinates: dedupedCoords },
                     properties: { emerg: isEmerg, military: isMil, hex },
                 })
             }
