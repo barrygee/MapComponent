@@ -74,6 +74,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
     private _interpolatedFeatures: AircraftGeoFeature[] | null = null
 
     _selectedHex:   string | null = null
+    _isolatedHex:   string | null = null
     private _eventsAdded    = false
     _followEnabled  = false
 
@@ -193,7 +194,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
     private _applyTypeFilter(): void {
         if (!this.map) return
-        console.debug('[adsb] _applyTypeFilter allHidden=%s selectedHex=%s labelsVisible=%s visible=%s', this._allHidden, this._selectedHex, this.labelsVisible, this.visible)
+        console.debug('[adsb] _applyTypeFilter allHidden=%s selectedHex=%s isolatedHex=%s labelsVisible=%s visible=%s', this._allHidden, this._selectedHex, this._isolatedHex, this.labelsVisible, this.visible)
 
         const baseFilter  = ['any', ['>', ['get', 'alt_baro'], 0], ['>=', ['zoom'], 10]]
         const isGndExpr   = ['match', ['get', 'category'], ['C1', 'C2'], true, false]
@@ -216,6 +217,26 @@ export class AdsbLiveControl implements maplibregl.IControl {
             if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', 'visible')
         })
         if (this.map.getLayer('adsb-hit')) this.map.setLayoutProperty('adsb-hit', 'visibility', this.visible ? 'visible' : 'none')
+
+        // Isolation mode: show only the selected aircraft
+        if (this._isolatedHex) {
+            console.warn('[adsb] ISOLATING to hex=%s', this._isolatedHex)
+            const isolateFilter = ['==', ['get', 'hex'], this._isolatedHex]
+            if (this.map.getLayer('adsb-bracket')) this.map.setFilter('adsb-bracket', isolateFilter as maplibregl.FilterSpecification)
+            if (this.map.getLayer('adsb-icons')) {
+                this.map.setFilter('adsb-icons', isolateFilter as maplibregl.FilterSpecification)
+                console.warn('[adsb] adsb-icons filter after set:', JSON.stringify(this.map.getFilter('adsb-icons')))
+                console.warn('[adsb] adsb-icons visibility:', this.map.getLayoutProperty('adsb-icons', 'visibility'))
+                if (this.labelsVisible) this.map.setLayoutProperty('adsb-icons', 'visibility', 'none')
+            }
+            setTimeout(() => {
+                if (this.map?.getLayer('adsb-icons')) {
+                    console.warn('[adsb] 200ms later — adsb-icons filter:', JSON.stringify(this.map.getFilter('adsb-icons')))
+                    console.warn('[adsb] 200ms later — adsb-icons visibility:', this.map.getLayoutProperty('adsb-icons', 'visibility'))
+                }
+            }, 200)
+            return
+        }
 
         const typeFiltering = this._typeFilter !== 'all'
         const showGnd    = this.visible && !typeFiltering && !this._hideGroundVehicles
@@ -462,6 +483,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         this._hideStatusBar()
 
         this._selectedHex  = null
+        this._isolatedHex  = null
         this._followEnabled = false
 
         ;['adsb-live', 'adsb-trails-source', 'adsb-trail-line-source'].forEach(id => {
@@ -599,7 +621,9 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 if (!e.features || !e.features.length) return
                 _clickHandled = true
                 const hex = (e.features[0].properties as AircraftProperties).hex
+                console.warn('[adsb] aircraft clicked hex=%s layer=%s', hex, e.type)
                 this._selectedHex = hex
+                this._isolatedHex = hex
                 this._hideHoverTag()
                 this._applySelection()
             }
@@ -614,7 +638,11 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 if (this._followEnabled) return
                 if (this._selectedHex) {
                     const hits = this.map.queryRenderedFeatures(e.point, { layers: ['adsb-hit', 'adsb-icons'] })
-                    if (!hits.length) { this._selectedHex = null; this._applySelection() }
+                    if (!hits.length) {
+                        this._selectedHex = null
+                        this._isolatedHex = null
+                        this._applySelection()
+                    }
                 }
             })
 
@@ -838,6 +866,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         if (this._tagMarker) { this._tagMarker.remove(); this._tagMarker = null }
         this._tagHex = null
         this._selectedHex = null
+        this._isolatedHex = null
         this._trailHex = null
         this._saveTrackingState()
         this._applySelection()
@@ -1352,6 +1381,11 @@ export class AdsbLiveControl implements maplibregl.IControl {
                 if (this._callsignMarkers[hex]) { this._callsignMarkers[hex].remove(); delete this._callsignMarkers[hex] }
                 continue
             }
+            // Isolation mode: hide all markers except the isolated aircraft
+            if (this._isolatedHex && hex !== this._isolatedHex) {
+                if (this._callsignMarkers[hex]) { this._callsignMarkers[hex].remove(); delete this._callsignMarkers[hex] }
+                continue
+            }
             const lngLat  = this._interpolatedCoords(hex) || f.geometry.coordinates
             const pos2    = this._lastPositions[hex]
             const isDim   = pos2 ? (Date.now() - pos2.lastSeen) / 1000 >= 45 : false
@@ -1820,7 +1854,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
                             if (this._interpolatedFeatures) this._interpolatedFeatures = this._interpolatedFeatures.filter(f => f.properties.hex !== hex)
                             if (this._callsignMarkers[hex]) { this._callsignMarkers[hex].remove(); delete this._callsignMarkers[hex] }
                             if (this._selectedHex === hex) {
-                                this._selectedHex = null; this._followEnabled = false
+                                this._selectedHex = null; this._isolatedHex = null; this._followEnabled = false
                                 this._hideSelectedTag(); this._hideStatusBar()
                             }
                             if (this.map) { this._rebuildTrails(); this._interpolate() }
@@ -2050,6 +2084,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
     resumeLive(): void {
         this._geojson = { type: 'FeatureCollection', features: [] }
         this._selectedHex = null
+        this._isolatedHex = null
         this._tagHex = null
         if (this.visible && !this._pollInterval) this._startPolling()
     }
@@ -2114,6 +2149,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         this._tagHex = null
         this._hideStatusBar()
         this._selectedHex = null
+        this._isolatedHex = null
         this._followEnabled = false
         this._geojson          = { type: 'FeatureCollection', features: [] }
         this._trailsGeojson    = { type: 'FeatureCollection', features: [] }
