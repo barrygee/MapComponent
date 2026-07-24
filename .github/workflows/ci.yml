@@ -117,6 +117,32 @@ jobs:
       - name: Build (Vite)
         run: npm run build
 
+      # Gate: the committed frontend/spa-dist/ must match what this source builds.
+      #
+      # Every other gate here builds its own bundle and tests that, so a stale
+      # committed bundle passes all of them and only surfaces at runtime — the
+      # backend serves the committed directory in production (backend/main.py
+      # SPA_DIR), and docker compose bind-mounts it. That gap already shipped
+      # twice: #238's dB-label fix was merged without a rebuild and had to be
+      # re-released as #241, and #239 landed with its CSS change absent from the
+      # bundle.
+      #
+      # `npm run build` above uses emptyOutDir, so it has just regenerated the
+      # directory in place; any diff means the commit is missing its rebuild.
+      # The `:/` pathspec anchors to the repo root regardless of working-directory.
+      - name: Verify committed spa-dist matches this build
+        run: |
+          if [ -n "$(git status --porcelain -- ':/frontend/spa-dist')" ]; then
+            echo "::error::frontend/spa-dist/ is stale — it does not match a build of this branch's source."
+            echo ""
+            echo "Fix: cd frontend/vue && npm run build, then commit frontend/spa-dist/."
+            echo ""
+            echo "Drift:"
+            git status --short -- ':/frontend/spa-dist'
+            exit 1
+          fi
+          echo "Committed bundle matches the build output."
+
       # Hand the built bundle to the a11y job so it serves the exact artifact
       # this job produced instead of rebuilding. Output dir is repo-root-relative
       # (vite.config.ts outDir: ../../frontend/spa-dist), so upload from root.
