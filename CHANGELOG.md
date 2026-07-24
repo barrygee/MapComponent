@@ -1088,6 +1088,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #241 from barrygee/fix/sdr-db-label-gap
 - Merge pull request #242 from barrygee/fix/aara-label-rotation-3d
 - Merge pull request #240 from barrygee/feat/sdr-decode-mute-per-radio
+- Merge pull request #243 from barrygee/chore/override-vulnerable-transitive-deps
 
 ### Refactoring
 
@@ -1226,3 +1227,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Make scanner play button icon-only and match saved-ranges size (#140)
 - Dark-grey search inputs matching the SEARCH tab height (#141)
 - Match side-panel tab icon colours to air and space rails (#142)
+
+### Dependencies
+
+- Patch three high-severity transitive advisories
