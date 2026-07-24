@@ -311,6 +311,8 @@ export class AaraToggleControl extends SentinelControlBase {
   private _labelMarkers: maplibregl.Marker[] | null = null
   private _labelEdges: [LngLat, LngLat][] = []
   private _labelEls: HTMLDivElement[] = []
+  // Bound once so the same reference can be detached in onRemove.
+  private _onCameraMove = (): void => this._updateLabelRotations()
 
   constructor(airStore: AirStore) {
     super()
@@ -327,6 +329,11 @@ export class AaraToggleControl extends SentinelControlBase {
 
   protected onInit(): void {
     this.setButtonActive(this.visible)
+    // Labels are HTML markers, so their rotation is screen-space and has to be
+    // recomputed whenever the camera changes — pitching into 3D (or rotating the
+    // bearing) changes the on-screen angle of each zone's long edge, and without
+    // this the text keeps its flat, north-up angle and sits skewed across the box.
+    this.map.on('move', this._onCameraMove)
     if (this.map.isStyleLoaded()) {
       this.initLayers()
     } else {
@@ -339,6 +346,7 @@ export class AaraToggleControl extends SentinelControlBase {
   }
 
   onRemove(): void {
+    this.map?.off('move', this._onCameraMove)
     if (this._labelMarkers) this._labelMarkers.forEach((m) => m.remove())
     super.onRemove()
   }
@@ -393,6 +401,9 @@ export class AaraToggleControl extends SentinelControlBase {
       })
 
       if (this.visible) this._labelMarkers.forEach((m) => m.addTo(this.map))
+      // computeTextRotate only knows the flat lng/lat angle; correct it against
+      // the current camera straight away rather than waiting for the first move.
+      this._updateLabelRotations()
     }
   }
 
@@ -415,8 +426,11 @@ export class AaraToggleControl extends SentinelControlBase {
       if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', layerVisibility)
     })
     if (this._labelMarkers) {
-      if (this.visible) this._labelMarkers.forEach((m) => m.addTo(this.map))
-      else this._labelMarkers.forEach((m) => m.remove())
+      if (this.visible) {
+        this._labelMarkers.forEach((m) => m.addTo(this.map))
+        // The camera may have moved while the labels were detached.
+        this._updateLabelRotations()
+      } else this._labelMarkers.forEach((m) => m.remove())
     }
     this.setButtonActive(this.visible)
     this._airStore.setOverlay('aara', this.visible)

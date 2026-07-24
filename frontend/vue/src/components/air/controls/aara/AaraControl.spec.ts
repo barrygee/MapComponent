@@ -43,13 +43,17 @@ interface FakeMap {
   addLayer: ReturnType<typeof vi.fn>
   setLayoutProperty: ReturnType<typeof vi.fn>
   project: ReturnType<typeof vi.fn>
+  on: ReturnType<typeof vi.fn>
+  off: ReturnType<typeof vi.fn>
   styleLoadHandlers: Array<() => void>
+  moveHandlers: Array<() => void>
   sources: Set<string>
   layers: Set<string>
 }
 
 function fakeMap(options: { styleLoaded?: boolean } = {}): FakeMap {
   const styleLoadHandlers: Array<() => void> = []
+  const moveHandlers: Array<() => void> = []
   const sources = new Set<string>()
   const layers = new Set<string>()
   const addSource = vi.fn((id: string) => sources.add(id))
@@ -57,11 +61,21 @@ function fakeMap(options: { styleLoaded?: boolean } = {}): FakeMap {
   const setLayoutProperty = vi.fn()
   // Identity-ish projection: lng→x, lat→y, so rotation maths run on real data.
   const project = vi.fn((coords: [number, number]) => ({ x: coords[0], y: coords[1] }))
+  const on = vi.fn((event: string, handler: () => void) => {
+    if (event === 'move') moveHandlers.push(handler)
+  })
+  const off = vi.fn((event: string, handler: () => void) => {
+    if (event !== 'move') return
+    const index = moveHandlers.indexOf(handler)
+    if (index !== -1) moveHandlers.splice(index, 1)
+  })
   const map = {
     isStyleLoaded: vi.fn(() => options.styleLoaded ?? true),
     once: vi.fn((event: string, handler: () => void) => {
       if (event === 'style.load') styleLoadHandlers.push(handler)
     }),
+    on,
+    off,
     getSource: vi.fn((id: string) => (sources.has(id) ? { id } : undefined)),
     getLayer: vi.fn((id: string) => (layers.has(id) ? { id } : undefined)),
     addSource,
@@ -75,7 +89,10 @@ function fakeMap(options: { styleLoaded?: boolean } = {}): FakeMap {
     addLayer,
     setLayoutProperty,
     project,
+    on,
+    off,
     styleLoadHandlers,
+    moveHandlers,
     sources,
     layers,
   }
@@ -259,6 +276,81 @@ describe('AaraToggleControl._updateLabelRotations', () => {
   })
 })
 
+describe('AaraToggleControl label rotation follows the camera', () => {
+  // Projections that ignore the zones' real geometry, so the expected angle is
+  // fixed by the camera alone: any label still carrying its flat lng/lat angle
+  // (the 3D-pitch bug) fails these outright.
+  const flattenToOneScreenRow = (coords: [number, number]) => ({ x: coords[0], y: 0 })
+  const collapseToOneScreenColumn = (coords: [number, number]) => ({ x: 0, y: coords[1] })
+
+  function labelTransforms(): string[] {
+    return markerRegistry.instances.map(
+      (marker) => marker.options.element.querySelector('div')!.style.transform,
+    )
+  }
+
+  // A label's on-screen orientation is its rotation modulo 180° — the control
+  // emits whichever of the two equivalent values keeps the text reading
+  // left-to-right (e.g. an east→west edge comes out as 360°, not 0°).
+  function labelOrientations(): number[] {
+    return labelTransforms().map((transform) => {
+      const degrees = Number(/^rotate\((-?[\d.]+)deg\)$/.exec(transform)![1])
+      return ((degrees % 180) + 180) % 180
+    })
+  }
+
+  it('rotates labels to the projected edge angle as soon as they are built', () => {
+    const control = new AaraToggleControl(airStore)
+    const map = fakeMap()
+    // Camera is set up before onAdd, so this covers the initial rotation pass.
+    map.project.mockImplementation(collapseToOneScreenColumn)
+
+    control.onAdd(map.map)
+
+    // Every edge projects vertically, whatever the zone's real lng/lat bearing.
+    expect(labelOrientations()).toEqual(Array(ZONE_COUNT).fill(90))
+  })
+
+  it('re-rotates labels when the camera moves (pitch/bearing change)', () => {
+    const control = new AaraToggleControl(airStore)
+    const map = fakeMap()
+    control.onAdd(map.map)
+    expect(map.on).toHaveBeenCalledWith('move', expect.any(Function))
+    expect(map.moveHandlers).toHaveLength(1)
+
+    map.project.mockImplementation(flattenToOneScreenRow)
+    map.moveHandlers[0]!()
+
+    expect(labelOrientations()).toEqual(Array(ZONE_COUNT).fill(0))
+  })
+
+  it('re-rotates labels that were re-shown after the camera moved while hidden', () => {
+    const control = new AaraToggleControl(airStore)
+    const map = fakeMap()
+    control.onAdd(map.map)
+
+    control.handleClickPublic() // hide
+    // Camera moves while the labels are detached; no move handler is fired, so
+    // only the toggle-on path can bring the rotations back in line.
+    map.project.mockImplementation(flattenToOneScreenRow)
+    control.handleClickPublic() // show
+
+    expect(labelOrientations()).toEqual(Array(ZONE_COUNT).fill(0))
+  })
+
+  it('leaves the rotations untouched when the labels are hidden', () => {
+    const control = new AaraToggleControl(airStore)
+    const map = fakeMap()
+    control.onAdd(map.map)
+    const beforeHiding = labelTransforms()
+
+    map.project.mockImplementation(flattenToOneScreenRow)
+    control.handleClickPublic() // hide — must not run a rotation pass
+
+    expect(labelTransforms()).toEqual(beforeHiding)
+  })
+})
+
 describe('AaraToggleControl.onRemove', () => {
   it('removes every label marker and detaches the container', () => {
     const control = new AaraToggleControl(airStore)
@@ -268,6 +360,17 @@ describe('AaraToggleControl.onRemove', () => {
     control.onRemove()
     markerRegistry.instances.forEach((marker) => expect(marker.remove).toHaveBeenCalled())
     expect(element.parentNode).toBeNull()
+  })
+
+  it('detaches the camera-move listener so the removed control stops reprojecting', () => {
+    const control = new AaraToggleControl(airStore)
+    const map = fakeMap()
+    control.onAdd(map.map)
+
+    control.onRemove()
+
+    expect(map.off).toHaveBeenCalledWith('move', expect.any(Function))
+    expect(map.moveHandlers).toHaveLength(0)
   })
 
   it('is a safe no-op when removed before any markers were built', () => {
