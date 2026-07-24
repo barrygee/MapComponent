@@ -164,9 +164,14 @@ mx.text = function (
       // Match the font sigplot draws with so measureText() is accurate.
       if (Mx.font?.font) measureContext.font = Mx.font.font
       const labelWidthPx = measureContext.measureText(lbl).width
-      // Gap between the label's right edge and the spectrum, and the minimum
-      // gap from the canvas's left edge (clamp keeps the widest label on-canvas).
-      const gapToSpectrumPx = 6
+      // Gap between the label's right edge and the spectrum. Roughly 1.4
+      // characters at the plot's 12px font — enough breathing room that the
+      // numbers don't read as stuck to the axis. The gutter is text_w * 4.5
+      // (~39px, installMarginTweaks) and the widest label ("-120") measures
+      // ~21px, so this still leaves the label clear of the canvas edge.
+      const gapToSpectrumPx = 12
+      // Minimum gap from the canvas's left edge (clamp keeps the widest label
+      // on-canvas if a narrow panel shrinks the gutter below the label width).
       const minGapFromLeftEdgePx = 4
       x = Math.max(minGapFromLeftEdgePx, Mx.l - gapToSpectrumPx - labelWidthPx)
     }

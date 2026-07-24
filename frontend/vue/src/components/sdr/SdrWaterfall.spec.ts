@@ -629,7 +629,7 @@ describe('SdrWaterfall — mx.drawaxis / mx.text overrides', () => {
     return calls[calls.length - 1]?.[1] as number
   }
 
-  it('right-aligns a y-axis dB label to a 6px gap left of the data-box edge using measured width', () => {
+  it('right-aligns a y-axis dB label to a 12px gap left of the data-box edge using measured width', () => {
     const measureText = vi.fn(() => ({ width: 20 }))
     const context = { font: '', measureText }
     const canvas = { getContext: vi.fn(() => context) }
@@ -651,8 +651,8 @@ describe('SdrWaterfall — mx.drawaxis / mx.text overrides', () => {
     // Measured in sigplot's own font so the width is accurate.
     expect(context.font).toBe('12px Barlow')
     expect(measureText).toHaveBeenCalledWith('-30')
-    // x = Mx.l - gapToSpectrum(6) - width(20) = 30.
-    expect(lastDrawX()).toBe(30)
+    // x = Mx.l - gapToSpectrum(12) - width(20) = 24.
+    expect(lastDrawX()).toBe(24)
   })
 
   it('clamps a wide y-axis label to the minimum left-edge gap so it stays on-canvas', () => {
@@ -671,7 +671,7 @@ describe('SdrWaterfall — mx.drawaxis / mx.text overrides', () => {
       100,
       '-128',
     )
-    // max(minGapFromLeftEdge(4), 56 - 6 - 100) = 4.
+    // max(minGapFromLeftEdge(4), 56 - 12 - 100) = 4.
     expect(lastDrawX()).toBe(4)
   })
 
@@ -687,8 +687,8 @@ describe('SdrWaterfall — mx.drawaxis / mx.text overrides', () => {
     )
     expect(context.font).toBe('')
     expect(context.measureText).toHaveBeenCalledWith('0')
-    // x = 56 - 6 - 10 = 40.
-    expect(lastDrawX()).toBe(40)
+    // x = 56 - 12 - 10 = 34.
+    expect(lastDrawX()).toBe(34)
   })
 })
 
