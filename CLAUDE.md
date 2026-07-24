@@ -28,7 +28,7 @@ You only need `--build` when **dependencies** change (`pyproject.toml` / `packag
 Note: `frontend/spa-dist/` (the built bundle) **is committed** and is what the backend serves in production — rebuild and commit it when shipping a frontend change.
 
 ## Test & lint
-Run backend commands from the repo **root** (tests need `pythonpath=.`), and pass `--project backend` so uv uses the backend venv — the project's `pyproject.toml` lives in `backend/`, so a bare `uv run` from the root resolves to the wrong interpreter (an unrelated `~/.venv` / system pytest).
+Run backend commands from the repo **root** (tests need `pythonpath=.`), and pass `--project backend` so uv uses the backend venv — the project's `pyproject.toml` lives in `backend/`, so a bare `uv run` from the root resolves to the wrong interpreter (an unrelated `~/.venv` / system pytest). If you get `ERROR: Missing required plugins: pytest-asyncio`, that is the guard in `pytest.ini` telling you pytest is running outside the backend venv — fix the interpreter rather than installing the plugin globally.
 ```bash
 # Backend (root)
 uv run --project backend pytest                                  # all backend tests
