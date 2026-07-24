@@ -1091,6 +1091,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #240 from barrygee/feat/sdr-decode-mute-per-radio
 - Merge pull request #243 from barrygee/chore/override-vulnerable-transitive-deps
 - Merge pull request #244 from barrygee/chore/pytest-required-plugins-guard
+- Merge pull request #246 from barrygee/ci/verify-committed-spa-dist
 
 ### Refactoring
 
@@ -1202,6 +1203,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Bump Node 20 actions to Node 24 versions
 - Regenerate on merge to main instead of per-PR
 - Split frontend-vue job into themed parallel jobs (#236)
+- Fail the build when the committed spa-dist is stale
 
 ### Styling
 
