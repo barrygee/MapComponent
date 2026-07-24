@@ -655,14 +655,14 @@ defineExpose({ reload })
   height: 40px;
   flex: 0 0 auto;
   padding: 0 20px 0 24px;
-  background: #000;
+  background: var(--color-search-field-bg);
   box-sizing: border-box;
   transition: background 0.12s;
 }
 
 /* Drop the green a11y focus ring (assets/a11y.css :focus-visible); the input row
-   stays black on focus. The accent text caret is the visible focus cue for this
-   text field (WCAG 2.4.7). */
+   keeps its own fill on focus. The accent text caret is the visible focus cue
+   for this text field (WCAG 2.4.7). */
 .sdr-recordings-search-input:focus-visible {
   outline: none !important;
 }

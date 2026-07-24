@@ -14,6 +14,12 @@
        the logo mark's outer ring (frontend/assets/logo.svg); keep the two in
        sync (guarded by designTokens.spec.ts). */
     --color-button-bg: #26292e;
+    /* Search/filter field rows (Air + Space sidebar filters, SDR recordings).
+       A translucent black scrim rather than a fixed hex so the field always
+       reads one consistent step darker than whichever panel surface hosts it
+       — the sidebar and the SDR panel are different greys. Flat #000 made the
+       rows read as holes punched in the panel. */
+    --color-search-field-bg: rgba(0, 0, 0, 0.32);
     --font-primary: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
     --font-condensed: 'Barlow Condensed', 'Helvetica Neue', Arial, sans-serif;
     --nav-height: calc(68px + env(safe-area-inset-top, 0px));
