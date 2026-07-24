@@ -313,6 +313,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Remove dead legacy jest suite and wiring (#235)
 - Rebuild bundle for the widened dB-label gap
 - Rebuild bundle for #239, #240, #241, #242
+- Fail fast when pytest runs outside the backend venv
 
 ### Other
 
@@ -1089,6 +1090,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #242 from barrygee/fix/aara-label-rotation-3d
 - Merge pull request #240 from barrygee/feat/sdr-decode-mute-per-radio
 - Merge pull request #243 from barrygee/chore/override-vulnerable-transitive-deps
+- Merge pull request #244 from barrygee/chore/pytest-required-plugins-guard
 
 ### Refactoring
 
