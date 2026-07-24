@@ -11,11 +11,38 @@ import type { SdrMode } from '@/stores/sdr'
 let _ctx: AudioContext | null = null
 let _worklet: AudioWorkletNode | null = null
 let _gain: GainNode | null = null
-// User-set output volume and a transient mute applied while a saved recording is
-// playing back. The effective gain is _volume unless _liveMuted, then 0 — the
-// IQ stream (and therefore signal meter / waterfall / spectrum) keeps running.
+// User-set output volume.
 let _volume = 1.0
-let _liveMuted = false
+
+/** Owner of a live mute. Each owner mutes and unmutes independently. */
+export type LiveMuteReason = 'playback' | 'digital' | 'aprs'
+/**
+ * What a mute applies to: a specific radio id, or 'all' for "whichever radio is
+ * currently audible".
+ */
+export type LiveMuteTarget = number | 'all'
+
+// Live-mute state, keyed by target and owner. Two things make the extra
+// structure necessary:
+//   • Multiple independent owners (a saved recording playing back, digital-voice
+//     decode, APRS decode). With one boolean, whichever unmuted last silently
+//     lifted the others' mute.
+//   • Decode owners must mute only THEIR radio. Decoding on one dongle must
+//     never silence another dongle the user is listening to — today only the
+//     selected radio is audible, but the keys are already per-radio so several
+//     concurrent audio streams need no rework here.
+// Recording playback targets 'all': it mutes whatever is live, whichever radio
+// that is. The effective gain is _volume unless the driven radio is muted, then
+// 0 — the IQ stream (and so the signal meter / waterfall / spectrum) keeps
+// running either way.
+const _liveMuteReasons = new Map<LiveMuteTarget, Set<LiveMuteReason>>()
+
+/** Whether audio for `radioId` is muted by any owner ('all' owners included). */
+function _isRadioLiveMuted(radioId: number | null): boolean {
+  if ((_liveMuteReasons.get('all')?.size ?? 0) > 0) return true
+  if (radioId == null) return false
+  return (_liveMuteReasons.get(radioId)?.size ?? 0) > 0
+}
 let _iqSocket: WebSocket | null = null
 let _radioId: number | null = null
 let _ready = false
@@ -350,7 +377,7 @@ async function _doInitAudio() {
       outputChannelCount: [1],
     })
     _gain = _ctx.createGain()
-    _gain.gain.value = _liveMuted ? 0 : _volume
+    _gain.gain.value = _isRadioLiveMuted(_radioId) ? 0 : _volume
     _worklet.connect(_gain)
     _gain.connect(_ctx.destination)
     _worklet.port.onmessage = (ev: MessageEvent) => {
@@ -419,6 +446,9 @@ export function useSdrAudio() {
 
   function setRadioId(id: number) {
     _radioId = id
+    // Which radio is driven decides whose mute applies, so re-evaluate the gain
+    // rather than leaving the previous radio's mute in force.
+    applyGain()
     if (_ready) _openIqSocket(id)
   }
 
@@ -432,7 +462,7 @@ export function useSdrAudio() {
   }
 
   function applyGain() {
-    if (_gain) _gain.gain.value = _liveMuted ? 0 : _volume
+    if (_gain) _gain.gain.value = _isRadioLiveMuted(_radioId) ? 0 : _volume
   }
 
   function setVolume(volume: number) {
@@ -440,12 +470,40 @@ export function useSdrAudio() {
     applyGain()
   }
 
-  // Mute the live SDR audio (e.g. while a recording plays) without touching
-  // the IQ stream, so signal/waterfall/spectrum keep updating. Restoring unmutes
-  // to the user's current volume.
-  function setLiveMuted(muted: boolean) {
-    _liveMuted = muted
+  /**
+   * Mute or unmute the live SDR audio without touching the IQ stream, so the
+   * signal meter / waterfall / spectrum keep updating. Unmuting restores the
+   * user's current volume.
+   *
+   * @param muted  Whether this owner wants the audio muted.
+   * @param reason Which owner is asking — owners never lift each other's mute.
+   * @param target The radio to mute, or 'all' for whichever radio is audible
+   *   (recording playback). Decode owners pass their own radio id so another
+   *   radio the user is listening to stays audible.
+   */
+  function setLiveMuted(
+    muted: boolean,
+    reason: LiveMuteReason = 'playback',
+    target: LiveMuteTarget = 'all',
+  ) {
+    // An owner holds at most one mute at a time, so drop this reason everywhere
+    // before re-applying it. That also covers the owner moving between radios
+    // (APRS restarted on another dongle) without stranding a mute on the old one.
+    for (const [key, reasons] of _liveMuteReasons) {
+      reasons.delete(reason)
+      if (reasons.size === 0) _liveMuteReasons.delete(key)
+    }
+    if (muted) {
+      const reasons = _liveMuteReasons.get(target) ?? new Set<LiveMuteReason>()
+      reasons.add(reason)
+      _liveMuteReasons.set(target, reasons)
+    }
     applyGain()
+  }
+
+  /** Whether audio for `radioId` is currently muted by any owner. */
+  function isRadioLiveMuted(radioId: number | null) {
+    return _isRadioLiveMuted(radioId)
   }
 
   function setBandwidthHz(hz: number) {
@@ -576,6 +634,7 @@ export function useSdrAudio() {
     setSquelch,
     setVolume,
     setLiveMuted,
+    isRadioLiveMuted,
     setBandwidthHz,
     setOffsetHz,
     startRecording,

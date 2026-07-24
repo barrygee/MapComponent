@@ -245,9 +245,11 @@
                   DMR
                 </BasePillToggle>
                 <!-- APRS runs in the BACKGROUND (independent of the analog view),
-                     so it needs a selected radio but not `playing`. It is mutually
-                     exclusive with voice decode on this radio (one channel), hence
-                     each disables the other. -->
+                     so it needs a selected radio but not `playing`. Its active
+                     state is per-radio (`aprsEnabled` = "decoding on the VIEWED
+                     radio"), so switching radios shows this radio's state, not
+                     the global one. It is mutually exclusive with voice decode on
+                     this radio (one channel), hence each disables the other. -->
                 <BasePillToggle
                   class="sdr-mode-pill sdr-digital-btn"
                   :active="aprsEnabled"
@@ -731,6 +733,7 @@ useDocumentEvent('sentinel:sidebar-state', (e: Event) => {
 useDocumentEvent('sentinel:config-uploaded', () => {
   void _sdrStore().hydrateAutoCenterFromDb()
   void _sdrStore().hydrateResumeDelaySecFromDb()
+  void _sdrStore().hydrateMuteAudioWhileDecodingFromDb()
 })
 
 const recordingsSectionRef = ref<InstanceType<typeof SdrRecordingsSection> | null>(null)
@@ -1123,12 +1126,43 @@ const {
 // it is driven by the store's HTTP start/stop endpoints rather than the spectrum
 // WS. The panel still opens the decode event socket so the waterfall panels show
 // the packets, and clears the decode buffers so the dock switches cleanly.
-const aprsEnabled = computed(() => _sdrStore().aprsEnabled)
+// Whether APRS is decoding on the radio currently being VIEWED. The store's
+// aprsEnabled is global (decode continues in the background whichever radio the
+// panel shows), so the button must key off the decoding radio instead —
+// otherwise it stays lit after switching radios and a click would stop decode on
+// a radio that was never decoding.
+const aprsEnabled = computed(
+  () => _sdrStore().aprsRadioId != null && _sdrStore().aprsRadioId === selectedRadioId.value,
+)
+
+// APRS traffic is data, not speech, so the radio decoding it is muted while it
+// does — but ONLY that radio (store.aprsRadioId, set when the backend accepts
+// the start). Any other radio the user has tuned to a voice frequency keeps its
+// audio. Honours the "Mute Audio While Decoding" setting, and re-runs when the
+// setting, the decoding radio or the viewed radio changes so it applies live.
+// `immediate` so a reload with APRS already running mutes without a toggle.
+watch(
+  [
+    () => _sdrStore().aprsRadioId,
+    () => _sdrStore().muteAudioWhileDecoding,
+    selectedRadioId,
+    playing,
+  ],
+  () => {
+    const decodingRadioId = _sdrStore().aprsRadioId
+    const shouldMute = decodingRadioId != null && _sdrStore().muteAudioWhileDecoding
+    sdrAudio.setLiveMuted(shouldMute, 'aprs', decodingRadioId ?? 'all')
+  },
+  { immediate: true },
+)
 
 async function toggleAprs() {
   const radioId = selectedRadioId.value
   if (!radioId) return
-  const next = !_sdrStore().aprsEnabled
+  // Toggling acts on the VIEWED radio: stop only when it is the one decoding,
+  // otherwise start here. The backend runs a single APRS bridge, so starting on
+  // another radio hands decode over rather than running two.
+  const next = !aprsEnabled.value
   _sdrStore().setAprsEnabled(next)
   _sdrStore().clearDecode()
   if (next) {
@@ -1895,6 +1929,13 @@ onMounted(() => {
   // user's persisted value even if the Settings SDR panel hasn't been opened
   // yet in this session.
   void _sdrStore().hydrateResumeDelaySecFromDb()
+
+  // The backend resumes APRS decode on the persisted radio at startup, so the DB
+  // — not the localStorage cache — is the truth about which radio is decoding
+  // (and therefore which one must stay muted) after a reload. Same for the
+  // decode-mute setting, which the Settings panel may never have been opened to.
+  void _sdrStore().hydrateAprsFromDb()
+  void _sdrStore().hydrateMuteAudioWhileDecodingFromDb()
 
   sdrAudio.onSquelchChange(onSquelchChangeCallback)
   sdrAudio.onPower(updateSignalBar)

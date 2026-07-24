@@ -1,5 +1,6 @@
 import { computed, watch, type Ref } from 'vue'
 import type { useSdrStore } from '@/stores/sdr'
+import type { LiveMuteReason, LiveMuteTarget } from '@/composables/useSdrAudio'
 
 /**
  * Digital decode (dsd-fme sidecar) + trunk tracking reconciliation, extracted
@@ -24,7 +25,7 @@ export interface UseSdrDigitalDecodeOptions {
   /** useSdrDecode's stop — closes the decode sockets. */
   stopDecode: () => void
   /** Mutes/unmutes the analog audio path (digital channels are noise to the ear). */
-  setLiveMuted: (muted: boolean) => void
+  setLiveMuted: (muted: boolean, reason?: LiveMuteReason, target?: LiveMuteTarget) => void
 }
 
 /**
@@ -47,10 +48,27 @@ export function useSdrDigitalDecode(options: UseSdrDigitalDecodeOptions) {
   // Mirrors the store toggle so the DIGITAL button reflects (and survives) it.
   const digitalEnabled = computed(() => _sdrStore().digitalEnabled)
 
+  /**
+   * Mute the analog audio of the radio that is decoding — and only that radio,
+   * so a second dongle tuned to a voice channel stays audible. Honours the
+   * "Mute Audio While Decoding" setting, and re-runs whenever the setting, the
+   * toggle or the decoding radio changes so a change applies mid-decode.
+   */
+  function applyDigitalMute() {
+    const shouldMute =
+      digitalEnabled.value && _sdrStore().muteAudioWhileDecoding && selectedRadioId.value != null
+    setLiveMuted(shouldMute, 'digital', selectedRadioId.value ?? 'all')
+  }
+  watch(
+    [digitalEnabled, () => _sdrStore().muteAudioWhileDecoding, selectedRadioId],
+    applyDigitalMute,
+  )
+
   // Turn digital decoding on/off while the radio is running. Enabling tells the
   // backend to start the decode bridge (via the control socket), opens the decode
-  // + decoded-audio sockets, and mutes the analog audio (the digital channel is
-  // just noise to the ear). Disabling reverses all of it.
+  // + decoded-audio sockets, and mutes this radio's analog audio (the digital
+  // channel is just noise to the ear) unless the user has turned that setting
+  // off. Disabling reverses all of it.
   function setDigital(on: boolean) {
     _sdrStore().setDigitalEnabled(on)
     if (on) {
@@ -63,11 +81,11 @@ export function useSdrDigitalDecode(options: UseSdrDigitalDecodeOptions) {
         mode: currentMode.value,
       })
       if (selectedRadioId.value != null) startDecode(selectedRadioId.value)
-      setLiveMuted(true)
+      applyDigitalMute()
     } else {
       sendCmd({ cmd: 'digital_decode', enabled: false })
       stopDecode()
-      setLiveMuted(false)
+      applyDigitalMute()
       _sdrStore().clearDecode()
     }
   }

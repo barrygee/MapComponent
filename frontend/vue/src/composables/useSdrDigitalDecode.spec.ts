@@ -55,7 +55,8 @@ describe('useSdrDigitalDecode — digital decode', () => {
       mode: 'NFM',
     })
     expect(startDecode).toHaveBeenCalledWith(3)
-    expect(setLiveMuted).toHaveBeenCalledWith(true)
+    // Muted under the 'digital' reason and scoped to the decoding radio only.
+    expect(setLiveMuted).toHaveBeenCalledWith(true, 'digital', 3)
   })
 
   it('enabling digital without a selected radio skips opening the decode sockets', () => {
@@ -73,7 +74,7 @@ describe('useSdrDigitalDecode — digital decode', () => {
     expect(store.digitalEnabled).toBe(false)
     expect(sendCmd).toHaveBeenCalledWith({ cmd: 'digital_decode', enabled: false })
     expect(stopDecode).toHaveBeenCalledTimes(1)
-    expect(setLiveMuted).toHaveBeenCalledWith(false)
+    expect(setLiveMuted).toHaveBeenCalledWith(false, 'digital', 3)
   })
 
   it('toggleDigital flips the store state', () => {
@@ -83,6 +84,48 @@ describe('useSdrDigitalDecode — digital decode', () => {
     expect(store.digitalEnabled).toBe(true)
     decode.toggleDigital()
     expect(store.digitalEnabled).toBe(false)
+  })
+
+  it('leaves audio alone when "mute audio while decoding" is off', () => {
+    const { decode, setLiveMuted } = createHarness()
+    useSdrStore().setMuteAudioWhileDecoding(false)
+    setLiveMuted.mockClear()
+    decode.setDigital(true)
+    expect(setLiveMuted).toHaveBeenCalledWith(false, 'digital', 3)
+    expect(setLiveMuted).not.toHaveBeenCalledWith(true, 'digital', 3)
+  })
+
+  it('applies the mute setting live while decode is already running', async () => {
+    const { decode, setLiveMuted } = createHarness()
+    const store = useSdrStore()
+    decode.setDigital(true)
+    setLiveMuted.mockClear()
+
+    store.setMuteAudioWhileDecoding(false)
+    await nextTick()
+    expect(setLiveMuted).toHaveBeenLastCalledWith(false, 'digital', 3)
+
+    store.setMuteAudioWhileDecoding(true)
+    await nextTick()
+    expect(setLiveMuted).toHaveBeenLastCalledWith(true, 'digital', 3)
+  })
+
+  it('re-targets the mute at the radio in use when the selection changes', async () => {
+    const selectedRadioId = ref<number | null>(3)
+    const { decode, setLiveMuted } = createHarness({ selectedRadioId })
+    decode.setDigital(true)
+    setLiveMuted.mockClear()
+
+    selectedRadioId.value = 7
+    await nextTick()
+    expect(setLiveMuted).toHaveBeenLastCalledWith(true, 'digital', 7)
+  })
+
+  it('falls back to the global target when no radio is selected', () => {
+    const { decode, setLiveMuted } = createHarness({ selectedRadioId: ref<number | null>(null) })
+    decode.setDigital(true)
+    // Nothing to scope the mute to, and nothing decoding either — unmute globally.
+    expect(setLiveMuted).toHaveBeenCalledWith(false, 'digital', 'all')
   })
 })
 

@@ -627,6 +627,15 @@ const ALL_SETTINGS: SettingItem[] = [
   {
     section: 'sdr',
     sectionLabel: 'SDR',
+    id: 'sdr-decode-mute-toggle',
+    label: 'Mute Audio While Decoding',
+    desc: 'When ON, a radio’s analog audio is muted while that radio decodes digital voice (DMR/P25) or APRS — the raw channel is noise, not speech. Only the decoding radio is muted; any other radio you are listening to keeps its audio. Turn OFF to keep hearing the analog demod during decode. On by default.',
+    type: 'sdr-decode-mute-toggle',
+    groupLabel: 'DECODING',
+  },
+  {
+    section: 'sdr',
+    sectionLabel: 'SDR',
     id: 'sdr-frequencies-file',
     label: 'Frequencies & Groups (JSON)',
     desc: 'Bulk-edit frequency groups, stored frequencies, and search ranges as raw JSON. Saved to backend/data/sdr_frequencies.json and the database.',

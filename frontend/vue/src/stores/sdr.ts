@@ -489,6 +489,84 @@ export const useSdrStore = defineStore('sdr', () => {
     } catch {}
   }
 
+  // Which radio is decoding APRS (null = none). The backend runs at most one
+  // APRS bridge (get_or_create_aprs_bridge stops any other) and persists the
+  // radio in `sdr/aprs_radio_id`, so this mirrors it. Needed because APRS decode
+  // mutes ONLY its own radio's audio — another radio the user is listening to
+  // must stay audible. localStorage is the fast-path cache (same pattern as
+  // aprsEnabled) so the mute is right on the first frame after a reload.
+  function _readAprsRadioId(): number | null {
+    try {
+      const raw = parseInt(localStorage.getItem('sdrAprsRadioId') || '', 10)
+      return Number.isFinite(raw) ? raw : null
+    } catch {
+      return null
+    }
+  }
+  const aprsRadioId = ref<number | null>(_readAprsRadioId())
+  function setAprsRadioId(radioId: number | null) {
+    aprsRadioId.value = radioId
+    try {
+      if (radioId == null) localStorage.removeItem('sdrAprsRadioId')
+      else localStorage.setItem('sdrAprsRadioId', String(radioId))
+    } catch {}
+  }
+
+  /**
+   * Reconcile the APRS decode state with the database. The backend resumes the
+   * persisted APRS radio on startup (resume_persisted_aprs), so after a reload
+   * the DB — not localStorage — is the truth about which radio is decoding.
+   */
+  async function hydrateAprsFromDb(): Promise<void> {
+    try {
+      const res = await fetch('/api/settings/sdr')
+      if (!res.ok) return
+      const data = await res.json()
+      const persistedRadioId = data?.aprs_radio_id
+      const nextRadioId = typeof persistedRadioId === 'number' ? persistedRadioId : null
+      if (nextRadioId !== aprsRadioId.value) setAprsRadioId(nextRadioId)
+      if ((nextRadioId !== null) !== aprsEnabled.value) setAprsEnabled(nextRadioId !== null)
+    } catch {
+      /* offline / transient — keep the cached value */
+    }
+  }
+
+  // ── Decode audio muting ───────────────────────────────────────────────────
+  // Settings → SDR → DECODING → "Mute Audio While Decoding". When ON (the
+  // default, and the behaviour before this setting existed) the analog audio of
+  // a radio is muted while that radio decodes digital voice or APRS — the raw
+  // channel is noise to the ear. Lives in the `sdr` settings namespace;
+  // localStorage is the fast-path cache so the first render after load is
+  // correct before the async settings fetch resolves. Absent/invalid ⇒ ON, so
+  // existing installs keep muting.
+  function _readMuteAudioWhileDecoding(): boolean {
+    try {
+      return localStorage.getItem('sdrMuteAudioWhileDecoding') !== '0'
+    } catch {
+      return true
+    }
+  }
+  const muteAudioWhileDecoding = ref<boolean>(_readMuteAudioWhileDecoding())
+  function setMuteAudioWhileDecoding(on: boolean) {
+    muteAudioWhileDecoding.value = on
+    try {
+      localStorage.setItem('sdrMuteAudioWhileDecoding', on ? '1' : '0')
+    } catch {}
+  }
+  async function hydrateMuteAudioWhileDecodingFromDb(): Promise<void> {
+    try {
+      const res = await fetch('/api/settings/sdr')
+      if (!res.ok) return
+      const data = await res.json()
+      const persisted = data?.muteAudioWhileDecoding
+      if (typeof persisted === 'boolean' && persisted !== muteAudioWhileDecoding.value) {
+        setMuteAudioWhileDecoding(persisted)
+      }
+    } catch {
+      /* offline / transient — keep the cached value */
+    }
+  }
+
   // Which decoded-event stream the dock is showing for the viewed radio. APRS
   // when APRS decode is on (its packet table + raw log), otherwise the voice
   // call table. Drives the dock's column layout.
@@ -508,6 +586,9 @@ export const useSdrStore = defineStore('sdr', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ radio_id: radioId, offset_hz: offsetHz, bw_hz: bwHz }),
       })
+      // Track the decoding radio only once the backend has accepted it, so a
+      // failed start never mutes a radio that isn't decoding.
+      if (res.ok) setAprsRadioId(radioId)
       return res.ok
     } catch {
       return false
@@ -525,6 +606,10 @@ export const useSdrStore = defineStore('sdr', () => {
       return res.ok
     } catch {
       return false
+    } finally {
+      // Clear regardless of the response: the user asked for decode to stop, so
+      // the audio must not stay muted even if the backend call failed.
+      setAprsRadioId(null)
     }
   }
 
@@ -955,6 +1040,12 @@ export const useSdrStore = defineStore('sdr', () => {
     hydrateDigitalEnabledFromDb,
     aprsEnabled,
     setAprsEnabled,
+    aprsRadioId,
+    setAprsRadioId,
+    hydrateAprsFromDb,
+    muteAudioWhileDecoding,
+    setMuteAudioWhileDecoding,
+    hydrateMuteAudioWhileDecodingFromDb,
     decodeStreamKind,
     decodeDockOpen,
     startAprs,

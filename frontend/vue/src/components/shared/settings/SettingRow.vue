@@ -131,6 +131,10 @@
       filename="sdr_bandplan.json"
       @stage="emit('stage', item.id, $event)"
     />
+    <SdrDecodeMuteToggleControl
+      v-else-if="item.type === 'sdr-decode-mute-toggle'"
+      @stage="emit('stage', item.id, $event)"
+    />
     <SdrTrunkTrackingToggleControl
       v-else-if="item.type === 'sdr-trunk-tracking-toggle'"
       @stage="emit('stage', item.id, $event)"
@@ -178,6 +182,7 @@ import SdrSnapToKnownControl from './SdrSnapToKnownControl.vue'
 import SdrShowBandPlanControl from './SdrShowBandPlanControl.vue'
 import SdrShowKnownFreqsControl from './SdrShowKnownFreqsControl.vue'
 import SdrResumeDelayControl from './SdrResumeDelayControl.vue'
+import SdrDecodeMuteToggleControl from './SdrDecodeMuteToggleControl.vue'
 import SdrTrunkTrackingToggleControl from './SdrTrunkTrackingToggleControl.vue'
 import ConfigCurrentControl from './ConfigCurrentControl.vue'
 import ExportAllControl from './ExportAllControl.vue'

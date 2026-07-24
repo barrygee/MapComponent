@@ -521,4 +521,121 @@ describe('useSdrAudio', () => {
       expect(lastWorklet!.port.postMessage).toHaveBeenCalledWith({ type: 'reset' })
     })
   })
+
+  // The mute registry is keyed by owner AND radio: independent owners must not
+  // lift each other's mute, and a decode running on one radio must never silence
+  // another radio the user is listening to.
+  describe('live mute', () => {
+    /** The gain node the module created most recently. */
+    function currentGain(): FakeGain {
+      return lastCtx!.createGain.mock.results.at(-1)!.value as FakeGain
+    }
+
+    it('mutes the radio being driven and restores the volume on unmute', async () => {
+      const audio = await loadAudio()
+      await audio.initAudio(3)
+      audio.setVolume(0.8)
+      expect(currentGain().gain.value).toBe(0.8)
+
+      audio.setLiveMuted(true, 'aprs', 3)
+      expect(currentGain().gain.value).toBe(0)
+      expect(audio.isRadioLiveMuted(3)).toBe(true)
+
+      audio.setLiveMuted(false, 'aprs', 3)
+      expect(currentGain().gain.value).toBe(0.8)
+      expect(audio.isRadioLiveMuted(3)).toBe(false)
+    })
+
+    it('leaves a radio audible while a DIFFERENT radio is muted', async () => {
+      const audio = await loadAudio()
+      await audio.initAudio(2)
+      audio.setVolume(0.5)
+
+      // APRS decoding on radio 5 while the user listens to radio 2.
+      audio.setLiveMuted(true, 'aprs', 5)
+      expect(currentGain().gain.value).toBe(0.5)
+      expect(audio.isRadioLiveMuted(5)).toBe(true)
+      expect(audio.isRadioLiveMuted(2)).toBe(false)
+    })
+
+    it("the 'all' target mutes whichever radio is audible", async () => {
+      const audio = await loadAudio()
+      await audio.initAudio(4)
+      audio.setVolume(1)
+      audio.setLiveMuted(true) // recording playback — defaults to 'playback'/'all'
+      expect(currentGain().gain.value).toBe(0)
+      expect(audio.isRadioLiveMuted(4)).toBe(true)
+      expect(audio.isRadioLiveMuted(99)).toBe(true)
+      expect(audio.isRadioLiveMuted(null)).toBe(true)
+    })
+
+    it('a radio-scoped mute does not apply when no radio is being driven', async () => {
+      const audio = await loadAudio()
+      await audio.initAudio()
+      audio.setLiveMuted(true, 'aprs', 6)
+      expect(audio.isRadioLiveMuted(null)).toBe(false)
+      expect(currentGain().gain.value).toBe(1)
+    })
+
+    it('one owner unmuting does not lift another owner’s mute', async () => {
+      const audio = await loadAudio()
+      await audio.initAudio(3)
+      audio.setVolume(1)
+      audio.setLiveMuted(true, 'aprs', 3)
+      audio.setLiveMuted(true) // a recording starts playing back
+
+      audio.setLiveMuted(false) // playback ends — APRS still wants silence
+      expect(currentGain().gain.value).toBe(0)
+
+      audio.setLiveMuted(false, 'aprs', 3)
+      expect(currentGain().gain.value).toBe(1)
+    })
+
+    it('keeps a radio muted while any of its owners still wants it', async () => {
+      const audio = await loadAudio()
+      await audio.initAudio(3)
+      audio.setVolume(1)
+      audio.setLiveMuted(true, 'digital', 3)
+      audio.setLiveMuted(true, 'aprs', 3) // second owner on the SAME radio
+
+      audio.setLiveMuted(false, 'digital', 3)
+      expect(currentGain().gain.value).toBe(0)
+
+      audio.setLiveMuted(false, 'aprs', 3)
+      expect(currentGain().gain.value).toBe(1)
+    })
+
+    it('moving an owner to another radio releases the previous one', async () => {
+      const audio = await loadAudio()
+      await audio.initAudio(3)
+      audio.setVolume(1)
+      audio.setLiveMuted(true, 'aprs', 3)
+      expect(currentGain().gain.value).toBe(0)
+
+      // APRS decode restarts on radio 7 — radio 3 must become audible again.
+      audio.setLiveMuted(true, 'aprs', 7)
+      expect(currentGain().gain.value).toBe(1)
+      expect(audio.isRadioLiveMuted(3)).toBe(false)
+      expect(audio.isRadioLiveMuted(7)).toBe(true)
+    })
+
+    it('applies an existing mute to the gain node created at init', async () => {
+      const audio = await loadAudio()
+      audio.setVolume(0.9) // no gain node yet → applyGain is a no-op
+      audio.setLiveMuted(true, 'aprs', 8)
+      await audio.initAudio(8)
+      expect(currentGain().gain.value).toBe(0)
+    })
+
+    it('re-evaluates the mute when the driven radio changes', async () => {
+      const audio = await loadAudio()
+      await audio.initAudio(3)
+      audio.setVolume(1)
+      audio.setLiveMuted(true, 'aprs', 4) // muted radio is not the one playing
+      expect(currentGain().gain.value).toBe(1)
+
+      audio.setRadioId(4)
+      expect(currentGain().gain.value).toBe(0)
+    })
+  })
 })

@@ -226,6 +226,16 @@ describe('SettingsPanel', () => {
       await sdrNav.trigger('click')
     }
 
+    it('lists the decode-mute toggle in the SDR section and in search', async () => {
+      localStorage.clear()
+      const wrapper = mountPanel()
+      await openSdrSection(wrapper)
+      expect(renderedItemIds(wrapper)).toContain('sdr-decode-mute-toggle')
+
+      await wrapper.find('#settings-search-input').setValue('Mute Audio While Decoding')
+      expect(renderedItemIds(wrapper)).toContain('sdr-decode-mute-toggle')
+    })
+
     it('hides the channel-maps editor when trunk tracking is off', async () => {
       localStorage.clear()
       const wrapper = mountPanel()

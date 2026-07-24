@@ -37,6 +37,7 @@ import SdrSnapToKnownControl from './SdrSnapToKnownControl.vue'
 import SdrShowBandPlanControl from './SdrShowBandPlanControl.vue'
 import SdrShowKnownFreqsControl from './SdrShowKnownFreqsControl.vue'
 import SdrResumeDelayControl from './SdrResumeDelayControl.vue'
+import SdrDecodeMuteToggleControl from './SdrDecodeMuteToggleControl.vue'
 import SdrTrunkTrackingToggleControl from './SdrTrunkTrackingToggleControl.vue'
 import ConfigCurrentControl from './ConfigCurrentControl.vue'
 import ExportAllControl from './ExportAllControl.vue'
@@ -85,6 +86,7 @@ const TYPE_TO_COMPONENT: Array<[string, Component, Partial<SettingItem>?]> = [
   ['sdr-show-bandplan', SdrShowBandPlanControl],
   ['sdr-show-known-freqs', SdrShowKnownFreqsControl],
   ['sdr-resume-delay', SdrResumeDelayControl],
+  ['sdr-decode-mute-toggle', SdrDecodeMuteToggleControl],
   ['sdr-trunk-tracking-toggle', SdrTrunkTrackingToggleControl],
   ['sdr-frequencies-file', JsonDataControl],
   ['sdr-bandplan-file', JsonDataControl],

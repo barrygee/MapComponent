@@ -88,6 +88,7 @@
     "showBandPlan": true,
     "showKnownFreqs": true,
     "digitalDecodeDefault": false,
+    "muteAudioWhileDecoding": true,
     "radios": []
   }
 }

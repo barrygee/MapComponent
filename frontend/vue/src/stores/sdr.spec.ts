@@ -854,4 +854,211 @@ describe('sdr store', () => {
       expect(await useSdrStore().stopAprs(1)).toBe(false)
     })
   })
+
+  // Which radio decodes APRS decides which radio's audio is muted, so the id has
+  // to be exact — a stale or missing one silences the wrong dongle.
+  describe('APRS decoding radio', () => {
+    it('defaults aprsRadioId to null', () => {
+      expect(useSdrStore().aprsRadioId).toBe(null)
+    })
+
+    it('reads aprsRadioId from localStorage on init', () => {
+      localStorage.setItem('sdrAprsRadioId', '4')
+      expect(useSdrStore().aprsRadioId).toBe(4)
+    })
+
+    it('ignores a non-numeric cached aprsRadioId', () => {
+      localStorage.setItem('sdrAprsRadioId', 'not-a-number')
+      expect(useSdrStore().aprsRadioId).toBe(null)
+    })
+
+    it('falls back to null when localStorage throws on read', () => {
+      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked')
+      })
+      expect(useSdrStore().aprsRadioId).toBe(null)
+      spy.mockRestore()
+    })
+
+    it('setAprsRadioId persists the id and removes it when cleared', () => {
+      const store = useSdrStore()
+      store.setAprsRadioId(6)
+      expect(store.aprsRadioId).toBe(6)
+      expect(localStorage.getItem('sdrAprsRadioId')).toBe('6')
+      store.setAprsRadioId(null)
+      expect(store.aprsRadioId).toBe(null)
+      expect(localStorage.getItem('sdrAprsRadioId')).toBe(null)
+    })
+
+    it('setAprsRadioId swallows a localStorage write error', () => {
+      const store = useSdrStore()
+      const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('full')
+      })
+      expect(() => store.setAprsRadioId(2)).not.toThrow()
+      expect(store.aprsRadioId).toBe(2)
+      spy.mockRestore()
+    })
+
+    it('startAprs records the decoding radio once the backend accepts it', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }))
+      const store = useSdrStore()
+      await store.startAprs(7)
+      expect(store.aprsRadioId).toBe(7)
+    })
+
+    it('startAprs leaves the decoding radio unset when the backend refuses', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }))
+      const store = useSdrStore()
+      await store.startAprs(7)
+      expect(store.aprsRadioId).toBe(null)
+    })
+
+    it('stopAprs clears the decoding radio', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }))
+      const store = useSdrStore()
+      store.setAprsRadioId(7)
+      await store.stopAprs(7)
+      expect(store.aprsRadioId).toBe(null)
+    })
+
+    it('stopAprs clears the decoding radio even when the request fails', async () => {
+      // The user asked decode to stop — audio must not stay muted regardless.
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+      const store = useSdrStore()
+      store.setAprsRadioId(7)
+      await store.stopAprs(7)
+      expect(store.aprsRadioId).toBe(null)
+    })
+
+    it('hydrateAprsFromDb adopts the radio the backend resumed', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, json: async () => ({ aprs_radio_id: 5 }) }),
+      )
+      const store = useSdrStore()
+      await store.hydrateAprsFromDb()
+      expect(store.aprsRadioId).toBe(5)
+      expect(store.aprsEnabled).toBe(true)
+    })
+
+    it('hydrateAprsFromDb clears stale local state when nothing is decoding', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, json: async () => ({ aprs_radio_id: null }) }),
+      )
+      const store = useSdrStore()
+      store.setAprsRadioId(5)
+      store.setAprsEnabled(true)
+      await store.hydrateAprsFromDb()
+      expect(store.aprsRadioId).toBe(null)
+      expect(store.aprsEnabled).toBe(false)
+    })
+
+    it('hydrateAprsFromDb leaves state alone when it already agrees', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, json: async () => ({ aprs_radio_id: 5 }) }),
+      )
+      const store = useSdrStore()
+      store.setAprsRadioId(5)
+      store.setAprsEnabled(true)
+      await store.hydrateAprsFromDb()
+      expect(store.aprsRadioId).toBe(5)
+      expect(store.aprsEnabled).toBe(true)
+    })
+
+    it('hydrateAprsFromDb ignores a non-ok response', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }))
+      const store = useSdrStore()
+      store.setAprsRadioId(5)
+      await store.hydrateAprsFromDb()
+      expect(store.aprsRadioId).toBe(5)
+    })
+
+    it('hydrateAprsFromDb swallows fetch errors', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+      const store = useSdrStore()
+      store.setAprsRadioId(5)
+      await expect(store.hydrateAprsFromDb()).resolves.toBeUndefined()
+      expect(store.aprsRadioId).toBe(5)
+    })
+  })
+
+  describe('mute audio while decoding', () => {
+    it('defaults to on so existing installs keep muting', () => {
+      expect(useSdrStore().muteAudioWhileDecoding).toBe(true)
+    })
+
+    it('reads an explicit off from localStorage on init', () => {
+      localStorage.setItem('sdrMuteAudioWhileDecoding', '0')
+      expect(useSdrStore().muteAudioWhileDecoding).toBe(false)
+    })
+
+    it('falls back to on when localStorage throws on read', () => {
+      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked')
+      })
+      expect(useSdrStore().muteAudioWhileDecoding).toBe(true)
+      spy.mockRestore()
+    })
+
+    it('setMuteAudioWhileDecoding updates state and persists', () => {
+      const store = useSdrStore()
+      store.setMuteAudioWhileDecoding(false)
+      expect(store.muteAudioWhileDecoding).toBe(false)
+      expect(localStorage.getItem('sdrMuteAudioWhileDecoding')).toBe('0')
+      store.setMuteAudioWhileDecoding(true)
+      expect(localStorage.getItem('sdrMuteAudioWhileDecoding')).toBe('1')
+    })
+
+    it('setMuteAudioWhileDecoding swallows a localStorage write error', () => {
+      const store = useSdrStore()
+      const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('full')
+      })
+      expect(() => store.setMuteAudioWhileDecoding(false)).not.toThrow()
+      expect(store.muteAudioWhileDecoding).toBe(false)
+      spy.mockRestore()
+    })
+
+    it('hydrateMuteAudioWhileDecodingFromDb applies the stored value', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue({ ok: true, json: async () => ({ muteAudioWhileDecoding: false }) }),
+      )
+      const store = useSdrStore()
+      await store.hydrateMuteAudioWhileDecodingFromDb()
+      expect(store.muteAudioWhileDecoding).toBe(false)
+    })
+
+    it('hydrateMuteAudioWhileDecodingFromDb ignores a non-boolean value', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue({ ok: true, json: async () => ({ muteAudioWhileDecoding: 'no' }) }),
+      )
+      const store = useSdrStore()
+      await store.hydrateMuteAudioWhileDecodingFromDb()
+      expect(store.muteAudioWhileDecoding).toBe(true)
+    })
+
+    it('hydrateMuteAudioWhileDecodingFromDb ignores a non-ok response', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }))
+      const store = useSdrStore()
+      store.setMuteAudioWhileDecoding(false)
+      await store.hydrateMuteAudioWhileDecodingFromDb()
+      expect(store.muteAudioWhileDecoding).toBe(false)
+    })
+
+    it('hydrateMuteAudioWhileDecodingFromDb swallows fetch errors', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+      const store = useSdrStore()
+      await expect(store.hydrateMuteAudioWhileDecodingFromDb()).resolves.toBeUndefined()
+      expect(store.muteAudioWhileDecoding).toBe(true)
+    })
+  })
 })
