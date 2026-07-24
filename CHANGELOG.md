@@ -112,6 +112,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Monochrome restyle for map markers, AARA/AWACS zones, and spectrum markers (#227)
 - APRS decode via Direwolf — plot stations on Land map + list packets below the waterfall (#237)
 - APRS decoding via Direwolf + Land map plotting (#238)
+- Mute only the decoding radio's audio, with a Settings toggle
 
 ### Bug Fixes
 
@@ -290,6 +291,11 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Make waterfall drag controls touch-friendly (#225)
 - Update e2e for frequency manager moving off the rail (#229)
 - Align frequency-manager play icon with row action glyphs (#231)
+- Lift search field rows off pure black
+- Rebuild SPA bundle so the dB-label right-align fix ships
+- Widen the gap between the dB tick labels and the spectrum axis
+- Align AARA labels with their zones in 3D
+- Make the APRS button reflect the viewed radio, not global decode
 
 ### Chores
 
@@ -305,6 +311,8 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Remove dead serving artifacts and unused files (#232)
 - Ignore tooling caches and remove stray husky --version dir (#234)
 - Remove dead legacy jest suite and wiring (#235)
+- Rebuild bundle for the widened dB-label gap
+- Rebuild bundle for #239, #240, #241, #242
 
 ### Other
 
@@ -1076,6 +1084,10 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Remove tagline from README
 - Feat/sdr panel restructure (#228)
 - Fix/sdr e2e frequency manager tab (#230)
+- Merge pull request #239 from barrygee/style/search-field-grey
+- Merge pull request #241 from barrygee/fix/sdr-db-label-gap
+- Merge pull request #242 from barrygee/fix/aara-label-rotation-3d
+- Merge pull request #240 from barrygee/feat/sdr-decode-mute-per-radio
 
 ### Refactoring
 
@@ -1170,6 +1182,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Add Playwright end-to-end suite covering all domains
 - Pin the clock in AirReplayPanel tests so they aren't date-sensitive (#161)
 - Close remaining coverage gaps and restore the 100% gate (#186)
+- Cover per-radio decode muting and the decode-mute setting
 
 ### Build System
 
