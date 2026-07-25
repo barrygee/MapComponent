@@ -1299,7 +1299,12 @@ defineExpose({
   border-bottom: none;
 }
 
-.filter-result-item:hover,
+/* Hover no longer washes the row background — it lights the chevron accent
+   instead (see .filter-result-item:hover .filter-result-chevron below), the
+   same signal every accordion in the side panels now uses. Keyboard focus
+   KEEPS its background: paired with the accent outline below it is the only
+   thing marking the active row during arrow-key navigation, and hover's
+   chevron cue does not follow the keyboard cursor. */
 .filter-result-item.keyboard-focused {
   background: rgba(255, 255, 255, 0.06);
 }
@@ -1385,7 +1390,7 @@ defineExpose({
 }
 
 .filter-result-item:hover .filter-result-chevron {
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--color-accent);
 }
 
 /* Down when open, left when closed — matches the section-heading convention. */

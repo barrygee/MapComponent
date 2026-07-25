@@ -44,8 +44,10 @@ useDocumentEvent('iss-position-update', onIssPositionUpdate)
   box-sizing: border-box;
 }
 
-.sip-toggle:hover {
-  background: rgba(255, 255, 255, 0.03);
+/* Hover lights the chevron accent rather than washing the header background —
+   matches the SDR panel's section accordions (.sdr-scanner-header-row). */
+.sip-toggle:hover .sip-toggle-icon {
+  color: var(--color-accent);
 }
 
 .sip-toggle-left {
