@@ -31,19 +31,19 @@ test.describe('SDR domain', () => {
     await expect(page.locator('#sdr-page')).toBeAttached()
   })
 
-  test('SDR rail shows 4 tab buttons: radio, search-ranges, groups, recordings', async ({
+  test('SDR rail shows 5 tab buttons: radio, frequency-manager, groups, search-ranges, recordings', async ({
     page,
   }) => {
     await page.goto('/sdr/')
     await waitForShellHydration(page)
 
-    // Frequency manager is no longer a rail tab — it lives in a radio-pane
-    // accordion — so the rail shows four tabs.
-    const expectedTabs = ['radio', 'search-ranges', 'groups', 'recordings']
+    // The frequency manager is a rail tab again (second, after RADIO); the
+    // radio pane's accordion slot now holds FAVOURITES instead.
+    const expectedTabs = ['radio', 'frequency-manager', 'groups', 'search-ranges', 'recordings']
     for (const tabId of expectedTabs) {
       await expect(page.locator(`#sdr-sidebar-rail [data-tab="${tabId}"]`)).toBeVisible()
     }
-    await expect(page.locator('#sdr-sidebar-rail [data-tab="frequency-manager"]')).toHaveCount(0)
+    await expect(page.locator('#sdr-sidebar-rail [data-tab]')).toHaveCount(expectedTabs.length)
   })
 
   test('SDR rail RADIO tab opens the radio panel pane', async ({ page }) => {
@@ -175,7 +175,7 @@ test.describe('SDR domain', () => {
     await expect(page.locator('input[type="range"][aria-label="RF gain in dB"]')).toBeVisible()
   })
 
-  test('Frequency Manager accordion shows frequencies from stub', async ({ page }) => {
+  test('Frequency Manager tab shows frequencies from stub', async ({ page }) => {
     await page.route('/api/sdr/frequencies', (route) => {
       void route.fulfill({
         contentType: 'application/json',
@@ -192,13 +192,9 @@ test.describe('SDR domain', () => {
     await page.goto('/sdr/')
     await waitForShellHydration(page)
 
-    // Frequency manager is no longer a rail tab — open the radio pane and
-    // expand its FREQUENCY MANAGER accordion, then check the stubbed
-    // frequencies are listed.
-    await page.locator('#sdr-sidebar-rail [data-tab="radio"]').click()
-    await expect(page.locator('#msb-pane-radio')).toBeVisible()
-
-    await page.locator('button[aria-controls="sdr-freq-manager-section"]').click()
+    // The frequency manager is its own rail tab again, so the list is reachable
+    // directly rather than by expanding a radio-pane accordion.
+    await page.locator('#sdr-sidebar-rail [data-tab="frequency-manager"]').click()
     await expect(page.locator('#sdr-freq-list')).toContainText('Air Traffic Control')
   })
 
