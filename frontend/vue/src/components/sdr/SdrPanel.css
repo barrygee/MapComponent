@@ -371,12 +371,13 @@
   margin-bottom: 12px;
 }
 
-/* Bottom padding stays tight (4px): the first frequency row already brings its
-   own 11px top padding, so a larger value here reads as a dead gap between the
-   GROUPS header and the start of the list — most visibly when the filter is
-   collapsed and the padding is all that separates them. */
+/* Top and bottom padding both stay tight: the Add Frequency row above already
+   pads below its button, and the first frequency row below brings its own 11px
+   top padding, so larger values here read as dead gaps rather than separation —
+   most visibly when the filter is collapsed and the padding is all that stands
+   between the button, the GROUPS header and the start of the list. */
 .sdr-frequency-manager-groups-filter {
-  padding: 20px 24px 4px;
+  padding: 6px 24px 4px;
 }
 
 /* Match the Scanner GROUPS title→chips gap (8px) so both group pickers read
@@ -385,6 +386,15 @@
 .sdr-frequency-manager-groups-filter
   .sdr-scanner-header-row.sdr-frequency-manager-accordion-toggle {
   margin-bottom: 8px;
+}
+
+/* Collapsed, there are no chips to separate from the title, so the 8px above
+   only pushes the frequency list further from the GROUPS header. */
+.sdr-frequency-manager-groups-filter
+  .sdr-scanner-header-row.sdr-frequency-manager-accordion-toggle:not(
+    .sdr-frequency-manager-accordion-toggle-expanded
+  ) {
+  margin-bottom: 0;
 }
 
 .sdr-frequency-manager-groups-filter-row {
@@ -663,8 +673,14 @@
   background: none;
 }
 
-.sdr-scanner-header-row:hover {
-  background: rgba(255, 255, 255, 0.04);
+/* Accordion section headers signal hover by lighting their chevron accent —
+   NOT by a background wash, which read as heavy across a panel of stacked
+   section bars. The chevron already transitions `color`, and expanded state
+   uses the same accent, so hovering a collapsed header previews where it is
+   going. Applied consistently to every side panel's section accordions
+   (SDR here, .sip-toggle / .spp-filter-toggle in the Space panels). */
+.sdr-scanner-header-row:hover .sdr-frequency-manager-accordion-chevron {
+  color: var(--color-accent);
 }
 
 .sdr-scanner-header-row .sdr-field-label.sdr-frequency-manager-scanner-title {
@@ -799,8 +815,9 @@
   transition: background 0.12s;
 }
 
-.sdr-frequency-manager-accordion-toggle:hover {
-  background: rgba(255, 255, 255, 0.03);
+/* See the .sdr-scanner-header-row:hover note — chevron accent, no background. */
+.sdr-frequency-manager-accordion-toggle:hover .sdr-frequency-manager-accordion-chevron {
+  color: var(--color-accent);
 }
 
 .sdr-frequency-manager-accordion-chevron {
@@ -977,6 +994,14 @@
   text-align: left;
   /* ChevronIcon strokes with currentColor. */
   color: rgba(255, 255, 255, 0.5);
+}
+
+/* The form-variant accordion never had a hover background to drop, but it gets
+   the same chevron-accent hover so both BaseAccordionSection variants agree.
+   Only the chevron shifts: it strokes with currentColor, while the title sets
+   its own #fff. */
+.sdr-ef-settings-toggle:hover {
+  color: var(--color-accent);
 }
 
 .sdr-ef-settings-toggle-title {
@@ -1281,6 +1306,10 @@
    internally if its content exceeds available space. */
 .sdr-frequency-manager-freqs-body > .sdr-frequency-manager-add-freq-row {
   flex: 0 0 auto;
+  /* Tighter than the shared 18px below the button: here the GROUPS accordion
+     follows immediately, and its own top padding covers the separation.
+     Scoped to this body so the Search Ranges tab keeps the shared spacing. */
+  padding-bottom: 8px;
 }
 .sdr-frequency-manager-freqs-body > .sdr-editfreq-body.sdr-addfreq-body {
   flex: 0 1 auto;
@@ -1457,6 +1486,15 @@
   align-items: flex-start;
   gap: 0;
   flex-shrink: 0;
+  /* Optically right-align the last glyph with the section accordion's chevron
+     above it. The button BOXES already end level with that chevron, but every
+     glyph is centred in its 24px target box, so the last one reads ~7px short
+     of the chevron — (24 - 10px glyph) / 2. Bleeding the cluster 7px right
+     lands the glyph on the chevron while keeping all four 24px targets intact
+     (never shrink the boxes to close this gap — see the note below).
+     FAVOURITES needs its scroll container widened to match, or this overflows
+     the clip edge; that pairing lives with the container rule. */
+  margin-right: -7px;
 }
 
 /* Row-action cluster (star / play / edit / delete) — ONE shared box for all
@@ -1856,6 +1894,14 @@
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: none;
+  /* Move the clip edge 7px right without moving any content, so the FAVOURITES
+     rows' 7px-bled action cluster (.sdr-freq-row-actions) keeps its full 24px
+     targets instead of being cut off here. `overflow-x: visible` is not an
+     option: paired with `overflow-y: auto` it computes to `auto` and adds a
+     horizontal scrollbar. The padding cancels the margin, so row content still
+     lays out to the same right edge. */
+  margin-right: -7px;
+  padding-right: 7px;
 }
 .sdr-tab-pane--radio
   > .sdr-radio-section

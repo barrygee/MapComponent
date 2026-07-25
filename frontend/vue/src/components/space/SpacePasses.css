@@ -25,8 +25,10 @@
   box-sizing: border-box;
 }
 
-.spp-filter-toggle:hover {
-  background: rgba(255, 255, 255, 0.03);
+/* Hover lights the chevron accent rather than washing the header background —
+   matches the SDR panel's section accordions (.sdr-scanner-header-row). */
+.spp-filter-toggle:hover .spp-filter-toggle-icon {
+  color: var(--color-accent);
 }
 
 .spp-filter-toggle-left {
@@ -357,8 +359,10 @@
   padding-top: 18px;
 }
 
-.spp-pass-card:hover {
-  background: rgba(255, 255, 255, 0.04);
+/* Hover lights the chevron accent instead of washing the card — see
+   .spp-pass-card:hover .spp-pass-chevron below. */
+.spp-pass-card:hover .spp-pass-chevron {
+  color: var(--color-accent);
 }
 
 .spp-pass-card.spp-expanded {

@@ -1192,7 +1192,10 @@ defineExpose({ focus: () => inputRef.value?.focus() })
   min-width: 0;
 }
 
-.space-filter-result-item:hover,
+/* Hover lights the chevron accent instead of washing the row — see
+   .space-filter-result-item:hover .sfr-item-chevron below. Keyboard focus
+   keeps its background: it is what marks the active row during arrow-key
+   navigation, which hover's chevron cue does not track. */
 .space-filter-result-item.keyboard-focused {
   background: rgba(255, 255, 255, 0.04);
 }
@@ -1245,6 +1248,10 @@ defineExpose({ focus: () => inputRef.value?.focus() })
     color 0.15s;
   transform: rotate(-90deg);
   pointer-events: none;
+}
+
+.space-filter-result-item:hover .sfr-item-chevron {
+  color: var(--color-accent);
 }
 
 .space-filter-result-item.sfr-expanded .sfr-item-chevron {
