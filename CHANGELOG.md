@@ -317,6 +317,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Fail fast when pytest runs outside the backend venv
 - Move the Node/npm pin to Node 24-25 / npm 11
 - Give the root context a working tsconfig and gate it in CI
+- Align @types/node with the Node 24 toolchain
 
 ### Other
 
@@ -1098,6 +1099,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #248 from barrygee/chore/bump-node-toolchain
 - Merge pull request #249 from barrygee/chore/fix-root-typecheck
 - Merge pull request #247 from barrygee/fix/sdr-aprs-decode-socket-on-load
+- Merge pull request #250 from barrygee/chore/align-spa-types-node
 
 ### Refactoring
 
