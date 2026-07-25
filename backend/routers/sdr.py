@@ -13,7 +13,8 @@ REST endpoints:
 
   GET    /api/sdr/frequencies             — list all stored frequencies
   POST   /api/sdr/frequencies             — save a frequency
-  PUT    /api/sdr/frequencies/{id}        — update a frequency
+  PUT    /api/sdr/frequencies/{id}        — update a frequency (full replace)
+  PATCH  /api/sdr/frequencies/{id}        — partial update (currently: favourite)
   DELETE /api/sdr/frequencies/{id}        — delete a frequency
 
   POST   /api/sdr/connect                 — open TCP connection to a radio
@@ -119,6 +120,7 @@ class FrequencyIn(BaseModel):
     zmin: float = 0.0  # waterfall Min dB (0 = auto/unset)
     zmax: float = 0.0  # waterfall Max dB (0 = auto/unset)
     scannable: bool = True
+    favourite: bool = False
     notes: str = ""
 
 
@@ -196,6 +198,21 @@ class RecordingStartIn(BaseModel):
     gain_db: float = 30.0
     squelch_dbfs: float = -60.0
     sample_rate: int = 2_048_000
+
+
+class FrequencyPatchIn(BaseModel):
+    """Body for the partial-update `PATCH /api/sdr/frequencies/{id}` endpoint.
+
+    Deliberately narrow (currently just `favourite`) rather than a partial
+    `FrequencyIn`: the sibling `PUT /api/sdr/frequencies/{id}` is a full
+    replace (`setattr`s every `FrequencyIn` field from `body.model_dump()`),
+    so routing a star-toggle through it would silently reset every field a
+    stale client omitted (mode, gain, scannable, group links, …). Only fields
+    set to a non-None value here are applied; anything else on the row is
+    left untouched.
+    """
+
+    favourite: bool | None = None
 
 
 class RecordingPatchIn(BaseModel):
@@ -278,6 +295,7 @@ def _freq_to_dict(f: SdrStoredFrequency, group_ids: list[int] | None = None) -> 
         "zmin": f.zmin,
         "zmax": f.zmax,
         "scannable": f.scannable,
+        "favourite": f.favourite,
         "notes": f.notes,
         "created_at": f.created_at,
     }
@@ -500,6 +518,41 @@ async def update_frequency(freq_id: int, body: FrequencyIn, db: AsyncSession = D
     await _sync_groups(db)
     await db.refresh(row)
     return JSONResponse(_freq_to_dict(row, gids))
+
+
+@router.patch("/api/sdr/frequencies/{freq_id}")
+async def patch_frequency(freq_id: int, body: FrequencyPatchIn, db: AsyncSession = Depends(get_db)):
+    """Apply a partial update to a stored frequency (currently just `favourite`).
+
+    Unlike `update_frequency` above — a full replace that `setattr`s every
+    `FrequencyIn` field from the request body — this only touches fields the
+    caller explicitly set. That is what makes a star-toggle (or any future
+    single-field patch) safe: a stale client's cached copy can never clobber
+    the frequency's other tuning settings or group links by omission.
+    """
+    row = (await db.execute(select(SdrStoredFrequency).where(SdrStoredFrequency.id == freq_id))).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Frequency not found")
+    # Only fields the caller actually sent AND set to a real value count as an
+    # update — an explicit `null` applies nothing, so it must take the no-op
+    # path too rather than sneaking past the guard below.
+    applied_fields = {name: value for name, value in body.model_dump(exclude_unset=True).items() if value is not None}
+    if not applied_fields:
+        # Nothing to apply — skip commit/_sync_groups entirely. _sync_groups is
+        # expensive (rewrites the user_settings config mirror AND rewrites
+        # sdr_frequencies.json to disk), so an empty patch looping on this
+        # unauthenticated endpoint must not become a free disk-write amplifier.
+        # Still a valid no-op, so return 200 with the row unchanged rather than
+        # rejecting the request.
+        group_map = await _load_freq_group_map(db)
+        return JSONResponse(_freq_to_dict(row, group_map.get(row.id, [])))
+    for field_name, field_value in applied_fields.items():
+        setattr(row, field_name, field_value)
+    await db.commit()
+    await _sync_groups(db)
+    await db.refresh(row)
+    group_map = await _load_freq_group_map(db)
+    return JSONResponse(_freq_to_dict(row, group_map.get(row.id, [])))
 
 
 @router.delete("/api/sdr/frequencies/{freq_id}", status_code=204)

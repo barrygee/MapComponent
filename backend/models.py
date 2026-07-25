@@ -158,6 +158,7 @@ class SdrStoredFrequency(Base):
     zmin = Column(Float, nullable=False, default=0.0)  # waterfall Min dB (0 = auto/unset)
     zmax = Column(Float, nullable=False, default=0.0)  # waterfall Max dB (0 = auto/unset)
     scannable = Column(Boolean, nullable=False, default=True)
+    favourite = Column(Boolean, nullable=False, default=False)
     notes = Column(Text, nullable=False, default="")
     created_at = Column(Integer, nullable=False)  # Unix ms
 

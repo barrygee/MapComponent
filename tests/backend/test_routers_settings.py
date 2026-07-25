@@ -350,6 +350,7 @@ class TestConfigUpload:
                     "zmin": -80.0,
                     "zmax": -10.0,
                     "scannable": False,
+                    "favourite": True,
                 },
             ],
         }
@@ -364,6 +365,28 @@ class TestConfigUpload:
         assert freq["zmin"] == -80.0
         assert freq["zmax"] == -10.0
         assert freq["scannable"] is False
+        assert freq["favourite"] is True
+
+    def test_reconcile_defaults_favourite_false_when_absent(self, client):
+        # This is the data-loss-prevention pairing: a settings import that
+        # doesn't mention `favourite` at all (e.g. an older exported config)
+        # must not be misread as "keep whatever was there" — reconcile always
+        # rebuilds rows from scratch, so the absent key must resolve to the
+        # documented default (False), not True or a stale carry-over.
+        payload = {
+            "groups": [],
+            "frequencies": [
+                {
+                    "label": "No favourite key",
+                    "frequency_hz": 100000000,
+                    "mode": "AM",
+                    "groups": [],
+                },
+            ],
+        }
+        assert self._set_sdr_data(client, payload).status_code == 200
+        freq = client.get("/api/sdr/frequencies").json()[0]
+        assert freq["favourite"] is False
 
     def test_reconcile_defaults_bandwidth_per_mode_when_omitted(self, client):
         payload = {
