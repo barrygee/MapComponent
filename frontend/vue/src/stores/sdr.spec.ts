@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useSdrStore } from './sdr'
+import type { SdrStoredFrequency } from './sdr'
 
 type SdrStore = ReturnType<typeof useSdrStore>
 
@@ -1059,6 +1060,79 @@ describe('sdr store', () => {
       const store = useSdrStore()
       await expect(store.hydrateMuteAudioWhileDecodingFromDb()).resolves.toBeUndefined()
       expect(store.muteAudioWhileDecoding).toBe(true)
+    })
+  })
+
+  // ── favourites ────────────────────────────────────────────────────────────────
+  describe('favouriteFrequencies / setFrequencyFavourite', () => {
+    function makeFrequency(overrides: Partial<SdrStoredFrequency> = {}): SdrStoredFrequency {
+      return {
+        id: 1,
+        group_id: null,
+        label: 'Tower',
+        frequency_hz: 118_300_000,
+        mode: 'AM',
+        favourite: false,
+        ...overrides,
+      }
+    }
+
+    it('exposes only the frequencies flagged as favourite', () => {
+      const store = useSdrStore()
+      store.frequencies = [
+        makeFrequency({ id: 1, favourite: true }),
+        makeFrequency({ id: 2, favourite: false }),
+        makeFrequency({ id: 3, favourite: true }),
+      ]
+      expect(store.favouriteFrequencies.map((freq) => freq.id)).toEqual([1, 3])
+    })
+
+    it('returns an empty list when nothing is favourited', () => {
+      const store = useSdrStore()
+      store.frequencies = [makeFrequency({ id: 1, favourite: false })]
+      expect(store.favouriteFrequencies).toEqual([])
+    })
+
+    it('PATCHes the favourite flag and replaces the local row from the server response', async () => {
+      const updated = makeFrequency({ id: 1, favourite: true, label: 'Tower Updated' })
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => updated })
+      vi.stubGlobal('fetch', fetchMock)
+      const store = useSdrStore()
+      store.frequencies = [makeFrequency({ id: 1, favourite: false })]
+      await store.setFrequencyFavourite(1, true)
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/sdr/frequencies/1',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ favourite: true }),
+        }),
+      )
+      expect(store.frequencies[0]).toEqual(updated)
+    })
+
+    it('throws on a non-OK response and leaves the local row untouched', async () => {
+      const original = makeFrequency({ id: 1, favourite: false })
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }),
+      )
+      const store = useSdrStore()
+      store.frequencies = [original]
+      await expect(store.setFrequencyFavourite(1, true)).rejects.toThrow(
+        'Failed to set favourite (status 500)',
+      )
+      expect(store.frequencies[0]).toEqual(original)
+    })
+
+    it('no-ops locally when the updated id is not present in the current list', async () => {
+      const updated = makeFrequency({ id: 999, favourite: true })
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => updated }))
+      const store = useSdrStore()
+      const original = [makeFrequency({ id: 1, favourite: false })]
+      store.frequencies = original
+      await store.setFrequencyFavourite(999, true)
+      // The id from the response isn't in the list, so nothing is replaced.
+      expect(store.frequencies).toEqual(original)
     })
   })
 })

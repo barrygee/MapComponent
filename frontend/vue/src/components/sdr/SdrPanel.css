@@ -371,8 +371,12 @@
   margin-bottom: 12px;
 }
 
+/* Bottom padding stays tight (4px): the first frequency row already brings its
+   own 11px top padding, so a larger value here reads as a dead gap between the
+   GROUPS header and the start of the list — most visibly when the filter is
+   collapsed and the padding is all that separates them. */
 .sdr-frequency-manager-groups-filter {
-  padding: 20px 24px 16px;
+  padding: 20px 24px 4px;
 }
 
 /* Match the Scanner GROUPS title→chips gap (8px) so both group pickers read
@@ -1224,7 +1228,9 @@
   font-size: 10px;
   font-weight: 400;
   letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.18);
+  /* WCAG 1.4.3 (AA): ~4.5:1 against the panel background — rgba(…, 0.18) only
+     managed ~1.68:1. */
+  color: rgba(255, 255, 255, 0.55);
   line-height: 1.8;
   display: none;
   text-transform: uppercase;
@@ -1249,29 +1255,18 @@
   min-height: 0;
 }
 
-/* Inside the FREQUENCY MANAGER accordion (#sdr-freq-manager-section) the
-   wrapper section already pads 20px, so the content's pane-era 24/28px
-   horizontal paddings would indent it past the accordion title. Zero them
-   so text left-aligns with the title, like the other accordion bodies. */
-#sdr-freq-manager-section .sdr-frequency-manager-groups-filter {
-  padding: 0 0 16px;
-}
-#sdr-freq-manager-section .sdr-freq-row-top {
+/* Inside the FAVOURITES accordion (#sdr-favourites-section) the wrapper
+   section already pads 20px, so the shared .sdr-freq-row-top /
+   .sdr-panel-empty pane-era 24/28px horizontal paddings (also used,
+   unmodified, by the Frequency Manager's own pane) would indent this
+   accordion's content past its title. Zero them here so text left-aligns with
+   the title, like the other accordion bodies. The Frequency Manager returned
+   to its own tab/pane (no longer an accordion), so its add/edit-form padding
+   no longer needs a similar override. */
+#sdr-favourites-section .sdr-freq-row-top {
   padding: 11px 0;
 }
-#sdr-freq-manager-section .sdr-editfreq-body {
-  padding-left: 0;
-  padding-right: 0;
-}
-#sdr-freq-manager-section .sdr-editfreq-body.expanded {
-  padding: 20px 0 28px;
-}
-/* The Add Frequency button now leads the accordion body (above the group
-   filter chips), so it takes the small top inset the chips used to have. */
-#sdr-freq-manager-section .sdr-frequency-manager-add-freq-row {
-  padding: 4px 0 16px;
-}
-#sdr-freq-manager-section .sdr-panel-empty {
+#sdr-favourites-section .sdr-panel-empty {
   padding: 28px 0;
 }
 
@@ -1323,6 +1318,12 @@
   display: none;
 }
 
+/* .sdr-favourites-row-item (FAVOURITES rows) always carries this class
+   alongside its own — same chrome, but a distinct selector for anything that
+   must target one list and not the other (e.g. test queries — both a
+   manager row and a favourites row can be in the DOM simultaneously, since
+   BaseAccordionSection renders its body with v-show, not v-if). No separate
+   ruleset needed here: the shared class already gives it the shared look. */
 .sdr-freq-row-item {
   display: flex;
   flex-direction: column;
@@ -1349,20 +1350,32 @@
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0;
   color: rgba(255, 255, 255, 0.35);
   font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 400;
-  line-height: 1;
   transition: color 0.2s;
-  flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: 2px;
+  /* Box/alignment come from the shared row-action rule below. */
 }
 
 .sdr-freq-row-del:hover {
   color: rgba(255, 255, 255, 0.85);
+}
+
+/* Inline remove confirm — same colour language as the recordings list's
+   armed delete (SdrRecordingsSection): ✓ reads as a "go" lime, ✕ stays
+   neutral until hovered, then red. */
+.sdr-freq-row-del--confirm {
+  color: rgba(200, 255, 0, 0.85);
+}
+.sdr-freq-row-del--confirm:hover:not(:disabled) {
+  color: rgba(200, 255, 0, 1);
+}
+.sdr-freq-row-del--cancel {
+  color: rgba(255, 255, 255, 0.45);
+}
+.sdr-freq-row-del--cancel:hover {
+  color: rgba(255, 80, 80, 0.85);
 }
 
 .sdr-freq-row-main {
@@ -1432,21 +1445,54 @@
   line-height: 1;
 }
 
-.sdr-freq-row-edit {
+/* The action buttons group as one tight cluster rather than being spread by
+   the row's 12px body↔actions gap, which gives the frequency label noticeably
+   more width before it truncates. `gap: 0` with the zero side padding below
+   packs the buttons to their bare 24px target boxes — the tightest spacing
+   that still keeps every glyph a WCAG 2.5.8 (AA) compliant 24×24 target.
+   Do NOT reclaim more width by shrinking the boxes. */
+.sdr-freq-row-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+/* Row-action cluster (star / play / edit / delete) — ONE shared box for all
+   four so their glyphs line up with each other.
+   Each button previously carried its own ad-hoc `margin-top` (2/4/3/2px) and
+   its own box (-del had no 24px minimum at all), which is why the glyphs read
+   as ragged: differing box heights top-aligned by differing offsets. Centring
+   each glyph in an identical 24×24 box makes their optical centres agree
+   regardless of the glyph's own size (10px play SVG → 13px star SVG). Adjust
+   the shared `margin-top` here to move the whole cluster; never reintroduce
+   per-button offsets. Also satisfies WCAG 2.5.8 (AA) for all four at once. */
+.sdr-freq-row-fav,
+.sdr-freq-row-play,
+.sdr-freq-row-edit,
+.sdr-freq-row-del {
   align-self: flex-start;
   display: flex;
-  /* Top-align the glyph so it sits level with the play/delete icons in the
-     same row; the 24px hit area below is what centred it ~5px too low. */
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  /* WCAG 2.5.8 (AA): ≥24×24px hit area; glyph size unchanged. */
+  /* Positioning context for BaseIconAction's absolutely-positioned tooltip
+     ::before — that component deliberately leaves `position` to the caller
+     (see its doc), and without this the tooltip anchors to a distant ancestor
+     instead of the button. */
+  position: relative;
   min-width: 24px;
   min-height: 24px;
-  padding: 0 4px;
-  font-size: 12px;
+  /* No side padding: the 24px minimum already provides the touch target, and
+     padding here only pushes the glyphs apart (see .sdr-freq-row-actions). */
+  padding: 0;
   line-height: 1;
-  margin-top: 2px;
+  margin-top: 0;
   flex-shrink: 0;
+}
+
+.sdr-freq-row-edit {
+  font-size: 12px;
 }
 
 .sdr-freq-row-edit:hover:not(:disabled),
@@ -1465,22 +1511,16 @@
   color: rgba(255, 255, 255, 0.2);
 }
 
+/* .sdr-favourites-row-play (the FAVOURITES row's play button) always carries
+   this class alongside its own — see the .sdr-favourites-row-item comment
+   above for why the extra class exists. */
 .sdr-freq-row-play {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0 4px;
   color: rgba(255, 255, 255, 0.35);
   transition: color 0.15s;
-  display: flex;
-  align-items: center;
-  line-height: 1;
-  flex-shrink: 0;
-  align-self: flex-start;
-  /* The play triangle's tip is at the SVG's vertical centre, which sits ~2px
-     above the visual centre of the taller ✕/pencil glyphs on the same row;
-     the extra 2px over the siblings' margin-top drops the tip level with them. */
-  margin-top: 4px;
+  /* Box/alignment come from the shared row-action rule above. */
 }
 
 .sdr-freq-row-play:hover:not(:disabled) {
@@ -1490,6 +1530,56 @@
 .sdr-freq-row-play:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Favourite star (SdrFavouriteStar) — muted grey outline that turns amber and
+   solid when favourited. Distinct from the military star (Air/Space filter
+   rails): fill state IS the toggle affordance here, not a fixed outline. */
+.sdr-freq-row-fav {
+  background: none;
+  border: none;
+  cursor: pointer;
+  /* WCAG 1.4.11 (AA, non-text contrast): 0.45 clears the 3:1 floor with margin
+     (0.35 only just cleared it at ~3.18:1). */
+  color: rgba(255, 255, 255, 0.45);
+  transition: color 0.15s;
+  /* Box/alignment come from the shared row-action rule above. */
+}
+
+.sdr-freq-row-fav:hover:not(:disabled) {
+  color: rgba(200, 255, 0, 0.75);
+}
+
+/* Favourited: the panel's lime accent, matching the -play/-edit hover colour
+   and the Add Frequency button rather than introducing a second accent hue. */
+.sdr-freq-row-fav-active {
+  color: #c8ff00;
+}
+
+.sdr-freq-row-fav-active:hover:not(:disabled) {
+  color: #d9ff4d;
+}
+
+.sdr-freq-row-fav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* FAVOURITES accordion body (SdrFavouritesSection). Reuses the Frequency
+   Manager's .sdr-frequency-manager-groups-filter / .sdr-freq-row-* /
+   .sdr-panel-empty chrome (see the #sdr-favourites-section overrides above)
+   rather than a parallel set of styles. */
+.sdr-favourites-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* A class, not an id: this component only renders once per SdrPanel mount, so
+   there is no live duplication risk today, but a class costs nothing and
+   avoids introducing one later. */
+.sdr-favourites-list {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Read-only follower: dim the whole frequency-manager surface so it visibly

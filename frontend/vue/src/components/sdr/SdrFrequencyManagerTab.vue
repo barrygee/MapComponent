@@ -2,6 +2,13 @@
   <span v-if="readOnly" class="sr-only" role="status"
     >Frequency manager is read-only while another Sentinel controls this radio</span
   >
+  <!-- Row-action announcements. Covers a failed favourite toggle (the star's
+       own accessible name already reflects a SUCCESSFUL change, so that needs
+       no announcement) and the remove flow, where the row and its button
+       disappear from under the user. -->
+  <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{
+    rowStatusMessage
+  }}</span>
   <div
     class="sdr-frequency-manager-freqs-body"
     :class="{ 'sdr-frequency-manager--readonly': readOnly }"
@@ -9,6 +16,7 @@
     <div v-show="!(efOpen && editingFreqId === null)" class="sdr-frequency-manager-add-freq-row">
       <button
         id="sdr-radio-add-freq"
+        ref="addFreqButtonRef"
         class="sdr-add-freq-btn"
         :disabled="readOnly"
         @click="openAddFreqPanel"
@@ -98,15 +106,15 @@
             Default
           </BasePillToggle>
           <BasePillToggle
-            v-for="g in groups"
-            :key="g.id"
+            v-for="group in groups"
+            :key="group.id"
             class="sdr-mode-pill sdr-ef-gpill"
-            :active="efGroupIds.includes(g.id)"
+            :active="efGroupIds.includes(group.id)"
             active-class="active"
-            :aria-pressed="efGroupIds.includes(g.id)"
-            @click="toggleEfGroup(g.id)"
+            :aria-pressed="efGroupIds.includes(group.id)"
+            @click="toggleEfGroup(group.id)"
           >
-            {{ g.name }}
+            {{ group.name }}
           </BasePillToggle>
         </div>
       </div>
@@ -247,106 +255,128 @@
     </div>
 
     <!-- Group-filter chips, tucked into their own GROUPS accordion. -->
-    <div v-show="groupsWithFreqs.length > 0" class="sdr-frequency-manager-groups-filter">
-      <BaseAccordionSection
-        v-model:expanded="groupsFilterExpanded"
-        title="GROUPS"
-        body-id="sdr-freq-manager-groups-section"
-      >
-        <div class="sdr-scan-groups-row sdr-frequency-manager-groups-filter-row">
-          <BasePillToggle
-            class="sdr-scan-group-chip"
-            :active="freqFilterAllSelected"
-            active-class="sdr-scan-group-chip-active"
-            :aria-pressed="freqFilterAllSelected"
-            :disabled="readOnly"
-            @click="toggleFreqFilterAll"
-          >
-            All
-          </BasePillToggle>
-          <BasePillToggle
-            v-for="g in groupsWithFreqs"
-            :key="g.id"
-            class="sdr-scan-group-chip"
-            :active="!freqFilterAllSelected && freqFilterSelectedGroupIds.includes(g.id)"
-            active-class="sdr-scan-group-chip-active"
-            :aria-pressed="!freqFilterAllSelected && freqFilterSelectedGroupIds.includes(g.id)"
-            :disabled="readOnly"
-            @click="toggleFreqFilterGroup(g.id)"
-          >
-            {{ g.name }}
-          </BasePillToggle>
-        </div>
-      </BaseAccordionSection>
-    </div>
+    <SdrFrequencyGroupFilter
+      v-model:expanded="groupFilter.expanded.value"
+      body-id="sdr-freq-manager-groups-section"
+      :groups="groupsWithFreqs"
+      :selected-group-ids="groupFilter.selectedGroupIds.value"
+      :all-selected="groupFilter.allSelected.value"
+      :disabled="readOnly"
+      @toggle-all="groupFilter.toggleAll"
+      @toggle-group="groupFilter.toggleGroup"
+    />
 
-    <div id="sdr-freq-list">
+    <div id="sdr-freq-list" ref="freqListRef">
       <div
-        v-for="f in filteredFreqs"
-        :key="f.id"
+        v-for="frequency in filteredFreqs"
+        :key="frequency.id"
         class="sdr-freq-row-item"
-        :class="{ 'sdr-freq-editing': editingFreqId === f.id }"
-        :data-id="f.id"
+        :class="{ 'sdr-freq-editing': editingFreqId === frequency.id }"
+        :data-id="frequency.id"
       >
-        <div class="sdr-freq-row-top">
-          <div class="sdr-freq-row-body">
-            <div class="sdr-freq-row-main">
-              <span class="sdr-freq-row-label">{{ f.label }}</span>
-            </div>
-            <div class="sdr-freq-row-sub">
-              <span class="sdr-freq-row-hz">{{ (f.frequency_hz / 1e6).toFixed(4) }} MHz</span>
-              <template v-if="f.mode">
-                <span class="sdr-freq-row-sep">·</span>
-                <span class="sdr-freq-row-mode">{{ f.mode }}</span>
-              </template>
-            </div>
-            <div class="sdr-freq-row-groups">
-              <template v-if="freqGroupsFor(f).length">
-                <span v-for="g in freqGroupsFor(f)" :key="g.id" class="sdr-freq-row-group-chip">
-                  {{ g.name }}
-                </span>
-              </template>
-              <span v-else class="sdr-freq-row-group-chip"> Default </span>
-            </div>
-          </div>
-          <BaseIconAction
-            class="sdr-freq-row-play"
-            accessible-name="Play frequency"
-            title="Play"
-            :disabled="tuningDisabled"
-            @click.stop="emit('play', f)"
-          >
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <polygon points="2,1 11,6 2,11" fill="currentColor" />
-            </svg>
-          </BaseIconAction>
-          <BaseIconAction
-            class="sdr-freq-row-edit"
-            accessible-name="Edit frequency"
-            title="Edit"
-            :disabled="readOnly"
-            @click.stop="toggleEditFreqPanel(f)"
-          >
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path
-                d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5z"
-                fill="currentColor"
-              />
-            </svg>
-          </BaseIconAction>
-          <BaseIconAction
-            class="sdr-freq-row-del"
-            accessible-name="Delete frequency"
-            title="Delete"
-            :disabled="readOnly"
-            @click.stop="deleteFreq(f.id)"
-          >
-            &#x2715;
-          </BaseIconAction>
-        </div>
+        <SdrFrequencyRowSummary :frequency="frequency">
+          <template #actions>
+            <SdrFavouriteStar
+              :favourite="frequency.favourite === true"
+              :frequency-label="frequency.label"
+              :disabled="readOnly"
+              @toggle="toggleFavourite(frequency)"
+            />
+            <BaseIconAction
+              class="sdr-freq-row-play"
+              accessible-name="Tune to frequency"
+              tooltip="Tune to"
+              tooltip-side="bottom"
+              :disabled="tuningDisabled"
+              @click.stop="emit('play', frequency)"
+            >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <polygon points="2,1 11,6 2,11" fill="currentColor" />
+              </svg>
+            </BaseIconAction>
+            <BaseIconAction
+              class="sdr-freq-row-edit"
+              accessible-name="Edit frequency"
+              tooltip="Edit"
+              tooltip-side="bottom"
+              :disabled="readOnly"
+              @click.stop="toggleEditFreqPanel(frequency)"
+            >
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5z"
+                  fill="currentColor"
+                />
+              </svg>
+            </BaseIconAction>
+            <!-- Inline remove confirm, same arm→confirm pattern as the
+                 recordings list: ✕ arms the row, then ✓ commits and ✕ cancels.
+                 Deleting a saved frequency is irreversible, so it should never
+                 be one stray click away. -->
+            <template v-if="confirmDeleteFreqId === frequency.id">
+              <BaseIconAction
+                class="sdr-freq-row-del sdr-freq-row-del--confirm"
+                accessible-name="Confirm remove frequency"
+                tooltip="Confirm remove"
+                tooltip-side="bottom"
+                :disabled="readOnly"
+                @click.stop="confirmRemoveFreq(frequency)"
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M2.5 7.5l3 3 6-7" />
+                </svg>
+              </BaseIconAction>
+              <BaseIconAction
+                class="sdr-freq-row-del sdr-freq-row-del--cancel"
+                accessible-name="Cancel remove frequency"
+                tooltip="Cancel"
+                tooltip-side="bottom"
+                @click.stop="cancelRemoveFreq(frequency)"
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" />
+                </svg>
+              </BaseIconAction>
+            </template>
+            <BaseIconAction
+              v-else
+              class="sdr-freq-row-del"
+              accessible-name="Remove frequency"
+              tooltip="Remove"
+              tooltip-side="bottom"
+              :disabled="readOnly"
+              @click.stop="armRemoveFreq(frequency)"
+            >
+              &#x2715;
+            </BaseIconAction>
+          </template>
+        </SdrFrequencyRowSummary>
 
         <!-- Inline edit form (accordion body) -->
-        <div v-if="efOpen && editingFreqId === f.id" class="sdr-editfreq-body expanded" @click.stop>
+        <div
+          v-if="efOpen && editingFreqId === frequency.id"
+          class="sdr-editfreq-body expanded"
+          @click.stop
+        >
           <div class="sdr-editfreq-field">
             <label class="sdr-field-label">LABEL</label>
             <input
@@ -413,15 +443,15 @@
                 Default
               </BasePillToggle>
               <BasePillToggle
-                v-for="g in groups"
-                :key="g.id"
+                v-for="group in groups"
+                :key="group.id"
                 class="sdr-mode-pill sdr-ef-gpill"
-                :active="efGroupIds.includes(g.id)"
+                :active="efGroupIds.includes(group.id)"
                 active-class="active"
-                :aria-pressed="efGroupIds.includes(g.id)"
-                @click="toggleEfGroup(g.id)"
+                :aria-pressed="efGroupIds.includes(group.id)"
+                @click="toggleEfGroup(group.id)"
               >
-                {{ g.name }}
+                {{ group.name }}
               </BasePillToggle>
             </div>
           </div>
@@ -575,6 +605,13 @@
  * forms (label, freq, mode, groups, notes and the RADIO SETTINGS grid of
  * per-frequency tuning settings). CRUD goes against /api/sdr/frequencies.
  *
+ * The GROUPS filter (`SdrFrequencyGroupFilter` + `useFrequencyGroupFilter`)
+ * and the row body (`SdrFrequencyRowSummary`) are shared with
+ * `SdrFavouritesSection` rather than duplicated. Each row's action cluster
+ * leads with `SdrFavouriteStar` (star before play/edit/delete, so the two
+ * destructive-adjacent buttons stay where muscle memory expects them) —
+ * starring here is what populates the RADIO panel's FAVOURITES accordion.
+ *
  * The tuning engine stays in the parent panel: the row play button emits
  * `play` (parent runs playFreq → applyStoredFreqSettings → tune), and the
  * add/edit forms seed their RADIO SETTINGS from the `live` prop (the parent's
@@ -587,11 +624,15 @@
  * Styling lives in SdrPanel.css (imported globally by SdrPanel.vue), same as
  * the other extracted panel sections.
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import BaseAccordionSection from '@/components/base/BaseAccordionSection.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseIconAction from '@/components/base/BaseIconAction.vue'
 import BasePillToggle from '@/components/base/BasePillToggle.vue'
+import SdrFavouriteStar from './SdrFavouriteStar.vue'
+import SdrFrequencyGroupFilter from './SdrFrequencyGroupFilter.vue'
+import SdrFrequencyRowSummary from './SdrFrequencyRowSummary.vue'
+import { useFrequencyGroupFilter } from '@/composables/useFrequencyGroupFilter'
 import { useRadioGroupKeyboard } from '@/composables/useRadioGroupKeyboard'
 import SdrSampleRatePicker from './SdrSampleRatePicker.vue'
 import { useSdrStore } from '@/stores/sdr'
@@ -635,34 +676,89 @@ const groupsWithFreqs = computed<SdrFrequencyGroup[]>(() => sdrStore.groupsWithF
 const freqGroupsFor = sdrStore.freqGroupsFor
 
 // ── Group filter ──────────────────────────────────────────────────────────────
-const freqFilterSelectedGroupIds = ref<number[]>([])
-const freqFilterAllSelected = ref(true)
-// GROUPS filter accordion — collapsed by default to keep the section compact.
-const groupsFilterExpanded = ref(false)
+// State + filtering live in useFrequencyGroupFilter, paired with the
+// presentational SdrFrequencyGroupFilter; this tab is the only host (the
+// FAVOURITES section is deliberately unfiltered — it is a short hand-picked
+// list). See the composable's doc for the "No matches." stranding behaviour
+// this tab's specs pin.
+const groupFilter = useFrequencyGroupFilter(freqGroupsFor)
+const filteredFreqs = computed<SdrStoredFrequency[]>(() =>
+  groupFilter.filterFrequencies(freqs.value),
+)
 
-const filteredFreqs = computed<SdrStoredFrequency[]>(() => {
-  if (!freqFilterAllSelected.value && freqFilterSelectedGroupIds.value.length > 0) {
-    const selected = new Set(freqFilterSelectedGroupIds.value)
-    return freqs.value.filter((f) => freqGroupsFor(f).some((g) => selected.has(g.id)))
+// Announces row-action outcomes (see the template's sr-only status span).
+const rowStatusMessage = ref('')
+
+// The saved-frequency list element, used to find a specific row's action
+// button by `data-id`, and the Add Frequency button as the last-resort focus
+// target when the removed row had no neighbour left to receive focus.
+const freqListRef = ref<HTMLElement | null>(null)
+const addFreqButtonRef = ref<HTMLButtonElement | null>(null)
+
+// The row whose ✕ is "armed" — swaps it for a ✓ / ✕ pair until confirmed,
+// mirroring the recordings list's inline delete confirm. A single value, so
+// only one row can ever be armed.
+const confirmDeleteFreqId = ref<number | null>(null)
+
+// Disarm a row that leaves the visible list (group filter changed, or the
+// parent reloaded the data). Without this the row stays armed while hidden and
+// comes back pre-armed, leaving a destructive ✓ one stray click away in a
+// state the user has long since forgotten arming.
+watch(filteredFreqs, (visibleFreqs) => {
+  if (confirmDeleteFreqId.value === null) return
+  if (!visibleFreqs.some((freq) => freq.id === confirmDeleteFreqId.value)) {
+    confirmDeleteFreqId.value = null
   }
-  return freqs.value
 })
 
-function toggleFreqFilterAll() {
-  freqFilterAllSelected.value = true
-  freqFilterSelectedGroupIds.value = []
+/**
+ * Moves keyboard focus to one of a row's action buttons, addressing the row by
+ * its `data-id` rather than keeping a parallel Map of element refs: the rows
+ * already carry `data-id` for exactly this kind of lookup, and every button in
+ * the arm→confirm swap is created/destroyed as the state changes, so a ref map
+ * would need constant re-syncing. Returns whether the target was found.
+ *
+ * This exists because each step of the remove flow REPLACES the button the
+ * user just activated (✕ → ✓/✕ → gone), which would otherwise drop focus onto
+ * `document.body` and lose the keyboard user's place in the list entirely.
+ */
+async function focusRowAction(frequencyId: number | null, actionSelector: string) {
+  if (frequencyId === null) return false
+  await nextTick()
+  const button = freqListRef.value?.querySelector<HTMLElement>(
+    `[data-id="${frequencyId}"] ${actionSelector}`,
+  )
+  button?.focus()
+  return button !== null && button !== undefined
 }
 
-function toggleFreqFilterGroup(id: number) {
-  if (freqFilterAllSelected.value) {
-    freqFilterAllSelected.value = false
-    freqFilterSelectedGroupIds.value = [id]
-    return
+/** Arms a row's ✕, moving focus onto the ✓ that replaces it. */
+async function armRemoveFreq(freq: SdrStoredFrequency) {
+  confirmDeleteFreqId.value = freq.id
+  rowStatusMessage.value = `Confirm removal of ${freq.label}, or cancel`
+  await focusRowAction(freq.id, '.sdr-freq-row-del--confirm')
+}
+
+/** Cancels an armed row, returning focus to the ✕ it came from. */
+async function cancelRemoveFreq(freq: SdrStoredFrequency) {
+  confirmDeleteFreqId.value = null
+  rowStatusMessage.value = `Removal of ${freq.label} cancelled`
+  await focusRowAction(freq.id, '.sdr-freq-row-del')
+}
+
+// Star a/unstar a stored frequency. Uses the store's dedicated favourite PATCH
+// (not the full-replace frequency PUT saveFreq below uses) so toggling a star
+// never risks resetting the row's other fields.
+async function toggleFavourite(freq: SdrStoredFrequency) {
+  const nextFavourite = !freq.favourite
+  try {
+    await sdrStore.setFrequencyFavourite(freq.id, nextFavourite)
+  } catch {
+    // The row simply keeps its previous favourite state on failure — the
+    // star reverts visually, so a screen-reader user needs the explicit
+    // announcement to know the press didn't take.
+    rowStatusMessage.value = `Failed to ${nextFavourite ? 'favourite' : 'unfavourite'} ${freq.label}`
   }
-  const idx = freqFilterSelectedGroupIds.value.indexOf(id)
-  if (idx >= 0) freqFilterSelectedGroupIds.value.splice(idx, 1)
-  else freqFilterSelectedGroupIds.value.push(id)
-  if (freqFilterSelectedGroupIds.value.length === 0) freqFilterAllSelected.value = true
 }
 
 // ── Edit frequency panel ──────────────────────────────────────────────────────
@@ -844,6 +940,11 @@ async function saveFreq() {
           /* v8 ignore start -- defensive default / fall-through for an always-present field (or jsdom-limited path) */
           scannable: existing?.scannable ?? true,
           /* v8 ignore stop */
+          // This PUT is a full replace (see the store's setFrequencyFavourite
+          // doc for why the star toggle uses a dedicated PATCH instead), so
+          // the star's current value must be resent here or saving the edit
+          // form would silently unfavourite the row.
+          favourite: existing?.favourite ?? false,
           notes: efNotes.value,
         }),
       })
@@ -857,6 +958,7 @@ async function saveFreq() {
           mode: efMode.value,
           ...freqSettingsPayload(),
           scannable: true,
+          favourite: false,
           group_ids: efGroupIds.value,
           notes: efNotes.value,
         }),
@@ -868,21 +970,36 @@ async function saveFreq() {
   } catch (_) {}
 }
 
-async function deleteFreq(id?: number) {
-  /* v8 ignore start -- defensive default / fall-through for an always-present field (or jsdom-limited path) */
-  const targetId = id ?? editingFreqId.value
-  /* v8 ignore stop */
-  // Every caller passes a concrete row id, so targetId is never nullish here.
-  /* v8 ignore start */
-  if (targetId === null || targetId === undefined) return
-  /* v8 ignore stop */
+/**
+ * Deletes the frequency whose ✕ was armed and then confirmed with ✓. Only
+ * reachable from the armed state, so the confirm is the guard — there is no
+ * unconfirmed delete path.
+ */
+async function confirmRemoveFreq(freq: SdrStoredFrequency) {
+  // Pick the focus successor BEFORE the row goes: once deleted it has no
+  // neighbours to ask.
+  const currentIndex = filteredFreqs.value.findIndex((item) => item.id === freq.id)
+  const successorId =
+    filteredFreqs.value[currentIndex + 1]?.id ?? filteredFreqs.value[currentIndex - 1]?.id ?? null
+  confirmDeleteFreqId.value = null
   try {
-    await fetch(`/api/sdr/frequencies/${targetId}`, { method: 'DELETE' })
-    if (editingFreqId.value === targetId) {
+    await fetch(`/api/sdr/frequencies/${freq.id}`, { method: 'DELETE' })
+    if (editingFreqId.value === freq.id) {
       editingFreqId.value = null
       efOpen.value = false
     }
+    rowStatusMessage.value = `${freq.label} removed`
     emit('changed')
-  } catch (_) {}
+    // The parent's reload drives the row's actual removal, so the successor's
+    // ✕ may not be focusable yet on the first tick; fall back to the always
+    // present Add Frequency button rather than leaving focus on nothing.
+    if (!(await focusRowAction(successorId, '.sdr-freq-row-del'))) {
+      addFreqButtonRef.value?.focus()
+    }
+  } catch {
+    // Nothing to roll back locally: the row is only removed once the parent's
+    // reload lands, so a failed delete simply leaves it in place.
+    rowStatusMessage.value = `Failed to remove ${freq.label}`
+  }
 }
 </script>

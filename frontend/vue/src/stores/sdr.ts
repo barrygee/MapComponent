@@ -40,12 +40,17 @@ export interface SdrStoredFrequency {
   zmin?: number
   zmax?: number
   scannable?: boolean
+  // Whether the user has starred this frequency for the RADIO panel's
+  // FAVOURITES accordion. Optional (not `boolean`) so pre-migration payloads
+  // — rows fetched before the backend column existed — still narrow cleanly,
+  // matching how `scannable?` is declared.
+  favourite?: boolean
   notes?: string
 }
 
 export type SdrMode = 'NFM' | 'WFM' | 'AM' | 'USB' | 'LSB' | 'CW'
 
-export type SdrTab = 'radio' | 'search-ranges' | 'groups' | 'recordings'
+export type SdrTab = 'radio' | 'frequency-manager' | 'search-ranges' | 'groups' | 'recordings'
 
 export interface SdrSpectrumFrame {
   bins: number[]
@@ -957,23 +962,64 @@ export const useSdrStore = defineStore('sdr', () => {
   }
 
   /**
-   * Groups that currently have at least one stored frequency, sorted
-   * case-insensitively by name. Drives the RADIO tab's scan-group chips and
-   * the Frequency Manager's group filter.
+   * The groups referenced by at least one of `freqs`, sorted
+   * case-insensitively by name.
    */
-  const groupsWithFreqs = computed<SdrFrequencyGroup[]>(() => {
-    const idsWithFreqs = new Set<number>()
-    frequencies.value.forEach((freq) => {
+  function _groupsReferencedBy(freqs: SdrStoredFrequency[]): SdrFrequencyGroup[] {
+    const referencedIds = new Set<number>()
+    freqs.forEach((freq) => {
       ;(freq.group_ids || []).forEach((id) => {
-        if (id !== 0) idsWithFreqs.add(id)
+        if (id !== 0) referencedIds.add(id)
       })
-      if (freq.group_id != null && freq.group_id !== 0) idsWithFreqs.add(freq.group_id)
+      if (freq.group_id != null && freq.group_id !== 0) referencedIds.add(freq.group_id)
     })
     return groups.value
-      .filter((group) => idsWithFreqs.has(group.id))
+      .filter((group) => referencedIds.has(group.id))
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-  })
+  }
+
+  /**
+   * Groups that currently have at least one stored frequency. Drives the
+   * RADIO tab's scan-group chips and the Frequency Manager's group filter.
+   */
+  const groupsWithFreqs = computed<SdrFrequencyGroup[]>(() =>
+    _groupsReferencedBy(frequencies.value),
+  )
+
+  /**
+   * Frequencies the user has starred. Drives the RADIO panel's FAVOURITES
+   * accordion — a fixed shortcut list distinct from the full Frequency
+   * Manager, kept as a computed (not a separate fetch) since `frequencies`
+   * already carries the `favourite` column.
+   */
+  const favouriteFrequencies = computed<SdrStoredFrequency[]>(() =>
+    frequencies.value.filter((freq) => freq.favourite === true),
+  )
+
+  /**
+   * Toggle a stored frequency's favourite flag. Uses the dedicated
+   * `PATCH /api/sdr/frequencies/{id}` favourite-only body rather than the
+   * full-replace frequency PUT — that endpoint setattrs every field from a
+   * client-supplied `FrequencyIn`, so a partial/stale caller would silently
+   * reset tuning settings (mode/gain/scannable/groups) back to their
+   * defaults. This is the store's first write action: it is invoked from two
+   * components (the manager's row star and the favourites list's unfavourite
+   * button), so the fetch lives here once rather than being duplicated in
+   * both. Rejects on a non-OK response so callers can surface the failure;
+   * the local row is left untouched until a successful response confirms it.
+   */
+  async function setFrequencyFavourite(frequencyId: number, favourite: boolean): Promise<void> {
+    const res = await fetch(`/api/sdr/frequencies/${frequencyId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ favourite }),
+    })
+    if (!res.ok) throw new Error(`Failed to set favourite (status ${res.status})`)
+    const updated = (await res.json()) as SdrStoredFrequency
+    const index = frequencies.value.findIndex((freq) => freq.id === frequencyId)
+    if (index !== -1) frequencies.value[index] = updated
+  }
 
   _restoreSession()
 
@@ -983,6 +1029,8 @@ export const useSdrStore = defineStore('sdr', () => {
     frequencies,
     freqGroupsFor,
     groupsWithFreqs,
+    favouriteFrequencies,
+    setFrequencyFavourite,
     currentRadioId,
     playing,
     connected,
