@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "target": "ES2022",
+        "lib": ["ES2022"],
+        "strict": true,
+        "noImplicitAny": true,
+        "exactOptionalPropertyTypes": false,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        // Nothing is compiled from the root context — it exists so `tsc --noEmit`
+        // (and editors) type-check the root TypeScript surface. The app build is
+        // `build:spa`, which runs Vite in frontend/vue.
+        "noEmit": true,
+        "types": ["node"]
+    },
+    // The same surface the root ESLint/Prettier run covers: the repo-root config
+    // files plus the full-stack e2e specs. Keep this in step with the `lint`
+    // script's globs so a file can't be linted but never type-checked.
+    "include": ["tests/**/*.ts", "*.config.ts"]
+}

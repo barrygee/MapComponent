@@ -205,7 +205,7 @@ jobs:
           retention-days: 7
 
   root-tooling:
-    name: root-tooling (eslint + prettier)
+    name: root-tooling (eslint + prettier + tsc)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -223,3 +223,9 @@ jobs:
       # don't cover.
       - name: Lint (ESLint + Prettier)
         run: npm run lint
+
+      # Type-checks the same surface. Gated here because the root context had no
+      # tsconfig.json for a while, so `npm run typecheck` failed for everyone and
+      # nothing noticed — a real type error had accumulated in the e2e specs.
+      - name: Typecheck (tsc)
+        run: npm run typecheck

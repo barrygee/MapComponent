@@ -44,8 +44,9 @@ cd frontend/vue && npm run test:coverage                         # vitest — GA
 
 # Root tooling
 npm run lint                                                     # ESLint + Prettier over root config files + tests/e2e specs
+npm run typecheck                                                # tsc --noEmit over the same surface (root tsconfig.json)
 ```
-All of the above run in CI (`.github/workflows/ci.yml`) on every PR and push to `main`; ruff check + `ruff format --check` + pytest (backend), ESLint/Prettier + vue-tsc + vitest@100% + Vite build (SPA), and ESLint/Prettier (root) are gating. mypy is not. A **husky** pre-commit hook (`.husky/pre-commit` + `.lintstagedrc.json`) mirrors the format/lint gates on staged files across both npm contexts. `CHANGELOG.md` is regenerated automatically from Conventional Commits on every push to `main` (`.github/workflows/changelog.yml`, git-cliff), and committed back to `main` with `[skip ci]` — it never touches feature branches, so local checkouts don't diverge. Don't hand-edit it. See `CONTRIBUTING.md` for the full contributor workflow and conventions; new code is expected to ship at 100% frontend coverage.
+All of the above run in CI (`.github/workflows/ci.yml`) on every PR and push to `main`; ruff check + `ruff format --check` + pytest (backend), ESLint/Prettier + vue-tsc + vitest@100% + Vite build (SPA), and ESLint/Prettier + `tsc` (root) are gating. mypy is not. A **husky** pre-commit hook (`.husky/pre-commit` + `.lintstagedrc.json`) mirrors the format/lint gates on staged files across both npm contexts. `CHANGELOG.md` is regenerated automatically from Conventional Commits on every push to `main` (`.github/workflows/changelog.yml`, git-cliff), and committed back to `main` with `[skip ci]` — it never touches feature branches, so local checkouts don't diverge. Don't hand-edit it. See `CONTRIBUTING.md` for the full contributor workflow and conventions; new code is expected to ship at 100% frontend coverage.
 
 ## Two npm contexts — don't confuse them
 - **`frontend/vue/`** — the real app (Vite + Vue 3 + Pinia + vue-router); tested with **vitest** (100% coverage gate) + ESLint/Prettier + `vue-tsc`.

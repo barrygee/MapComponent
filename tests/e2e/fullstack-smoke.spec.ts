@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Full-stack integration smoke suite for Sentinel.
@@ -34,7 +34,7 @@ import { test, expect } from '@playwright/test';
 // ---------------------------------------------------------------------------
 
 /** Waits until the Vue shell is fully mounted and the router has settled. */
-async function waitForShellHydration(page: Parameters<typeof test>[1]['page']): Promise<void> {
+async function waitForShellHydration(page: Page): Promise<void> {
     await expect(page.getByRole('navigation', { name: /domains/i })).toBeVisible({
         timeout: 15_000,
     });
