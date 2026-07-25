@@ -113,6 +113,8 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - APRS decode via Direwolf — plot stations on Land map + list packets below the waterfall (#237)
 - APRS decoding via Direwolf + Land map plotting (#238)
 - Mute only the decoding radio's audio, with a Settings toggle
+- Persist a favourite flag on stored frequencies
+- Add a favourites accordion and restore the frequency manager tab
 
 ### Bug Fixes
 
@@ -318,6 +320,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Move the Node/npm pin to Node 24-25 / npm 11
 - Give the root context a working tsconfig and gate it in CI
 - Align @types/node with the Node 24 toolchain
+- Rebuild the SPA bundle
 
 ### Other
 
@@ -1100,6 +1103,8 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #249 from barrygee/chore/fix-root-typecheck
 - Merge pull request #247 from barrygee/fix/sdr-aprs-decode-socket-on-load
 - Merge pull request #250 from barrygee/chore/align-spa-types-node
+- Merge pull request #252 from barrygee/chore/document-e2e-gate
+- Merge pull request #251 from barrygee/feat/sdr-favourites-accordion
 
 ### Refactoring
 
@@ -1162,6 +1167,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Add ADR recording the webapp-standards retrofit decision
 - Require a feature branch for every change (#123)
 - Sync services, SDR API, and config with current codebase (#233)
+- Document the Playwright e2e gate and the two e2e suites
 
 ### Tests
 
@@ -1195,6 +1201,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Pin the clock in AirReplayPanel tests so they aren't date-sensitive (#161)
 - Close remaining coverage gaps and restore the 100% gate (#186)
 - Cover per-radio decode muting and the decode-mute setting
+- Update e2e specs for the restored frequency manager tab
 
 ### Build System
 
