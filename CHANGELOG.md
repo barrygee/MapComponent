@@ -296,6 +296,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Widen the gap between the dB tick labels and the spectrum axis
 - Align AARA labels with their zones in 3D
 - Make the APRS button reflect the viewed radio, not global decode
+- Reattach the APRS decode socket after a reload
 
 ### Chores
 
@@ -314,6 +315,8 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Rebuild bundle for the widened dB-label gap
 - Rebuild bundle for #239, #240, #241, #242
 - Fail fast when pytest runs outside the backend venv
+- Move the Node/npm pin to Node 24-25 / npm 11
+- Give the root context a working tsconfig and gate it in CI
 
 ### Other
 
@@ -1092,6 +1095,9 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #243 from barrygee/chore/override-vulnerable-transitive-deps
 - Merge pull request #244 from barrygee/chore/pytest-required-plugins-guard
 - Merge pull request #246 from barrygee/ci/verify-committed-spa-dist
+- Merge pull request #248 from barrygee/chore/bump-node-toolchain
+- Merge pull request #249 from barrygee/chore/fix-root-typecheck
+- Merge pull request #247 from barrygee/fix/sdr-aprs-decode-socket-on-load
 
 ### Refactoring
 
