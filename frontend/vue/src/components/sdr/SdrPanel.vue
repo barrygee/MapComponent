@@ -50,6 +50,24 @@
           <line x1="6" y1="13" x2="11" y2="13" stroke="currentColor" stroke-width="1.6" />
           <line x1="6" y1="17" x2="11" y2="17" stroke="currentColor" stroke-width="1.6" />
         </svg>
+        <!-- frequency manager (bookmark) -->
+        <svg
+          v-else-if="tab.id === 'frequency-manager'"
+          width="19"
+          height="19"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path
+            d="M6 3h12v18l-6-4-6 4V3Z"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linejoin="miter"
+            fill="none"
+          />
+        </svg>
         <!-- search ranges (range brackets with sweep) -->
         <svg
           v-else-if="tab.id === 'search-ranges'"
@@ -289,23 +307,17 @@
           </BaseAccordionSection>
         </div>
 
-        <!-- Frequency manager (saved frequencies) — lives in its own accordion
-             between SETTINGS and SCANNER (formerly a rail tab). `activate`
-             fires when one of its forms opens, so expand the accordion to keep
-             the form visible. -->
+        <!-- Favourites accordion — a quick-tune shortcut list of the
+             frequencies starred in the Frequency Manager tab, between SETTINGS
+             and SCANNER (the same slot the Frequency Manager accordion used
+             to occupy before it moved back to its own tab). -->
         <div class="sdr-radio-section sdr-scan-controls">
           <BaseAccordionSection
-            v-model:expanded="freqManagerSectionExpanded"
-            title="FREQUENCY MANAGER"
-            body-id="sdr-freq-manager-section"
+            v-model:expanded="favouritesSectionExpanded"
+            title="FAVOURITES"
+            body-id="sdr-favourites-section"
           >
-            <SdrFrequencyManagerTab
-              :live="liveTuneSeed"
-              :tuning-disabled="tuningDisabled"
-              @play="playFreq"
-              @activate="freqManagerSectionExpanded = true"
-              @changed="reloadData"
-            />
+            <SdrFavouritesSection :tuning-disabled="tuningDisabled" @play="playFreq" />
           </BaseAccordionSection>
         </div>
 
@@ -557,6 +569,17 @@
         />
       </div>
 
+      <!-- ───────────── FREQUENCY MANAGER TAB (saved frequencies) ───────────── -->
+      <div class="sdr-tab-pane" :class="{ active: activeSdrTab === 'frequency-manager' }">
+        <SdrFrequencyManagerTab
+          :live="liveTuneSeed"
+          :tuning-disabled="tuningDisabled"
+          @play="playFreq"
+          @activate="switchSdrTab('frequency-manager')"
+          @changed="reloadData"
+        />
+      </div>
+
       <!-- ───────────── SEARCH RANGES TAB ───────────── -->
       <div class="sdr-tab-pane" :class="{ active: activeSdrTab === 'search-ranges' }">
         <SdrSearchRangesTab
@@ -606,6 +629,7 @@ import SdrGroupsTab from './SdrGroupsTab.vue'
 import SdrSearchRangesTab from './SdrSearchRangesTab.vue'
 import SdrStepPicker from './SdrStepPicker.vue'
 import SdrFrequencyManagerTab from './SdrFrequencyManagerTab.vue'
+import SdrFavouritesSection from './SdrFavouritesSection.vue'
 import SdrDeviceSelector from './SdrDeviceSelector.vue'
 import SdrSettingsAccordion from './SdrSettingsAccordion.vue'
 import SdrTrunkSection from './SdrTrunkSection.vue'
@@ -678,6 +702,7 @@ const SIGNAL_SEGS = 36
 const SDR_TAB_KEY = 'sentinel_sdr_tab'
 const sdrTabs: ReadonlyArray<{ id: SdrTab; label: string }> = [
   { id: 'radio', label: 'RADIO' },
+  { id: 'frequency-manager', label: 'FREQUENCY MANAGER' },
   { id: 'groups', label: 'GROUPS' },
   { id: 'search-ranges', label: 'SEARCH RANGES' },
   { id: 'recordings', label: 'RECORDINGS' },
@@ -813,7 +838,7 @@ watch(
   () => _sdrStore().panelOpen,
   (open) => {
     if (open) {
-      freqManagerSectionExpanded.value = false
+      favouritesSectionExpanded.value = false
       scannerSectionExpanded.value = false
       searchSectionExpanded.value = false
       savedRangesExpanded.value = false
@@ -935,7 +960,8 @@ const _rangesSectionExpanded = ref(false)
 // drives the fetch via reloadData() below, which calls the store actions.
 const freqs = computed<SdrStoredFrequency[]>(() => _sdrStore().frequencies)
 const scannerSectionExpanded = ref(false)
-const freqManagerSectionExpanded = ref(false)
+// FAVOURITES accordion — collapsed by default, like SCANNER/SEARCH.
+const favouritesSectionExpanded = ref(false)
 // Mode/digital/signal accordion — open by default and (like SETTINGS) not
 // collapsed when the panel reopens; these are the primary tuning controls.
 const modeSectionExpanded = ref(true)
@@ -955,10 +981,10 @@ const groupsWithFreqs = computed<SdrFrequencyGroup[]>(() => _sdrStore().groupsWi
 // the read-only sweep-mirror clear all live in useSdrSweepEngine (below).
 
 // ── Edit frequency panel ──────────────────────────────────────────────────────
-// The FREQUENCY MANAGER accordion (freq list, group filter and the add/edit
-// forms with their RADIO SETTINGS grid) lives in SdrFrequencyManagerTab.vue.
-// The panel supplies the `live` seed (current radio state) and reacts to its
-// events: play (tune to a stored frequency), activate (expand the accordion
+// The FREQUENCY MANAGER tab (freq list, group filter and the add/edit forms
+// with their RADIO SETTINGS grid) lives in SdrFrequencyManagerTab.vue. The
+// panel supplies the `live` seed (current radio state) and reacts to its
+// events: play (tune to a stored frequency), activate (switch the visible tab
 // so an opening form is visible) and changed (full data reload).
 
 // The parent's live radio state, seeding the tab's add/edit forms.

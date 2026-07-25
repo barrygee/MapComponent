@@ -105,8 +105,14 @@ test.describe('App shell', () => {
 
     // These regions are always mounted — they start empty but must exist for
     // screen readers to register them before any announcement fires.
-    await expect(page.locator('[role="status"][aria-live="polite"]')).toBeAttached()
-    await expect(page.locator('[role="alert"][aria-live="assertive"]')).toBeAttached()
+    //
+    // `.first()` because several are legitimately mounted at once: the shell's
+    // own region plus the per-feature ones (the SDR panel is teleported into
+    // every route, so its frequency-manager and favourites regions are present
+    // here too). The assertion is "at least one is registered", not "exactly
+    // one" — a bare locator would trip Playwright's strict mode.
+    await expect(page.locator('[role="status"][aria-live="polite"]').first()).toBeAttached()
+    await expect(page.locator('[role="alert"][aria-live="assertive"]').first()).toBeAttached()
   })
 
   test('disabled domain redirects to first enabled domain', async ({ page }) => {

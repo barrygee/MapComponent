@@ -231,6 +231,46 @@ describe('SdrFrequencyManagerTab — play', () => {
 })
 
 // =============================================================================
+describe('SdrFrequencyManagerTab — favourite star', () => {
+  it('stars a frequency via the store and leaves no failure announcement on success', async () => {
+    const wrapper = mountTab({ freqs: [makeFreq({ favourite: false })] })
+    const store = useSdrStore()
+    const setFavouriteSpy = vi.spyOn(store, 'setFrequencyFavourite').mockResolvedValue(undefined)
+    await wrapper.find('.sdr-freq-row-fav').trigger('click')
+    await flushPromises()
+    expect(setFavouriteSpy).toHaveBeenCalledWith(10, true)
+    expect(wrapper.find('[role="status"]').text()).toBe('')
+  })
+
+  it('unstars an already-favourited frequency (toggles the opposite way)', async () => {
+    const wrapper = mountTab({ freqs: [makeFreq({ favourite: true })] })
+    const store = useSdrStore()
+    const setFavouriteSpy = vi.spyOn(store, 'setFrequencyFavourite').mockResolvedValue(undefined)
+    await wrapper.find('.sdr-freq-row-fav').trigger('click')
+    await flushPromises()
+    expect(setFavouriteSpy).toHaveBeenCalledWith(10, false)
+  })
+
+  it('announces failure and keeps the row state when the store call rejects', async () => {
+    const wrapper = mountTab({ freqs: [makeFreq({ favourite: false, label: 'Tower' })] })
+    const store = useSdrStore()
+    vi.spyOn(store, 'setFrequencyFavourite').mockRejectedValue(new Error('offline'))
+    await wrapper.find('.sdr-freq-row-fav').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[role="status"]').text()).toBe('Failed to favourite Tower')
+  })
+
+  it('announces an unfavourite failure with the opposite verb', async () => {
+    const wrapper = mountTab({ freqs: [makeFreq({ favourite: true, label: 'Tower' })] })
+    const store = useSdrStore()
+    vi.spyOn(store, 'setFrequencyFavourite').mockRejectedValue(new Error('offline'))
+    await wrapper.find('.sdr-freq-row-fav').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[role="status"]').text()).toBe('Failed to unfavourite Tower')
+  })
+})
+
+// =============================================================================
 describe('SdrFrequencyManagerTab — add', () => {
   it('seeds the add form from the live radio state and emits activate', async () => {
     const wrapper = mountTab({ live: makeLive({ gainAuto: true }) })
@@ -321,6 +361,7 @@ describe('SdrFrequencyManagerTab — add', () => {
       zmin: -110,
       zmax: -10,
       scannable: true,
+      favourite: false,
       group_ids: [2],
       notes: '',
     })
@@ -531,10 +572,22 @@ describe('SdrFrequencyManagerTab — edit', () => {
 })
 
 // =============================================================================
+/**
+ * Removing a frequency is a two-step inline confirm (the ✕ arms the row, then
+ * the ✓ commits — same pattern as the recordings list), so a delete assertion
+ * has to drive BOTH steps. Clicking the ✕ alone only arms it and deletes
+ * nothing, which would leave these tests passing vacuously.
+ */
+async function removeRow(wrapper: VueWrapper, rowIndex = 0) {
+  await wrapper.findAll('.sdr-freq-row-del')[rowIndex].trigger('click')
+  // Only one row can be armed at a time, so the confirm ✓ is unambiguous.
+  await wrapper.find('.sdr-freq-row-del--confirm').trigger('click')
+}
+
 describe('SdrFrequencyManagerTab — delete', () => {
   it('DELETEs the row and emits changed', async () => {
     const wrapper = mountTab()
-    await wrapper.find('.sdr-freq-row-del').trigger('click')
+    await removeRow(wrapper)
     await flushPromises()
     expect(
       fetchCalls.some(
@@ -548,7 +601,7 @@ describe('SdrFrequencyManagerTab — delete', () => {
     const wrapper = mountTab()
     await wrapper.find('.sdr-freq-row-edit').trigger('click')
     expect(wrapper.find('.sdr-freq-editing').exists()).toBe(true)
-    await wrapper.find('.sdr-freq-row-del').trigger('click')
+    await removeRow(wrapper)
     await flushPromises()
     expect(wrapper.find('.sdr-freq-editing').exists()).toBe(false)
   })
@@ -558,7 +611,7 @@ describe('SdrFrequencyManagerTab — delete', () => {
       freqs: [makeFreq(), makeFreq({ id: 11, label: 'Coast' })],
     })
     await wrapper.findAll('.sdr-freq-row-edit')[0].trigger('click')
-    await wrapper.findAll('.sdr-freq-row-del')[1].trigger('click')
+    await removeRow(wrapper, 1)
     await flushPromises()
     expect(wrapper.find('.sdr-freq-editing').exists()).toBe(true)
   })
@@ -566,9 +619,55 @@ describe('SdrFrequencyManagerTab — delete', () => {
   it('swallows a network error on delete without emitting', async () => {
     fetchOverride = () => Promise.reject(new Error('offline'))
     const wrapper = mountTab()
-    await wrapper.find('.sdr-freq-row-del').trigger('click')
+    await removeRow(wrapper)
     await flushPromises()
     expect(wrapper.emitted('changed')).toBeUndefined()
+  })
+
+  it('cancels an armed row, returning focus to its plain ✕ and announcing the cancellation', async () => {
+    const wrapper = mountTab({ freqs: [makeFreq({ label: 'Tower' })] })
+    await wrapper.find('.sdr-freq-row-del').trigger('click')
+    expect(wrapper.find('.sdr-freq-row-del--confirm').exists()).toBe(true)
+    await wrapper.find('.sdr-freq-row-del--cancel').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.sdr-freq-row-del--confirm').exists()).toBe(false)
+    expect(wrapper.find('.sdr-freq-row-del').exists()).toBe(true)
+    expect(wrapper.find('[role="status"]').text()).toBe('Removal of Tower cancelled')
+    expect(document.activeElement).toBe(wrapper.find('.sdr-freq-row-del').element)
+  })
+
+  it('disarms a row that leaves the visible list when the group filter changes', async () => {
+    const wrapper = mountTab({
+      groups: [makeGroup(), makeGroup({ id: 2, name: 'Marine', slug: 'marine' })],
+      freqs: [makeFreq(), makeFreq({ id: 11, label: 'Coast', group_ids: [2] })],
+    })
+    // Arm the Tower row's remove (leaves it showing the ✓/✕ confirm pair).
+    await wrapper.findAll('.sdr-freq-row-del')[0].trigger('click')
+    expect(wrapper.find('.sdr-freq-row-del--confirm').exists()).toBe(true)
+    // Filtering to Marine hides Tower from the visible list entirely, which
+    // should disarm it (the watcher guard) rather than leaving it armed
+    // underneath the filter.
+    const chips = wrapper.findAll('.sdr-frequency-manager-groups-filter .sdr-scan-group-chip')
+    await chips.find((chip) => chip.text() === 'Marine')!.trigger('click')
+    // Returning to All should now show Tower with a plain ✕, not the armed
+    // confirm pair — proving the row was disarmed while hidden rather than
+    // merely hidden-but-still-armed.
+    await chips.find((chip) => chip.text() === 'All')!.trigger('click')
+    expect(freqRows(wrapper)).toHaveLength(2)
+    expect(wrapper.find('.sdr-freq-row-del--confirm').exists()).toBe(false)
+  })
+
+  it('leaves an armed row alone when the filter change does not remove it from view', async () => {
+    const wrapper = mountTab({
+      groups: [makeGroup(), makeGroup({ id: 2, name: 'Marine', slug: 'marine' })],
+      freqs: [makeFreq(), makeFreq({ id: 11, label: 'Coast', group_ids: [2] })],
+    })
+    // Arm the Tower row, then filter to Airband (which Tower still belongs
+    // to) — the watcher should find Tower still visible and leave it armed.
+    await wrapper.findAll('.sdr-freq-row-del')[0].trigger('click')
+    const chips = wrapper.findAll('.sdr-frequency-manager-groups-filter .sdr-scan-group-chip')
+    await chips.find((chip) => chip.text() === 'Airband')!.trigger('click')
+    expect(wrapper.find('.sdr-freq-row-del--confirm').exists()).toBe(true)
   })
 })
 

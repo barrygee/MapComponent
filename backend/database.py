@@ -83,6 +83,7 @@ async def create_tables():
             "ALTER TABLE sdr_stored_frequencies ADD COLUMN zoom REAL NOT NULL DEFAULT 1.0",
             "ALTER TABLE sdr_stored_frequencies ADD COLUMN zmin REAL NOT NULL DEFAULT 0.0",
             "ALTER TABLE sdr_stored_frequencies ADD COLUMN zmax REAL NOT NULL DEFAULT 0.0",
+            "ALTER TABLE sdr_stored_frequencies ADD COLUMN favourite INTEGER NOT NULL DEFAULT 0",
         ]:
             try:
                 await conn.execute(sa_text(col_sql))
@@ -301,6 +302,7 @@ async def sync_sdr_groups_to_config(session: AsyncSession) -> None:
                 "zmin": f.zmin,
                 "zmax": f.zmax,
                 "scannable": f.scannable,
+                "favourite": f.favourite,
                 "notes": f.notes,
                 "groups": slugs,
             }

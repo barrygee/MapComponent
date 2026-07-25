@@ -291,6 +291,7 @@ async def _reconcile_sdr_frequencies(db: AsyncSession, payload: list, catalogue:
             zmin=_coerce_float(item.get("zmin"), 0.0),
             zmax=_coerce_float(item.get("zmax"), 0.0),
             scannable=bool(item.get("scannable", True)),
+            favourite=bool(item.get("favourite", False)),
             notes=str(item.get("notes", ""))[:500],
             created_at=ts,
         )
