@@ -300,6 +300,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Align AARA labels with their zones in 3D
 - Make the APRS button reflect the viewed radio, not global decode
 - Reattach the APRS decode socket after a reload
+- Render APRS symbol icons in white
 
 ### Chores
 
@@ -1107,6 +1108,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #252 from barrygee/chore/document-e2e-gate
 - Merge pull request #251 from barrygee/feat/sdr-favourites-accordion
 - Merge pull request #253 from barrygee/feat/sdr-accordion-hover-and-row-alignment
+- Merge pull request #254 from barrygee/fix/aprs-symbol-icon-colour
 
 ### Refactoring
 
