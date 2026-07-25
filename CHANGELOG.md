@@ -115,6 +115,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Mute only the decoding radio's audio, with a Settings toggle
 - Persist a favourite flag on stored frequencies
 - Add a favourites accordion and restore the frequency manager tab
+- Tighten frequency manager spacing and unify accordion hover
 
 ### Bug Fixes
 
@@ -1105,6 +1106,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #250 from barrygee/chore/align-spa-types-node
 - Merge pull request #252 from barrygee/chore/document-e2e-gate
 - Merge pull request #251 from barrygee/feat/sdr-favourites-accordion
+- Merge pull request #253 from barrygee/feat/sdr-accordion-hover-and-row-alignment
 
 ### Refactoring
 
