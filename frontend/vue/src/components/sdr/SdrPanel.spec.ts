@@ -748,6 +748,48 @@ describe('SdrPanel — RADIO tab: APRS decode', () => {
     expect(aprsSpy).toHaveBeenCalled()
     expect(muteSpy).toHaveBeenCalled()
   })
+
+  // The event socket lives in the panel, so it dies with the page while the
+  // backend bridge keeps decoding — a reload (including the one Settings does on
+  // APPLY CHANGES) used to leave the dock stuck on "No packets to display".
+  it('re-subscribes to the event stream on mount when a radio is already decoding', async () => {
+    const store = useSdrStore()
+    store.setAprsRadioId(1) // as hydrated from the DB after a reload
+    decodeMock.start.mockClear()
+    await mountReady()
+    expect(decodeMock.start).toHaveBeenCalledWith(1)
+  })
+
+  it('re-subscribes to the decoding radio even while another radio is viewed', async () => {
+    const { wrapper } = await mountPlaying() // viewing radio 1
+    const store = useSdrStore()
+    decodeMock.start.mockClear()
+    store.setAprsRadioId(2) // decode is running on a different dongle
+    await wrapper.vm.$nextTick()
+    expect(decodeMock.start).toHaveBeenCalledWith(2)
+  })
+
+  it('leaves the event stream alone when no radio is decoding APRS', async () => {
+    // Explicit, not inherited: setAprsRadioId caches to localStorage, which
+    // outlives the per-test Pinia instance and would otherwise decide this.
+    useSdrStore().setAprsRadioId(null)
+    decodeMock.start.mockClear()
+    await mountReady()
+    expect(decodeMock.start).not.toHaveBeenCalled()
+  })
+
+  it('does not claim the event socket while digital voice decode owns it', async () => {
+    const { wrapper } = await mountPlaying()
+    const store = useSdrStore()
+    // Digital decode drives the shared per-radio socket itself (the first
+    // .sdr-digital-btn is DMR), so the APRS watcher must stand down.
+    await wrapper.find('.sdr-digital-btn').trigger('click')
+    await flushPromises()
+    decodeMock.start.mockClear()
+    store.setAprsRadioId(1)
+    await wrapper.vm.$nextTick()
+    expect(decodeMock.start).not.toHaveBeenCalled()
+  })
 })
 
 // =============================================================================

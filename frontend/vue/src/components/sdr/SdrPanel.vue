@@ -1156,6 +1156,27 @@ watch(
   { immediate: true },
 )
 
+// APRS decode survives a page reload (the backend bridge keeps running and the
+// radio is persisted), but the decode event socket does NOT — it lives in the
+// panel, and until now was opened only by a click on the APRS button. So the
+// dock came back after every reload — including the one SettingsPanel performs
+// on APPLY CHANGES — permanently stuck on "No packets to display", with the
+// sidecar happily decoding and nothing subscribed to /ws/sdr/{id}/decode.
+// Re-subscribe whenever a radio is decoding APRS, keyed off the DECODING radio
+// (not the viewed one) to match the dock, which shows the packet table from the
+// global aprsEnabled. Skipped while digital voice decode owns the socket —
+// useSdrDigitalDecode drives it then, and the two share one connection per
+// radio. `start` no-ops when already open on that radio, so a live session is
+// never churned.
+watch(
+  [() => _sdrStore().aprsRadioId, digitalEnabled],
+  ([decodingRadioId, isDigitalDecoding]) => {
+    if (isDigitalDecoding) return
+    if (decodingRadioId != null) sdrDecode.start(decodingRadioId)
+  },
+  { immediate: true },
+)
+
 async function toggleAprs() {
   const radioId = selectedRadioId.value
   if (!radioId) return
