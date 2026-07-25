@@ -301,6 +301,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Make the APRS button reflect the viewed radio, not global decode
 - Reattach the APRS decode socket after a reload
 - Render APRS symbol icons in white
+- Open the Frequency Manager GROUPS accordion by default
 
 ### Chores
 
@@ -1109,6 +1110,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #251 from barrygee/feat/sdr-favourites-accordion
 - Merge pull request #253 from barrygee/feat/sdr-accordion-hover-and-row-alignment
 - Merge pull request #254 from barrygee/fix/aprs-symbol-icon-colour
+- Merge pull request #255 from barrygee/fix/freq-manager-groups-open-by-default
 
 ### Refactoring
 
