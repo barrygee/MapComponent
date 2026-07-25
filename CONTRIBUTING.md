@@ -159,8 +159,15 @@ instructions, including how to audit against the live backend with
 ### Root tooling (repo root)
 
 ```bash
-npm run lint   # ESLint + Prettier --check (gating)
+npm run lint      # ESLint + Prettier --check (gating)
+npm run typecheck # tsc --noEmit over tsconfig.json (gating)
 ```
+
+The root `tsconfig.json` covers the same surface the root lint run does — the
+repo-root config files plus the full-stack e2e specs in `tests/e2e/`. Keep its
+`include` in step with the `lint` script's globs so a file can't be linted but
+never type-checked. Nothing is emitted from this context (`noEmit`); the app
+build is `build:spa`.
 
 ---
 
