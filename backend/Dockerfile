@@ -1,5 +1,5 @@
 # ── Stage 1: Build Vue SPA ────────────────────────────────────────────────────
-FROM node:20-alpine AS spa-builder
+FROM node:24-alpine AS spa-builder
 WORKDIR /repo/frontend/vue
 COPY frontend/vue/package.json frontend/vue/package-lock.json ./
 RUN npm ci
