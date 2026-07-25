@@ -41,16 +41,26 @@ uv run --project backend mypy backend                            # informational
 cd frontend/vue && npm run lint                                  # ESLint + Prettier --check
 cd frontend/vue && npm run typecheck                             # vue-tsc --noEmit
 cd frontend/vue && npm run test:coverage                         # vitest — GATED AT 100% coverage (CI fails on any drop)
+cd frontend/vue && npm run test:e2e                              # Playwright + axe-core (frontend/vue/e2e/) — GATING
+cd frontend/vue && npx playwright test e2e/sdr.spec.ts            # single e2e spec
+cd frontend/vue && npm run test:e2e:report                       # open the last HTML report
 
 # Root tooling
 npm run lint                                                     # ESLint + Prettier over root config files + tests/e2e specs
 npm run typecheck                                                # tsc --noEmit over the same surface (root tsconfig.json)
 ```
-All of the above run in CI (`.github/workflows/ci.yml`) on every PR and push to `main`; ruff check + `ruff format --check` + pytest (backend), ESLint/Prettier + vue-tsc + vitest@100% + Vite build (SPA), and ESLint/Prettier + `tsc` (root) are gating. mypy is not. A **husky** pre-commit hook (`.husky/pre-commit` + `.lintstagedrc.json`) mirrors the format/lint gates on staged files across both npm contexts. `CHANGELOG.md` is regenerated automatically from Conventional Commits on every push to `main` (`.github/workflows/changelog.yml`, git-cliff), and committed back to `main` with `[skip ci]` — it never touches feature branches, so local checkouts don't diverge. Don't hand-edit it. See `CONTRIBUTING.md` for the full contributor workflow and conventions; new code is expected to ship at 100% frontend coverage.
+All of the above run in CI (`.github/workflows/ci.yml`) on every PR and push to `main`; ruff check + `ruff format --check` + pytest (backend), ESLint/Prettier + vue-tsc + vitest@100% + Vite build + **Playwright/axe e2e** (SPA), and ESLint/Prettier + `tsc` (root) are gating.
+
+**Don't forget the e2e suite.** `npm run test:coverage` passing is NOT enough to know CI will be green — the `frontend-vue / a11y (Playwright + axe-core)` job is a separate gate, and UI restructuring (renaming a rail tab, moving a section between a pane and an accordion, adding an ARIA live region) breaks it while every vitest spec still passes. Run `npm run test:e2e` before pushing any UI change. Two gotchas that cost real time: Playwright's **strict mode** fails a bare locator that matches more than one element, so adding a second `[role="status"]` region breaks an unrelated shell spec — use `.first()` when the intent is "at least one"; and the suite serves the **committed** `frontend/spa-dist/` bundle via `npm run preview`, so `npm run build` first or you are testing stale code. mypy is not. A **husky** pre-commit hook (`.husky/pre-commit` + `.lintstagedrc.json`) mirrors the format/lint gates on staged files across both npm contexts. `CHANGELOG.md` is regenerated automatically from Conventional Commits on every push to `main` (`.github/workflows/changelog.yml`, git-cliff), and committed back to `main` with `[skip ci]` — it never touches feature branches, so local checkouts don't diverge. Don't hand-edit it. See `CONTRIBUTING.md` for the full contributor workflow and conventions; new code is expected to ship at 100% frontend coverage.
 
 ## Two npm contexts — don't confuse them
-- **`frontend/vue/`** — the real app (Vite + Vue 3 + Pinia + vue-router); tested with **vitest** (100% coverage gate) + ESLint/Prettier + `vue-tsc`.
+- **`frontend/vue/`** — the real app (Vite + Vue 3 + Pinia + vue-router); tested with **vitest** (100% coverage gate) + ESLint/Prettier + `vue-tsc`, **plus the Playwright/axe e2e suite in `frontend/vue/e2e/`**.
 - **Repo-root `package.json`** — root-level tooling only: ESLint/Prettier over config files + the full-stack e2e specs in `tests/e2e/`, plus husky/lint-staged. Not the app build.
+
+## Two SEPARATE e2e suites — check both
+There are two, in different directories, run by different tooling. Finding one and assuming it is the only one is a live trap:
+- **`frontend/vue/e2e/`** — the big one (10 spec files, ~93 tests: shell, sdr, air, space, sidebar, settings, notifications, connectivity, scaffolding, a11y). Playwright + `@axe-core/playwright`, config `frontend/vue/playwright.config.ts`, run via `npm run test:e2e` from `frontend/vue/`. **This is the gating CI job**, and it is where UI-structure assertions live (rail tab ids and counts, `aria-controls` targets, live regions).
+- **`tests/e2e/`** — one full-stack smoke spec, config `playwright.fullstack.config.ts` at the repo root, driven by the root `package.json`.
 
 ## Architecture
 
