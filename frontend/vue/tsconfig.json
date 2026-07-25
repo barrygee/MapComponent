@@ -1,9 +1,15 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    // ES2022 baseline: the app already relies on ES2022 library features
+    // (Array.prototype.at in 34 places) and Vite's default build target covers
+    // them. The ES2020 lib only appeared to work because @types/node backfilled
+    // the declarations — a coincidence that broke when it was bumped to v24. The
+    // ES2023 lib matches tsconfig.node.json, so both projects declare the same
+    // runtime surface.
+    "target": "ES2022",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
