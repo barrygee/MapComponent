@@ -26,11 +26,11 @@ function makeFreqGroupsFor(groups: SdrFrequencyGroup[]) {
 }
 
 describe('useFrequencyGroupFilter — initial state', () => {
-  it('starts with All selected, no groups selected and the accordion collapsed', () => {
+  it('starts with All selected, no groups selected and the accordion expanded', () => {
     const filter = useFrequencyGroupFilter(makeFreqGroupsFor([]))
     expect(filter.allSelected.value).toBe(true)
     expect(filter.selectedGroupIds.value).toEqual([])
-    expect(filter.expanded.value).toBe(false)
+    expect(filter.expanded.value).toBe(true)
   })
 })
 

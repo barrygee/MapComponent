@@ -22,9 +22,9 @@ export function useFrequencyGroupFilter(
 ) {
   const selectedGroupIds = ref<number[]>([])
   const allSelected = ref(true)
-  // Collapsed by default to keep the section compact, matching the
-  // pre-extraction Frequency Manager behaviour.
-  const expanded = ref(false)
+  // Expanded by default so the group chips are visible on arrival — filtering
+  // by group is the primary way users navigate a long frequency list.
+  const expanded = ref(true)
 
   function toggleAll() {
     allSelected.value = true
