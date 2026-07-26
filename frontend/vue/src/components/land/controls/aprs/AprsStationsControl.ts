@@ -1,7 +1,20 @@
 import maplibregl from 'maplibre-gl'
 import { watch, type WatchStopHandle } from 'vue'
 import { SentinelControlBase } from '@/components/air/controls/sentinel-control-base/SentinelControlBase'
-import { aprsSymbolSvg } from '@/utils/aprsSymbols'
+import { aprsSymbolIcon, aprsSymbolSvg } from '@/utils/aprsSymbols'
+import { APRS_ACCENT_COLOR, APRS_BADGE_BACKGROUND } from '@/constants/aprs'
+import {
+  appendMirrored,
+  createAccentBadge,
+  createDimBadge,
+  createDirectionArrowShape,
+  createGlyphSvg,
+  createGlyphWell,
+  createLabelPill,
+  createNameSegment,
+  isLeftFacing,
+  MAP_LABEL_SIZE_PX,
+} from '@/components/shared/map-label/mapLabelParts'
 import type { AprsStation, useLandStore } from '@/stores/land'
 
 type LandStore = ReturnType<typeof useLandStore>
@@ -20,8 +33,9 @@ type LandStore = ReturnType<typeof useLandStore>
  */
 export class AprsStationsControl extends SentinelControlBase {
   private readonly _landStore: LandStore
-  private _visible = true
   private _markers = new Map<string, maplibregl.Marker>()
+  private _markerSignatures = new Map<string, string>()
+  private _markerPositions = new Map<string, [number, number]>()
   private _popup: maplibregl.Popup | null = null
   private _stopWatch: WatchStopHandle | null = null
   private _a11yRegion: HTMLDivElement | null = null
@@ -45,21 +59,35 @@ export class AprsStationsControl extends SentinelControlBase {
     return 'Toggle APRS stations'
   }
 
+  /** Whether the APRS layer is shown. Lives on the store so the side panel can
+   *  list exactly what the map plots. */
+  private get _visible(): boolean {
+    return this._landStore.aprsLayerVisible
+  }
+
   protected onInit(): void {
     this.setButtonActive(this._visible)
     this._ensureA11yRegion()
     // Poll the station snapshot while this control is on the map, and re-render
     // markers + the a11y table whenever the list changes.
     this._landStore.startAprsPolling()
+    // Re-render on either input: a new station snapshot, or the operator
+    // switching label fields on/off in Settings. Watching the store directly is
+    // enough — unlike the Air domain, no DOM CustomEvent bridge is needed.
     this._stopWatch = watch(
-      () => this._landStore.aprsStations,
-      (stations) => this._render(stations),
+      () =>
+        [
+          this._landStore.aprsStations,
+          this._landStore.aprsLabelFields,
+          this._landStore.aprsLayerVisible,
+        ] as const,
+      () => this._render(this._landStore.aprsStations),
       { immediate: true, deep: true },
     )
   }
 
   protected handleClick(): void {
-    this._visible = !this._visible
+    this._landStore.setAprsLayerVisible(!this._visible)
     this.setButtonActive(this._visible)
     this._render(this._landStore.aprsStations)
   }
@@ -68,7 +96,7 @@ export class AprsStationsControl extends SentinelControlBase {
    *  config), a no-op if already in that state. */
   setVisible(visible: boolean): void {
     if (this._visible === visible) return
-    this._visible = visible
+    this._landStore.setAprsLayerVisible(visible)
     this.setButtonActive(this._visible)
     this._render(this._landStore.aprsStations)
   }
@@ -95,57 +123,176 @@ export class AprsStationsControl extends SentinelControlBase {
   /** Add/update/remove markers so the on-map set matches `stations` by callsign. */
   private _syncMarkers(stations: AprsStation[]): void {
     const seen = new Set<string>()
-    for (const station of stations) {
+    for (const { station, stackIndex } of withStackIndices(stations)) {
       seen.add(station.callsign)
       const coords: [number, number] = [station.longitude, station.latitude]
+      const signature = this._markerSignature(station, stackIndex)
       const existing = this._markers.get(station.callsign)
-      if (existing) {
-        existing.setLngLat(coords)
+      // Label content unchanged → keep the existing marker. A station only ever
+      // moves when its beacon actually reports a new fix: re-plotting on an
+      // unchanged position would make a stationary marker twitch as the poll
+      // repeats the same snapshot.
+      if (existing && this._markerSignatures.get(station.callsign) === signature) {
+        if (this._hasMoved(station.callsign, coords)) {
+          existing.setLngLat(coords)
+          this._markerPositions.set(station.callsign, coords)
+        }
         continue
       }
+      // Anything else (a new field value, or a course change that flips the
+      // pill's direction and therefore its anchor) needs the marker rebuilding,
+      // since MapLibre fixes both element and anchor at construction.
+      existing?.remove()
       const marker = new maplibregl.Marker({
         element: this._buildMarkerElement(station),
-        anchor: 'top-left',
+        // Keep the glyph over the station's actual position: a left-facing pill
+        // extends leftward, so it anchors by its right edge.
+        anchor: this._isLeftFacing(station) ? 'right' : 'left',
+        // Co-sited stations (repeater + digipeater on one mast, all beaconing
+        // the same fix) would otherwise stack exactly on top of each other and
+        // read as a single station. The first keeps the true position and the
+        // rest step down from it.
+        offset: [0, stackIndex * STACKED_LABEL_OFFSET_PX],
       })
         .setLngLat(coords)
         .addTo(this.map)
       this._markers.set(station.callsign, marker)
+      this._markerSignatures.set(station.callsign, signature)
+      this._markerPositions.set(station.callsign, coords)
     }
     // Drop markers for stations no longer present (expired or hidden).
     for (const [callsign, marker] of this._markers) {
       if (!seen.has(callsign)) {
         marker.remove()
         this._markers.delete(callsign)
+        this._markerSignatures.delete(callsign)
+        this._markerPositions.delete(callsign)
       }
     }
   }
 
+  /** Whether this snapshot carries a genuinely new fix for the station, rather
+   *  than a repeat of the position already plotted. */
+  private _hasMoved(callsign: string, coords: [number, number]): boolean {
+    const plotted = this._markerPositions.get(callsign)
+    /* v8 ignore start -- defensive: a marker always has a recorded position */
+    if (!plotted) return true
+    /* v8 ignore stop */
+    return plotted[0] !== coords[0] || plotted[1] !== coords[1]
+  }
+
+  /** Whether a station is travelling leftward across the screen. Stations with
+   *  no reported course (digipeaters, weather nodes) always read right-facing. */
+  private _isLeftFacing(station: AprsStation): boolean {
+    return typeof station.course === 'number' && isLeftFacing(station.course)
+  }
+
+  /**
+   * Everything about a station that affects its rendered pill, as one string —
+   * cheap change detection so unchanged markers are never rebuilt.
+   *
+   * Values only count when the field that shows them is switched on, which
+   * matters most for position: a station beaconing a new fix every few seconds
+   * would otherwise rebuild its marker on every poll instead of taking the far
+   * cheaper `setLngLat` path. Facing is always included because it decides the
+   * marker's anchor, not just its content.
+   */
+  private _markerSignature(station: AprsStation, stackIndex: number): string {
+    const fields = this._landStore.aprsLabelFields
+    const shown = (enabled: boolean, value: unknown) => (enabled ? value : null)
+    return JSON.stringify([
+      this._isLeftFacing(station),
+      // The offset is fixed when the marker is constructed, so a change in how
+      // many stations share this site has to rebuild it.
+      stackIndex,
+      fields,
+      shown(fields.callsign, station.callsign),
+      shown(fields.symbolText, station.symbol),
+      shown(fields.time, station.last_heard_ms),
+      shown(fields.course, station.course),
+      shown(fields.speed, station.speed),
+      shown(fields.altitude, station.altitude),
+      shown(fields.latitude, station.latitude),
+      shown(fields.longitude, station.longitude),
+      shown(fields.path, station.path),
+      shown(fields.comment, station.comment),
+      // With the icon shown and no course reported, the well draws the symbol
+      // glyph — so a symbol change must redraw it even when the text chip is off.
+      fields.symbol && station.course === null ? station.symbol : null,
+    ])
+  }
+
+  /**
+   * Build a station's map label: the shared Sentinel pill, in the APRS accent,
+   * showing whichever fields the operator has enabled.
+   *
+   * The leading icon and the symbol's name are separate fields: an operator can
+   * keep the at-a-glance glyph while dropping the "CAR"/"DIGIPEATER" text, or
+   * vice versa.
+   */
   private _buildMarkerElement(station: AprsStation): HTMLDivElement {
-    const element = document.createElement('div')
-    element.style.cssText =
-      'cursor:pointer;pointer-events:auto;user-select:none;display:flex;align-items:center;gap:4px'
+    const fields = this._landStore.aprsLabelFields
+    const leftFacing = this._isLeftFacing(station)
+    const symbol = aprsSymbolIcon(station.symbol)
 
-    // The decoded APRS symbol as a line-art icon (car, digipeater, weather, …),
-    // in the map's accent colour — matching the air-domain marker style. Unknown
-    // symbols fall back to a generic beacon dot.
-    const icon = document.createElement('span')
-    icon.style.cssText =
-      'display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 0 2px #0a0d14)'
-    icon.innerHTML = aprsSymbolSvg(station.symbol, { size: 18, color: '#c8ff00' })
-    element.appendChild(icon)
+    // With the icon switched off the callsign has no glyph to sit against, so
+    // both its edges are outer edges and it takes the balanced padding.
+    const nameSide = fields.symbol ? (leftFacing ? 'left' : 'right') : 'standalone'
 
-    const label = document.createElement('span')
-    label.style.cssText =
-      "color:#c8ff00;font-family:'Barlow Condensed','Barlow',monospace;font-size:10px;font-weight:700;" +
-      'letter-spacing:.06em;white-space:nowrap;pointer-events:none;text-shadow:0 0 3px #0a0d14'
-    label.textContent = station.callsign
-    element.appendChild(label)
+    const pill = createLabelPill()
+    pill.style.pointerEvents = 'auto'
+    pill.dataset.dir = leftFacing ? 'left' : 'right'
+    pill.dataset.callsign = station.callsign
+    pill.setAttribute('aria-label', `APRS station ${station.callsign}, ${symbol.label}`)
 
-    element.addEventListener('click', (domEvent: Event) => {
+    appendMirrored(
+      pill,
+      [
+        fields.symbol ? createGlyphWell(this._glyphMarkup(station)) : null,
+        fields.callsign ? createNameSegment(station.callsign, nameSide) : null,
+        fields.symbolText
+          ? createAccentBadge(symbol.label, APRS_BADGE_BACKGROUND, APRS_ACCENT_COLOR)
+          : null,
+        this._dimField(fields.time, 'TIME', formatHeardTime(station.last_heard_ms)),
+        this._dimField(fields.course, 'CRS', formatCourse(station.course)),
+        this._dimField(fields.speed, 'SPD', formatSpeed(station.speed)),
+        this._dimField(fields.altitude, 'ALT', formatAltitude(station.altitude)),
+        this._dimField(fields.latitude, 'LAT', station.latitude.toFixed(4)),
+        this._dimField(fields.longitude, 'LON', station.longitude.toFixed(4)),
+        this._dimField(fields.path, 'PATH', truncate(station.path)),
+        this._dimField(fields.comment, 'CMT', truncate(station.comment)),
+      ],
+      leftFacing,
+    )
+
+    pill.addEventListener('click', (domEvent: Event) => {
       domEvent.stopPropagation()
       this._openPopup(station)
+      // Let the Land side panel expand this station's row (see LandFilter).
+      document.dispatchEvent(
+        new CustomEvent('aprs-station-selected', { detail: { callsign: station.callsign } }),
+      )
     })
-    return element
+    return pill
+  }
+
+  /**
+   * The icon drawn in the label's leading well: a course arrow when the station
+   * reports a course — identical to an aircraft's track arrow, so movement is
+   * readable at a glance — otherwise its APRS symbol, since an arrow would imply
+   * a heading the beacon never sent.
+   */
+  private _glyphMarkup(station: AprsStation): string {
+    return typeof station.course === 'number'
+      ? createGlyphSvg(createDirectionArrowShape(APRS_ACCENT_COLOR), station.course)
+      : aprsSymbolSvg(station.symbol, { size: MAP_LABEL_SIZE_PX - 10, color: APRS_ACCENT_COLOR })
+  }
+
+  /** A dim `LABEL value` segment, or null when the field is switched off or the
+   *  packet didn't carry it. */
+  private _dimField(enabled: boolean, label: string, value: string | null): HTMLSpanElement | null {
+    if (!enabled || value === null) return null
+    return createDimBadge(label, escapeHtml(value), APRS_ACCENT_COLOR)
   }
 
   private _openPopup(station: AprsStation): void {
@@ -163,11 +310,13 @@ export class AprsStationsControl extends SentinelControlBase {
     ]
     if (station.comment) rows.push(escapeHtml(station.comment))
     if (typeof station.course === 'number' || typeof station.speed === 'number') {
-      const course = typeof station.course === 'number' ? `${Math.round(station.course)}°` : '—'
-      const speed = typeof station.speed === 'number' ? `${Math.round(station.speed)} kn` : '—'
-      rows.push(`Course ${course} · Speed ${speed}`)
+      // Units come straight from aprslib's normalised values (km/h, not the
+      // packet's knots) — the previous "kn" label misreported them.
+      rows.push(
+        `Course ${formatCourse(station.course) ?? '—'} · Speed ${formatSpeed(station.speed) ?? '—'}`,
+      )
     }
-    rows.push(`Heard ${new Date(station.last_heard_ms).toLocaleTimeString([], { hour12: false })}`)
+    rows.push(`Heard ${formatHeardTime(station.last_heard_ms)}`)
     return (
       '<div style="font-family:\'Barlow\',sans-serif;font-size:12px;line-height:1.5;color:#0a0d14">' +
       rows.join('<br>') +
@@ -200,23 +349,122 @@ export class AprsStationsControl extends SentinelControlBase {
       this._a11yRegion.innerHTML = '<p>No APRS stations heard.</p>'
       return
     }
+    // The table carries every field regardless of which are switched on for the
+    // map labels: it is the accessible equivalent of the map, and a screen-reader
+    // user shouldn't lose data to a visual-density setting.
     const rows = stations
       .map((station) => {
-        const position = `${station.latitude.toFixed(4)}, ${station.longitude.toFixed(4)}`
-        const comment = station.comment ? escapeHtml(station.comment) : ''
-        return `<tr><td>${escapeHtml(station.callsign)}</td><td>${position}</td><td>${comment}</td></tr>`
+        const cells = [
+          escapeHtml(station.callsign),
+          escapeHtml(aprsSymbolIcon(station.symbol).label),
+          formatHeardTime(station.last_heard_ms),
+          `${station.latitude.toFixed(4)}, ${station.longitude.toFixed(4)}`,
+          formatCourse(station.course) ?? '',
+          formatSpeed(station.speed) ?? '',
+          formatAltitude(station.altitude) ?? '',
+          station.path ? escapeHtml(station.path) : '',
+          station.comment ? escapeHtml(station.comment) : '',
+        ]
+        return `<tr>${cells.map((cell) => `<td>${cell}</td>`).join('')}</tr>`
       })
       .join('')
+    const headers = [
+      'Callsign',
+      'Symbol',
+      'Time',
+      'Position',
+      'Course',
+      'Speed',
+      'Altitude',
+      'Path',
+      'Comment',
+    ]
     this._a11yRegion.innerHTML =
-      '<table><caption>APRS stations heard</caption>' +
-      '<thead><tr><th scope="col">Callsign</th><th scope="col">Position</th><th scope="col">Comment</th></tr></thead>' +
-      `<tbody>${rows}</tbody></table>`
+      '<table><caption>APRS stations heard</caption><thead><tr>' +
+      headers.map((header) => `<th scope="col">${header}</th>`).join('') +
+      `</tr></thead><tbody>${rows}</tbody></table>`
   }
 
   private _clearMarkers(): void {
     for (const marker of this._markers.values()) marker.remove()
     this._markers.clear()
   }
+}
+
+/** Vertical step between the labels of stations sharing one site, in pixels —
+ *  just over a label's height, so stacked pills read as a list without touching. */
+const STACKED_LABEL_OFFSET_PX = 30
+
+/** Decimal places used to decide two stations share a site (3 dp ≈ 110 m). */
+const SITE_PRECISION_DP = 3
+
+/** A station together with its position in its site's label stack. */
+export interface StackedStation {
+  station: AprsStation
+  /** 0 for the station holding the site's true position, 1 for the next, … */
+  stackIndex: number
+}
+
+/**
+ * Pair each station with its position within its site's stack.
+ *
+ * Co-sited stations are routine in APRS — a repeater, its digipeater and a
+ * gateway on one mast all beacon the same coordinates — and superimposed labels
+ * would otherwise render as a single unreadable smear, making the map look like
+ * it holds fewer stations than it does.
+ *
+ * Ordering is by callsign rather than arrival, so a station keeps its place in
+ * the stack across polls instead of hopping about as beacons arrive.
+ */
+export function withStackIndices(stations: AprsStation[]): StackedStation[] {
+  const sites = new Map<string, AprsStation[]>()
+  for (const station of stations) {
+    const siteKey = `${station.latitude.toFixed(SITE_PRECISION_DP)},${station.longitude.toFixed(SITE_PRECISION_DP)}`
+    const site = sites.get(siteKey)
+    if (site) site.push(station)
+    else sites.set(siteKey, [station])
+  }
+  const stacked: StackedStation[] = []
+  for (const site of sites.values()) {
+    const ordered = [...site].sort((left, right) => left.callsign.localeCompare(right.callsign))
+    ordered.forEach((station, stackIndex) => stacked.push({ station, stackIndex }))
+  }
+  return stacked
+}
+
+/** Time a station was last heard, as 24-hour local wall time. */
+export function formatHeardTime(lastHeardMs: number): string {
+  return new Date(lastHeardMs).toLocaleTimeString([], { hour12: false })
+}
+
+/** Course over ground in whole degrees, or null when not reported. */
+export function formatCourse(course: number | null): string | null {
+  return typeof course === 'number' ? `${Math.round(course)}°` : null
+}
+
+/** Speed in km/h — the unit aprslib normalises APRS speeds to (it converts the
+ *  packet's knots on parse), so the raw value must not be relabelled here. */
+export function formatSpeed(speed: number | null): string | null {
+  return typeof speed === 'number' ? `${Math.round(speed)} KM/H` : null
+}
+
+/** Altitude in metres — likewise already converted from the packet's feet. */
+export function formatAltitude(altitude: number | null): string | null {
+  return typeof altitude === 'number' ? `${Math.round(altitude)} M` : null
+}
+
+/** Longest free-text run allowed on a map label before it crowds the map. */
+const MAX_LABEL_TEXT_LENGTH = 24
+
+/** Clip free-text fields (path, comment) so one chatty station can't stretch a
+ *  pill across the viewport. The full text stays in the popup and side panel. */
+export function truncate(value: string | null): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  return trimmed.length > MAX_LABEL_TEXT_LENGTH
+    ? `${trimmed.slice(0, MAX_LABEL_TEXT_LENGTH - 1)}…`
+    : trimmed
 }
 
 /** Escape a string for safe interpolation into marker/popup/table HTML. */
