@@ -356,7 +356,7 @@ describe('AprsStationsControl', () => {
         const glyph = marker.element.querySelector('.adsb-arrow-wrap svg')!
         return glyph.getAttribute('width')
       })
-      expect(sizes).toEqual(['11', '11'])
+      expect(sizes).toEqual(['15', '15'])
     })
 
     it('draws the glyph and dim field labels in white', () => {

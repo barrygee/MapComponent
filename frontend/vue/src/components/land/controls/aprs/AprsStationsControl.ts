@@ -372,7 +372,7 @@ export class AprsStationsControl extends SentinelControlBase {
         aprsSymbolSvg(station.symbol, {
           size: MAP_LABEL_GLYPH_SIZE_PX,
           color: APRS_ACCENT_COLOR,
-          strokeWidth: 2.6,
+          strokeWidth: 2.2,
         })
   }
 

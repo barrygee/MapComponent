@@ -20,8 +20,10 @@
 export const MAP_LABEL_SIZE_PX = 26
 
 /** Rendered size of the glyph inside the well, in pixels. Every domain draws at
- *  this size so an aircraft arrow and an APRS symbol read as one icon family. */
-export const MAP_LABEL_GLYPH_SIZE_PX = 11
+ *  this size so an aircraft arrow and an APRS symbol read as one icon family.
+ *  Sized against the label's 14px type rather than the 26px well, which carries
+ *  its own padding. */
+export const MAP_LABEL_GLYPH_SIZE_PX = 15
 
 /** Shared type stack for every label segment. */
 const MAP_LABEL_FONT_STACK = "'Barlow Condensed','Barlow',sans-serif"

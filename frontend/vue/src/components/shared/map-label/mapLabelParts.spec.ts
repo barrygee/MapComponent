@@ -12,6 +12,7 @@ import {
   createLocationPinShape,
   createNameSegment,
   isLeftFacing,
+  MAP_LABEL_GLYPH_SIZE_PX,
   MAP_LABEL_SIZE_PX,
 } from './mapLabelParts'
 
@@ -65,6 +66,16 @@ describe('mapLabelParts', () => {
     it('lets a rotated shape overflow its viewBox rather than clipping it', () => {
       // A rotated arrowhead's corners fall outside the 12×12 box at some angles.
       expect(createGlyphSvg('<polygon/>', 45)).toContain('overflow:visible')
+    })
+
+    it('renders every domain’s glyph at the shared size', () => {
+      // Air arrows and APRS symbols draw from this one constant, so they can
+      // never end up different sizes on the same map.
+      const svg = createGlyphSvg('<polygon/>')
+      expect(svg).toContain(`width="${MAP_LABEL_GLYPH_SIZE_PX}"`)
+      expect(svg).toContain(`height="${MAP_LABEL_GLYPH_SIZE_PX}"`)
+      // Comfortably inside the well, which carries its own padding.
+      expect(MAP_LABEL_GLYPH_SIZE_PX).toBeLessThan(MAP_LABEL_SIZE_PX)
     })
 
     it('embeds the shape markup it was given', () => {
