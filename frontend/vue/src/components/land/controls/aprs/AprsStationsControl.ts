@@ -595,7 +595,7 @@ export function groupStationsBySite(stations: AprsStation[]): StationSite[] {
   return [...sites.values()]
 }
 
-/** Size of the site marker's inner square, in pixels. Small: it marks a point,
+/** Diameter of the site marker's inner dot, in pixels. Small: it marks a point,
  *  and has to sit under a column of labels without competing with them. */
 const SITE_MARKER_SIZE_PX = 12
 
@@ -605,10 +605,10 @@ const SITE_MARKER_RING_PX = 2
 /**
  * The marker showing a shared site's real position.
  *
- * A small square — a dark grey centre inside a black ring, which is what holds
- * it against both the pale roads and the dark water the basemap puts under it.
- * Nothing is drawn inside: a glyph here would compete with the station symbols
- * on the labels it leads to.
+ * A small dark grey dot inside a black ring — two concentric circles, which is
+ * what holds it against both the pale roads and the dark water the basemap puts
+ * under it. Nothing is drawn inside: a glyph here would compete with the station
+ * symbols on the labels it leads to.
  *
  * Purely a position cue: it takes no pointer events, so it never intercepts a
  * click meant for a label, and is hidden from assistive tech, which reads the
@@ -622,6 +622,7 @@ export function buildSiteMarker(branches: LeaderBranch[]): HTMLElement {
     `width:${SITE_MARKER_SIZE_PX}px`,
     `height:${SITE_MARKER_SIZE_PX}px`,
     `background:${APRS_BADGE_BACKGROUND}`,
+    'border-radius:50%',
     // Drawn as a shadow rather than a border so the ring sits outside the box,
     // leaving the marker's centre exactly on the site's position.
     `box-shadow:0 0 0 ${SITE_MARKER_RING_PX}px ${APRS_SITE_MARKER_BACKGROUND}`,

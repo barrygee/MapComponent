@@ -831,18 +831,19 @@ describe('AprsStationsControl', () => {
       expect(verticalOffsets).toEqual([43, 73, 103])
     })
 
-    it('marks the site with a small ringed square', () => {
+    it('marks the site with a small ringed dot', () => {
       store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
       addControl()
       const marker = dotMarkers()[0]!.element
       expect(marker.style.width).toBe('12px')
       expect(marker.style.height).toBe('12px')
-      // Dark grey centre in a black ring: the pairing that holds against both
-      // the pale roads and the dark water the basemap puts under it.
+      // Concentric circles — a dark grey dot in a black ring — which is the
+      // pairing that holds against both the pale roads and the dark water the
+      // basemap puts under it.
+      expect(marker.style.borderRadius).toBe('50%')
       expect(marker.style.background).toBe('rgb(21, 23, 29)')
       expect(marker.style.boxShadow).toBe('0 0 0 2px #000000')
-      // Square, and with nothing drawn inside it but the leaders.
-      expect(marker.style.borderRadius).toBe('')
+      // Nothing drawn inside it but the leaders.
       expect(marker.querySelector('svg:not(.aprs-site-leaders)')).toBeNull()
     })
 
