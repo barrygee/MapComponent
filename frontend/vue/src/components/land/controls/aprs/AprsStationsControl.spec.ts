@@ -78,6 +78,7 @@ vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker, Popup: mock
 import {
   AprsStationsControl,
   groupStationsBySite,
+  planSiteLayout,
   formatAltitude,
   formatCourse,
   formatHeardTime,
@@ -106,23 +107,7 @@ function station(overrides: Partial<AprsStation> = {}): AprsStation {
 function makeFakeMap() {
   const container = document.createElement('div')
   document.body.appendChild(container)
-  const handlers: Record<string, (() => void)[]> = {}
-  return {
-    getContainer: () => container,
-    _container: container,
-    // A linear projection is enough: co-located stations project to the same
-    // point, and separated ones to a predictable pixel delta.
-    project: ([lon, lat]: [number, number]) => ({ x: lon * 1000, y: -lat * 1000 }),
-    on: (event: string, handler: () => void) => {
-      ;(handlers[event] ??= []).push(handler)
-    },
-    off: (event: string, handler: () => void) => {
-      handlers[event] = (handlers[event] ?? []).filter((each) => each !== handler)
-    },
-    /** Fire a map event, as MapLibre would while panning or zooming. */
-    _emit: (event: string) => (handlers[event] ?? []).forEach((handler) => handler()),
-    _handlerCount: (event: string) => (handlers[event] ?? []).length,
-  }
+  return { getContainer: () => container, _container: container }
 }
 
 describe('AprsStationsControl', () => {
@@ -811,47 +796,39 @@ describe('AprsStationsControl', () => {
       expect(remaining[0]!.element.querySelector('.aprs-leader-line')).toBeNull()
     })
 
-    it('reaches a station that sits apart from its site, not where it would be if co-located', () => {
-      // A site groups stations within ~110 m. Zoomed in, that spread is visible:
-      // the leader must reach the label's real position, or it dangles in space
-      // while the label sits somewhere else entirely.
+    it('gives a nearby station its own marker on its own real position', () => {
+      // ~11 m apart: a tolerance would have lumped these into one site, putting
+      // the marker somewhere none of them actually is — and stranding a label
+      // when they separate on screen. Each keeps its own point instead.
       store.aprsStations = [
         station({ callsign: 'AAA', course: null, latitude: 54.9, longitude: -1.5 }),
-        station({ callsign: 'BBB', course: null, latitude: 54.9, longitude: -1.5004 }),
+        station({ callsign: 'BBB', course: null, latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'NEARBY', course: null, latitude: 54.9, longitude: -1.5002 }),
       ]
       addControl()
-      const paths = [...dotMarkers()[0]!.element.querySelectorAll('.aprs-site-leaders path')].map(
-        (path) => path.getAttribute('d')!,
-      )
-      // AAA is at the site origin, so its branch is the plain label offset.
-      expect(paths[0]).toBe('M 13 13 L 13 30 Q 13 56 39 56 L 41 56')
-      // BBB projects 0.4px left of the origin under the test projection, and its
-      // branch follows it rather than assuming the site's own point.
-      expect(paths[1]).toContain('L 40.6 86')
+      const markers = dotMarkers()
+      expect(markers).toHaveLength(2)
+      expect(markers.map((marker) => marker.lngLat)).toEqual([
+        [-1.5, 54.9],
+        [-1.5002, 54.9],
+      ])
+      // Each marker tethers only its own stations.
+      expect(markers[0]!.element.querySelectorAll('.aprs-site-leaders path')).toHaveLength(2)
+      expect(markers[1]!.element.querySelectorAll('.aprs-site-leaders path')).toHaveLength(1)
     })
 
-    it('redraws the leaders as the map moves', () => {
+    it('shares one label column between neighbouring sites, so stacks never collide', () => {
+      // Zoomed out, sites metres apart sit on the same pixel: numbering their
+      // labels straight through is what stops the second stack landing on the
+      // first, which is the pile-up this whole treatment exists to prevent.
       store.aprsStations = [
-        station({ callsign: 'AAA', course: null }),
-        station({ callsign: 'BBB', course: null }),
+        station({ callsign: 'AAA', course: null, latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', course: null, latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'NEARBY', course: null, latitude: 54.9, longitude: -1.5002 }),
       ]
-      const { map } = addControl()
-      expect(map._handlerCount('move')).toBe(1)
-
-      const leaders = () => dotMarkers()[0]!.element.querySelector('.aprs-site-leaders')
-      const before = leaders()
-      map._emit('move')
-      // Redrawn, not merely left in place: at a new zoom the pixel geometry
-      // between a site and its stations is different.
-      expect(leaders()).not.toBe(before)
-      expect(leaders()!.querySelectorAll('path')).toHaveLength(2)
-    })
-
-    it('stops redrawing leaders once the control is removed', () => {
-      store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
-      const { control, map } = addControl()
-      control.onRemove()
-      expect(map._handlerCount('move')).toBe(0)
+      addControl()
+      const verticalOffsets = labelMarkers().map((marker) => marker.offset![1])
+      expect(verticalOffsets).toEqual([43, 73, 103])
     })
 
     it('marks the site with the same square well the labels use, holding a pin', () => {
@@ -880,30 +857,47 @@ describe('AprsStationsControl', () => {
       expect(dot.getAttribute('aria-hidden')).toBe('true')
     })
 
-    it('reuses one dot for a site across polls, moving it if the fix changes', async () => {
+    it('redraws the leaders when another station joins the same fix', async () => {
       store.aprsStations = [
         station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
         station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
       ]
       addControl()
-      const dotsAfterFirstRender = created.markers.filter((marker) =>
-        marker.element.classList.contains('aprs-site-marker'),
-      )
-      expect(dotsAfterFirstRender).toHaveLength(1)
+      const marker = dotMarkers()[0]!
+      expect(marker.element.querySelectorAll('.aprs-site-leaders path')).toHaveLength(2)
 
-      // A later poll nudges the shared fix within the site's tolerance: the dot
-      // follows rather than being torn down and rebuilt.
       store.aprsStations = [
-        station({ callsign: 'AAA', latitude: 54.9001, longitude: -1.5 }),
-        station({ callsign: 'BBB', latitude: 54.9001, longitude: -1.5 }),
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'CCC', latitude: 54.9, longitude: -1.5 }),
       ]
       await nextTick()
-      const allDots = created.markers.filter((marker) =>
+      // The marker is kept, but its leaders grow a branch for the newcomer.
+      expect(dotMarkers()).toHaveLength(1)
+      expect(dotMarkers()[0]).toBe(marker)
+      expect(marker.element.querySelectorAll('.aprs-site-leaders path')).toHaveLength(3)
+    })
+
+    it('keeps one marker for a site across polls rather than rebuilding it', async () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
+      ]
+      addControl()
+      expect(dotMarkers()).toHaveLength(1)
+
+      // A later poll repeats the same fix: the marker stays put instead of
+      // being torn down and recreated on every 5-second refresh.
+      store.aprsStations = [
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5, comment: 'new' }),
+        station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
+      ]
+      await nextTick()
+      const allMarkers = created.markers.filter((marker) =>
         marker.element.classList.contains('aprs-site-marker'),
       )
-      expect(allDots).toHaveLength(1)
-      expect(allDots[0]!.lngLat).toEqual([-1.5, 54.9001])
-      expect(allDots[0]!.removed).toBe(false)
+      expect(allMarkers).toHaveLength(1)
+      expect(allMarkers[0]!.removed).toBe(false)
     })
 
     it('tears site dots down with the control', () => {
@@ -1070,14 +1064,19 @@ describe('groupStationsBySite', () => {
     expect(indices.get('MB7IAE-L')).toBe(1)
   })
 
-  it('treats stations within ~110 m as one site', () => {
-    // GB3CD/GB3CD-R/MB7VU-10 sit metres apart; their labels would still collide.
-    const indices = stackIndexByCallsign([
+  it('groups only stations reporting the very same fix', () => {
+    // Real data: GB3CD and GB3CD-R beacon an identical position, while
+    // MB7VU-10 is ~11 m west. Grouping on the reported values rather than a
+    // tolerance keeps a site a genuine single point, so its labels can never
+    // drift away from the leaders drawn to them as the map zooms in.
+    const sites = groupStationsBySite([
       at('GB3CD', 54.735166, -1.7448333),
       at('GB3CD-R', 54.735166, -1.7448333),
       at('MB7VU-10', 54.735166, -1.745),
     ])
-    expect([...indices.values()].sort()).toEqual([0, 1, 2])
+    expect(sites).toHaveLength(2)
+    expect(sites[0]!.stations.map((each) => each.callsign)).toEqual(['GB3CD', 'GB3CD-R'])
+    expect(sites[1]!.stations.map((each) => each.callsign)).toEqual(['MB7VU-10'])
   })
 
   it('keeps stations far enough apart on their own true positions', () => {
@@ -1110,5 +1109,62 @@ describe('groupStationsBySite', () => {
     expect(sites[0]!.latitude).toBe(54.9)
     expect(sites[0]!.longitude).toBe(-1.5)
     expect(sites[1]!.stations).toHaveLength(1)
+  })
+})
+
+describe('planSiteLayout', () => {
+  function site(key: string, latitude: number, longitude: number, count: number) {
+    return {
+      key,
+      latitude,
+      longitude,
+      stations: Array.from({ length: count }, (_unused, index) => ({
+        callsign: `${key}-${index}`,
+        latitude,
+        longitude,
+        symbol: null,
+        comment: null,
+        course: null,
+        speed: null,
+        altitude: null,
+        path: null,
+        raw: null,
+        last_heard_ms: 0,
+      })),
+    }
+  }
+
+  it('leaves a station standing on its own undisplaced', () => {
+    const [planned] = planSiteLayout([site('a', 54.9, -1.5, 1)])
+    expect(planned!.layout).toEqual({ startIndex: 0, displaced: false })
+  })
+
+  it('numbers a shared site from the top of the column', () => {
+    const [planned] = planSiteLayout([site('a', 54.9, -1.5, 3)])
+    expect(planned!.layout).toEqual({ startIndex: 0, displaced: true })
+  })
+
+  it('numbers neighbouring sites straight through one column', () => {
+    // Two masts ~11 m apart: zoomed out their stacks would land on each other.
+    const planned = planSiteLayout([site('a', 54.9, -1.5, 2), site('b', 54.9, -1.5002, 3)])
+    expect(planned[0]!.layout).toEqual({ startIndex: 0, displaced: true })
+    expect(planned[1]!.layout).toEqual({ startIndex: 2, displaced: true })
+  })
+
+  it('displaces a lone station that shares a neighbourhood with a busy mast', () => {
+    // On its own it would need no marker, but here its label would land in the
+    // mast's column, so it joins the column and gets a marker of its own.
+    const planned = planSiteLayout([site('a', 54.9, -1.5, 2), site('b', 54.9, -1.5002, 1)])
+    expect(planned[1]!.layout).toEqual({ startIndex: 2, displaced: true })
+  })
+
+  it('keeps distant sites independent of one another', () => {
+    const planned = planSiteLayout([site('a', 54.9, -1.5, 2), site('b', 55.9, -2.5, 2)])
+    expect(planned[0]!.layout.startIndex).toBe(0)
+    expect(planned[1]!.layout.startIndex).toBe(0)
+  })
+
+  it('plans nothing for an empty list', () => {
+    expect(planSiteLayout([])).toEqual([])
   })
 })

@@ -39,10 +39,9 @@ export class AprsStationsControl extends SentinelControlBase {
   private _markerSignatures = new Map<string, string>()
   private _markerPositions = new Map<string, [number, number]>()
   private _siteMarkers = new Map<string, maplibregl.Marker>()
-  /** Live sites, so their leaders can be recomputed in screen space whenever
-   *  the map moves. */
-  private _sites = new Map<string, StationSite>()
-  private _onMapMove: (() => void) | null = null
+  /** Signature of each site's leader geometry, so a marker is only rebuilt when
+   *  the stations sharing the site change. */
+  private _siteSignatures = new Map<string, string>()
   private _popup: maplibregl.Popup | null = null
   private _stopWatch: WatchStopHandle | null = null
   private _a11yRegion: HTMLDivElement | null = null
@@ -81,11 +80,6 @@ export class AprsStationsControl extends SentinelControlBase {
     // Re-render on either input: a new station snapshot, or the operator
     // switching label fields on/off in Settings. Watching the store directly is
     // enough — unlike the Air domain, no DOM CustomEvent bridge is needed.
-    // Leader geometry is in screen pixels, so it has to follow the map: two
-    // stations a few metres apart share a point when zoomed out and separate
-    // when zoomed in.
-    this._onMapMove = () => this._updateSiteLeaders()
-    this.map.on('move', this._onMapMove)
     this._stopWatch = watch(
       () =>
         [
@@ -114,11 +108,6 @@ export class AprsStationsControl extends SentinelControlBase {
   }
 
   onRemove(): void {
-    /* v8 ignore start -- defensive: onInit always assigns the handler, and
-       MapLibre never removes a control it did not add */
-    if (this._onMapMove) this.map.off('move', this._onMapMove)
-    /* v8 ignore stop */
-    this._onMapMove = null
     this._stopWatch?.()
     this._stopWatch = null
     this._landStore.stopAprsPolling()
@@ -141,16 +130,17 @@ export class AprsStationsControl extends SentinelControlBase {
   private _syncMarkers(stations: AprsStation[]): void {
     const seen = new Set<string>()
     const seenSites = new Set<string>()
-    for (const site of groupStationsBySite(stations)) {
-      // A lone station sits on its own position and needs no tether. A shared
-      // one gets a dot marking the real position, with every label displaced
-      // below it and joined back by a leader line.
-      const isShared = site.stations.length > 1
+    for (const { site, layout } of planSiteLayout(groupStationsBySite(stations))) {
+      // A station standing alone sits on its own position and needs no tether.
+      // Anywhere labels would pile up, each site gets a marker on its real
+      // position and its labels are displaced into the shared column below.
+      const isShared = layout.displaced
       if (isShared) {
         seenSites.add(site.key)
-        this._syncSiteMarker(site)
+        this._syncSiteMarker(site, layout.startIndex)
       }
-      site.stations.forEach((station, stackIndex) => {
+      site.stations.forEach((station, indexInSite) => {
+        const stackIndex = layout.startIndex + indexInSite
         seen.add(station.callsign)
         const coords: [number, number] = [station.longitude, station.latitude]
         // A displaced label steps clear of the site marker's own square; a lone
@@ -204,7 +194,7 @@ export class AprsStationsControl extends SentinelControlBase {
       if (!seenSites.has(key)) {
         marker.remove()
         this._siteMarkers.delete(key)
-        this._sites.delete(key)
+        this._siteSignatures.delete(key)
       }
     }
   }
@@ -213,52 +203,42 @@ export class AprsStationsControl extends SentinelControlBase {
    * Place (or move) the marker showing a shared site's real position, together
    * with the leaders reaching each of its labels.
    */
-  private _syncSiteMarker(site: StationSite): void {
+  private _syncSiteMarker(site: StationSite, startIndex: number): void {
     const coords: [number, number] = [site.longitude, site.latitude]
-    this._sites.set(site.key, site)
+    const branches = this._leaderBranches(site, startIndex)
+    const signature = JSON.stringify(branches)
     const existing = this._siteMarkers.get(site.key)
     if (existing) {
       existing.setLngLat(coords)
-      renderSiteLeaders(existing.getElement(), this._leaderBranches(site))
+      // Only redraw the leaders when the stations sharing the site change.
+      if (this._siteSignatures.get(site.key) !== signature) {
+        renderSiteLeaders(existing.getElement(), branches)
+        this._siteSignatures.set(site.key, signature)
+      }
       return
     }
     const marker = new maplibregl.Marker({
-      element: buildSiteMarker(this._leaderBranches(site)),
+      element: buildSiteMarker(branches),
       anchor: 'center',
     })
       .setLngLat(coords)
       .addTo(this.map)
     this._siteMarkers.set(site.key, marker)
-  }
-
-  /** Redraw every site's leaders against the current view. */
-  private _updateSiteLeaders(): void {
-    for (const [key, site] of this._sites) {
-      const marker = this._siteMarkers.get(key)
-      /* v8 ignore start -- defensive: markers and sites are written together */
-      if (!marker) continue
-      /* v8 ignore stop */
-      renderSiteLeaders(marker.getElement(), this._leaderBranches(site))
-    }
+    this._siteSignatures.set(site.key, signature)
   }
 
   /**
    * Where each of a site's labels sits, relative to the site marker, in pixels.
    *
-   * A site groups stations within about 110 m, which is one point at low zoom
-   * but a visible spread further in — so each branch measures the station's own
-   * projected position, not the site's, and the leader stays attached to its
-   * label at every zoom level.
+   * Fixed offsets, not projected positions: every station in a site reports the
+   * same fix, and a label keeps its place in the column relative to its own
+   * marker, so the geometry never changes with the view.
    */
-  private _leaderBranches(site: StationSite): LeaderBranch[] {
-    const origin = this.map.project([site.longitude, site.latitude])
-    return site.stations.map((station, stackIndex) => {
-      const projected = this.map.project([station.longitude, station.latitude])
-      return {
-        dx: projected.x - origin.x + this._labelHorizontalOffset(station),
-        dy: projected.y - origin.y + labelVerticalOffset(stackIndex),
-      }
-    })
+  private _leaderBranches(site: StationSite, startIndex: number): LeaderBranch[] {
+    return site.stations.map((station, indexInSite) => ({
+      dx: this._labelHorizontalOffset(station),
+      dy: labelVerticalOffset(startIndex + indexInSite),
+    }))
   }
 
   /** Which way a label is displaced: away from the marker, on the side its
@@ -500,7 +480,7 @@ export class AprsStationsControl extends SentinelControlBase {
     this._markerPositions.clear()
     for (const marker of this._siteMarkers.values()) marker.remove()
     this._siteMarkers.clear()
-    this._sites.clear()
+    this._siteSignatures.clear()
   }
 }
 
@@ -518,12 +498,55 @@ function labelVerticalOffset(stackIndex: number): number {
   return MAP_LABEL_SIZE_PX / 2 + (stackIndex + 1) * STACKED_LABEL_OFFSET_PX
 }
 
-/** Decimal places used to decide two stations share a site (3 dp ≈ 110 m). */
-const SITE_PRECISION_DP = 3
+/** Decimal places at which two sites are near enough for their labels to pile
+ *  up and need one shared column (3 dp ≈ 110 m). */
+const NEIGHBOURHOOD_PRECISION_DP = 3
+
+/** Where a site's labels sit in the column shared with its neighbours. */
+export interface SiteLayout {
+  /** Position of the site's first label in the column. */
+  startIndex: number
+  /** Whether its labels are displaced into the column at all — false for a
+   *  station standing on its own, which keeps its position and needs no marker. */
+  displaced: boolean
+}
+
+/**
+ * Decide where each site's labels sit.
+ *
+ * Sites are exact positions, but two masts a few metres apart still collide on
+ * screen when zoomed out — so neighbouring sites share one column of labels,
+ * numbered straight through, while each keeps its own marker on its own real
+ * position. Because a label's offset is measured from its own marker, the two
+ * stay joined however far apart the sites drift as the map zooms in.
+ */
+export function planSiteLayout(sites: StationSite[]): { site: StationSite; layout: SiteLayout }[] {
+  const neighbourhoodKey = (site: StationSite) =>
+    `${site.latitude.toFixed(NEIGHBOURHOOD_PRECISION_DP)},${site.longitude.toFixed(NEIGHBOURHOOD_PRECISION_DP)}`
+
+  const neighbourhoods = new Map<string, StationSite[]>()
+  for (const site of sites) {
+    const key = neighbourhoodKey(site)
+    const neighbours = neighbourhoods.get(key)
+    if (neighbours) neighbours.push(site)
+    else neighbourhoods.set(key, [site])
+  }
+
+  const planned: { site: StationSite; layout: SiteLayout }[] = []
+  for (const neighbours of neighbourhoods.values()) {
+    const population = neighbours.reduce((total, site) => total + site.stations.length, 0)
+    let startIndex = 0
+    for (const site of neighbours) {
+      planned.push({ site, layout: { startIndex, displaced: population > 1 } })
+      startIndex += site.stations.length
+    }
+  }
+  return planned
+}
 
 /** Stations sharing one position, with the position they share. */
 export interface StationSite {
-  /** Rounded "lat,lon" identifying the site. */
+  /** The shared "lat,lon" identifying the site. */
   key: string
   longitude: number
   latitude: number
@@ -538,7 +561,13 @@ export interface StationSite {
  * gateway on one mast all beacon the same coordinates — and superimposed labels
  * would render as a single unreadable smear, making the map look like it holds
  * fewer stations than it does. A site with more than one station is drawn as a
- * dot at the real position with its labels displaced and tethered to it.
+ * marker at the real position with its labels displaced and tethered to it.
+ *
+ * Grouping is on the reported coordinates exactly, not a tolerance: stations
+ * that beacon the same fix are the same point at every zoom, so their labels
+ * never drift away from the leaders drawn to them. Stations merely *near* each
+ * other keep their own positions, which is the truthful answer — and the only
+ * one that stays true as the map zooms in.
  *
  * Ordering is by callsign rather than arrival, so a station keeps its place in
  * the stack across polls instead of hopping about as beacons arrive.
@@ -546,7 +575,7 @@ export interface StationSite {
 export function groupStationsBySite(stations: AprsStation[]): StationSite[] {
   const sites = new Map<string, StationSite>()
   for (const station of stations) {
-    const key = `${station.latitude.toFixed(SITE_PRECISION_DP)},${station.longitude.toFixed(SITE_PRECISION_DP)}`
+    const key = `${station.latitude},${station.longitude}`
     const site = sites.get(key)
     if (site) site.stations.push(station)
     else
