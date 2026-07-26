@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { usePersistedObject, usePersistedRef } from './_persist'
 
 /** One APRS station's latest fix, as returned by GET /api/land/aprs/stations. */
 export interface AprsStation {
@@ -14,6 +15,49 @@ export interface AprsStation {
   path: string | null
   raw: string | null
   last_heard_ms: number
+}
+
+/**
+ * Which fields a station's map label shows. Every field an APRS position report
+ * can carry is switchable, mirroring the Air domain's per-aircraft label fields
+ * — the map stays readable at density because the operator decides what matters.
+ */
+export interface AprsLabelFieldMap {
+  time: boolean
+  callsign: boolean
+  /** The station's icon in the label's leading well (symbol glyph, or the
+   *  course arrow when the station reports one). */
+  symbol: boolean
+  /** The symbol's name as a text chip, e.g. "CAR" — independent of the icon. */
+  symbolText: boolean
+  latitude: boolean
+  longitude: boolean
+  course: boolean
+  speed: boolean
+  altitude: boolean
+  path: boolean
+  comment: boolean
+}
+
+/** A valid key of {@link AprsLabelFieldMap}. */
+export type AprsLabelField = keyof AprsLabelFieldMap
+
+const LS_APRS_LABEL_FIELDS_KEY = 'aprsLabelFields_v1'
+
+/** Icon + callsign only, matching what the map showed before the fields were
+ *  switchable — an upgrade never changes what an existing user sees. */
+const DEFAULT_APRS_LABEL_FIELDS: AprsLabelFieldMap = {
+  time: false,
+  callsign: true,
+  symbol: true,
+  symbolText: false,
+  latitude: false,
+  longitude: false,
+  course: false,
+  speed: false,
+  altitude: false,
+  path: false,
+  comment: false,
 }
 
 /** How often the Land map refreshes the APRS station snapshot (ms). APRS is a
@@ -40,6 +84,39 @@ export const useLandStore = defineStore('land', () => {
   const aprsRetentionMinutes = ref<number>(DEFAULT_APRS_RETENTION_MINUTES)
   function setAprsRetentionMinutes(minutes: number): void {
     aprsRetentionMinutes.value = minutes
+  }
+
+  // Which data fields appear on APRS map labels. Persisted locally for instant
+  // restore and mirrored to the backend by the Settings control, so the choice
+  // follows the user across devices (see main.ts for the startup hydrate).
+  const aprsLabelFields = usePersistedObject<AprsLabelFieldMap>(
+    LS_APRS_LABEL_FIELDS_KEY,
+    DEFAULT_APRS_LABEL_FIELDS,
+  )
+  function setAprsLabelFields(fields: AprsLabelFieldMap): void {
+    aprsLabelFields.value = fields
+  }
+
+  // Whether the APRS layer is currently shown. Held here rather than inside the
+  // map control so the side panel can show exactly what the map shows: hiding
+  // the layer empties the list too, instead of leaving it listing stations that
+  // are no longer plotted.
+  const aprsLayerVisible = ref(true)
+  function setAprsLayerVisible(visible: boolean): void {
+    aprsLayerVisible.value = visible
+  }
+
+  // SEARCH pane (LandFilter). Held on the store rather than in the teleported
+  // pane, whose mount timing is fragile — this way the pane resumes exactly as
+  // left when returning to Land, and a map click can expand a row before the
+  // pane has even rendered.
+  const searchQuery = usePersistedRef<string>('sentinel_land_filterQuery', '')
+  const searchExpandedCallsign = usePersistedRef<string>('sentinel_land_filterExpanded', '')
+  function setSearchQuery(query: string): void {
+    searchQuery.value = query
+  }
+  function setSearchExpandedCallsign(callsign: string): void {
+    searchExpandedCallsign.value = callsign
   }
 
   // Which map layers are shown by default (from the `land.defaultLayers` config).
@@ -93,6 +170,14 @@ export const useLandStore = defineStore('land', () => {
     aprsStations,
     aprsRetentionMinutes,
     setAprsRetentionMinutes,
+    aprsLabelFields,
+    setAprsLabelFields,
+    aprsLayerVisible,
+    setAprsLayerVisible,
+    searchQuery,
+    setSearchQuery,
+    searchExpandedCallsign,
+    setSearchExpandedCallsign,
     defaultLayers,
     hydrateDefaultLayers,
     fetchAprsStations,

@@ -559,6 +559,16 @@ const ALL_SETTINGS: SettingItem[] = [
   {
     section: 'land',
     sectionLabel: 'LAND',
+    id: 'land-aprs-label-fields',
+    label: 'Label Data Points',
+    desc: 'Choose which data fields appear on APRS station labels on the map',
+    type: 'land-aprs-label-fields',
+    ns: 'land',
+    groupLabel: 'LABELS',
+  },
+  {
+    section: 'land',
+    sectionLabel: 'LAND',
     id: 'land-aprs-retention',
     label: 'APRS Retention',
     desc: 'Minutes a heard APRS station stays on the map after its last signal',

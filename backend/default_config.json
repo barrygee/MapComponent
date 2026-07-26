@@ -69,6 +69,19 @@
   "land": {
     "enabled": false,
     "sourceOverride": "auto",
+    "labelDataPoints": {
+      "time": false,
+      "callsign": true,
+      "symbol": true,
+      "symbolText": false,
+      "latitude": false,
+      "longitude": false,
+      "course": false,
+      "speed": false,
+      "altitude": false,
+      "path": false,
+      "comment": false
+    },
     "aprsRetentionMinutes": 5,
     "defaultLayers": [
       "aprs"

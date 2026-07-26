@@ -29,6 +29,7 @@ import SpaceTleSatListControl from './SpaceTleSatListControl.vue'
 import SpaceHoverPreviewControl from './SpaceHoverPreviewControl.vue'
 import AdsbLabelFieldsControl from './AdsbLabelFieldsControl.vue'
 import AdsbTagFieldsControl from './AdsbTagFieldsControl.vue'
+import AprsLabelFieldsControl from './AprsLabelFieldsControl.vue'
 import AirReplayToggleControl from './AirReplayToggleControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import SdrAutoCenterControl from './SdrAutoCenterControl.vue'
@@ -78,6 +79,7 @@ const TYPE_TO_COMPONENT: Array<[string, Component, Partial<SettingItem>?]> = [
   ['space-hover-preview', SpaceHoverPreviewControl],
   ['air-label-fields', AdsbLabelFieldsControl],
   ['air-tag-fields', AdsbTagFieldsControl],
+  ['land-aprs-label-fields', AprsLabelFieldsControl],
   ['air-replay-toggle', AirReplayToggleControl],
   ['sdr-devices', SdrDevicesControl],
   ['sdr-autocenter', SdrAutoCenterControl],

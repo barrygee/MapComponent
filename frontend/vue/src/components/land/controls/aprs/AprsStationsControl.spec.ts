@@ -8,6 +8,8 @@ import { axe } from 'jest-axe'
 //    vi.hoisted so they exist when the (hoisted) vi.mock factory runs. ──────────
 interface RecordedMarker {
   element: HTMLElement
+  anchor: string | undefined
+  offset: [number, number] | undefined
   lngLat: [number, number] | null
   removed: boolean
 }
@@ -20,15 +22,22 @@ const mocks = vi.hoisted(() => {
   const created = { markers: [] as RecordedMarker[], popups: [] as RecordedPopup[] }
   class MockMarker {
     element: HTMLElement
+    anchor: string | undefined
+    offset: [number, number] | undefined
     lngLat: [number, number] | null = null
     removed = false
-    constructor(options: { element: HTMLElement }) {
+    constructor(options: { element: HTMLElement; anchor?: string; offset?: [number, number] }) {
       this.element = options.element
+      this.anchor = options.anchor
+      this.offset = options.offset
       created.markers.push(this)
     }
     setLngLat(coords: [number, number]): this {
       this.lngLat = coords
       return this
+    }
+    getElement(): HTMLElement {
+      return this.element
     }
     addTo(): this {
       return this
@@ -66,7 +75,16 @@ const created = mocks.created
 
 vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker, Popup: mocks.MockPopup } }))
 
-import { AprsStationsControl } from './AprsStationsControl'
+import {
+  AprsStationsControl,
+  groupStationsBySite,
+  planSiteLayout,
+  formatAltitude,
+  formatCourse,
+  formatHeardTime,
+  formatSpeed,
+  truncate,
+} from './AprsStationsControl'
 import { useLandStore, type AprsStation } from '@/stores/land'
 
 function station(overrides: Partial<AprsStation> = {}): AprsStation {
@@ -174,7 +192,7 @@ describe('AprsStationsControl', () => {
     expect(html).toContain('M0ABC-9')
     expect(html).toContain('51.5000, -0.1000')
     expect(html).toContain('hi')
-    expect(html).toContain('Course 90° · Speed 30 kn')
+    expect(html).toContain('Course 90° · Speed 30 KM/H')
     expect(html).toContain('Heard')
   })
 
@@ -192,7 +210,7 @@ describe('AprsStationsControl', () => {
     store.aprsStations = [station({ course: null, speed: 20 })]
     addControl()
     created.markers[0].element.dispatchEvent(new Event('click'))
-    expect(created.popups[0].html).toContain('Course — · Speed 20 kn')
+    expect(created.popups[0].html).toContain('Course — · Speed 20 KM/H')
   })
 
   it('omits the movement row entirely when neither course nor speed is present', () => {
@@ -273,5 +291,878 @@ describe('AprsStationsControl', () => {
     const { map } = addControl()
     const region = map._container.querySelector('[role="region"]') as HTMLElement
     expect(await axe(region)).toHaveNoViolations()
+  })
+
+  // ── label pill ──────────────────────────────────────────────────────────────
+
+  describe('label pill', () => {
+    /** Enable every label field so a full pill renders. */
+    function allFieldsOn() {
+      store.setAprsLabelFields({
+        time: true,
+        callsign: true,
+        symbol: true,
+        symbolText: true,
+        latitude: true,
+        longitude: true,
+        course: true,
+        speed: true,
+        altitude: true,
+        path: true,
+        comment: true,
+      })
+    }
+
+    it('shows the icon and callsign by default, without the symbol name', () => {
+      store.aprsStations = [station()]
+      addControl()
+      const pill = created.markers[0].element
+      expect(pill.textContent).toContain('M0ABC-9')
+      expect(pill.querySelector('.adsb-arrow-wrap')).not.toBeNull()
+      // The symbol's name is its own field, off by default.
+      expect(pill.textContent).not.toContain('Car')
+    })
+
+    it('draws the symbol name chip in white on the sidebar charcoal', () => {
+      store.setAprsLabelFields({ ...store.aprsLabelFields, symbolText: true })
+      store.aprsStations = [station()]
+      addControl()
+      const pill = created.markers[0].element
+      expect(pill.textContent).toContain('Car') // '/>' decodes to the car symbol
+      const chip = Array.from(pill.querySelectorAll('span')).find(
+        (span) => span.textContent === 'Car',
+      )
+      // Monochrome by design: Air uses colour to mean military/civil/emergency,
+      // so Land labels stay white and grey rather than adding a fourth hue.
+      expect(chip!.style.color).toBe('rgb(255, 255, 255)')
+      expect(chip!.style.background).toBe('rgb(21, 23, 29)')
+    })
+
+    it('backs the icon well with the same charcoal as the chip', () => {
+      store.aprsStations = [station()]
+      addControl()
+      const well = created.markers[0].element.querySelector('.adsb-arrow-wrap') as HTMLElement
+      expect(well.style.background).toBe('rgb(21, 23, 29)')
+    })
+
+    it('draws the station symbol at the same size as an aircraft arrow', () => {
+      // Mixed glyph sizes read as two icon families on one map.
+      store.aprsStations = [
+        station({ callsign: 'MOVING', course: 90 }),
+        station({ callsign: 'FIXED', course: null, latitude: 55, longitude: -2 }),
+      ]
+      addControl()
+      const sizes = created.markers.map((marker) => {
+        const glyph = marker.element.querySelector('.adsb-arrow-wrap svg')!
+        return glyph.getAttribute('width')
+      })
+      expect(sizes).toEqual(['15', '15'])
+    })
+
+    it('draws the glyph and dim field labels in white', () => {
+      store.setAprsLabelFields({ ...store.aprsLabelFields, speed: true })
+      store.aprsStations = [station({ course: 275, speed: 30 })]
+      addControl()
+      const pill = created.markers[0].element
+      expect(pill.querySelector('.adsb-arrow polygon')!.getAttribute('stroke')).toBe('#ffffff')
+      const speedBadge = Array.from(pill.querySelectorAll('span')).find((span) =>
+        span.textContent?.startsWith('SPD'),
+      )
+      expect(speedBadge!.style.color).toBe('rgb(255, 255, 255)')
+    })
+
+    it('hides the leading icon when the Symbol field is switched off', () => {
+      store.setAprsLabelFields({ ...store.aprsLabelFields, symbol: false })
+      store.aprsStations = [station()]
+      addControl()
+      const pill = created.markers[0].element
+      expect(pill.querySelector('.adsb-arrow-wrap')).toBeNull()
+      // The rest of the label is unaffected.
+      expect(pill.textContent).toContain('M0ABC-9')
+    })
+
+    it('balances the callsign padding when there is no icon beside it', () => {
+      store.setAprsLabelFields({ ...store.aprsLabelFields, symbol: false })
+      store.aprsStations = [station()]
+      addControl()
+      const name = created.markers[0].element.querySelector('.adsb-label-name') as HTMLElement
+      // Both edges are outer edges here, so neither gets the tight glyph-side
+      // padding that would leave the label looking lopsided.
+      expect(name.style.paddingLeft).toBe('12px')
+      expect(name.style.paddingRight).toBe('10px')
+    })
+
+    it('keeps the callsign tight against the icon when one is shown', () => {
+      store.aprsStations = [station({ course: 275 })]
+      addControl()
+      const name = created.markers[0].element.querySelector('.adsb-label-name') as HTMLElement
+      expect(name.style.paddingLeft).toBe('6px')
+      expect(name.style.paddingRight).toBe('10px')
+    })
+
+    it('keeps the icon when only the symbol name is switched off, and vice versa', () => {
+      store.setAprsLabelFields({ ...store.aprsLabelFields, symbol: true, symbolText: false })
+      store.aprsStations = [station()]
+      addControl()
+      expect(created.markers[0].element.querySelector('.adsb-arrow-wrap')).not.toBeNull()
+
+      created.markers.length = 0
+      store.setAprsLabelFields({ ...store.aprsLabelFields, symbol: false, symbolText: true })
+      store.aprsStations = [station({ callsign: 'OTHER-1' })]
+      addControl()
+      const pill = created.markers[0].element
+      expect(pill.querySelector('.adsb-arrow-wrap')).toBeNull()
+      expect(pill.textContent).toContain('Car')
+    })
+
+    it('leads with a course arrow rotated to the reported course', () => {
+      store.aprsStations = [station({ course: 275 })]
+      addControl()
+      const glyph = created.markers[0].element.querySelector('.adsb-arrow')
+      expect(glyph!.getAttribute('style')).toContain('rotate(275deg)')
+      expect(glyph!.innerHTML).toContain('polygon')
+    })
+
+    it('falls back to the station symbol glyph when no course is reported', () => {
+      store.aprsStations = [station({ course: null, symbol: '/#' })]
+      addControl()
+      const well = created.markers[0].element.querySelector('.adsb-arrow-wrap')!
+      // A symbol icon, not a direction arrow — an arrow would assert a heading
+      // the beacon never sent.
+      expect(well.querySelector('.adsb-arrow')).toBeNull()
+      expect(well.querySelector('svg')!.getAttribute('aria-label')).toBe('Digipeater')
+    })
+
+    it('anchors by the leading edge so the glyph stays over the fix', () => {
+      store.aprsStations = [station({ callsign: 'LEFT', course: 90 })]
+      addControl()
+      expect(created.markers[0].anchor).toBe('right')
+
+      created.markers.length = 0
+      store.aprsStations = [station({ callsign: 'RIGHT', course: 275 })]
+      addControl()
+      expect(created.markers[0].anchor).toBe('left')
+    })
+
+    it('treats a station with no course as right-facing', () => {
+      store.aprsStations = [station({ course: null })]
+      addControl()
+      expect(created.markers[0].anchor).toBe('left')
+      expect(created.markers[0].element.dataset.dir).toBe('right')
+    })
+
+    it('mirrors the segment order for a left-facing station', () => {
+      allFieldsOn()
+      store.aprsStations = [station({ course: 90 })]
+      addControl()
+      const pill = created.markers[0].element
+      expect(pill.dataset.dir).toBe('left')
+      // Glyph well last (leading edge on the left of travel), callsign next to
+      // it — the exact reverse of the right-facing order below.
+      expect(pill.lastElementChild!.className).toBe('adsb-arrow-wrap')
+      expect((pill.lastElementChild!.previousElementSibling as HTMLElement).textContent).toBe(
+        'M0ABC-9',
+      )
+    })
+
+    it('puts the glyph first for a right-facing station', () => {
+      allFieldsOn()
+      store.aprsStations = [station({ course: 275 })]
+      addControl()
+      const pill = created.markers[0].element
+      expect(pill.firstElementChild!.className).toBe('adsb-arrow-wrap')
+    })
+
+    it('renders every enabled field with its unit', () => {
+      allFieldsOn()
+      store.aprsStations = [
+        station({ course: 275, speed: 48, altitude: 122, last_heard_ms: 0, path: 'WIDE1-1' }),
+      ]
+      addControl()
+      const text = created.markers[0].element.textContent!
+      expect(text).toContain('CRS')
+      expect(text).toContain('275°')
+      expect(text).toContain('48 KM/H') // aprslib normalises speed to km/h
+      expect(text).toContain('122 M') // …and altitude to metres
+      expect(text).toContain('51.5000')
+      expect(text).toContain('-0.1000')
+      expect(text).toContain('WIDE1-1')
+      expect(text).toContain('rolling')
+      expect(text).toContain('TIME')
+    })
+
+    it('omits an enabled field the packet did not carry', () => {
+      allFieldsOn()
+      store.aprsStations = [station({ speed: null, altitude: null, path: null, comment: null })]
+      addControl()
+      const text = created.markers[0].element.textContent!
+      expect(text).not.toContain('SPD')
+      expect(text).not.toContain('ALT')
+      expect(text).not.toContain('PATH')
+      expect(text).not.toContain('CMT')
+      // The fields that ARE present still render.
+      expect(text).toContain('CRS')
+    })
+
+    it('omits a disabled field even when the packet carried it', () => {
+      store.setAprsLabelFields({
+        ...store.aprsLabelFields,
+        speed: false,
+        callsign: false,
+        symbolText: false,
+      })
+      store.aprsStations = [station({ speed: 30 })]
+      addControl()
+      const text = created.markers[0].element.textContent!
+      expect(text).not.toContain('SPD')
+      expect(text).not.toContain('M0ABC-9')
+      expect(text).not.toContain('Car')
+    })
+
+    it('still draws the direction glyph when every text field is switched off', () => {
+      store.setAprsLabelFields({
+        time: false,
+        callsign: false,
+        symbol: true,
+        symbolText: false,
+        latitude: false,
+        longitude: false,
+        course: false,
+        speed: false,
+        altitude: false,
+        path: false,
+        comment: false,
+      })
+      store.aprsStations = [station({ course: 90 })]
+      addControl()
+      const pill = created.markers[0].element
+      expect(pill.textContent).toBe('')
+      expect(pill.querySelector('.adsb-arrow')).not.toBeNull()
+    })
+
+    it('truncates a long comment so one chatty station cannot span the viewport', () => {
+      store.setAprsLabelFields({ ...store.aprsLabelFields, comment: true })
+      store.aprsStations = [station({ comment: 'x'.repeat(80) })]
+      addControl()
+      const text = created.markers[0].element.textContent!
+      expect(text).toContain('…')
+      expect(text).not.toContain('x'.repeat(80))
+    })
+
+    it('escapes HTML in label field values', () => {
+      store.setAprsLabelFields({ ...store.aprsLabelFields, comment: true })
+      store.aprsStations = [station({ comment: '<img src=x>' })]
+      addControl()
+      const pill = created.markers[0].element
+      // Escaped, so the tag is inert text rather than an injected element.
+      expect(pill.querySelector('img')).toBeNull()
+      expect(pill.textContent).toContain('<img src=x>')
+    })
+
+    it('carries an accessible name naming the station and its symbol', () => {
+      store.aprsStations = [station()]
+      addControl()
+      expect(created.markers[0].element.getAttribute('aria-label')).toBe(
+        'APRS station M0ABC-9, Car',
+      )
+    })
+
+    it('redraws labels when the operator changes the enabled fields', async () => {
+      store.aprsStations = [station()]
+      addControl()
+      expect(created.markers[0].element.textContent).not.toContain('SPD')
+      const before = created.markers.length
+      store.setAprsLabelFields({ ...store.aprsLabelFields, speed: true })
+      await nextTick()
+      expect(created.markers.length).toBeGreaterThan(before)
+      const latest = created.markers[created.markers.length - 1]
+      expect(latest.element.textContent).toContain('SPD')
+    })
+  })
+
+  // ── marker churn ────────────────────────────────────────────────────────────
+
+  describe('marker updates', () => {
+    it('does not re-plot a station when the snapshot repeats its position', async () => {
+      addControl()
+      store.aprsStations = [station()]
+      await nextTick()
+      const marker = created.markers[created.markers.length - 1]
+      const plotted = marker.lngLat
+      marker.lngLat = null // detect any further setLngLat call
+
+      // Same fix arriving again on the next poll must not move the marker.
+      store.aprsStations = [station()]
+      await nextTick()
+      expect(marker.lngLat).toBeNull()
+      expect(plotted).toEqual([-0.1, 51.5])
+    })
+
+    it('moves the marker when a genuinely new fix arrives', async () => {
+      addControl()
+      store.aprsStations = [station()]
+      await nextTick()
+      const marker = created.markers[created.markers.length - 1]
+      store.aprsStations = [station({ longitude: -0.2 })]
+      await nextTick()
+      expect(marker.lngLat).toEqual([-0.2, 51.5])
+    })
+
+    it('rebuilds the marker when the station turns across the facing threshold', async () => {
+      addControl()
+      store.aprsStations = [station({ course: 90 })]
+      await nextTick()
+      const before = created.markers.length
+      expect(created.markers[before - 1].anchor).toBe('right')
+
+      store.aprsStations = [station({ course: 275 })]
+      await nextTick()
+      // A new marker: MapLibre fixes the anchor at construction.
+      expect(created.markers.length).toBeGreaterThan(before)
+      expect(created.markers[created.markers.length - 1].anchor).toBe('left')
+      expect(created.markers[before - 1].removed).toBe(true)
+    })
+
+    it('redraws when a hidden-field value changes only if it is displayed', async () => {
+      addControl()
+      store.aprsStations = [station({ speed: 10 })]
+      await nextTick()
+      const before = created.markers.length
+      // Speed is switched off by default → a speed change is invisible, so the
+      // marker must not churn.
+      store.aprsStations = [station({ speed: 99 })]
+      await nextTick()
+      expect(created.markers.length).toBe(before)
+    })
+
+    it('redraws when the symbol changes for a station with no course', async () => {
+      addControl()
+      store.aprsStations = [station({ course: null, symbol: '/>' })]
+      await nextTick()
+      const before = created.markers.length
+      // The glyph well shows the symbol when there is no course, so it must
+      // follow a symbol change even though the chip text is what usually does.
+      store.aprsStations = [station({ course: null, symbol: '/#' })]
+      await nextTick()
+      expect(created.markers.length).toBeGreaterThan(before)
+    })
+  })
+
+  describe('co-sited stations', () => {
+    /** Markers that are station labels rather than site dots. */
+    function labelMarkers() {
+      return created.markers.filter(
+        (marker) => !marker.element.classList.contains('aprs-site-marker') && !marker.removed,
+      )
+    }
+    /** Markers that are site position markers rather than labels. */
+    function dotMarkers() {
+      return created.markers.filter(
+        (marker) => marker.element.classList.contains('aprs-site-marker') && !marker.removed,
+      )
+    }
+
+    it('displaces co-sited labels and marks the real position with a dot', () => {
+      // Two stations on one mast: superimposed labels would read as one station.
+      store.aprsStations = [
+        station({ callsign: 'MB7IAE-L', latitude: 54.898666, longitude: -2.243833 }),
+        station({ callsign: 'M0UKB-L', latitude: 54.898666, longitude: -2.243833 }),
+      ]
+      addControl()
+
+      const dots = dotMarkers()
+      expect(dots).toHaveLength(1)
+      expect(dots[0]!.lngLat).toEqual([-2.243833, 54.898666])
+      expect(dots[0]!.anchor).toBe('center')
+
+      // Both labels step below the dot, leaving it clear. The fixture reports a
+      // course of 90°, so both are left-facing and displace to the left.
+      const offsets = labelMarkers().map((marker) => marker.offset)
+      expect(offsets).toContainEqual([-28, 43])
+      expect(offsets).toContainEqual([-28, 73])
+    })
+
+    it('draws one leader per label, all from the site marker', () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null }),
+        station({ callsign: 'BBB', course: null }),
+        station({ callsign: 'CCC', course: null }),
+      ]
+      addControl()
+      // The leaders belong to the site, not the labels: one graphic, one branch
+      // each, so they cannot bundle into a braid under the marker.
+      const leaders = dotMarkers()[0]!.element.querySelectorAll('.aprs-site-leaders path')
+      expect(leaders).toHaveLength(3)
+      for (const label of labelMarkers()) {
+        expect(label.element.querySelector('.aprs-site-leaders')).toBeNull()
+      }
+    })
+
+    it('draws each leader dashed, not solid', () => {
+      // Solid lines mean tracks and routes in the Air domain; a leader is a
+      // position cue, so it must not read as one.
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null }),
+        station({ callsign: 'BBB', course: null }),
+      ]
+      addControl()
+      const path = dotMarkers()[0]!.element.querySelector('.aprs-site-leaders path')!
+      expect(path.getAttribute('stroke-dasharray')).toBe('2.5 3.5')
+      expect(path.getAttribute('stroke-width')).toBe('1.6')
+      expect(path.getAttribute('fill')).toBe('none')
+    })
+
+    it('runs every leader down one shared stem before turning out', () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null }),
+        station({ callsign: 'BBB', course: null }),
+      ]
+      addControl()
+      const paths = [...dotMarkers()[0]!.element.querySelectorAll('.aprs-site-leaders path')].map(
+        (path) => path.getAttribute('d')!,
+      )
+      // Both start at the marker centre and descend on the same x, so their
+      // stems (and dash phases) coincide instead of fanning apart.
+      expect(paths[0]!.startsWith('M 6 6 L 6 ')).toBe(true)
+      expect(paths[1]!.startsWith('M 6 6 L 6 ')).toBe(true)
+      // Rounded corner, then a short reach to the label's leading edge.
+      expect(paths[0]).toBe('M 6 6 L 6 23 Q 6 49 32 49 L 34 49')
+      expect(paths[1]).toBe('M 6 6 L 6 53 Q 6 79 32 79 L 34 79')
+    })
+
+    it('mirrors the leaders for a left-facing label', () => {
+      // A left-facing pill extends leftward, so its leading edge — and the
+      // branch reaching it — is on the other side of the marker.
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: 90 }),
+        station({ callsign: 'BBB', course: 90 }),
+      ]
+      addControl()
+      const path = dotMarkers()[0]!.element.querySelector('.aprs-site-leaders path')!
+      expect(path.getAttribute('d')).toBe('M 6 6 L 6 23 Q 6 49 -20 49 L -22 49')
+    })
+
+    it('displaces the label sideways as well as down, so the curve has room', () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null }),
+        station({ callsign: 'BBB', course: 90 }),
+      ]
+      addControl()
+      const offsets = labelMarkers().map((marker) => marker.offset)
+      // Right-facing pushes right, left-facing pushes left — each away from the
+      // dot, on the side its leading edge faces.
+      expect(offsets).toContainEqual([28, 43])
+      expect(offsets).toContainEqual([-28, 73])
+    })
+
+    it('plots a lone station on its true position, with no dot or tether', () => {
+      store.aprsStations = [station()]
+      addControl()
+      expect(labelMarkers()[0]!.offset).toEqual([0, 0])
+      expect(labelMarkers()[0]!.element.querySelector('.aprs-leader-line')).toBeNull()
+      expect(dotMarkers()).toHaveLength(0)
+    })
+
+    it('adds a dot and tethers when a second station joins a site', async () => {
+      store.aprsStations = [station({ callsign: 'ZZZ', latitude: 54.9, longitude: -1.5 })]
+      addControl()
+      expect(dotMarkers()).toHaveLength(0)
+
+      store.aprsStations = [
+        station({ callsign: 'ZZZ', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
+      ]
+      await nextTick()
+      expect(dotMarkers()).toHaveLength(1)
+      const offsets = labelMarkers().map((marker) => marker.offset)
+      expect(offsets).toContainEqual([-28, 43])
+      expect(offsets).toContainEqual([-28, 73])
+    })
+
+    it('removes the dot and the tether when a site drops back to one station', async () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
+      ]
+      addControl()
+      expect(dotMarkers()).toHaveLength(1)
+
+      store.aprsStations = [station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 })]
+      await nextTick()
+      expect(dotMarkers()).toHaveLength(0)
+      const remaining = labelMarkers()
+      expect(remaining).toHaveLength(1)
+      expect(remaining[0]!.offset).toEqual([0, 0])
+      expect(remaining[0]!.element.querySelector('.aprs-leader-line')).toBeNull()
+    })
+
+    it('gives a nearby station its own marker on its own real position', () => {
+      // ~11 m apart: a tolerance would have lumped these into one site, putting
+      // the marker somewhere none of them actually is — and stranding a label
+      // when they separate on screen. Each keeps its own point instead.
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null, latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', course: null, latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'NEARBY', course: null, latitude: 54.9, longitude: -1.5002 }),
+      ]
+      addControl()
+      const markers = dotMarkers()
+      expect(markers).toHaveLength(2)
+      expect(markers.map((marker) => marker.lngLat)).toEqual([
+        [-1.5, 54.9],
+        [-1.5002, 54.9],
+      ])
+      // Each marker tethers only its own stations.
+      expect(markers[0]!.element.querySelectorAll('.aprs-site-leaders path')).toHaveLength(2)
+      expect(markers[1]!.element.querySelectorAll('.aprs-site-leaders path')).toHaveLength(1)
+    })
+
+    it('shares one label column between neighbouring sites, so stacks never collide', () => {
+      // Zoomed out, sites metres apart sit on the same pixel: numbering their
+      // labels straight through is what stops the second stack landing on the
+      // first, which is the pile-up this whole treatment exists to prevent.
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null, latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', course: null, latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'NEARBY', course: null, latitude: 54.9, longitude: -1.5002 }),
+      ]
+      addControl()
+      const verticalOffsets = labelMarkers().map((marker) => marker.offset![1])
+      expect(verticalOffsets).toEqual([43, 73, 103])
+    })
+
+    it('marks the site with a small ringed dot', () => {
+      store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
+      addControl()
+      const marker = dotMarkers()[0]!.element
+      expect(marker.style.width).toBe('12px')
+      expect(marker.style.height).toBe('12px')
+      // Concentric circles — a dark grey dot in a black ring — which is the
+      // pairing that holds against both the pale roads and the dark water the
+      // basemap puts under it.
+      expect(marker.style.borderRadius).toBe('50%')
+      expect(marker.style.background).toBe('rgb(21, 23, 29)')
+      expect(marker.style.boxShadow).toBe('0 0 0 2px #000000')
+      // Nothing drawn inside it but the leaders.
+      expect(marker.querySelector('svg:not(.aprs-site-leaders)')).toBeNull()
+    })
+
+    it('keeps the dot out of the way of clicks and screen readers', () => {
+      store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
+      addControl()
+      const dot = dotMarkers()[0]!.element
+      expect(dot.style.pointerEvents).toBe('none')
+      expect(dot.getAttribute('aria-hidden')).toBe('true')
+    })
+
+    it('redraws the leaders when another station joins the same fix', async () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
+      ]
+      addControl()
+      const marker = dotMarkers()[0]!
+      expect(marker.element.querySelectorAll('.aprs-site-leaders path')).toHaveLength(2)
+
+      store.aprsStations = [
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'CCC', latitude: 54.9, longitude: -1.5 }),
+      ]
+      await nextTick()
+      // The marker is kept, but its leaders grow a branch for the newcomer.
+      expect(dotMarkers()).toHaveLength(1)
+      expect(dotMarkers()[0]).toBe(marker)
+      expect(marker.element.querySelectorAll('.aprs-site-leaders path')).toHaveLength(3)
+    })
+
+    it('keeps one marker for a site across polls rather than rebuilding it', async () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
+      ]
+      addControl()
+      expect(dotMarkers()).toHaveLength(1)
+
+      // A later poll repeats the same fix: the marker stays put instead of
+      // being torn down and recreated on every 5-second refresh.
+      store.aprsStations = [
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5, comment: 'new' }),
+        station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
+      ]
+      await nextTick()
+      const allMarkers = created.markers.filter((marker) =>
+        marker.element.classList.contains('aprs-site-marker'),
+      )
+      expect(allMarkers).toHaveLength(1)
+      expect(allMarkers[0]!.removed).toBe(false)
+    })
+
+    it('tears site dots down with the control', () => {
+      store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
+      const { control } = addControl()
+      expect(dotMarkers()).toHaveLength(1)
+      control.onRemove()
+      // Leaving a dot behind would strand it on the map after leaving Land.
+      expect(dotMarkers()).toHaveLength(0)
+    })
+
+    it('removes site dots when the layer is hidden', () => {
+      store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
+      const { control } = addControl()
+      expect(dotMarkers()).toHaveLength(1)
+      control.setVisible(false)
+      expect(dotMarkers()).toHaveLength(0)
+    })
+  })
+
+  // ── side-panel hand-off ─────────────────────────────────────────────────────
+
+  it('announces the clicked station so the side panel can expand its row', () => {
+    const listener = vi.fn()
+    document.addEventListener('aprs-station-selected', listener)
+    store.aprsStations = [station()]
+    addControl()
+    created.markers[0].element.dispatchEvent(new Event('click'))
+    expect(listener).toHaveBeenCalledOnce()
+    expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({ callsign: 'M0ABC-9' })
+    document.removeEventListener('aprs-station-selected', listener)
+  })
+
+  // ── accessible table ────────────────────────────────────────────────────────
+
+  it('lists every field in the accessible table regardless of label settings', () => {
+    // All label fields are off except the defaults; the table is the accessible
+    // equivalent of the map and must not lose data to a display preference.
+    store.aprsStations = [station({ course: 90, speed: 30, altitude: 120, last_heard_ms: 0 })]
+    const { map } = addControl()
+    const region = map._container.querySelector('[role="region"]')!
+    const headers = Array.from(region.querySelectorAll('th')).map((th) => th.textContent)
+    expect(headers).toEqual([
+      'Callsign',
+      'Symbol',
+      'Time',
+      'Position',
+      'Course',
+      'Speed',
+      'Altitude',
+      'Path',
+      'Comment',
+    ])
+    const cells = Array.from(region.querySelectorAll('td')).map((td) => td.textContent)
+    expect(cells).toContain('Car')
+    expect(cells).toContain('90°')
+    expect(cells).toContain('30 KM/H')
+    expect(cells).toContain('120 M')
+    expect(cells).toContain('WIDE1-1')
+  })
+
+  it('leaves table cells blank for fields the packet omitted', () => {
+    store.aprsStations = [station({ course: null, speed: null, altitude: null, path: null })]
+    const { map } = addControl()
+    const cells = Array.from(map._container.querySelectorAll('[role="region"] td')) as HTMLElement[]
+    expect(cells[4]!.textContent).toBe('')
+    expect(cells[5]!.textContent).toBe('')
+    expect(cells[6]!.textContent).toBe('')
+    expect(cells[7]!.textContent).toBe('')
+  })
+})
+
+// ── exported formatters ───────────────────────────────────────────────────────
+
+describe('APRS field formatters', () => {
+  it('formatHeardTime renders 24-hour local wall time', () => {
+    const heard = new Date(2026, 6, 25, 21, 33, 47).getTime()
+    expect(formatHeardTime(heard)).toBe('21:33:47')
+  })
+
+  it('formatCourse rounds to whole degrees, or null when unreported', () => {
+    expect(formatCourse(274.6)).toBe('275°')
+    expect(formatCourse(0)).toBe('0°')
+    expect(formatCourse(null)).toBeNull()
+  })
+
+  it('formatSpeed labels km/h — the unit aprslib normalises to', () => {
+    expect(formatSpeed(48.4)).toBe('48 KM/H')
+    expect(formatSpeed(0)).toBe('0 KM/H')
+    expect(formatSpeed(null)).toBeNull()
+  })
+
+  it('formatAltitude labels metres — likewise already converted', () => {
+    expect(formatAltitude(121.9)).toBe('122 M')
+    expect(formatAltitude(0)).toBe('0 M')
+    expect(formatAltitude(null)).toBeNull()
+  })
+
+  describe('truncate', () => {
+    it('returns short text unchanged, trimmed', () => {
+      expect(truncate('  WIDE1-1  ')).toBe('WIDE1-1')
+    })
+
+    it('treats null, empty and whitespace-only text as absent', () => {
+      expect(truncate(null)).toBeNull()
+      expect(truncate('')).toBeNull()
+      expect(truncate('   ')).toBeNull()
+    })
+
+    it('keeps text at exactly the limit intact', () => {
+      const exact = 'x'.repeat(24)
+      expect(truncate(exact)).toBe(exact)
+    })
+
+    it('clips text over the limit and marks it with an ellipsis', () => {
+      const clipped = truncate('y'.repeat(25))!
+      expect(clipped).toHaveLength(24)
+      expect(clipped.endsWith('…')).toBe(true)
+    })
+  })
+})
+
+// ── co-sited stations ─────────────────────────────────────────────────────────
+
+describe('groupStationsBySite', () => {
+  /** Stack position by callsign, for readable assertions. */
+  function stackIndexByCallsign(stations: AprsStation[]): Map<string, number> {
+    const indices = new Map<string, number>()
+    for (const site of groupStationsBySite(stations)) {
+      site.stations.forEach((station, index) => indices.set(station.callsign, index))
+    }
+    return indices
+  }
+
+  function at(callsign: string, latitude: number, longitude: number): AprsStation {
+    return {
+      callsign,
+      latitude,
+      longitude,
+      symbol: '/>',
+      comment: null,
+      course: null,
+      speed: null,
+      altitude: null,
+      path: null,
+      raw: null,
+      last_heard_ms: 0,
+    }
+  }
+
+  it('gives every station index 0 when none share a site', () => {
+    const indices = stackIndexByCallsign([at('A', 54.9, -1.5), at('B', 55.2, -1.9)])
+    expect(indices.get('A')).toBe(0)
+    expect(indices.get('B')).toBe(0)
+  })
+
+  it('stacks stations beaconing identical coordinates', () => {
+    // Real case: a repeater and a gateway on one mast.
+    const indices = stackIndexByCallsign([
+      at('MB7IAE-L', 54.898666, -2.243833),
+      at('M0UKB-L', 54.898666, -2.243833),
+    ])
+    expect(indices.get('M0UKB-L')).toBe(0)
+    expect(indices.get('MB7IAE-L')).toBe(1)
+  })
+
+  it('groups only stations reporting the very same fix', () => {
+    // Real data: GB3CD and GB3CD-R beacon an identical position, while
+    // MB7VU-10 is ~11 m west. Grouping on the reported values rather than a
+    // tolerance keeps a site a genuine single point, so its labels can never
+    // drift away from the leaders drawn to them as the map zooms in.
+    const sites = groupStationsBySite([
+      at('GB3CD', 54.735166, -1.7448333),
+      at('GB3CD-R', 54.735166, -1.7448333),
+      at('MB7VU-10', 54.735166, -1.745),
+    ])
+    expect(sites).toHaveLength(2)
+    expect(sites[0]!.stations.map((each) => each.callsign)).toEqual(['GB3CD', 'GB3CD-R'])
+    expect(sites[1]!.stations.map((each) => each.callsign)).toEqual(['MB7VU-10'])
+  })
+
+  it('keeps stations far enough apart on their own true positions', () => {
+    const indices = stackIndexByCallsign([at('A', 54.9, -1.5), at('B', 54.9, -1.51)])
+    expect(indices.get('A')).toBe(0)
+    expect(indices.get('B')).toBe(0)
+  })
+
+  it('orders a stack by callsign, so it is stable across polls', () => {
+    const first = stackIndexByCallsign([at('ZZZ', 54.9, -1.5), at('AAA', 54.9, -1.5)])
+    // Same stations, opposite arrival order → identical stack positions.
+    const second = stackIndexByCallsign([at('AAA', 54.9, -1.5), at('ZZZ', 54.9, -1.5)])
+    expect(first.get('AAA')).toBe(0)
+    expect(first.get('ZZZ')).toBe(1)
+    expect(second).toEqual(first)
+  })
+
+  it('handles an empty snapshot', () => {
+    expect(groupStationsBySite([])).toEqual([])
+  })
+
+  it('carries each site’s position, so its dot can be placed', () => {
+    const sites = groupStationsBySite([
+      at('A', 54.9, -1.5),
+      at('B', 54.9, -1.5),
+      at('C', 55.4, -2.2),
+    ])
+    expect(sites).toHaveLength(2)
+    expect(sites[0]!.stations.map((each) => each.callsign)).toEqual(['A', 'B'])
+    expect(sites[0]!.latitude).toBe(54.9)
+    expect(sites[0]!.longitude).toBe(-1.5)
+    expect(sites[1]!.stations).toHaveLength(1)
+  })
+})
+
+describe('planSiteLayout', () => {
+  function site(key: string, latitude: number, longitude: number, count: number) {
+    return {
+      key,
+      latitude,
+      longitude,
+      stations: Array.from({ length: count }, (_unused, index) => ({
+        callsign: `${key}-${index}`,
+        latitude,
+        longitude,
+        symbol: null,
+        comment: null,
+        course: null,
+        speed: null,
+        altitude: null,
+        path: null,
+        raw: null,
+        last_heard_ms: 0,
+      })),
+    }
+  }
+
+  it('leaves a station standing on its own undisplaced', () => {
+    const [planned] = planSiteLayout([site('a', 54.9, -1.5, 1)])
+    expect(planned!.layout).toEqual({ startIndex: 0, displaced: false })
+  })
+
+  it('numbers a shared site from the top of the column', () => {
+    const [planned] = planSiteLayout([site('a', 54.9, -1.5, 3)])
+    expect(planned!.layout).toEqual({ startIndex: 0, displaced: true })
+  })
+
+  it('numbers neighbouring sites straight through one column', () => {
+    // Two masts ~11 m apart: zoomed out their stacks would land on each other.
+    const planned = planSiteLayout([site('a', 54.9, -1.5, 2), site('b', 54.9, -1.5002, 3)])
+    expect(planned[0]!.layout).toEqual({ startIndex: 0, displaced: true })
+    expect(planned[1]!.layout).toEqual({ startIndex: 2, displaced: true })
+  })
+
+  it('displaces a lone station that shares a neighbourhood with a busy mast', () => {
+    // On its own it would need no marker, but here its label would land in the
+    // mast's column, so it joins the column and gets a marker of its own.
+    const planned = planSiteLayout([site('a', 54.9, -1.5, 2), site('b', 54.9, -1.5002, 1)])
+    expect(planned[1]!.layout).toEqual({ startIndex: 2, displaced: true })
+  })
+
+  it('keeps distant sites independent of one another', () => {
+    const planned = planSiteLayout([site('a', 54.9, -1.5, 2), site('b', 55.9, -2.5, 2)])
+    expect(planned[0]!.layout.startIndex).toBe(0)
+    expect(planned[1]!.layout.startIndex).toBe(0)
+  })
+
+  it('plans nothing for an empty list', () => {
+    expect(planSiteLayout([])).toEqual([])
   })
 })
