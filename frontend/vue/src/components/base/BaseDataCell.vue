@@ -17,7 +17,10 @@
  * `--ba-cell-value-font-weight`, `--ba-cell-value-white-space`,
  * `--ba-cell-value-overflow`, `--ba-cell-value-text-overflow`,
  * `--ba-cell-value-word-break`, `--ba-cell-value-overflow-wrap`,
- * `--ba-cell-value-line-height`, `--ba-cell-align` (SpaceFilter/SpacePasses's
+ * `--ba-cell-value-line-height`, `--ba-cell-value-color`,
+ * `--ba-cell-value-letter-spacing` (free prose reads better unspaced and
+ * slightly dimmed than fixed-width telemetry does), `--ba-cell-align`
+ * (SpaceFilter/SpacePasses's
  * RADIO grid left-aligns each cell at its natural width — `flex-start` —
  * instead of the default `stretch`, so an unusually long value isn't
  * ellipsized at the column edge; POSITION/ORBITAL never had this and keep the
@@ -88,8 +91,8 @@ withDefaults(defineProps<BaseDataCellProps>(), {
   font-family: var(--font-primary);
   font-size: var(--ba-cell-value-font-size, 14px);
   font-weight: var(--ba-cell-value-font-weight, 600);
-  letter-spacing: 0.06em;
-  color: #fff;
+  letter-spacing: var(--ba-cell-value-letter-spacing, 0.06em);
+  color: var(--ba-cell-value-color, #fff);
   white-space: var(--ba-cell-value-white-space, nowrap);
   overflow: var(--ba-cell-value-overflow, hidden);
   text-overflow: var(--ba-cell-value-text-overflow, ellipsis);
