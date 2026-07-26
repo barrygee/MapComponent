@@ -648,13 +648,13 @@ describe('AprsStationsControl', () => {
     /** Markers that are station labels rather than site dots. */
     function labelMarkers() {
       return created.markers.filter(
-        (marker) => !marker.element.classList.contains('aprs-site-dot') && !marker.removed,
+        (marker) => !marker.element.classList.contains('aprs-site-marker') && !marker.removed,
       )
     }
-    /** Markers that are site dots. */
+    /** Markers that are site position markers rather than labels. */
     function dotMarkers() {
       return created.markers.filter(
-        (marker) => marker.element.classList.contains('aprs-site-dot') && !marker.removed,
+        (marker) => marker.element.classList.contains('aprs-site-marker') && !marker.removed,
       )
     }
 
@@ -674,11 +674,11 @@ describe('AprsStationsControl', () => {
       // Both labels step below the dot, leaving it clear. The fixture reports a
       // course of 90°, so both are left-facing and displace to the left.
       const offsets = labelMarkers().map((marker) => marker.offset)
-      expect(offsets).toContainEqual([-20, 30])
-      expect(offsets).toContainEqual([-20, 60])
+      expect(offsets).toContainEqual([-28, 43])
+      expect(offsets).toContainEqual([-28, 73])
     })
 
-    it('tethers each displaced label back to the dot from its leading edge', () => {
+    it('tethers each displaced label back to the marker from its leading edge', () => {
       store.aprsStations = [
         station({ callsign: 'AAA', course: null }),
         station({ callsign: 'BBB', course: null }),
@@ -690,12 +690,12 @@ describe('AprsStationsControl', () => {
       expect(tethers.every(Boolean)).toBe(true)
       // Each rises exactly as far as its label is displaced, so the curve lands
       // on the dot rather than near it.
-      expect(tethers[0]!.getAttribute('height')).toBe('30')
-      expect(tethers[1]!.getAttribute('height')).toBe('60')
+      expect(tethers[0]!.getAttribute('height')).toBe('43')
+      expect(tethers[1]!.getAttribute('height')).toBe('73')
       // Right-facing labels anchor by their left edge, so the tether sits to
       // the left of the label, starting above its centre.
-      expect(tethers[0]!.style.left).toBe('-20px')
-      expect(tethers[0]!.style.top).toBe('-17px')
+      expect(tethers[0]!.style.left).toBe('-28px')
+      expect(tethers[0]!.style.top).toBe('-30px')
     })
 
     it('draws the tether as a dashed curve, not a solid line', () => {
@@ -707,10 +707,10 @@ describe('AprsStationsControl', () => {
       ]
       addControl()
       const path = labelMarkers()[0]!.element.querySelector('.aprs-leader-line path')!
-      expect(path.getAttribute('stroke-dasharray')).toBe('2 3')
+      expect(path.getAttribute('stroke-dasharray')).toBe('2.5 3.5')
       expect(path.getAttribute('fill')).toBe('none')
-      // A quadratic curve out of the label edge and up to the dot.
-      expect(path.getAttribute('d')).toBe('M 20 30 Q 0 30 0 0')
+      // A cubic curve out of the label edge and up into the marker.
+      expect(path.getAttribute('d')).toBe('M 28 43 C 0 43 0 19.35 0 0')
     })
 
     it('tethers a left-facing label from its right edge, mirrored', () => {
@@ -722,9 +722,9 @@ describe('AprsStationsControl', () => {
       ]
       addControl()
       const tether = labelMarkers()[0]!.element.querySelector('.aprs-leader-line') as SVGSVGElement
-      expect(tether.style.right).toBe('-20px')
+      expect(tether.style.right).toBe('-28px')
       expect(tether.style.left).toBe('')
-      expect(tether.querySelector('path')!.getAttribute('d')).toBe('M 0 30 Q 20 30 20 0')
+      expect(tether.querySelector('path')!.getAttribute('d')).toBe('M 0 43 C 28 43 28 19.35 28 0')
     })
 
     it('displaces the label sideways as well as down, so the curve has room', () => {
@@ -736,8 +736,8 @@ describe('AprsStationsControl', () => {
       const offsets = labelMarkers().map((marker) => marker.offset)
       // Right-facing pushes right, left-facing pushes left — each away from the
       // dot, on the side its leading edge faces.
-      expect(offsets).toContainEqual([20, 30])
-      expect(offsets).toContainEqual([-20, 60])
+      expect(offsets).toContainEqual([28, 43])
+      expect(offsets).toContainEqual([-28, 73])
     })
 
     it('plots a lone station on its true position, with no dot or tether', () => {
@@ -760,8 +760,8 @@ describe('AprsStationsControl', () => {
       await nextTick()
       expect(dotMarkers()).toHaveLength(1)
       const offsets = labelMarkers().map((marker) => marker.offset)
-      expect(offsets).toContainEqual([-20, 30])
-      expect(offsets).toContainEqual([-20, 60])
+      expect(offsets).toContainEqual([-28, 43])
+      expect(offsets).toContainEqual([-28, 73])
     })
 
     it('removes the dot and the tether when a site drops back to one station', async () => {
@@ -781,6 +781,19 @@ describe('AprsStationsControl', () => {
       expect(remaining[0]!.element.querySelector('.aprs-leader-line')).toBeNull()
     })
 
+    it('marks the site with the same square well the labels use, holding a pin', () => {
+      store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
+      addControl()
+      const marker = dotMarkers()[0]!.element
+      // Same square + charcoal as a label's symbol well, so the two read as one
+      // family; a pin rather than a station symbol, because it marks a place.
+      expect(marker.classList.contains('adsb-arrow-wrap')).toBe(true)
+      expect(marker.style.background).toBe('rgb(21, 23, 29)')
+      expect(marker.style.width).toBe('26px')
+      expect(marker.querySelector('circle')).not.toBeNull()
+      expect(marker.querySelector('path')!.getAttribute('d')).toContain('M6 10.5')
+    })
+
     it('keeps the dot out of the way of clicks and screen readers', () => {
       store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
       addControl()
@@ -796,7 +809,7 @@ describe('AprsStationsControl', () => {
       ]
       addControl()
       const dotsAfterFirstRender = created.markers.filter((marker) =>
-        marker.element.classList.contains('aprs-site-dot'),
+        marker.element.classList.contains('aprs-site-marker'),
       )
       expect(dotsAfterFirstRender).toHaveLength(1)
 
@@ -808,7 +821,7 @@ describe('AprsStationsControl', () => {
       ]
       await nextTick()
       const allDots = created.markers.filter((marker) =>
-        marker.element.classList.contains('aprs-site-dot'),
+        marker.element.classList.contains('aprs-site-marker'),
       )
       expect(allDots).toHaveLength(1)
       expect(allDots[0]!.lngLat).toEqual([-1.5, 54.9001])

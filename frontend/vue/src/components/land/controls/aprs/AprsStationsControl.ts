@@ -11,6 +11,7 @@ import {
   createGlyphSvg,
   createGlyphWell,
   createLabelPill,
+  createLocationPinShape,
   createNameSegment,
   isLeftFacing,
   MAP_LABEL_GLYPH_SIZE_PX,
@@ -138,8 +139,11 @@ export class AprsStationsControl extends SentinelControlBase {
       site.stations.forEach((station, stackIndex) => {
         seen.add(station.callsign)
         const coords: [number, number] = [station.longitude, station.latitude]
-        // Displaced stacks start one step down so the site dot stays clear.
-        const leaderLength = isShared ? (stackIndex + 1) * STACKED_LABEL_OFFSET_PX : 0
+        // Displaced stacks clear the site marker's own square before stepping,
+        // so the first tether has room to read as a curve.
+        const leaderLength = isShared
+          ? MAP_LABEL_SIZE_PX / 2 + (stackIndex + 1) * STACKED_LABEL_OFFSET_PX
+          : 0
         const signature = this._markerSignature(station, leaderLength)
         const existing = this._markers.get(station.callsign)
         // Label content unchanged → keep the existing marker. A station only
@@ -200,7 +204,7 @@ export class AprsStationsControl extends SentinelControlBase {
     }
   }
 
-  /** Place (or move) the dot marking a shared site's real position. */
+  /** Place (or move) the marker showing a shared site's real position. */
   private _syncSiteDot(site: StationSite): void {
     const coords: [number, number] = [site.longitude, site.latitude]
     const existing = this._siteMarkers.get(site.key)
@@ -208,7 +212,7 @@ export class AprsStationsControl extends SentinelControlBase {
       existing.setLngLat(coords)
       return
     }
-    const marker = new maplibregl.Marker({ element: buildSiteDot(), anchor: 'center' })
+    const marker = new maplibregl.Marker({ element: buildSiteMarker(), anchor: 'center' })
       .setLngLat(coords)
       .addTo(this.map)
     this._siteMarkers.set(site.key, marker)
@@ -462,9 +466,9 @@ export class AprsStationsControl extends SentinelControlBase {
  *  just over a label's height, so stacked pills read as a list without touching. */
 const STACKED_LABEL_OFFSET_PX = 30
 
-/** How far a displaced label is pushed sideways from its site dot, in pixels.
+/** How far a displaced label is pushed sideways from its site marker, in pixels.
  *  Gives the tether room to curve rather than doubling back on itself. */
-const LEADER_HORIZONTAL_OFFSET_PX = 20
+const LEADER_HORIZONTAL_OFFSET_PX = 28
 
 /** Decimal places used to decide two stations share a site (3 dp ≈ 110 m). */
 const SITE_PRECISION_DP = 3
@@ -512,35 +516,34 @@ export function groupStationsBySite(stations: AprsStation[]): StationSite[] {
 }
 
 /**
- * The dot marking a shared site's real position.
+ * The marker showing a shared site's real position.
  *
- * Purely a position cue — it takes no pointer events, so it never intercepts a
+ * Deliberately the same square well the labels carry their symbol icon in, so
+ * it reads as part of the same family — a pin glyph rather than a station
+ * symbol, because it points at a place, not a transmitter.
+ *
+ * Purely a position cue: it takes no pointer events, so it never intercepts a
  * click meant for a label, and is hidden from assistive tech, which reads the
  * stations from the data table instead.
  */
-export function buildSiteDot(): HTMLDivElement {
-  const dot = document.createElement('div')
-  dot.className = 'aprs-site-dot'
-  dot.setAttribute('aria-hidden', 'true')
-  dot.style.cssText = [
-    'width:7px',
-    'height:7px',
-    'border-radius:50%',
-    `background:${APRS_ACCENT_COLOR}`,
-    // A dark ring keeps the dot legible over pale coastline and road fills.
-    'box-shadow:0 0 0 2px rgba(10,13,20,0.85)',
-    'pointer-events:none',
-  ].join(';')
-  return dot
+export function buildSiteMarker(): HTMLElement {
+  const marker = createGlyphWell(
+    createGlyphSvg(createLocationPinShape(APRS_ACCENT_COLOR)),
+    APRS_BADGE_BACKGROUND,
+  )
+  marker.classList.add('aprs-site-marker')
+  marker.setAttribute('aria-hidden', 'true')
+  marker.style.pointerEvents = 'none'
+  return marker
 }
 
 /**
- * The curved, dashed tether joining a displaced label to its site dot.
+ * The curved, dashed tether joining a displaced label to its site marker.
  *
  * Drawn inside the label and positioned out of flow, so it does not affect the
  * element's box — and therefore not the anchor MapLibre computes from it. The
  * curve starts at the label's leading edge (the side carrying the icon, or the
- * callsign when the icon is off) and sweeps up to the dot, which the offset
+ * callsign when the icon is off) and sweeps up to the marker, which the offset
  * places `rise` pixels above and `run` pixels to the side.
  *
  * Dashed rather than solid so a tether never reads as a route or a track — the
@@ -556,15 +559,19 @@ export function createLeaderLine(rise: number, run: number, leftFacing: boolean)
   svg.setAttribute('viewBox', `0 0 ${run} ${rise}`)
   svg.setAttribute('fill', 'none')
 
-  // The label edge sits at the box's bottom on the dot's side; the control
-  // point below the dot bends the run out of the label before it climbs.
+  // A cubic, not a quadratic: the first control point holds the run horizontal
+  // as it leaves the label and the second holds it vertical as it meets the
+  // marker, which rounds the corner far more than a single control point can.
   const labelEdgeX = leftFacing ? 0 : run
-  const dotX = leftFacing ? run : 0
+  const markerX = leftFacing ? run : 0
   const path = document.createElementNS(svgNamespace, 'path')
-  path.setAttribute('d', `M ${labelEdgeX} ${rise} Q ${dotX} ${rise} ${dotX} 0`)
-  path.setAttribute('stroke', 'rgba(255,255,255,0.45)')
-  path.setAttribute('stroke-width', '1')
-  path.setAttribute('stroke-dasharray', '2 3')
+  path.setAttribute(
+    'd',
+    `M ${labelEdgeX} ${rise} C ${markerX} ${rise} ${markerX} ${rise * 0.45} ${markerX} 0`,
+  )
+  path.setAttribute('stroke', 'rgba(255,255,255,0.5)')
+  path.setAttribute('stroke-width', '1.6')
+  path.setAttribute('stroke-dasharray', '2.5 3.5')
   path.setAttribute('stroke-linecap', 'round')
   path.setAttribute('fill', 'none')
   svg.appendChild(path)
