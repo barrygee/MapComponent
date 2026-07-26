@@ -116,6 +116,10 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Persist a favourite flag on stored frequencies
 - Add a favourites accordion and restore the frequency manager tab
 - Tighten frequency manager spacing and unify accordion hover
+- Style APRS map labels like aircraft labels
+- Add APRS label data point controls
+- Add searchable APRS station side panel
+- Tether co-sited APRS labels to a dot with curved leaders
 
 ### Bug Fixes
 
@@ -302,6 +306,8 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Reattach the APRS decode socket after a reload
 - Render APRS symbol icons in white
 - Open the Frequency Manager GROUPS accordion by default
+- Draw APRS site leaders as one comb instead of a curve per label
+- Keep APRS site leaders attached to their labels when zooming
 
 ### Chores
 
@@ -1111,6 +1117,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #253 from barrygee/feat/sdr-accordion-hover-and-row-alignment
 - Merge pull request #254 from barrygee/fix/aprs-symbol-icon-colour
 - Merge pull request #255 from barrygee/fix/freq-manager-groups-open-by-default
+- Merge pull request #256 from barrygee/feat/aprs-label-styling
 
 ### Refactoring
 
@@ -1164,6 +1171,8 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Delete verified-dead CSS from SdrPanel.css (base dedupe B10g) (#213)
 - Delete verified-dead CSS from SettingsPanel.css and close out the B-series (base dedupe B10h) (#214)
 - Extract SdrPanel engine spine into composables (P8) (#218)
+- Extract shared map-label primitives
+- Group APRS sites on the reported position, not a tolerance
 
 ### Documentation
 
@@ -1214,6 +1223,16 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Rebuild SPA bundle for reformatted source
 - Rebuild SPA bundle after hover-tag/CSS removal
 - Rebuild spa-dist on merged main (8-4a + 8-4b)
+- Rebuild bundle for the APRS label and panel work
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
 
 ### Continuous Integration
 
@@ -1252,6 +1271,11 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Make scanner play button icon-only and match saved-ranges size (#140)
 - Dark-grey search inputs matching the SEARCH tab height (#141)
 - Match side-panel tab icon colours to air and space rails (#142)
+- Align APRS labels and panel with the app's surfaces
+- Draw the APRS site marker as a pinned square with rounder tethers
+- Draw label glyphs larger
+- Reduce the APRS site marker to a small ringed square
+- Round the APRS site marker into concentric circles
 
 ### Dependencies
 
