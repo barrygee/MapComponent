@@ -11,6 +11,19 @@ import {
   createGroundVehicleBlip,
   createUAVBlip,
 } from './adsbSprites'
+import {
+  appendMirrored,
+  createAccentBadge,
+  createDimBadge,
+  createDirectionArrowShape,
+  createFilledDotShape,
+  createGlyphSvg,
+  createGlyphWell,
+  createHollowDotShape,
+  createLabelPill,
+  createNameSegment,
+  isLeftFacing,
+} from '@/components/shared/map-label/mapLabelParts'
 
 // ---- Internal types ----
 
@@ -1299,24 +1312,30 @@ export class AdsbLiveControl implements maplibregl.IControl {
   // ---- Callsign label markers ----
 
   private _isLeftFacing(track: number): boolean {
-    const t = ((track % 360) + 360) % 360
-    return t >= 1 && t <= 189
+    return isLeftFacing(track)
+  }
+
+  /**
+   * The glyph drawn in a label's leading well: a rotated arrowhead for aircraft
+   * in flight, or an unrotated ring/dot for ground vehicles and towers, whose
+   * ADS-B "track" is not a meaningful heading.
+   */
+  private _glyphMarkup(
+    props: { category?: string; t?: string },
+    color: string,
+    track: number,
+  ): string {
+    const cat = (props.category || '').toUpperCase()
+    const isTwr = (props.t || '').toUpperCase() === 'TWR'
+    if (cat === 'C1' || cat === 'C2') return createGlyphSvg(createHollowDotShape(color))
+    if (cat === 'C3' || cat === 'C4' || cat === 'C5' || isTwr)
+      return createGlyphSvg(createFilledDotShape(color))
+    return createGlyphSvg(createDirectionArrowShape(color), track)
   }
 
   private _makeArrowSvg(color: string, track: number, category?: string, type?: string): string {
-    const cat = (category || '').toUpperCase()
-    const isTwr = (type || '').toUpperCase() === 'TWR'
-    let shape: string
-    if (cat === 'C1' || cat === 'C2') {
-      shape = `<circle cx="6" cy="6" r="3.5" fill="none" stroke="${color}" stroke-width="1.5"/>`
-    } else if (cat === 'C3' || cat === 'C4' || cat === 'C5' || isTwr) {
-      shape = `<circle cx="6" cy="6" r="3.5" fill="${color}" stroke="none"/>`
-    } else {
-      shape = `<polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`
-    }
-    const noRotate =
-      cat === 'C1' || cat === 'C2' || cat === 'C3' || cat === 'C4' || cat === 'C5' || isTwr
-    return `<span class="adsb-arrow-wrap" style="display:flex;align-items:center;justify-content:center;width:26px;align-self:stretch;background:#000;flex-shrink:0"><svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${noRotate ? 0 : track}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg">${shape}</svg></span>`
+    const well = createGlyphWell(this._glyphMarkup({ category, t: type }, color, track), '#000')
+    return well.outerHTML
   }
 
   private _buildCallsignLabelEl(props: AircraftProperties): HTMLElement {
@@ -1335,50 +1354,11 @@ export class AdsbLiveControl implements maplibregl.IControl {
     const leftFacing = this._isLeftFacing(track)
     const notifOn = this._notifEnabled.has(props.hex)
 
-    const el = document.createElement('div')
-    el.style.cssText = [
-      isEmerg ? 'background:rgba(180,0,0,0.85)' : 'background:#000000',
-      'color:#ffffff',
-      "font-family:'Barlow Condensed','Barlow',sans-serif",
-      'font-size:14px',
-      'font-weight:400',
-      'letter-spacing:.12em',
-      'text-transform:uppercase',
-      'box-sizing:border-box',
-      'display:flex',
-      'align-items:stretch',
-      'gap:0',
-      'padding:0',
-      'cursor:pointer',
-      'white-space:nowrap',
-      'user-select:none',
-      'min-height:26px',
-      'min-width:26px',
-    ].join(';')
+    const el = createLabelPill(isEmerg ? 'rgba(180,0,0,0.85)' : '#000000')
     el.dataset.dir = leftFacing ? 'left' : 'right'
     el.dataset.notif = notifOn ? '1' : '0'
 
-    const arrowWrap = document.createElement('span')
-    arrowWrap.className = 'adsb-arrow-wrap'
-    arrowWrap.style.cssText =
-      'display:flex;align-items:center;justify-content:center;width:26px;align-self:stretch;flex-shrink:0'
-    {
-      const cat = (props.category || '').toUpperCase()
-      const isTwr = (props.t || '').toUpperCase() === 'TWR'
-      let shape: string
-      let rotate: number
-      if (cat === 'C1' || cat === 'C2') {
-        shape = `<circle cx="6" cy="6" r="3.5" fill="none" stroke="${arrowColor}" stroke-width="1.5"/>`
-        rotate = 0
-      } else if (cat === 'C3' || cat === 'C4' || cat === 'C5' || isTwr) {
-        shape = `<circle cx="6" cy="6" r="3.5" fill="${arrowColor}" stroke="none"/>`
-        rotate = 0
-      } else {
-        shape = `<polygon points="6,1 10,11 6,8.5 2,11" fill="none" stroke="${arrowColor}" stroke-width="1.5" stroke-linejoin="round"/>`
-        rotate = track
-      }
-      arrowWrap.innerHTML = `<svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" style="transform:rotate(${rotate}deg);transform-origin:center;transform-box:fill-box;display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg">${shape}</svg>`
-    }
+    const arrowWrap = createGlyphWell(this._glyphMarkup(props, arrowColor, track))
     const badgeColor = isEmerg ? '#ff4040' : isMil ? '#c8ff00' : 'rgba(255,255,255,0.7)'
     const nameColor = isEmerg ? '#ff4040' : '#ffffff'
     const typeBg = isEmerg ? '#4d0000' : isMil ? '#4d6600' : '#002244'
@@ -1386,29 +1366,17 @@ export class AdsbLiveControl implements maplibregl.IControl {
     const catLbl = this._categoryLabel(props.category)
     const isTracked = isMil && this._followEnabled && props.hex === this._tagHex
 
-    const dimBadge = (label: string, value: string) => {
-      const b = document.createElement('span')
-      b.style.cssText = `background:#000000;color:${badgeColor} !important;font-size:12px;font-weight:700;padding:0 7px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;gap:4px;`
-      b.innerHTML = `<span style="opacity:0.45;font-weight:600;font-size:10px;letter-spacing:.12em">${label}</span><span>${value}</span>`
-      return b
-    }
+    const dimBadge = (label: string, value: string) => createDimBadge(label, value, badgeColor)
 
     const makeCallsign = (side: 'left' | 'right') => {
       if (!showCallsign) return null
-      const s = document.createElement('span')
-      s.className = 'adsb-label-name'
-      s.textContent = callsign
-      const pad = side === 'left' ? '3px 6px 3px 12px' : '3px 12px 3px 6px'
-      s.style.cssText = `color:${nameColor} !important;padding:${pad};display:flex;align-items:center;`
-      return s
+      return createNameSegment(callsign, side, nameColor)
     }
 
     const makeType = () => {
       if (!showType || !props.t) return null
-      const b = document.createElement('span')
+      const b = createAccentBadge(props.t.toUpperCase(), typeBg, typeColor)
       b.className = isMil ? 'mil-model-badge' : 'civil-model-badge'
-      b.textContent = props.t.toUpperCase()
-      b.style.cssText = `background:${typeBg};color:${typeColor} !important;font-size:12px;font-weight:700;padding:0 7px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;`
       return b
     }
 
@@ -1425,10 +1393,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
     }
 
     const makeEmergSqk = () => {
-      const b = document.createElement('span')
+      const b = createAccentBadge(props.squawk, '#000', '#ff2222')
       b.className = 'sqk-badge'
-      b.textContent = props.squawk
-      b.style.cssText = `background:#000;color:#ff2222 !important;font-size:12px;font-weight:700;padding:0 7px;letter-spacing:.05em;align-self:stretch;display:flex;align-items:center;`
       return b
     }
 
@@ -1471,41 +1437,28 @@ export class AdsbLiveControl implements maplibregl.IControl {
       return btn
     }
 
-    const append = (...nodes: (HTMLElement | null)[]) => {
-      for (const n of nodes) if (n) el.appendChild(n)
-    }
-
-    if (leftFacing) {
-      // 1–189°: trk, bell, cat, reg, spd, hdg, alt, sqk, type, callsign, arrow
-      append(makeTrackBtn())
-      append(makeNotifBell())
-      if (has('category') && catLbl) append(dimBadge('CAT', catLbl))
-      if (has('registration') && props.r) append(dimBadge('REG', props.r))
-      if (has('speed') && props.gs != null) append(dimBadge('SPD', Math.round(props.gs) + 'kt'))
-      if (has('heading') && props.track != null)
-        append(dimBadge('HDG', Math.round(props.track) + '°'))
-      append(makeAlt())
-      if (isEmerg) append(makeEmergSqk())
-      else append(makeSqk())
-      append(makeType())
-      append(makeCallsign('left'))
-      el.appendChild(arrowWrap)
-    } else {
-      // 190–360/0°: arrow, callsign, type, sqk, alt, hdg, spd, reg, cat, bell, trk
-      el.appendChild(arrowWrap)
-      append(makeCallsign('right'))
-      append(makeType())
-      if (isEmerg) append(makeEmergSqk())
-      else append(makeSqk())
-      append(makeAlt())
-      if (has('heading') && props.track != null)
-        append(dimBadge('HDG', Math.round(props.track) + '°'))
-      if (has('speed') && props.gs != null) append(dimBadge('SPD', Math.round(props.gs) + 'kt'))
-      if (has('registration') && props.r) append(dimBadge('REG', props.r))
-      if (has('category') && catLbl) append(dimBadge('CAT', catLbl))
-      append(makeNotifBell())
-      append(makeTrackBtn())
-    }
+    // Segments in leading-edge order (arrow first, data trailing outward).
+    // `appendMirrored` reverses the whole list for a left-facing aircraft, which
+    // keeps the arrow on the nose and the data behind it.
+    appendMirrored(
+      el,
+      [
+        arrowWrap,
+        makeCallsign(leftFacing ? 'left' : 'right'),
+        makeType(),
+        isEmerg ? makeEmergSqk() : makeSqk(),
+        makeAlt(),
+        has('heading') && props.track != null
+          ? dimBadge('HDG', Math.round(props.track) + '°')
+          : null,
+        has('speed') && props.gs != null ? dimBadge('SPD', Math.round(props.gs) + 'kt') : null,
+        has('registration') && props.r ? dimBadge('REG', props.r) : null,
+        has('category') && catLbl ? dimBadge('CAT', catLbl) : null,
+        makeNotifBell(),
+        makeTrackBtn(),
+      ],
+      leftFacing,
+    )
     el.addEventListener('mouseenter', () => {
       const feature = this._geojson.features.find((f) => f.properties.hex === props.hex)
       if (feature)
