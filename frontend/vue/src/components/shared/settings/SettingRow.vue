@@ -87,6 +87,10 @@
       v-else-if="item.type === 'air-tag-fields'"
       @stage="emit('stage', item.id, $event)"
     />
+    <AprsLabelFieldsControl
+      v-else-if="item.type === 'land-aprs-label-fields'"
+      @stage="emit('stage', item.id, $event)"
+    />
     <AirReplayToggleControl
       v-else-if="item.type === 'air-replay-toggle'"
       @stage="emit('stage', item.id, $event)"
@@ -174,6 +178,7 @@ import SpaceTleSatListControl from './SpaceTleSatListControl.vue'
 import SpaceHoverPreviewControl from './SpaceHoverPreviewControl.vue'
 import AdsbLabelFieldsControl from './AdsbLabelFieldsControl.vue'
 import AdsbTagFieldsControl from './AdsbTagFieldsControl.vue'
+import AprsLabelFieldsControl from './AprsLabelFieldsControl.vue'
 import AirReplayToggleControl from './AirReplayToggleControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import SdrAutoCenterControl from './SdrAutoCenterControl.vue'
@@ -206,6 +211,7 @@ const HALF_TYPES = new Set([
   'space-sat-radio-file',
   'space-hover-preview',
   'air-tag-fields',
+  'land-aprs-label-fields',
 ])
 const NATURAL_HEIGHT_TYPES = new Set(['location'])
 const isWide = WIDE_TYPES.has(props.item.type)

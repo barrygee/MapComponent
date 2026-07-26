@@ -16,6 +16,8 @@ import { useAppStore } from './stores/app'
 import type { ConnectivityMode } from './stores/app'
 import { useAirStore } from './stores/air'
 import type { AdsbLabelFields, AdsbTagFields } from './stores/air'
+import { useLandStore } from './stores/land'
+import type { AprsLabelFieldMap } from './stores/land'
 import { useSdrStore } from './stores/sdr'
 import { useSettingsStore } from './stores/settings'
 
@@ -45,6 +47,7 @@ const ALL_DOMAINS = ['air', 'space', 'sea', 'land', 'sdr'] as const
 // Domains that are ON by default when the DB has no explicit enabled key for them.
 const DOMAINS_ON_BY_DEFAULT = new Set(['air', 'space', 'sdr'])
 const airStore = useAirStore()
+const landStore = useLandStore()
 const sdrStore = useSdrStore()
 const settingsStore = useSettingsStore()
 
@@ -130,6 +133,24 @@ const DEFAULT_LABEL_DATA_POINTS = {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ value: DEFAULT_LABEL_DATA_POINTS }),
+        }).catch(() => {})
+      }
+
+      // APRS station label fields — same cross-device rationale as the ADS-B
+      // fields above: adopt the stored choice, or seed the DB from this
+      // browser's current one when the key has never been written.
+      const remoteAprsFields = data.land?.labelDataPoints as Partial<AprsLabelFieldMap> | undefined
+      if (
+        remoteAprsFields &&
+        typeof remoteAprsFields === 'object' &&
+        !Array.isArray(remoteAprsFields)
+      ) {
+        landStore.setAprsLabelFields({ ...landStore.aprsLabelFields, ...remoteAprsFields })
+      } else {
+        fetch('/api/settings/land/labelDataPoints', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: landStore.aprsLabelFields }),
         }).catch(() => {})
       }
 
