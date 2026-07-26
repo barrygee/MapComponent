@@ -39,7 +39,10 @@ export class AprsStationsControl extends SentinelControlBase {
   private _markerSignatures = new Map<string, string>()
   private _markerPositions = new Map<string, [number, number]>()
   private _siteMarkers = new Map<string, maplibregl.Marker>()
-  private _siteSignatures = new Map<string, string>()
+  /** Live sites, so their leaders can be recomputed in screen space whenever
+   *  the map moves. */
+  private _sites = new Map<string, StationSite>()
+  private _onMapMove: (() => void) | null = null
   private _popup: maplibregl.Popup | null = null
   private _stopWatch: WatchStopHandle | null = null
   private _a11yRegion: HTMLDivElement | null = null
@@ -78,6 +81,11 @@ export class AprsStationsControl extends SentinelControlBase {
     // Re-render on either input: a new station snapshot, or the operator
     // switching label fields on/off in Settings. Watching the store directly is
     // enough — unlike the Air domain, no DOM CustomEvent bridge is needed.
+    // Leader geometry is in screen pixels, so it has to follow the map: two
+    // stations a few metres apart share a point when zoomed out and separate
+    // when zoomed in.
+    this._onMapMove = () => this._updateSiteLeaders()
+    this.map.on('move', this._onMapMove)
     this._stopWatch = watch(
       () =>
         [
@@ -106,6 +114,11 @@ export class AprsStationsControl extends SentinelControlBase {
   }
 
   onRemove(): void {
+    /* v8 ignore start -- defensive: onInit always assigns the handler, and
+       MapLibre never removes a control it did not add */
+    if (this._onMapMove) this.map.off('move', this._onMapMove)
+    /* v8 ignore stop */
+    this._onMapMove = null
     this._stopWatch?.()
     this._stopWatch = null
     this._landStore.stopAprsPolling()
@@ -191,7 +204,7 @@ export class AprsStationsControl extends SentinelControlBase {
       if (!seenSites.has(key)) {
         marker.remove()
         this._siteMarkers.delete(key)
-        this._siteSignatures.delete(key)
+        this._sites.delete(key)
       }
     }
   }
@@ -202,29 +215,50 @@ export class AprsStationsControl extends SentinelControlBase {
    */
   private _syncSiteMarker(site: StationSite): void {
     const coords: [number, number] = [site.longitude, site.latitude]
-    const branches = this._leaderBranches(site)
-    const signature = JSON.stringify(branches)
+    this._sites.set(site.key, site)
     const existing = this._siteMarkers.get(site.key)
-    // Only the position changed → move it. The leaders are baked into the
-    // element, so a change in the stations sharing the site rebuilds it.
-    if (existing && this._siteSignatures.get(site.key) === signature) {
+    if (existing) {
       existing.setLngLat(coords)
+      renderSiteLeaders(existing.getElement(), this._leaderBranches(site))
       return
     }
-    existing?.remove()
-    const marker = new maplibregl.Marker({ element: buildSiteMarker(branches), anchor: 'center' })
+    const marker = new maplibregl.Marker({
+      element: buildSiteMarker(this._leaderBranches(site)),
+      anchor: 'center',
+    })
       .setLngLat(coords)
       .addTo(this.map)
     this._siteMarkers.set(site.key, marker)
-    this._siteSignatures.set(site.key, signature)
   }
 
-  /** Where each of a site's labels sits, relative to the site marker. */
+  /** Redraw every site's leaders against the current view. */
+  private _updateSiteLeaders(): void {
+    for (const [key, site] of this._sites) {
+      const marker = this._siteMarkers.get(key)
+      /* v8 ignore start -- defensive: markers and sites are written together */
+      if (!marker) continue
+      /* v8 ignore stop */
+      renderSiteLeaders(marker.getElement(), this._leaderBranches(site))
+    }
+  }
+
+  /**
+   * Where each of a site's labels sits, relative to the site marker, in pixels.
+   *
+   * A site groups stations within about 110 m, which is one point at low zoom
+   * but a visible spread further in — so each branch measures the station's own
+   * projected position, not the site's, and the leader stays attached to its
+   * label at every zoom level.
+   */
   private _leaderBranches(site: StationSite): LeaderBranch[] {
-    return site.stations.map((station, stackIndex) => ({
-      dx: this._labelHorizontalOffset(station),
-      dy: labelVerticalOffset(stackIndex),
-    }))
+    const origin = this.map.project([site.longitude, site.latitude])
+    return site.stations.map((station, stackIndex) => {
+      const projected = this.map.project([station.longitude, station.latitude])
+      return {
+        dx: projected.x - origin.x + this._labelHorizontalOffset(station),
+        dy: projected.y - origin.y + labelVerticalOffset(stackIndex),
+      }
+    })
   }
 
   /** Which way a label is displaced: away from the marker, on the side its
@@ -466,7 +500,7 @@ export class AprsStationsControl extends SentinelControlBase {
     this._markerPositions.clear()
     for (const marker of this._siteMarkers.values()) marker.remove()
     this._siteMarkers.clear()
-    this._siteSignatures.clear()
+    this._sites.clear()
   }
 }
 
@@ -548,10 +582,27 @@ export function buildSiteMarker(branches: LeaderBranch[]): HTMLElement {
   marker.classList.add('aprs-site-marker')
   marker.setAttribute('aria-hidden', 'true')
   marker.style.pointerEvents = 'none'
+  // The well takes its height from `align-self:stretch`, which only resolves
+  // inside a label's flex row. Standing alone it would collapse to the glyph's
+  // height and read as a letterbox, so the square is set explicitly here.
+  marker.style.height = `${MAP_LABEL_SIZE_PX}px`
+  renderSiteLeaders(marker, branches)
+  return marker
+}
+
+/**
+ * Draw (or redraw) a site marker's leaders.
+ *
+ * Separate from building the marker because the branches are screen-space: two
+ * stations inside one site's tolerance are the same point when zoomed out and
+ * metres apart when zoomed in, so the leaders have to be recomputed as the map
+ * zooms or the labels drift away from them.
+ */
+export function renderSiteLeaders(marker: HTMLElement, branches: LeaderBranch[]): void {
+  marker.querySelector('.aprs-site-leaders')?.remove()
   // Behind the square, so each leader appears to emerge from under the marker
   // rather than from a point floating on top of it.
   marker.insertBefore(createSiteLeaders(branches), marker.firstChild)
-  return marker
 }
 
 /** Where a displaced label's leading edge sits, relative to its site marker. */
@@ -564,6 +615,12 @@ export interface LeaderBranch {
 
 /** Radius of the corner where a leader turns out of its vertical run. */
 const LEADER_CORNER_PX = 26
+
+/** Round a path coordinate to a tenth of a pixel — finer than the screen can
+ *  show, without dragging float noise into the markup. */
+function roundToPixelFraction(value: number): number {
+  return Math.round(value * 10) / 10
+}
 
 /**
  * Build the leader graphic joining a shared site's marker to each of its
@@ -592,15 +649,19 @@ export function createSiteLeaders(branches: LeaderBranch[]): SVGSVGElement {
 
   const centre = MAP_LABEL_SIZE_PX / 2
   for (const branch of branches) {
-    const endY = centre + branch.dy
-    const endX = centre + branch.dx
+    // Projected pixel deltas carry float noise; a sub-pixel path coordinate is
+    // meaningless on screen and makes the markup unreadable.
+    const endY = roundToPixelFraction(centre + branch.dy)
+    const endX = roundToPixelFraction(centre + branch.dx)
     // A straight run, a rounded corner, then a short reach to the label. Drawn
     // as explicit segments rather than one sweeping curve so that every branch's
     // vertical run lies on exactly the same line — and, sharing a start point,
     // the same dash phase — collapsing into one clean stem instead of the fan a
     // single curve per label produces.
     const towardLabel = Math.sign(branch.dx)
-    const corner = Math.min(LEADER_CORNER_PX, Math.abs(branch.dx), Math.abs(branch.dy) - centre)
+    const corner = roundToPixelFraction(
+      Math.min(LEADER_CORNER_PX, Math.abs(branch.dx), Math.abs(branch.dy) - centre),
+    )
     const path = document.createElementNS(svgNamespace, 'path')
     path.setAttribute(
       'd',

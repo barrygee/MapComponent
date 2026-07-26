@@ -23,6 +23,9 @@ const mocks = vi.hoisted(() => {
     setLngLat(): this {
       return this
     }
+    getElement(): HTMLElement {
+      return this.element
+    }
     addTo(): this {
       return this
     }
@@ -105,7 +108,14 @@ describe('APRS map/list parity', () => {
     const control = new AprsStationsControl(store)
     const container = document.createElement('div')
     document.body.appendChild(container)
-    control.onAdd({ getContainer: () => container } as never)
+    // The control projects positions for its site leaders and listens for map
+    // movement, so the stand-in needs more than a container.
+    control.onAdd({
+      getContainer: () => container,
+      project: ([lon, lat]: [number, number]) => ({ x: lon * 1000, y: -lat * 1000 }),
+      on: () => {},
+      off: () => {},
+    } as never)
     const panel = mount(LandFilter)
     /** Callsigns currently listed in the side panel. */
     const listed = () => panel.findAll('.bfp-result-primary').map((row) => row.text())

@@ -36,6 +36,9 @@ const mocks = vi.hoisted(() => {
       this.lngLat = coords
       return this
     }
+    getElement(): HTMLElement {
+      return this.element
+    }
     addTo(): this {
       return this
     }
@@ -103,7 +106,23 @@ function station(overrides: Partial<AprsStation> = {}): AprsStation {
 function makeFakeMap() {
   const container = document.createElement('div')
   document.body.appendChild(container)
-  return { getContainer: () => container, _container: container }
+  const handlers: Record<string, (() => void)[]> = {}
+  return {
+    getContainer: () => container,
+    _container: container,
+    // A linear projection is enough: co-located stations project to the same
+    // point, and separated ones to a predictable pixel delta.
+    project: ([lon, lat]: [number, number]) => ({ x: lon * 1000, y: -lat * 1000 }),
+    on: (event: string, handler: () => void) => {
+      ;(handlers[event] ??= []).push(handler)
+    },
+    off: (event: string, handler: () => void) => {
+      handlers[event] = (handlers[event] ?? []).filter((each) => each !== handler)
+    },
+    /** Fire a map event, as MapLibre would while panning or zooming. */
+    _emit: (event: string) => (handlers[event] ?? []).forEach((handler) => handler()),
+    _handlerCount: (event: string) => (handlers[event] ?? []).length,
+  }
 }
 
 describe('AprsStationsControl', () => {
@@ -792,6 +811,49 @@ describe('AprsStationsControl', () => {
       expect(remaining[0]!.element.querySelector('.aprs-leader-line')).toBeNull()
     })
 
+    it('reaches a station that sits apart from its site, not where it would be if co-located', () => {
+      // A site groups stations within ~110 m. Zoomed in, that spread is visible:
+      // the leader must reach the label's real position, or it dangles in space
+      // while the label sits somewhere else entirely.
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null, latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', course: null, latitude: 54.9, longitude: -1.5004 }),
+      ]
+      addControl()
+      const paths = [...dotMarkers()[0]!.element.querySelectorAll('.aprs-site-leaders path')].map(
+        (path) => path.getAttribute('d')!,
+      )
+      // AAA is at the site origin, so its branch is the plain label offset.
+      expect(paths[0]).toBe('M 13 13 L 13 30 Q 13 56 39 56 L 41 56')
+      // BBB projects 0.4px left of the origin under the test projection, and its
+      // branch follows it rather than assuming the site's own point.
+      expect(paths[1]).toContain('L 40.6 86')
+    })
+
+    it('redraws the leaders as the map moves', () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null }),
+        station({ callsign: 'BBB', course: null }),
+      ]
+      const { map } = addControl()
+      expect(map._handlerCount('move')).toBe(1)
+
+      const leaders = () => dotMarkers()[0]!.element.querySelector('.aprs-site-leaders')
+      const before = leaders()
+      map._emit('move')
+      // Redrawn, not merely left in place: at a new zoom the pixel geometry
+      // between a site and its stations is different.
+      expect(leaders()).not.toBe(before)
+      expect(leaders()!.querySelectorAll('path')).toHaveLength(2)
+    })
+
+    it('stops redrawing leaders once the control is removed', () => {
+      store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
+      const { control, map } = addControl()
+      control.onRemove()
+      expect(map._handlerCount('move')).toBe(0)
+    })
+
     it('marks the site with the same square well the labels use, holding a pin', () => {
       store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
       addControl()
@@ -801,6 +863,9 @@ describe('AprsStationsControl', () => {
       expect(marker.classList.contains('adsb-arrow-wrap')).toBe(true)
       expect(marker.style.background).toBe('rgb(21, 23, 29)')
       expect(marker.style.width).toBe('26px')
+      // Square, not a letterbox: the well's stretch only resolves inside a
+      // label's flex row, so a standalone marker must set its own height.
+      expect(marker.style.height).toBe('26px')
       expect(marker.querySelector('circle')).not.toBeNull()
       expect(marker.querySelector('svg:not(.aprs-site-leaders) path')!.getAttribute('d')).toContain(
         'M6 10.5',
