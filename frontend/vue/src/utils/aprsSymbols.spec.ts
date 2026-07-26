@@ -53,3 +53,41 @@ describe('aprsSymbolSvg', () => {
     expect(svg).toContain(FALLBACK_SYMBOL.paths)
   })
 })
+
+describe('artwork centring', () => {
+  it('shifts an off-centre icon by the difference from the viewBox centre', () => {
+    // The car is drawn low in its box (measured centre y = 14.1), so it lifts.
+    const car = aprsSymbolIcon('/>')
+    expect(car.paths).toContain('<g transform="translate(0,-2.1)">')
+    expect(car.paths.endsWith('</g>')).toBe(true)
+  })
+
+  it('leaves an already-centred icon unwrapped', () => {
+    // No wrapper for the common case, so the markup stays as drawn.
+    const fallback = aprsSymbolIcon(null)
+    expect(fallback.paths).not.toContain('<g transform')
+  })
+
+  it('keeps every symbol’s declared centre inside its viewBox', () => {
+    // A centre outside 0..24 would mean the measurement was taken against
+    // different artwork, and would throw the icon out of its well entirely.
+    const codes =
+      '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~'
+    for (const code of codes) {
+      const icon = aprsSymbolIcon(`/${code}`)
+      if (!icon.centre) continue
+      const [x, y] = icon.centre
+      expect(x).toBeGreaterThanOrEqual(0)
+      expect(x).toBeLessThanOrEqual(24)
+      expect(y).toBeGreaterThanOrEqual(0)
+      expect(y).toBeLessThanOrEqual(24)
+    }
+  })
+
+  it('preserves the label and the original artwork when centring', () => {
+    const truck = aprsSymbolIcon('/k')
+    expect(truck.label).toBe('Truck')
+    // The drawing itself is untouched — only wrapped.
+    expect(truck.paths).toContain('<circle')
+  })
+})
