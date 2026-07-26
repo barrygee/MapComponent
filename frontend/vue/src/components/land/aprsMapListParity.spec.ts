@@ -93,11 +93,12 @@ describe('APRS map/list parity', () => {
     document.body.innerHTML = ''
   })
 
-  /** Callsigns currently plotted on the map. */
+  /** Callsigns currently plotted on the map. Site dots — the position markers
+   *  drawn for co-located stations — are not stations and are excluded. */
   function plotted(): string[] {
     return mocks.created.markers
-      .filter((marker) => !marker.removed)
-      .map((marker) => marker.element.dataset.callsign ?? '')
+      .filter((marker) => !marker.removed && marker.element.dataset.callsign)
+      .map((marker) => marker.element.dataset.callsign!)
   }
 
   function mountBoth() {

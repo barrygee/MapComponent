@@ -14,6 +14,7 @@ import {
   createNameSegment,
   isLeftFacing,
   MAP_LABEL_GLYPH_SIZE_PX,
+  MAP_LABEL_SIZE_PX,
 } from '@/components/shared/map-label/mapLabelParts'
 import type { AprsStation, useLandStore } from '@/stores/land'
 
@@ -36,6 +37,7 @@ export class AprsStationsControl extends SentinelControlBase {
   private _markers = new Map<string, maplibregl.Marker>()
   private _markerSignatures = new Map<string, string>()
   private _markerPositions = new Map<string, [number, number]>()
+  private _siteMarkers = new Map<string, maplibregl.Marker>()
   private _popup: maplibregl.Popup | null = null
   private _stopWatch: WatchStopHandle | null = null
   private _a11yRegion: HTMLDivElement | null = null
@@ -123,42 +125,62 @@ export class AprsStationsControl extends SentinelControlBase {
   /** Add/update/remove markers so the on-map set matches `stations` by callsign. */
   private _syncMarkers(stations: AprsStation[]): void {
     const seen = new Set<string>()
-    for (const { station, stackIndex } of withStackIndices(stations)) {
-      seen.add(station.callsign)
-      const coords: [number, number] = [station.longitude, station.latitude]
-      const signature = this._markerSignature(station, stackIndex)
-      const existing = this._markers.get(station.callsign)
-      // Label content unchanged → keep the existing marker. A station only ever
-      // moves when its beacon actually reports a new fix: re-plotting on an
-      // unchanged position would make a stationary marker twitch as the poll
-      // repeats the same snapshot.
-      if (existing && this._markerSignatures.get(station.callsign) === signature) {
-        if (this._hasMoved(station.callsign, coords)) {
-          existing.setLngLat(coords)
-          this._markerPositions.set(station.callsign, coords)
-        }
-        continue
+    const seenSites = new Set<string>()
+    for (const site of groupStationsBySite(stations)) {
+      // A lone station sits on its own position and needs no tether. A shared
+      // one gets a dot marking the real position, with every label displaced
+      // below it and joined back by a leader line.
+      const isShared = site.stations.length > 1
+      if (isShared) {
+        seenSites.add(site.key)
+        this._syncSiteDot(site)
       }
-      // Anything else (a new field value, or a course change that flips the
-      // pill's direction and therefore its anchor) needs the marker rebuilding,
-      // since MapLibre fixes both element and anchor at construction.
-      existing?.remove()
-      const marker = new maplibregl.Marker({
-        element: this._buildMarkerElement(station),
-        // Keep the glyph over the station's actual position: a left-facing pill
-        // extends leftward, so it anchors by its right edge.
-        anchor: this._isLeftFacing(station) ? 'right' : 'left',
-        // Co-sited stations (repeater + digipeater on one mast, all beaconing
-        // the same fix) would otherwise stack exactly on top of each other and
-        // read as a single station. The first keeps the true position and the
-        // rest step down from it.
-        offset: [0, stackIndex * STACKED_LABEL_OFFSET_PX],
+      site.stations.forEach((station, stackIndex) => {
+        seen.add(station.callsign)
+        const coords: [number, number] = [station.longitude, station.latitude]
+        // Displaced stacks start one step down so the site dot stays clear.
+        const leaderLength = isShared ? (stackIndex + 1) * STACKED_LABEL_OFFSET_PX : 0
+        const signature = this._markerSignature(station, leaderLength)
+        const existing = this._markers.get(station.callsign)
+        // Label content unchanged → keep the existing marker. A station only
+        // ever moves when its beacon actually reports a new fix: re-plotting on
+        // an unchanged position would make a stationary marker twitch as the
+        // poll repeats the same snapshot.
+        if (existing && this._markerSignatures.get(station.callsign) === signature) {
+          if (this._hasMoved(station.callsign, coords)) {
+            existing.setLngLat(coords)
+            this._markerPositions.set(station.callsign, coords)
+          }
+          return
+        }
+        // Anything else (a new field value, a course change that flips the
+        // pill's direction, or a change in how many stations share the site)
+        // needs the marker rebuilding, since MapLibre fixes the element, anchor
+        // and offset at construction.
+        existing?.remove()
+        const leftFacing = this._isLeftFacing(station)
+        const marker = new maplibregl.Marker({
+          element: this._buildMarkerElement(station, leaderLength),
+          // Keep the leading edge over the station's position: a left-facing
+          // pill extends leftward, so it anchors by its right edge.
+          anchor: leftFacing ? 'right' : 'left',
+          // Displaced sideways as well as down, so the tether has room to curve
+          // and the labels never sit over the dot's own column.
+          offset: [
+            leaderLength === 0
+              ? 0
+              : leftFacing
+                ? -LEADER_HORIZONTAL_OFFSET_PX
+                : LEADER_HORIZONTAL_OFFSET_PX,
+            leaderLength,
+          ],
+        })
+          .setLngLat(coords)
+          .addTo(this.map)
+        this._markers.set(station.callsign, marker)
+        this._markerSignatures.set(station.callsign, signature)
+        this._markerPositions.set(station.callsign, coords)
       })
-        .setLngLat(coords)
-        .addTo(this.map)
-      this._markers.set(station.callsign, marker)
-      this._markerSignatures.set(station.callsign, signature)
-      this._markerPositions.set(station.callsign, coords)
     }
     // Drop markers for stations no longer present (expired or hidden).
     for (const [callsign, marker] of this._markers) {
@@ -169,6 +191,27 @@ export class AprsStationsControl extends SentinelControlBase {
         this._markerPositions.delete(callsign)
       }
     }
+    // …and dots for sites that no longer hold more than one station.
+    for (const [key, marker] of this._siteMarkers) {
+      if (!seenSites.has(key)) {
+        marker.remove()
+        this._siteMarkers.delete(key)
+      }
+    }
+  }
+
+  /** Place (or move) the dot marking a shared site's real position. */
+  private _syncSiteDot(site: StationSite): void {
+    const coords: [number, number] = [site.longitude, site.latitude]
+    const existing = this._siteMarkers.get(site.key)
+    if (existing) {
+      existing.setLngLat(coords)
+      return
+    }
+    const marker = new maplibregl.Marker({ element: buildSiteDot(), anchor: 'center' })
+      .setLngLat(coords)
+      .addTo(this.map)
+    this._siteMarkers.set(site.key, marker)
   }
 
   /** Whether this snapshot carries a genuinely new fix for the station, rather
@@ -197,14 +240,14 @@ export class AprsStationsControl extends SentinelControlBase {
    * cheaper `setLngLat` path. Facing is always included because it decides the
    * marker's anchor, not just its content.
    */
-  private _markerSignature(station: AprsStation, stackIndex: number): string {
+  private _markerSignature(station: AprsStation, leaderLength: number): string {
     const fields = this._landStore.aprsLabelFields
     const shown = (enabled: boolean, value: unknown) => (enabled ? value : null)
     return JSON.stringify([
       this._isLeftFacing(station),
-      // The offset is fixed when the marker is constructed, so a change in how
-      // many stations share this site has to rebuild it.
-      stackIndex,
+      // The offset and leader line are fixed when the marker is constructed, so
+      // a change in how many stations share this site has to rebuild it.
+      leaderLength,
       fields,
       shown(fields.callsign, station.callsign),
       shown(fields.symbolText, station.symbol),
@@ -230,7 +273,7 @@ export class AprsStationsControl extends SentinelControlBase {
    * keep the at-a-glance glyph while dropping the "CAR"/"DIGIPEATER" text, or
    * vice versa.
    */
-  private _buildMarkerElement(station: AprsStation): HTMLDivElement {
+  private _buildMarkerElement(station: AprsStation, leaderLength = 0): HTMLDivElement {
     const fields = this._landStore.aprsLabelFields
     const leftFacing = this._isLeftFacing(station)
     const symbol = aprsSymbolIcon(station.symbol)
@@ -264,6 +307,18 @@ export class AprsStationsControl extends SentinelControlBase {
       ],
       leftFacing,
     )
+
+    // Tether a displaced label back to its site's dot, so its real position is
+    // never in doubt. The line rises from the label's leading edge — the side
+    // carrying the icon, or the callsign when the icon is switched off — which
+    // is the edge the anchor puts directly below the dot.
+    // The line positions against the pill without setting `position` on it:
+    // MapLibre's own `.maplibregl-marker` rule makes every marker element
+    // absolute, which is already a containing block. Setting `position:relative`
+    // here would override that rule and drop the label out of the map's
+    // transform entirely.
+    if (leaderLength > 0)
+      pill.appendChild(createLeaderLine(leaderLength, LEADER_HORIZONTAL_OFFSET_PX, leftFacing))
 
     pill.addEventListener('click', (domEvent: Event) => {
       domEvent.stopPropagation()
@@ -396,6 +451,10 @@ export class AprsStationsControl extends SentinelControlBase {
   private _clearMarkers(): void {
     for (const marker of this._markers.values()) marker.remove()
     this._markers.clear()
+    this._markerSignatures.clear()
+    this._markerPositions.clear()
+    for (const marker of this._siteMarkers.values()) marker.remove()
+    this._siteMarkers.clear()
   }
 }
 
@@ -403,41 +462,123 @@ export class AprsStationsControl extends SentinelControlBase {
  *  just over a label's height, so stacked pills read as a list without touching. */
 const STACKED_LABEL_OFFSET_PX = 30
 
+/** How far a displaced label is pushed sideways from its site dot, in pixels.
+ *  Gives the tether room to curve rather than doubling back on itself. */
+const LEADER_HORIZONTAL_OFFSET_PX = 20
+
 /** Decimal places used to decide two stations share a site (3 dp ≈ 110 m). */
 const SITE_PRECISION_DP = 3
 
-/** A station together with its position in its site's label stack. */
-export interface StackedStation {
-  station: AprsStation
-  /** 0 for the station holding the site's true position, 1 for the next, … */
-  stackIndex: number
+/** Stations sharing one position, with the position they share. */
+export interface StationSite {
+  /** Rounded "lat,lon" identifying the site. */
+  key: string
+  longitude: number
+  latitude: number
+  /** Ordered by callsign, so a station keeps its place across polls. */
+  stations: AprsStation[]
 }
 
 /**
- * Pair each station with its position within its site's stack.
+ * Group stations by the position they beacon.
  *
  * Co-sited stations are routine in APRS — a repeater, its digipeater and a
  * gateway on one mast all beacon the same coordinates — and superimposed labels
- * would otherwise render as a single unreadable smear, making the map look like
- * it holds fewer stations than it does.
+ * would render as a single unreadable smear, making the map look like it holds
+ * fewer stations than it does. A site with more than one station is drawn as a
+ * dot at the real position with its labels displaced and tethered to it.
  *
  * Ordering is by callsign rather than arrival, so a station keeps its place in
  * the stack across polls instead of hopping about as beacons arrive.
  */
-export function withStackIndices(stations: AprsStation[]): StackedStation[] {
-  const sites = new Map<string, AprsStation[]>()
+export function groupStationsBySite(stations: AprsStation[]): StationSite[] {
+  const sites = new Map<string, StationSite>()
   for (const station of stations) {
-    const siteKey = `${station.latitude.toFixed(SITE_PRECISION_DP)},${station.longitude.toFixed(SITE_PRECISION_DP)}`
-    const site = sites.get(siteKey)
-    if (site) site.push(station)
-    else sites.set(siteKey, [station])
+    const key = `${station.latitude.toFixed(SITE_PRECISION_DP)},${station.longitude.toFixed(SITE_PRECISION_DP)}`
+    const site = sites.get(key)
+    if (site) site.stations.push(station)
+    else
+      sites.set(key, {
+        key,
+        longitude: station.longitude,
+        latitude: station.latitude,
+        stations: [station],
+      })
   }
-  const stacked: StackedStation[] = []
   for (const site of sites.values()) {
-    const ordered = [...site].sort((left, right) => left.callsign.localeCompare(right.callsign))
-    ordered.forEach((station, stackIndex) => stacked.push({ station, stackIndex }))
+    site.stations.sort((left, right) => left.callsign.localeCompare(right.callsign))
   }
-  return stacked
+  return [...sites.values()]
+}
+
+/**
+ * The dot marking a shared site's real position.
+ *
+ * Purely a position cue — it takes no pointer events, so it never intercepts a
+ * click meant for a label, and is hidden from assistive tech, which reads the
+ * stations from the data table instead.
+ */
+export function buildSiteDot(): HTMLDivElement {
+  const dot = document.createElement('div')
+  dot.className = 'aprs-site-dot'
+  dot.setAttribute('aria-hidden', 'true')
+  dot.style.cssText = [
+    'width:7px',
+    'height:7px',
+    'border-radius:50%',
+    `background:${APRS_ACCENT_COLOR}`,
+    // A dark ring keeps the dot legible over pale coastline and road fills.
+    'box-shadow:0 0 0 2px rgba(10,13,20,0.85)',
+    'pointer-events:none',
+  ].join(';')
+  return dot
+}
+
+/**
+ * The curved, dashed tether joining a displaced label to its site dot.
+ *
+ * Drawn inside the label and positioned out of flow, so it does not affect the
+ * element's box — and therefore not the anchor MapLibre computes from it. The
+ * curve starts at the label's leading edge (the side carrying the icon, or the
+ * callsign when the icon is off) and sweeps up to the dot, which the offset
+ * places `rise` pixels above and `run` pixels to the side.
+ *
+ * Dashed rather than solid so a tether never reads as a route or a track — the
+ * Air domain draws those as solid lines.
+ */
+export function createLeaderLine(rise: number, run: number, leftFacing: boolean): SVGSVGElement {
+  const svgNamespace = 'http://www.w3.org/2000/svg'
+  const svg = document.createElementNS(svgNamespace, 'svg')
+  svg.setAttribute('class', 'aprs-leader-line')
+  svg.setAttribute('aria-hidden', 'true')
+  svg.setAttribute('width', String(run))
+  svg.setAttribute('height', String(rise))
+  svg.setAttribute('viewBox', `0 0 ${run} ${rise}`)
+  svg.setAttribute('fill', 'none')
+
+  // The label edge sits at the box's bottom on the dot's side; the control
+  // point below the dot bends the run out of the label before it climbs.
+  const labelEdgeX = leftFacing ? 0 : run
+  const dotX = leftFacing ? run : 0
+  const path = document.createElementNS(svgNamespace, 'path')
+  path.setAttribute('d', `M ${labelEdgeX} ${rise} Q ${dotX} ${rise} ${dotX} 0`)
+  path.setAttribute('stroke', 'rgba(255,255,255,0.45)')
+  path.setAttribute('stroke-width', '1')
+  path.setAttribute('stroke-dasharray', '2 3')
+  path.setAttribute('stroke-linecap', 'round')
+  path.setAttribute('fill', 'none')
+  svg.appendChild(path)
+
+  const halfLabel = MAP_LABEL_SIZE_PX / 2
+  svg.style.cssText = [
+    'position:absolute',
+    // Sits just outside the label, on the side the dot is on.
+    leftFacing ? `right:-${run}px` : `left:-${run}px`,
+    `top:${halfLabel - rise}px`,
+    'overflow:visible',
+    'pointer-events:none',
+  ].join(';')
+  return svg
 }
 
 /** Time a station was last heard, as 24-hour local wall time. */

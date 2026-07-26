@@ -74,7 +74,7 @@ vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker, Popup: mock
 
 import {
   AprsStationsControl,
-  withStackIndices,
+  groupStationsBySite,
   formatAltitude,
   formatCourse,
   formatHeardTime,
@@ -645,45 +645,191 @@ describe('AprsStationsControl', () => {
   })
 
   describe('co-sited stations', () => {
-    it('offsets superimposed labels so each station stays readable', () => {
-      // Two stations on one mast: without an offset the second label would sit
-      // exactly on the first and the map would look like it holds one station.
+    /** Markers that are station labels rather than site dots. */
+    function labelMarkers() {
+      return created.markers.filter(
+        (marker) => !marker.element.classList.contains('aprs-site-dot') && !marker.removed,
+      )
+    }
+    /** Markers that are site dots. */
+    function dotMarkers() {
+      return created.markers.filter(
+        (marker) => marker.element.classList.contains('aprs-site-dot') && !marker.removed,
+      )
+    }
+
+    it('displaces co-sited labels and marks the real position with a dot', () => {
+      // Two stations on one mast: superimposed labels would read as one station.
       store.aprsStations = [
         station({ callsign: 'MB7IAE-L', latitude: 54.898666, longitude: -2.243833 }),
         station({ callsign: 'M0UKB-L', latitude: 54.898666, longitude: -2.243833 }),
       ]
       addControl()
-      expect(created.markers).toHaveLength(2)
-      const offsets = created.markers.map((marker) => marker.offset)
-      expect(offsets).toContainEqual([0, 0])
-      expect(offsets).toContainEqual([0, 30])
+
+      const dots = dotMarkers()
+      expect(dots).toHaveLength(1)
+      expect(dots[0]!.lngLat).toEqual([-2.243833, 54.898666])
+      expect(dots[0]!.anchor).toBe('center')
+
+      // Both labels step below the dot, leaving it clear. The fixture reports a
+      // course of 90°, so both are left-facing and displace to the left.
+      const offsets = labelMarkers().map((marker) => marker.offset)
+      expect(offsets).toContainEqual([-20, 30])
+      expect(offsets).toContainEqual([-20, 60])
     })
 
-    it('plots a lone station on its true position', () => {
+    it('tethers each displaced label back to the dot from its leading edge', () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null }),
+        station({ callsign: 'BBB', course: null }),
+      ]
+      addControl()
+      const tethers = labelMarkers().map(
+        (marker) => marker.element.querySelector('.aprs-leader-line') as SVGSVGElement,
+      )
+      expect(tethers.every(Boolean)).toBe(true)
+      // Each rises exactly as far as its label is displaced, so the curve lands
+      // on the dot rather than near it.
+      expect(tethers[0]!.getAttribute('height')).toBe('30')
+      expect(tethers[1]!.getAttribute('height')).toBe('60')
+      // Right-facing labels anchor by their left edge, so the tether sits to
+      // the left of the label, starting above its centre.
+      expect(tethers[0]!.style.left).toBe('-20px')
+      expect(tethers[0]!.style.top).toBe('-17px')
+    })
+
+    it('draws the tether as a dashed curve, not a solid line', () => {
+      // Solid lines mean tracks and routes in the Air domain; a tether is a
+      // position cue, so it must not read as one.
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null }),
+        station({ callsign: 'BBB', course: null }),
+      ]
+      addControl()
+      const path = labelMarkers()[0]!.element.querySelector('.aprs-leader-line path')!
+      expect(path.getAttribute('stroke-dasharray')).toBe('2 3')
+      expect(path.getAttribute('fill')).toBe('none')
+      // A quadratic curve out of the label edge and up to the dot.
+      expect(path.getAttribute('d')).toBe('M 20 30 Q 0 30 0 0')
+    })
+
+    it('tethers a left-facing label from its right edge, mirrored', () => {
+      // A left-facing pill extends leftward, so its leading edge — and the dot
+      // above it — is on the right.
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: 90 }),
+        station({ callsign: 'BBB', course: 90 }),
+      ]
+      addControl()
+      const tether = labelMarkers()[0]!.element.querySelector('.aprs-leader-line') as SVGSVGElement
+      expect(tether.style.right).toBe('-20px')
+      expect(tether.style.left).toBe('')
+      expect(tether.querySelector('path')!.getAttribute('d')).toBe('M 0 30 Q 20 30 20 0')
+    })
+
+    it('displaces the label sideways as well as down, so the curve has room', () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null }),
+        station({ callsign: 'BBB', course: 90 }),
+      ]
+      addControl()
+      const offsets = labelMarkers().map((marker) => marker.offset)
+      // Right-facing pushes right, left-facing pushes left — each away from the
+      // dot, on the side its leading edge faces.
+      expect(offsets).toContainEqual([20, 30])
+      expect(offsets).toContainEqual([-20, 60])
+    })
+
+    it('plots a lone station on its true position, with no dot or tether', () => {
       store.aprsStations = [station()]
       addControl()
-      expect(created.markers[0].offset).toEqual([0, 0])
+      expect(labelMarkers()[0]!.offset).toEqual([0, 0])
+      expect(labelMarkers()[0]!.element.querySelector('.aprs-leader-line')).toBeNull()
+      expect(dotMarkers()).toHaveLength(0)
     })
 
-    it('rebuilds a stack when another station joins the same site', async () => {
+    it('adds a dot and tethers when a second station joins a site', async () => {
       store.aprsStations = [station({ callsign: 'ZZZ', latitude: 54.9, longitude: -1.5 })]
       addControl()
-      expect(created.markers[created.markers.length - 1].offset).toEqual([0, 0])
+      expect(dotMarkers()).toHaveLength(0)
 
-      // A new station sorts ahead of it, so ZZZ must step down the stack.
       store.aprsStations = [
         station({ callsign: 'ZZZ', latitude: 54.9, longitude: -1.5 }),
         station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
       ]
       await nextTick()
-      const live = created.markers.filter((marker) => !marker.removed)
-      expect(live).toHaveLength(2)
-      expect(live.map((marker) => marker.offset)).toEqual(
-        expect.arrayContaining([
-          [0, 0],
-          [0, 30],
-        ]),
+      expect(dotMarkers()).toHaveLength(1)
+      const offsets = labelMarkers().map((marker) => marker.offset)
+      expect(offsets).toContainEqual([-20, 30])
+      expect(offsets).toContainEqual([-20, 60])
+    })
+
+    it('removes the dot and the tether when a site drops back to one station', async () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
+      ]
+      addControl()
+      expect(dotMarkers()).toHaveLength(1)
+
+      store.aprsStations = [station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 })]
+      await nextTick()
+      expect(dotMarkers()).toHaveLength(0)
+      const remaining = labelMarkers()
+      expect(remaining).toHaveLength(1)
+      expect(remaining[0]!.offset).toEqual([0, 0])
+      expect(remaining[0]!.element.querySelector('.aprs-leader-line')).toBeNull()
+    })
+
+    it('keeps the dot out of the way of clicks and screen readers', () => {
+      store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
+      addControl()
+      const dot = dotMarkers()[0]!.element
+      expect(dot.style.pointerEvents).toBe('none')
+      expect(dot.getAttribute('aria-hidden')).toBe('true')
+    })
+
+    it('reuses one dot for a site across polls, moving it if the fix changes', async () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', latitude: 54.9, longitude: -1.5 }),
+        station({ callsign: 'BBB', latitude: 54.9, longitude: -1.5 }),
+      ]
+      addControl()
+      const dotsAfterFirstRender = created.markers.filter((marker) =>
+        marker.element.classList.contains('aprs-site-dot'),
       )
+      expect(dotsAfterFirstRender).toHaveLength(1)
+
+      // A later poll nudges the shared fix within the site's tolerance: the dot
+      // follows rather than being torn down and rebuilt.
+      store.aprsStations = [
+        station({ callsign: 'AAA', latitude: 54.9001, longitude: -1.5 }),
+        station({ callsign: 'BBB', latitude: 54.9001, longitude: -1.5 }),
+      ]
+      await nextTick()
+      const allDots = created.markers.filter((marker) =>
+        marker.element.classList.contains('aprs-site-dot'),
+      )
+      expect(allDots).toHaveLength(1)
+      expect(allDots[0]!.lngLat).toEqual([-1.5, 54.9001])
+      expect(allDots[0]!.removed).toBe(false)
+    })
+
+    it('tears site dots down with the control', () => {
+      store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
+      const { control } = addControl()
+      expect(dotMarkers()).toHaveLength(1)
+      control.onRemove()
+      // Leaving a dot behind would strand it on the map after leaving Land.
+      expect(dotMarkers()).toHaveLength(0)
+    })
+
+    it('removes site dots when the layer is hidden', () => {
+      store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
+      const { control } = addControl()
+      expect(dotMarkers()).toHaveLength(1)
+      control.setVisible(false)
+      expect(dotMarkers()).toHaveLength(0)
     })
   })
 
@@ -791,12 +937,14 @@ describe('APRS field formatters', () => {
 
 // ── co-sited stations ─────────────────────────────────────────────────────────
 
-describe('withStackIndices', () => {
+describe('groupStationsBySite', () => {
   /** Stack position by callsign, for readable assertions. */
   function stackIndexByCallsign(stations: AprsStation[]): Map<string, number> {
-    return new Map(
-      withStackIndices(stations).map(({ station, stackIndex }) => [station.callsign, stackIndex]),
-    )
+    const indices = new Map<string, number>()
+    for (const site of groupStationsBySite(stations)) {
+      site.stations.forEach((station, index) => indices.set(station.callsign, index))
+    }
+    return indices
   }
 
   function at(callsign: string, latitude: number, longitude: number): AprsStation {
@@ -857,6 +1005,19 @@ describe('withStackIndices', () => {
   })
 
   it('handles an empty snapshot', () => {
-    expect(stackIndexByCallsign([]).size).toBe(0)
+    expect(groupStationsBySite([])).toEqual([])
+  })
+
+  it('carries each site’s position, so its dot can be placed', () => {
+    const sites = groupStationsBySite([
+      at('A', 54.9, -1.5),
+      at('B', 54.9, -1.5),
+      at('C', 55.4, -2.2),
+    ])
+    expect(sites).toHaveLength(2)
+    expect(sites[0]!.stations.map((each) => each.callsign)).toEqual(['A', 'B'])
+    expect(sites[0]!.latitude).toBe(54.9)
+    expect(sites[0]!.longitude).toBe(-1.5)
+    expect(sites[1]!.stations).toHaveLength(1)
   })
 })
