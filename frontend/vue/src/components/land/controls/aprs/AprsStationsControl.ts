@@ -5,7 +5,8 @@ import { aprsSymbolIcon, aprsSymbolSvg } from '@/utils/aprsSymbols'
 import {
   APRS_ACCENT_COLOR,
   APRS_BADGE_BACKGROUND,
-  APRS_SITE_MARKER_BACKGROUND,
+  APRS_SITE_MARKER_CENTRE,
+  APRS_SITE_MARKER_RING,
 } from '@/constants/aprs'
 import {
   appendMirrored,
@@ -45,7 +46,6 @@ export class AprsStationsControl extends SentinelControlBase {
   /** Signature of each site's leader geometry, so a marker is only rebuilt when
    *  the stations sharing the site change. */
   private _siteSignatures = new Map<string, string>()
-  private _popup: maplibregl.Popup | null = null
   private _stopWatch: WatchStopHandle | null = null
   private _a11yRegion: HTMLDivElement | null = null
 
@@ -115,8 +115,6 @@ export class AprsStationsControl extends SentinelControlBase {
     this._stopWatch = null
     this._landStore.stopAprsPolling()
     this._clearMarkers()
-    this._popup?.remove()
-    this._popup = null
     this._a11yRegion?.remove()
     this._a11yRegion = null
     super.onRemove()
@@ -348,10 +346,11 @@ export class AprsStationsControl extends SentinelControlBase {
     // never in doubt. The line rises from the label's leading edge — the side
     // carrying the icon, or the callsign when the icon is switched off — which
     // is the edge the anchor puts directly below the dot.
+    // A click opens the station in the side panel rather than a map popup: the
+    // panel already shows every field of the packet, where a popup could only
+    // repeat a few of them over the map it is describing.
     pill.addEventListener('click', (domEvent: Event) => {
       domEvent.stopPropagation()
-      this._openPopup(station)
-      // Let the Land side panel expand this station's row (see LandFilter).
       document.dispatchEvent(
         new CustomEvent('aprs-station-selected', { detail: { callsign: station.callsign } }),
       )
@@ -384,35 +383,6 @@ export class AprsStationsControl extends SentinelControlBase {
   private _dimField(enabled: boolean, label: string, value: string | null): HTMLSpanElement | null {
     if (!enabled || value === null) return null
     return createDimBadge(label, escapeHtml(value), APRS_ACCENT_COLOR)
-  }
-
-  private _openPopup(station: AprsStation): void {
-    this._popup?.remove()
-    this._popup = new maplibregl.Popup({ closeButton: true, offset: 12 })
-      .setLngLat([station.longitude, station.latitude])
-      .setHTML(this._popupHtml(station))
-      .addTo(this.map)
-  }
-
-  private _popupHtml(station: AprsStation): string {
-    const rows: string[] = [
-      `<strong>${escapeHtml(station.callsign)}</strong>`,
-      `${station.latitude.toFixed(4)}, ${station.longitude.toFixed(4)}`,
-    ]
-    if (station.comment) rows.push(escapeHtml(station.comment))
-    if (typeof station.course === 'number' || typeof station.speed === 'number') {
-      // Units come straight from aprslib's normalised values (km/h, not the
-      // packet's knots) — the previous "kn" label misreported them.
-      rows.push(
-        `Course ${formatCourse(station.course) ?? '—'} · Speed ${formatSpeed(station.speed) ?? '—'}`,
-      )
-    }
-    rows.push(`Heard ${formatHeardTime(station.last_heard_ms)}`)
-    return (
-      '<div style="font-family:\'Barlow\',sans-serif;font-size:12px;line-height:1.5;color:#0a0d14">' +
-      rows.join('<br>') +
-      '</div>'
-    )
   }
 
   // ── accessibility ────────────────────────────────────────────────────────────
@@ -605,7 +575,7 @@ const SITE_MARKER_RING_PX = 2
 /**
  * The marker showing a shared site's real position.
  *
- * A small dark grey dot inside a black ring — two concentric circles, which is
+ * A small light grey dot inside a black ring — two concentric circles, which is
  * what holds it against both the pale roads and the dark water the basemap puts
  * under it. Nothing is drawn inside: a glyph here would compete with the station
  * symbols on the labels it leads to.
@@ -621,11 +591,11 @@ export function buildSiteMarker(branches: LeaderBranch[]): HTMLElement {
   marker.style.cssText = [
     `width:${SITE_MARKER_SIZE_PX}px`,
     `height:${SITE_MARKER_SIZE_PX}px`,
-    `background:${APRS_BADGE_BACKGROUND}`,
+    `background:${APRS_SITE_MARKER_CENTRE}`,
     'border-radius:50%',
     // Drawn as a shadow rather than a border so the ring sits outside the box,
     // leaving the marker's centre exactly on the site's position.
-    `box-shadow:0 0 0 ${SITE_MARKER_RING_PX}px ${APRS_SITE_MARKER_BACKGROUND}`,
+    `box-shadow:0 0 0 ${SITE_MARKER_RING_PX}px ${APRS_SITE_MARKER_RING}`,
     'pointer-events:none',
   ].join(';')
   renderSiteLeaders(marker, branches)

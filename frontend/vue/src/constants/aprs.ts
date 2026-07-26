@@ -22,6 +22,9 @@ export const APRS_ACCENT_COLOR = '#ffffff'
  */
 export const APRS_BADGE_BACKGROUND = '#15171d'
 
-/** Fill of the site marker — the disc standing on a shared position. Black, as
- *  the labels' own background is, so a site reads as part of the same set. */
-export const APRS_SITE_MARKER_BACKGROUND = '#000000'
+/** Ring around the site marker — black, as the labels' own background is. */
+export const APRS_SITE_MARKER_RING = '#000000'
+
+/** Centre of the site marker. Light enough to read as a dot inside its black
+ *  ring at 12px, over both the pale roads and the dark water beneath it. */
+export const APRS_SITE_MARKER_CENTRE = '#cfd6dd'

@@ -34,23 +34,9 @@ const mocks = vi.hoisted(() => {
       return this
     }
   }
-  class MockPopup {
-    setLngLat(): this {
-      return this
-    }
-    setHTML(): this {
-      return this
-    }
-    addTo(): this {
-      return this
-    }
-    remove(): this {
-      return this
-    }
-  }
-  return { created, MockMarker, MockPopup }
+  return { created, MockMarker }
 })
-vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker, Popup: mocks.MockPopup } }))
+vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker } }))
 
 import { AprsStationsControl } from './controls/aprs/AprsStationsControl'
 import LandFilter from './LandFilter.vue'

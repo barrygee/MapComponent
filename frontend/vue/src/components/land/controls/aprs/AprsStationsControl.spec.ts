@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { nextTick } from 'vue'
 import { axe } from 'jest-axe'
 
-// ── maplibre-gl mock: record created markers/popups so the control's DOM/
+// ── maplibre-gl mock: record created markers so the control's DOM/
 //    lifecycle effects can be asserted without a real map. The classes live in
 //    vi.hoisted so they exist when the (hoisted) vi.mock factory runs. ──────────
 interface RecordedMarker {
@@ -13,13 +13,8 @@ interface RecordedMarker {
   lngLat: [number, number] | null
   removed: boolean
 }
-interface RecordedPopup {
-  html: string
-  removed: boolean
-}
-
 const mocks = vi.hoisted(() => {
-  const created = { markers: [] as RecordedMarker[], popups: [] as RecordedPopup[] }
+  const created = { markers: [] as RecordedMarker[] }
   class MockMarker {
     element: HTMLElement
     anchor: string | undefined
@@ -47,33 +42,12 @@ const mocks = vi.hoisted(() => {
       return this
     }
   }
-  class MockPopup {
-    html = ''
-    removed = false
-    constructor() {
-      created.popups.push(this)
-    }
-    setLngLat(): this {
-      return this
-    }
-    setHTML(html: string): this {
-      this.html = html
-      return this
-    }
-    addTo(): this {
-      return this
-    }
-    remove(): this {
-      this.removed = true
-      return this
-    }
-  }
-  return { created, MockMarker, MockPopup }
+  return { created, MockMarker }
 })
 
 const created = mocks.created
 
-vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker, Popup: mocks.MockPopup } }))
+vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker } }))
 
 import {
   AprsStationsControl,
@@ -116,7 +90,6 @@ describe('AprsStationsControl', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     created.markers.length = 0
-    created.popups.length = 0
     // The control starts polling on init; stub fetch so the store never hits the
     // network, and spy on the polling methods to assert lifecycle wiring.
     vi.stubGlobal(
@@ -183,60 +156,6 @@ describe('AprsStationsControl', () => {
     expect(created.markers.every((marker) => marker.removed)).toBe(true)
   })
 
-  it('opens a popup with details when a marker is clicked', () => {
-    store.aprsStations = [station({ comment: 'hi', course: 90, speed: 30 })]
-    addControl()
-    created.markers[0].element.dispatchEvent(new Event('click'))
-    expect(created.popups).toHaveLength(1)
-    const html = created.popups[0].html
-    expect(html).toContain('M0ABC-9')
-    expect(html).toContain('51.5000, -0.1000')
-    expect(html).toContain('hi')
-    expect(html).toContain('Course 90° · Speed 30 KM/H')
-    expect(html).toContain('Heard')
-  })
-
-  it('omits movement and comment rows when absent, keeping partial movement', () => {
-    store.aprsStations = [station({ comment: null, course: 45, speed: null })]
-    addControl()
-    created.markers[0].element.dispatchEvent(new Event('click'))
-    const html = created.popups[0].html
-    // Only course present → speed shown as em-dash (no "kn"); no comment line.
-    expect(html).toContain('Course 45° · Speed —')
-    expect(html).not.toContain('rolling')
-  })
-
-  it('shows a dash for course when only speed is present', () => {
-    store.aprsStations = [station({ course: null, speed: 20 })]
-    addControl()
-    created.markers[0].element.dispatchEvent(new Event('click'))
-    expect(created.popups[0].html).toContain('Course — · Speed 20 KM/H')
-  })
-
-  it('omits the movement row entirely when neither course nor speed is present', () => {
-    store.aprsStations = [station({ course: null, speed: null })]
-    addControl()
-    created.markers[0].element.dispatchEvent(new Event('click'))
-    expect(created.popups[0].html).not.toContain('Course')
-  })
-
-  it('closes a previous popup before opening a new one', () => {
-    store.aprsStations = [station()]
-    addControl()
-    created.markers[0].element.dispatchEvent(new Event('click'))
-    created.markers[0].element.dispatchEvent(new Event('click'))
-    expect(created.popups).toHaveLength(2)
-    expect(created.popups[0].removed).toBe(true) // first popup closed
-  })
-
-  it('escapes HTML in callsign/comment to prevent injection', () => {
-    store.aprsStations = [station({ callsign: 'X&<Y>', comment: '<script>' })]
-    addControl()
-    created.markers[0].element.dispatchEvent(new Event('click'))
-    expect(created.popups[0].html).toContain('X&amp;&lt;Y&gt;')
-    expect(created.popups[0].html).not.toContain('<script>')
-  })
-
   it('setVisible hides and shows stations, and is a no-op when unchanged', () => {
     store.aprsStations = [station()]
     const { control } = addControl()
@@ -260,24 +179,13 @@ describe('AprsStationsControl', () => {
     expect(created.markers.filter((marker) => !marker.removed).length).toBeGreaterThan(0)
   })
 
-  it('stops polling and tears down markers, popup, and a11y region on remove', () => {
+  it('stops polling and tears down markers and the a11y region on remove', () => {
     const stopSpy = vi.spyOn(store, 'stopAprsPolling')
     store.aprsStations = [station()]
     const { control, map } = addControl()
-    created.markers[0].element.dispatchEvent(new Event('click'))
     control.onRemove()
     expect(stopSpy).toHaveBeenCalledOnce()
     expect(created.markers.every((marker) => marker.removed)).toBe(true)
-    expect(created.popups[0].removed).toBe(true)
-    expect(map._container.querySelector('[role="region"]')).toBeNull()
-  })
-
-  it('removes cleanly when no popup was ever opened', () => {
-    store.aprsStations = [station()]
-    const { control, map } = addControl()
-    // No marker click → no popup; onRemove must still tear everything down.
-    expect(() => control.onRemove()).not.toThrow()
-    expect(created.popups).toHaveLength(0)
     expect(map._container.querySelector('[role="region"]')).toBeNull()
   })
 
@@ -837,11 +745,11 @@ describe('AprsStationsControl', () => {
       const marker = dotMarkers()[0]!.element
       expect(marker.style.width).toBe('12px')
       expect(marker.style.height).toBe('12px')
-      // Concentric circles — a dark grey dot in a black ring — which is the
+      // Concentric circles — a light grey dot in a black ring — which is the
       // pairing that holds against both the pale roads and the dark water the
       // basemap puts under it.
       expect(marker.style.borderRadius).toBe('50%')
-      expect(marker.style.background).toBe('rgb(21, 23, 29)')
+      expect(marker.style.background).toBe('rgb(207, 214, 221)')
       expect(marker.style.boxShadow).toBe('0 0 0 2px #000000')
       // Nothing drawn inside it but the leaders.
       expect(marker.querySelector('svg:not(.aprs-site-leaders)')).toBeNull()
