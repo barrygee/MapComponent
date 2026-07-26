@@ -319,7 +319,7 @@ describe('AprsStationsControl', () => {
       expect(pill.textContent).not.toContain('Car')
     })
 
-    it('draws the symbol name chip in white on the app grey when that field is on', () => {
+    it('draws the symbol name chip in white on the sidebar charcoal', () => {
       store.setAprsLabelFields({ ...store.aprsLabelFields, symbolText: true })
       store.aprsStations = [station()]
       addControl()
@@ -331,7 +331,28 @@ describe('AprsStationsControl', () => {
       // Monochrome by design: Air uses colour to mean military/civil/emergency,
       // so Land labels stay white and grey rather than adding a fourth hue.
       expect(chip!.style.color).toBe('rgb(255, 255, 255)')
-      expect(chip!.style.background).toBe('rgb(38, 41, 46)')
+      expect(chip!.style.background).toBe('rgb(21, 23, 29)')
+    })
+
+    it('backs the icon well with the same charcoal as the chip', () => {
+      store.aprsStations = [station()]
+      addControl()
+      const well = created.markers[0].element.querySelector('.adsb-arrow-wrap') as HTMLElement
+      expect(well.style.background).toBe('rgb(21, 23, 29)')
+    })
+
+    it('draws the station symbol at the same size as an aircraft arrow', () => {
+      // Mixed glyph sizes read as two icon families on one map.
+      store.aprsStations = [
+        station({ callsign: 'MOVING', course: 90 }),
+        station({ callsign: 'FIXED', course: null, latitude: 55, longitude: -2 }),
+      ]
+      addControl()
+      const sizes = created.markers.map((marker) => {
+        const glyph = marker.element.querySelector('.adsb-arrow-wrap svg')!
+        return glyph.getAttribute('width')
+      })
+      expect(sizes).toEqual(['11', '11'])
     })
 
     it('draws the glyph and dim field labels in white', () => {

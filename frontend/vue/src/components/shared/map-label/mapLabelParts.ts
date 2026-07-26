@@ -19,6 +19,10 @@
 /** Height of the pill and the square glyph well, in pixels. */
 export const MAP_LABEL_SIZE_PX = 26
 
+/** Rendered size of the glyph inside the well, in pixels. Every domain draws at
+ *  this size so an aircraft arrow and an APRS symbol read as one icon family. */
+export const MAP_LABEL_GLYPH_SIZE_PX = 11
+
 /** Shared type stack for every label segment. */
 const MAP_LABEL_FONT_STACK = "'Barlow Condensed','Barlow',sans-serif"
 
@@ -94,7 +98,7 @@ export function createGlyphWell(glyphMarkup: string, background = 'none'): HTMLS
  */
 export function createGlyphSvg(shapeMarkup: string, rotationDeg = 0): string {
   return (
-    `<svg class="adsb-arrow" width="11" height="11" viewBox="0 0 12 12" ` +
+    `<svg class="adsb-arrow" width="${MAP_LABEL_GLYPH_SIZE_PX}" height="${MAP_LABEL_GLYPH_SIZE_PX}" viewBox="0 0 12 12" ` +
     `style="transform:rotate(${rotationDeg}deg);transform-origin:center;transform-box:fill-box;` +
     `display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg">` +
     `${shapeMarkup}</svg>`

@@ -13,7 +13,7 @@ import {
   createLabelPill,
   createNameSegment,
   isLeftFacing,
-  MAP_LABEL_SIZE_PX,
+  MAP_LABEL_GLYPH_SIZE_PX,
 } from '@/components/shared/map-label/mapLabelParts'
 import type { AprsStation, useLandStore } from '@/stores/land'
 
@@ -248,7 +248,7 @@ export class AprsStationsControl extends SentinelControlBase {
     appendMirrored(
       pill,
       [
-        fields.symbol ? createGlyphWell(this._glyphMarkup(station)) : null,
+        fields.symbol ? createGlyphWell(this._glyphMarkup(station), APRS_BADGE_BACKGROUND) : null,
         fields.callsign ? createNameSegment(station.callsign, nameSide) : null,
         fields.symbolText
           ? createAccentBadge(symbol.label, APRS_BADGE_BACKGROUND, APRS_ACCENT_COLOR)
@@ -285,7 +285,15 @@ export class AprsStationsControl extends SentinelControlBase {
   private _glyphMarkup(station: AprsStation): string {
     return typeof station.course === 'number'
       ? createGlyphSvg(createDirectionArrowShape(APRS_ACCENT_COLOR), station.course)
-      : aprsSymbolSvg(station.symbol, { size: MAP_LABEL_SIZE_PX - 10, color: APRS_ACCENT_COLOR })
+      : // Drawn at the shared glyph size so a station symbol and an aircraft
+        // arrow are the same size on screen. The APRS icons use a 24-unit
+        // viewBox against the arrow's 12, so the stroke is scaled up to keep
+        // the same on-screen weight once shrunk.
+        aprsSymbolSvg(station.symbol, {
+          size: MAP_LABEL_GLYPH_SIZE_PX,
+          color: APRS_ACCENT_COLOR,
+          strokeWidth: 2.6,
+        })
   }
 
   /** A dim `LABEL value` segment, or null when the field is switched off or the

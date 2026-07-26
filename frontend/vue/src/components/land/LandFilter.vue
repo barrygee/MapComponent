@@ -146,14 +146,16 @@ watch(
   display: flex;
   flex-direction: column;
   padding-bottom: 12px;
-  /* Free-text packet fields wrap instead of being ellipsized at the column edge:
-     a path or comment is unreadable truncated to one line. */
+}
+/* Only the free-text packet fields deviate from the shared cell styling the
+   Space pane uses: they wrap rather than being ellipsized at the column edge (a
+   raw frame is unreadable truncated to one line) and sit in regular weight, so
+   they read as prose instead of shouting like a telemetry value. */
+.land-filter-packet {
+  display: contents;
   --ba-cell-value-white-space: normal;
   --ba-cell-value-word-break: break-word;
   --ba-cell-align: flex-start;
-}
-.land-filter-packet {
-  display: contents;
   --ba-cell-value-font-weight: 400;
 }
 </style>
