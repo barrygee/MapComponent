@@ -678,53 +678,64 @@ describe('AprsStationsControl', () => {
       expect(offsets).toContainEqual([-28, 73])
     })
 
-    it('tethers each displaced label back to the marker from its leading edge', () => {
+    it('draws one leader per label, all from the site marker', () => {
       store.aprsStations = [
         station({ callsign: 'AAA', course: null }),
         station({ callsign: 'BBB', course: null }),
+        station({ callsign: 'CCC', course: null }),
       ]
       addControl()
-      const tethers = labelMarkers().map(
-        (marker) => marker.element.querySelector('.aprs-leader-line') as SVGSVGElement,
-      )
-      expect(tethers.every(Boolean)).toBe(true)
-      // Each rises exactly as far as its label is displaced, so the curve lands
-      // on the dot rather than near it.
-      expect(tethers[0]!.getAttribute('height')).toBe('43')
-      expect(tethers[1]!.getAttribute('height')).toBe('73')
-      // Right-facing labels anchor by their left edge, so the tether sits to
-      // the left of the label, starting above its centre.
-      expect(tethers[0]!.style.left).toBe('-28px')
-      expect(tethers[0]!.style.top).toBe('-30px')
+      // The leaders belong to the site, not the labels: one graphic, one branch
+      // each, so they cannot bundle into a braid under the marker.
+      const leaders = dotMarkers()[0]!.element.querySelectorAll('.aprs-site-leaders path')
+      expect(leaders).toHaveLength(3)
+      for (const label of labelMarkers()) {
+        expect(label.element.querySelector('.aprs-site-leaders')).toBeNull()
+      }
     })
 
-    it('draws the tether as a dashed curve, not a solid line', () => {
-      // Solid lines mean tracks and routes in the Air domain; a tether is a
+    it('draws each leader dashed, not solid', () => {
+      // Solid lines mean tracks and routes in the Air domain; a leader is a
       // position cue, so it must not read as one.
       store.aprsStations = [
         station({ callsign: 'AAA', course: null }),
         station({ callsign: 'BBB', course: null }),
       ]
       addControl()
-      const path = labelMarkers()[0]!.element.querySelector('.aprs-leader-line path')!
+      const path = dotMarkers()[0]!.element.querySelector('.aprs-site-leaders path')!
       expect(path.getAttribute('stroke-dasharray')).toBe('2.5 3.5')
+      expect(path.getAttribute('stroke-width')).toBe('1.6')
       expect(path.getAttribute('fill')).toBe('none')
-      // A cubic curve out of the label edge and up into the marker.
-      expect(path.getAttribute('d')).toBe('M 28 43 C 0 43 0 19.35 0 0')
     })
 
-    it('tethers a left-facing label from its right edge, mirrored', () => {
-      // A left-facing pill extends leftward, so its leading edge — and the dot
-      // above it — is on the right.
+    it('runs every leader down one shared stem before turning out', () => {
+      store.aprsStations = [
+        station({ callsign: 'AAA', course: null }),
+        station({ callsign: 'BBB', course: null }),
+      ]
+      addControl()
+      const paths = [...dotMarkers()[0]!.element.querySelectorAll('.aprs-site-leaders path')].map(
+        (path) => path.getAttribute('d')!,
+      )
+      // Both start at the marker centre and descend on the same x, so their
+      // stems (and dash phases) coincide instead of fanning apart.
+      expect(paths[0]!.startsWith('M 13 13 L 13 ')).toBe(true)
+      expect(paths[1]!.startsWith('M 13 13 L 13 ')).toBe(true)
+      // Rounded corner, then a short reach to the label's leading edge.
+      expect(paths[0]).toBe('M 13 13 L 13 30 Q 13 56 39 56 L 41 56')
+      expect(paths[1]).toBe('M 13 13 L 13 60 Q 13 86 39 86 L 41 86')
+    })
+
+    it('mirrors the leaders for a left-facing label', () => {
+      // A left-facing pill extends leftward, so its leading edge — and the
+      // branch reaching it — is on the other side of the marker.
       store.aprsStations = [
         station({ callsign: 'AAA', course: 90 }),
         station({ callsign: 'BBB', course: 90 }),
       ]
       addControl()
-      const tether = labelMarkers()[0]!.element.querySelector('.aprs-leader-line') as SVGSVGElement
-      expect(tether.style.right).toBe('-28px')
-      expect(tether.style.left).toBe('')
-      expect(tether.querySelector('path')!.getAttribute('d')).toBe('M 0 43 C 28 43 28 19.35 28 0')
+      const path = dotMarkers()[0]!.element.querySelector('.aprs-site-leaders path')!
+      expect(path.getAttribute('d')).toBe('M 13 13 L 13 30 Q 13 56 -13 56 L -15 56')
     })
 
     it('displaces the label sideways as well as down, so the curve has room', () => {
@@ -791,7 +802,9 @@ describe('AprsStationsControl', () => {
       expect(marker.style.background).toBe('rgb(21, 23, 29)')
       expect(marker.style.width).toBe('26px')
       expect(marker.querySelector('circle')).not.toBeNull()
-      expect(marker.querySelector('path')!.getAttribute('d')).toContain('M6 10.5')
+      expect(marker.querySelector('svg:not(.aprs-site-leaders) path')!.getAttribute('d')).toContain(
+        'M6 10.5',
+      )
     })
 
     it('keeps the dot out of the way of clicks and screen readers', () => {

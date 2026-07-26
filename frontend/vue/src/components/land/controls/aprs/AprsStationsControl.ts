@@ -39,6 +39,7 @@ export class AprsStationsControl extends SentinelControlBase {
   private _markerSignatures = new Map<string, string>()
   private _markerPositions = new Map<string, [number, number]>()
   private _siteMarkers = new Map<string, maplibregl.Marker>()
+  private _siteSignatures = new Map<string, string>()
   private _popup: maplibregl.Popup | null = null
   private _stopWatch: WatchStopHandle | null = null
   private _a11yRegion: HTMLDivElement | null = null
@@ -134,17 +135,17 @@ export class AprsStationsControl extends SentinelControlBase {
       const isShared = site.stations.length > 1
       if (isShared) {
         seenSites.add(site.key)
-        this._syncSiteDot(site)
+        this._syncSiteMarker(site)
       }
       site.stations.forEach((station, stackIndex) => {
         seen.add(station.callsign)
         const coords: [number, number] = [station.longitude, station.latitude]
-        // Displaced stacks clear the site marker's own square before stepping,
-        // so the first tether has room to read as a curve.
-        const leaderLength = isShared
-          ? MAP_LABEL_SIZE_PX / 2 + (stackIndex + 1) * STACKED_LABEL_OFFSET_PX
-          : 0
-        const signature = this._markerSignature(station, leaderLength)
+        // A displaced label steps clear of the site marker's own square; a lone
+        // station stays on its true position.
+        const offset: [number, number] = isShared
+          ? [this._labelHorizontalOffset(station), labelVerticalOffset(stackIndex)]
+          : [0, 0]
+        const signature = this._markerSignature(station, offset)
         const existing = this._markers.get(station.callsign)
         // Label content unchanged → keep the existing marker. A station only
         // ever moves when its beacon actually reports a new fix: re-plotting on
@@ -162,22 +163,12 @@ export class AprsStationsControl extends SentinelControlBase {
         // needs the marker rebuilding, since MapLibre fixes the element, anchor
         // and offset at construction.
         existing?.remove()
-        const leftFacing = this._isLeftFacing(station)
         const marker = new maplibregl.Marker({
-          element: this._buildMarkerElement(station, leaderLength),
+          element: this._buildMarkerElement(station),
           // Keep the leading edge over the station's position: a left-facing
           // pill extends leftward, so it anchors by its right edge.
-          anchor: leftFacing ? 'right' : 'left',
-          // Displaced sideways as well as down, so the tether has room to curve
-          // and the labels never sit over the dot's own column.
-          offset: [
-            leaderLength === 0
-              ? 0
-              : leftFacing
-                ? -LEADER_HORIZONTAL_OFFSET_PX
-                : LEADER_HORIZONTAL_OFFSET_PX,
-            leaderLength,
-          ],
+          anchor: this._isLeftFacing(station) ? 'right' : 'left',
+          offset,
         })
           .setLngLat(coords)
           .addTo(this.map)
@@ -200,22 +191,46 @@ export class AprsStationsControl extends SentinelControlBase {
       if (!seenSites.has(key)) {
         marker.remove()
         this._siteMarkers.delete(key)
+        this._siteSignatures.delete(key)
       }
     }
   }
 
-  /** Place (or move) the marker showing a shared site's real position. */
-  private _syncSiteDot(site: StationSite): void {
+  /**
+   * Place (or move) the marker showing a shared site's real position, together
+   * with the leaders reaching each of its labels.
+   */
+  private _syncSiteMarker(site: StationSite): void {
     const coords: [number, number] = [site.longitude, site.latitude]
+    const branches = this._leaderBranches(site)
+    const signature = JSON.stringify(branches)
     const existing = this._siteMarkers.get(site.key)
-    if (existing) {
+    // Only the position changed → move it. The leaders are baked into the
+    // element, so a change in the stations sharing the site rebuilds it.
+    if (existing && this._siteSignatures.get(site.key) === signature) {
       existing.setLngLat(coords)
       return
     }
-    const marker = new maplibregl.Marker({ element: buildSiteMarker(), anchor: 'center' })
+    existing?.remove()
+    const marker = new maplibregl.Marker({ element: buildSiteMarker(branches), anchor: 'center' })
       .setLngLat(coords)
       .addTo(this.map)
     this._siteMarkers.set(site.key, marker)
+    this._siteSignatures.set(site.key, signature)
+  }
+
+  /** Where each of a site's labels sits, relative to the site marker. */
+  private _leaderBranches(site: StationSite): LeaderBranch[] {
+    return site.stations.map((station, stackIndex) => ({
+      dx: this._labelHorizontalOffset(station),
+      dy: labelVerticalOffset(stackIndex),
+    }))
+  }
+
+  /** Which way a label is displaced: away from the marker, on the side its
+   *  leading edge faces. */
+  private _labelHorizontalOffset(station: AprsStation): number {
+    return this._isLeftFacing(station) ? -LEADER_HORIZONTAL_OFFSET_PX : LEADER_HORIZONTAL_OFFSET_PX
   }
 
   /** Whether this snapshot carries a genuinely new fix for the station, rather
@@ -244,14 +259,14 @@ export class AprsStationsControl extends SentinelControlBase {
    * cheaper `setLngLat` path. Facing is always included because it decides the
    * marker's anchor, not just its content.
    */
-  private _markerSignature(station: AprsStation, leaderLength: number): string {
+  private _markerSignature(station: AprsStation, offset: [number, number]): string {
     const fields = this._landStore.aprsLabelFields
     const shown = (enabled: boolean, value: unknown) => (enabled ? value : null)
     return JSON.stringify([
       this._isLeftFacing(station),
-      // The offset and leader line are fixed when the marker is constructed, so
-      // a change in how many stations share this site has to rebuild it.
-      leaderLength,
+      // The offset is fixed when the marker is constructed, so a change in how
+      // many stations share this site has to rebuild it.
+      offset,
       fields,
       shown(fields.callsign, station.callsign),
       shown(fields.symbolText, station.symbol),
@@ -277,7 +292,7 @@ export class AprsStationsControl extends SentinelControlBase {
    * keep the at-a-glance glyph while dropping the "CAR"/"DIGIPEATER" text, or
    * vice versa.
    */
-  private _buildMarkerElement(station: AprsStation, leaderLength = 0): HTMLDivElement {
+  private _buildMarkerElement(station: AprsStation): HTMLDivElement {
     const fields = this._landStore.aprsLabelFields
     const leftFacing = this._isLeftFacing(station)
     const symbol = aprsSymbolIcon(station.symbol)
@@ -316,14 +331,6 @@ export class AprsStationsControl extends SentinelControlBase {
     // never in doubt. The line rises from the label's leading edge — the side
     // carrying the icon, or the callsign when the icon is switched off — which
     // is the edge the anchor puts directly below the dot.
-    // The line positions against the pill without setting `position` on it:
-    // MapLibre's own `.maplibregl-marker` rule makes every marker element
-    // absolute, which is already a containing block. Setting `position:relative`
-    // here would override that rule and drop the label out of the map's
-    // transform entirely.
-    if (leaderLength > 0)
-      pill.appendChild(createLeaderLine(leaderLength, LEADER_HORIZONTAL_OFFSET_PX, leftFacing))
-
     pill.addEventListener('click', (domEvent: Event) => {
       domEvent.stopPropagation()
       this._openPopup(station)
@@ -459,6 +466,7 @@ export class AprsStationsControl extends SentinelControlBase {
     this._markerPositions.clear()
     for (const marker of this._siteMarkers.values()) marker.remove()
     this._siteMarkers.clear()
+    this._siteSignatures.clear()
   }
 }
 
@@ -469,6 +477,12 @@ const STACKED_LABEL_OFFSET_PX = 30
 /** How far a displaced label is pushed sideways from its site marker, in pixels.
  *  Gives the tether room to curve rather than doubling back on itself. */
 const LEADER_HORIZONTAL_OFFSET_PX = 28
+
+/** How far below a shared site's marker the nth label sits, in pixels. Clears
+ *  the marker's own square before stepping, so the first leader can curve. */
+function labelVerticalOffset(stackIndex: number): number {
+  return MAP_LABEL_SIZE_PX / 2 + (stackIndex + 1) * STACKED_LABEL_OFFSET_PX
+}
 
 /** Decimal places used to decide two stations share a site (3 dp ≈ 110 m). */
 const SITE_PRECISION_DP = 3
@@ -526,7 +540,7 @@ export function groupStationsBySite(stations: AprsStation[]): StationSite[] {
  * click meant for a label, and is hidden from assistive tech, which reads the
  * stations from the data table instead.
  */
-export function buildSiteMarker(): HTMLElement {
+export function buildSiteMarker(branches: LeaderBranch[]): HTMLElement {
   const marker = createGlyphWell(
     createGlyphSvg(createLocationPinShape(APRS_ACCENT_COLOR)),
     APRS_BADGE_BACKGROUND,
@@ -534,57 +548,74 @@ export function buildSiteMarker(): HTMLElement {
   marker.classList.add('aprs-site-marker')
   marker.setAttribute('aria-hidden', 'true')
   marker.style.pointerEvents = 'none'
+  // Behind the square, so each leader appears to emerge from under the marker
+  // rather than from a point floating on top of it.
+  marker.insertBefore(createSiteLeaders(branches), marker.firstChild)
   return marker
 }
 
+/** Where a displaced label's leading edge sits, relative to its site marker. */
+export interface LeaderBranch {
+  /** Horizontal offset in pixels; negative for a left-facing label. */
+  dx: number
+  /** Vertical offset in pixels, always below the marker. */
+  dy: number
+}
+
+/** Radius of the corner where a leader turns out of its vertical run. */
+const LEADER_CORNER_PX = 26
+
 /**
- * The curved, dashed tether joining a displaced label to its site marker.
+ * Build the leader graphic joining a shared site's marker to each of its
+ * displaced labels.
  *
- * Drawn inside the label and positioned out of flow, so it does not affect the
- * element's box — and therefore not the anchor MapLibre computes from it. The
- * curve starts at the label's leading edge (the side carrying the icon, or the
- * callsign when the icon is off) and sweeps up to the marker, which the offset
- * places `rise` pixels above and `run` pixels to the side.
+ * Drawn once per site rather than once per label: separate full-length curves
+ * from every label overlap into a braid under the marker, where a single comb —
+ * one vertical run with a rounded turn into each label — stays legible however
+ * many stations share the mast.
  *
- * Dashed rather than solid so a tether never reads as a route or a track — the
- * Air domain draws those as solid lines.
+ * Dashed rather than solid so a leader never reads as a track or route, which
+ * the Air domain draws solid.
  */
-export function createLeaderLine(rise: number, run: number, leftFacing: boolean): SVGSVGElement {
+export function createSiteLeaders(branches: LeaderBranch[]): SVGSVGElement {
   const svgNamespace = 'http://www.w3.org/2000/svg'
   const svg = document.createElementNS(svgNamespace, 'svg')
-  svg.setAttribute('class', 'aprs-leader-line')
+  svg.setAttribute('class', 'aprs-site-leaders')
   svg.setAttribute('aria-hidden', 'true')
-  svg.setAttribute('width', String(run))
-  svg.setAttribute('height', String(rise))
-  svg.setAttribute('viewBox', `0 0 ${run} ${rise}`)
+  svg.setAttribute('width', String(MAP_LABEL_SIZE_PX))
+  svg.setAttribute('height', String(MAP_LABEL_SIZE_PX))
+  svg.setAttribute('viewBox', `0 0 ${MAP_LABEL_SIZE_PX} ${MAP_LABEL_SIZE_PX}`)
   svg.setAttribute('fill', 'none')
+  // Branches run well outside the marker's own box; `overflow:visible` is what
+  // lets them draw there, and the marker square covers where they start.
+  svg.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none'
 
-  // A cubic, not a quadratic: the first control point holds the run horizontal
-  // as it leaves the label and the second holds it vertical as it meets the
-  // marker, which rounds the corner far more than a single control point can.
-  const labelEdgeX = leftFacing ? 0 : run
-  const markerX = leftFacing ? run : 0
-  const path = document.createElementNS(svgNamespace, 'path')
-  path.setAttribute(
-    'd',
-    `M ${labelEdgeX} ${rise} C ${markerX} ${rise} ${markerX} ${rise * 0.45} ${markerX} 0`,
-  )
-  path.setAttribute('stroke', 'rgba(255,255,255,0.5)')
-  path.setAttribute('stroke-width', '1.6')
-  path.setAttribute('stroke-dasharray', '2.5 3.5')
-  path.setAttribute('stroke-linecap', 'round')
-  path.setAttribute('fill', 'none')
-  svg.appendChild(path)
-
-  const halfLabel = MAP_LABEL_SIZE_PX / 2
-  svg.style.cssText = [
-    'position:absolute',
-    // Sits just outside the label, on the side the dot is on.
-    leftFacing ? `right:-${run}px` : `left:-${run}px`,
-    `top:${halfLabel - rise}px`,
-    'overflow:visible',
-    'pointer-events:none',
-  ].join(';')
+  const centre = MAP_LABEL_SIZE_PX / 2
+  for (const branch of branches) {
+    const endY = centre + branch.dy
+    const endX = centre + branch.dx
+    // A straight run, a rounded corner, then a short reach to the label. Drawn
+    // as explicit segments rather than one sweeping curve so that every branch's
+    // vertical run lies on exactly the same line — and, sharing a start point,
+    // the same dash phase — collapsing into one clean stem instead of the fan a
+    // single curve per label produces.
+    const towardLabel = Math.sign(branch.dx)
+    const corner = Math.min(LEADER_CORNER_PX, Math.abs(branch.dx), Math.abs(branch.dy) - centre)
+    const path = document.createElementNS(svgNamespace, 'path')
+    path.setAttribute(
+      'd',
+      `M ${centre} ${centre} ` +
+        `L ${centre} ${endY - corner} ` +
+        `Q ${centre} ${endY} ${centre + corner * towardLabel} ${endY} ` +
+        `L ${endX} ${endY}`,
+    )
+    path.setAttribute('stroke', 'rgba(255,255,255,0.5)')
+    path.setAttribute('stroke-width', '1.6')
+    path.setAttribute('stroke-dasharray', '2.5 3.5')
+    path.setAttribute('stroke-linecap', 'round')
+    path.setAttribute('fill', 'none')
+    svg.appendChild(path)
+  }
   return svg
 }
 
