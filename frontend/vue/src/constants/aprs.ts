@@ -25,6 +25,6 @@ export const APRS_BADGE_BACKGROUND = '#15171d'
 /** Ring around the site marker — black, as the labels' own background is. */
 export const APRS_SITE_MARKER_RING = '#000000'
 
-/** Centre of the site marker. Light enough to read as a dot inside its black
- *  ring at 12px, over both the pale roads and the dark water beneath it. */
-export const APRS_SITE_MARKER_CENTRE = '#cfd6dd'
+/** Centre dot of the site marker — the app's panel grey, dark but distinct
+ *  from the black ring around it. */
+export const APRS_SITE_MARKER_CENTRE = '#26292e'

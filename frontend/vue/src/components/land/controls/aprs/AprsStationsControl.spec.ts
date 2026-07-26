@@ -631,11 +631,11 @@ describe('AprsStationsControl', () => {
       )
       // Both start at the marker centre and descend on the same x, so their
       // stems (and dash phases) coincide instead of fanning apart.
-      expect(paths[0]!.startsWith('M 6 6 L 6 ')).toBe(true)
-      expect(paths[1]!.startsWith('M 6 6 L 6 ')).toBe(true)
+      expect(paths[0]!.startsWith('M 6 12 L 6 ')).toBe(true)
+      expect(paths[1]!.startsWith('M 6 12 L 6 ')).toBe(true)
       // Rounded corner, then a short reach to the label's leading edge.
-      expect(paths[0]).toBe('M 6 6 L 6 23 Q 6 49 32 49 L 34 49')
-      expect(paths[1]).toBe('M 6 6 L 6 53 Q 6 79 32 79 L 34 79')
+      expect(paths[0]).toBe('M 6 12 L 6 23 Q 6 49 32 49 L 34 49')
+      expect(paths[1]).toBe('M 6 12 L 6 53 Q 6 79 32 79 L 34 79')
     })
 
     it('mirrors the leaders for a left-facing label', () => {
@@ -647,7 +647,7 @@ describe('AprsStationsControl', () => {
       ]
       addControl()
       const path = dotMarkers()[0]!.element.querySelector('.aprs-site-leaders path')!
-      expect(path.getAttribute('d')).toBe('M 6 6 L 6 23 Q 6 49 -20 49 L -22 49')
+      expect(path.getAttribute('d')).toBe('M 6 12 L 6 23 Q 6 49 -20 49 L -22 49')
     })
 
     it('displaces the label sideways as well as down, so the curve has room', () => {
@@ -739,20 +739,24 @@ describe('AprsStationsControl', () => {
       expect(verticalOffsets).toEqual([43, 73, 103])
     })
 
-    it('marks the site with a small ringed dot', () => {
+    it('marks the site with a ring and a separate centre dot', () => {
       store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
       addControl()
       const marker = dotMarkers()[0]!.element
       expect(marker.style.width).toBe('12px')
       expect(marker.style.height).toBe('12px')
-      // Concentric circles — a light grey dot in a black ring — which is the
-      // pairing that holds against both the pale roads and the dark water the
-      // basemap puts under it.
-      expect(marker.style.borderRadius).toBe('50%')
-      expect(marker.style.background).toBe('rgb(207, 214, 221)')
-      expect(marker.style.boxShadow).toBe('0 0 0 2px #000000')
-      // Nothing drawn inside it but the leaders.
-      expect(marker.querySelector('svg:not(.aprs-site-leaders)')).toBeNull()
+
+      // The same ring-and-dot the user-location marker uses — a stroked ring
+      // with the map showing through, then a dot — in its own colours.
+      const rings = marker.querySelector('svg:not(.aprs-site-leaders)')!
+      const [ring, dot] = [...rings.querySelectorAll('circle')]
+      expect(ring!.getAttribute('fill')).toBe('none')
+      expect(ring!.getAttribute('stroke')).toBe('#000000')
+      expect(dot!.getAttribute('fill')).toBe('#26292e')
+      // The ring is pulled in by half its stroke, which straddles the radius,
+      // so the marker stays inside its 12px box.
+      expect(ring!.getAttribute('r')).toBe('5.2')
+      expect(dot!.getAttribute('r')).toBe('2.2')
     })
 
     it('keeps the dot out of the way of clicks and screen readers', () => {

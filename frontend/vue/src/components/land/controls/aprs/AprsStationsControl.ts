@@ -569,15 +569,26 @@ export function groupStationsBySite(stations: AprsStation[]): StationSite[] {
  *  and has to sit under a column of labels without competing with them. */
 const SITE_MARKER_SIZE_PX = 12
 
+/** XML namespace every SVG element the control builds must be created in. */
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg'
+
 /** Width of the marker's black outer ring, in pixels. */
-const SITE_MARKER_RING_PX = 2
+const SITE_MARKER_RING_PX = 1.6
+
+/** Radius of the dot at the marker's centre, in pixels. Sized against the ring
+ *  in the same proportion the user-location marker uses. */
+const SITE_MARKER_DOT_RADIUS_PX = 2.2
 
 /**
  * The marker showing a shared site's real position.
  *
- * A small light grey dot inside a black ring — two concentric circles, which is
- * what holds it against both the pale roads and the dark water the basemap puts
- * under it. Nothing is drawn inside: a glyph here would compete with the station
+ * Built on the same ring-and-dot the user-location marker uses — a stroked
+ * ring with the map showing through, and a separate dot at the centre — so a
+ * position reads as a position wherever it appears. Its own colours, though:
+ * a black ring around the app's panel grey, rather than the location marker's
+ * white and accent, which would claim more attention than a site deserves.
+ *
+ * Nothing else is drawn inside: a glyph here would compete with the station
  * symbols on the labels it leads to.
  *
  * Purely a position cue: it takes no pointer events, so it never intercepts a
@@ -591,14 +602,26 @@ export function buildSiteMarker(branches: LeaderBranch[]): HTMLElement {
   marker.style.cssText = [
     `width:${SITE_MARKER_SIZE_PX}px`,
     `height:${SITE_MARKER_SIZE_PX}px`,
-    `background:${APRS_SITE_MARKER_CENTRE}`,
-    'border-radius:50%',
-    // Drawn as a shadow rather than a border so the ring sits outside the box,
-    // leaving the marker's centre exactly on the site's position.
-    `box-shadow:0 0 0 ${SITE_MARKER_RING_PX}px ${APRS_SITE_MARKER_RING}`,
     'pointer-events:none',
   ].join(';')
   renderSiteLeaders(marker, branches)
+
+  const centre = SITE_MARKER_SIZE_PX / 2
+  // The ring's stroke straddles its radius, so the radius is pulled in by half
+  // the stroke to keep the whole marker inside its box.
+  const ringRadius = centre - SITE_MARKER_RING_PX / 2
+  const rings = document.createElementNS(SVG_NAMESPACE, 'svg')
+  rings.setAttribute('width', String(SITE_MARKER_SIZE_PX))
+  rings.setAttribute('height', String(SITE_MARKER_SIZE_PX))
+  rings.setAttribute('viewBox', `0 0 ${SITE_MARKER_SIZE_PX} ${SITE_MARKER_SIZE_PX}`)
+  rings.setAttribute('fill', 'none')
+  rings.style.cssText = 'position:absolute;left:0;top:0'
+  rings.innerHTML =
+    `<circle cx="${centre}" cy="${centre}" r="${ringRadius}" fill="none" ` +
+    `stroke="${APRS_SITE_MARKER_RING}" stroke-width="${SITE_MARKER_RING_PX}"/>` +
+    `<circle cx="${centre}" cy="${centre}" r="${SITE_MARKER_DOT_RADIUS_PX}" ` +
+    `fill="${APRS_SITE_MARKER_CENTRE}"/>`
+  marker.appendChild(rings)
   return marker
 }
 
@@ -647,8 +670,7 @@ function roundToPixelFraction(value: number): number {
  * the Air domain draws solid.
  */
 export function createSiteLeaders(branches: LeaderBranch[]): SVGSVGElement {
-  const svgNamespace = 'http://www.w3.org/2000/svg'
-  const svg = document.createElementNS(svgNamespace, 'svg')
+  const svg = document.createElementNS(SVG_NAMESPACE, 'svg')
   svg.setAttribute('class', 'aprs-site-leaders')
   svg.setAttribute('aria-hidden', 'true')
   svg.setAttribute('width', String(SITE_MARKER_SIZE_PX))
@@ -665,8 +687,11 @@ export function createSiteLeaders(branches: LeaderBranch[]): SVGSVGElement {
     // meaningless on screen and makes the markup unreadable.
     const endY = roundToPixelFraction(centre + branch.dy)
     const endX = roundToPixelFraction(centre + branch.dx)
-    // A straight run, a rounded corner, then a short reach to the label. Drawn
-    // as explicit segments rather than one sweeping curve so that every branch's
+    // Starts at the marker's lower edge rather than its centre: the ring has a
+    // gap the map shows through, and a leader begun at the centre puts a dash
+    // inside it. A straight run, a rounded corner, then a short reach to the
+    // label. Drawn as explicit segments rather than one sweeping curve so that
+    // every branch's
     // vertical run lies on exactly the same line — and, sharing a start point,
     // the same dash phase — collapsing into one clean stem instead of the fan a
     // single curve per label produces.
@@ -674,10 +699,10 @@ export function createSiteLeaders(branches: LeaderBranch[]): SVGSVGElement {
     const corner = roundToPixelFraction(
       Math.min(LEADER_CORNER_PX, Math.abs(branch.dx), Math.abs(branch.dy) - centre),
     )
-    const path = document.createElementNS(svgNamespace, 'path')
+    const path = document.createElementNS(SVG_NAMESPACE, 'path')
     path.setAttribute(
       'd',
-      `M ${centre} ${centre} ` +
+      `M ${centre} ${SITE_MARKER_SIZE_PX} ` +
         `L ${centre} ${endY - corner} ` +
         `Q ${centre} ${endY} ${centre + corner * towardLabel} ${endY} ` +
         `L ${endX} ${endY}`,
