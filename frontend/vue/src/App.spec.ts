@@ -314,6 +314,15 @@ describe('App', () => {
       expect(sidebarSpies.switchTab).toHaveBeenCalledTimes(2)
       expect(sidebarSpies.switchTab).toHaveBeenCalledWith('search')
     })
+
+    it('opens the search tab when an APRS station is clicked on the Land map', async () => {
+      // The pane itself expands the matching row; App only owns the sidebar.
+      mountApp()
+      document.dispatchEvent(
+        new CustomEvent('aprs-station-selected', { detail: { callsign: 'M0ABC-9' } }),
+      )
+      expect(sidebarSpies.switchTab).toHaveBeenCalledWith('search')
+    })
   })
 
   describe('footer ↔ sidebar wiring', () => {

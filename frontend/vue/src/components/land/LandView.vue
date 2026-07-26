@@ -22,6 +22,12 @@
       :aprs-active="aprsActive"
       :location-active="locationActive"
     />
+    <!-- msb-pane-search lives in MapSidebar, a sibling of <RouterView> in
+         App.vue — see useSidebarPaneTarget for why this waits rather than
+         teleporting unconditionally. -->
+    <Teleport v-if="searchPaneReady" :to="sidebarPaneSelector('search')">
+      <LandFilter />
+    </Teleport>
   </div>
 </template>
 
@@ -36,6 +42,9 @@ import { useMapContextMenu } from '@/composables/useMapContextMenu'
 import MapLibreMap from '@/components/shared/MapLibreMap.vue'
 import NoUrlOverlay from '@/components/shared/NoUrlOverlay.vue'
 import LandSideMenu from '@/components/land/LandSideMenu.vue'
+import LandFilter from '@/components/land/LandFilter.vue'
+import { sidebarPaneSelector } from '@/constants/sidebarPanes'
+import { useSidebarPaneTarget } from '@/composables/useSidebarPaneTarget'
 import { UserLocationMarker } from '@/components/shared/UserLocationMarker'
 import { AprsStationsControl } from '@/components/land/controls/aprs/AprsStationsControl'
 import { LandRangeRingsControl } from '@/components/land/controls/range-rings/LandRangeRingsControl'
@@ -46,6 +55,7 @@ const LOCATE_ZOOM = 10
 const appStore = useAppStore()
 const landStore = useLandStore()
 const mapRef = ref<InstanceType<typeof MapLibreMap> | null>(null)
+const { ready: searchPaneReady } = useSidebarPaneTarget('search')
 
 // User location drives the "go to my location" button, the range rings' centre,
 // and the on-map location marker (shared app-wide via useUserLocation).
@@ -65,8 +75,9 @@ let _aprsControl: AprsStationsControl | null = null
 let _rangeRingsControl: LandRangeRingsControl | null = null
 
 // Reactive toggle state backing the side-menu buttons' active (green) styling.
-// APRS starts visible per the land.defaultLayers config (default ["aprs"]).
-const aprsActive = ref(landStore.defaultLayers.includes('aprs'))
+// APRS visibility lives on the store, so the map and the side panel's station
+// list can never disagree about what is currently shown.
+const aprsActive = computed(() => landStore.aprsLayerVisible)
 const rangeRingsActive = ref(false)
 const locationActive = computed(() => userLocation.value !== null)
 
@@ -89,7 +100,8 @@ function onMapCreated(m: Map) {
   _aprsControl = new AprsStationsControl(landStore)
   _rangeRingsControl.onAdd(m)
   _aprsControl.onAdd(m)
-  _aprsControl.setVisible(aprsActive.value)
+  // APRS starts visible per the land.defaultLayers config (default ["aprs"]).
+  _aprsControl.setVisible(landStore.defaultLayers.includes('aprs'))
   rangeRingsActive.value = _rangeRingsControl.visible
 
   const nativeCtrl = m.getContainer().querySelector<HTMLElement>('.maplibregl-ctrl-top-right')
@@ -119,8 +131,8 @@ function toggleRangeRings() {
   rangeRingsActive.value = !rangeRingsActive.value
 }
 function toggleAprs() {
+  // The control flips the shared store flag, which `aprsActive` tracks.
   _aprsControl?.handleClickPublic()
-  aprsActive.value = !aprsActive.value
 }
 
 onMounted(() => {
@@ -130,8 +142,7 @@ onMounted(() => {
   watch(
     () => landStore.defaultLayers,
     (layers) => {
-      aprsActive.value = layers.includes('aprs')
-      _aprsControl?.setVisible(aprsActive.value)
+      _aprsControl?.setVisible(layers.includes('aprs'))
     },
   )
 

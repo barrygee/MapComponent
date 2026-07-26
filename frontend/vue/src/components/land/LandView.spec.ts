@@ -79,12 +79,25 @@ const aprsSpies = vi.hoisted(() => ({
   handleClickPublic: vi.fn(),
   setVisible: vi.fn(),
 }))
+// The real control owns APRS visibility on the land store (so the map and the
+// side panel's list can't disagree); the stub mirrors that, since the view's
+// active-state prop now reads the store rather than a local ref.
 vi.mock('@/components/land/controls/aprs/AprsStationsControl', () => ({
   AprsStationsControl: class {
+    private _store: { aprsLayerVisible: boolean; setAprsLayerVisible: (v: boolean) => void }
+    constructor(store: { aprsLayerVisible: boolean; setAprsLayerVisible: (v: boolean) => void }) {
+      this._store = store
+    }
     onAdd = aprsSpies.onAdd
     onRemove = aprsSpies.onRemove
-    handleClickPublic = aprsSpies.handleClickPublic
-    setVisible = aprsSpies.setVisible
+    handleClickPublic = (...args: unknown[]) => {
+      this._store.setAprsLayerVisible(!this._store.aprsLayerVisible)
+      return aprsSpies.handleClickPublic(...args)
+    }
+    setVisible = (visible: boolean) => {
+      this._store.setAprsLayerVisible(visible)
+      return aprsSpies.setVisible(visible)
+    }
   },
 }))
 
@@ -144,6 +157,18 @@ function makeFakeMap() {
   }
 }
 
+const LandFilterStub = defineComponent({
+  name: 'LandFilterStub',
+  setup: () => () => h('div', { class: 'land-filter-stub' }),
+})
+
+/** Stand in for the sidebar pane MapSidebar owns, which LandView teleports into. */
+function teleportTarget(): void {
+  const searchPane = document.createElement('div')
+  searchPane.id = 'msb-pane-search'
+  document.body.append(searchPane)
+}
+
 function mountView() {
   return mount(LandView, {
     global: {
@@ -151,6 +176,7 @@ function mountView() {
         MapLibreMap: MapLibreMapStub,
         NoUrlOverlay: InertStub,
         LandSideMenu: LandSideMenuStub,
+        LandFilter: LandFilterStub,
       },
     },
   })
@@ -169,6 +195,23 @@ describe('LandView', () => {
     if (locationState.location) locationState.location.value = null
     localStorage.clear()
     document.body.innerHTML = ''
+  })
+
+  describe('teleport target', () => {
+    it('teleports the APRS filter pane into the sidebar once it exists', () => {
+      teleportTarget()
+      mountView()
+      // useSidebarPaneTarget('search') resolves synchronously when the pane is
+      // already present, so the Teleport is active on first render.
+      expect(document.querySelector('#msb-pane-search .land-filter-stub')).not.toBeNull()
+    })
+
+    it('does not teleport until the sidebar panes appear', () => {
+      // No teleportTarget(): MapSidebar hasn't rendered its panes, so the
+      // Teleport stays gated off and LandFilter never mounts.
+      expect(() => mountView()).not.toThrow()
+      expect(document.querySelector('.land-filter-stub')).toBeNull()
+    })
   })
 
   describe('style selection', () => {
