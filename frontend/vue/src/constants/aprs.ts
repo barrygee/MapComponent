@@ -21,3 +21,7 @@ export const APRS_ACCENT_COLOR = '#ffffff'
  * outside the Vue tree; `aprsStyle.spec.ts` guards the two staying in step.
  */
 export const APRS_BADGE_BACKGROUND = '#15171d'
+
+/** Fill of the site marker — the disc standing on a shared position. Black, as
+ *  the labels' own background is, so a site reads as part of the same set. */
+export const APRS_SITE_MARKER_BACKGROUND = '#000000'

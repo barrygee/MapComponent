@@ -124,22 +124,6 @@ export function createHollowDotShape(color: string): string {
   return `<circle cx="6" cy="6" r="3.5" fill="none" stroke="${color}" stroke-width="1.5"/>`
 }
 
-/**
- * A map pin, for a marker that points at a place rather than a target — e.g.
- * the site marker shared by several co-located stations.
- *
- * The same teardrop-and-dot glyph as `LocationPinIcon.vue`, scaled from that
- * component's 24-unit viewBox into the 12-unit one these shapes use, so the two
- * read as the same icon wherever they appear together.
- */
-export function createLocationPinShape(color: string): string {
-  return (
-    `<path d="M6 10.5s3.5-3.25 3.5-6a3.5 3.5 0 1 0-7 0c0 2.75 3.5 6 3.5 6Z" ` +
-    `fill="none" stroke="${color}" stroke-width="1.2" stroke-linejoin="round"/>` +
-    `<circle cx="6" cy="4.5" r="1.15" fill="${color}"/>`
-  )
-}
-
 /** A filled dot, for static targets (ground structures, fixed stations). */
 export function createFilledDotShape(color: string): string {
   return `<circle cx="6" cy="6" r="3.5" fill="${color}" stroke="none"/>`

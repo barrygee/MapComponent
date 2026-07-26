@@ -723,11 +723,11 @@ describe('AprsStationsControl', () => {
       )
       // Both start at the marker centre and descend on the same x, so their
       // stems (and dash phases) coincide instead of fanning apart.
-      expect(paths[0]!.startsWith('M 13 13 L 13 ')).toBe(true)
-      expect(paths[1]!.startsWith('M 13 13 L 13 ')).toBe(true)
+      expect(paths[0]!.startsWith('M 6 6 L 6 ')).toBe(true)
+      expect(paths[1]!.startsWith('M 6 6 L 6 ')).toBe(true)
       // Rounded corner, then a short reach to the label's leading edge.
-      expect(paths[0]).toBe('M 13 13 L 13 30 Q 13 56 39 56 L 41 56')
-      expect(paths[1]).toBe('M 13 13 L 13 60 Q 13 86 39 86 L 41 86')
+      expect(paths[0]).toBe('M 6 6 L 6 23 Q 6 49 32 49 L 34 49')
+      expect(paths[1]).toBe('M 6 6 L 6 53 Q 6 79 32 79 L 34 79')
     })
 
     it('mirrors the leaders for a left-facing label', () => {
@@ -739,7 +739,7 @@ describe('AprsStationsControl', () => {
       ]
       addControl()
       const path = dotMarkers()[0]!.element.querySelector('.aprs-site-leaders path')!
-      expect(path.getAttribute('d')).toBe('M 13 13 L 13 30 Q 13 56 -13 56 L -15 56')
+      expect(path.getAttribute('d')).toBe('M 6 6 L 6 23 Q 6 49 -20 49 L -22 49')
     })
 
     it('displaces the label sideways as well as down, so the curve has room', () => {
@@ -831,22 +831,19 @@ describe('AprsStationsControl', () => {
       expect(verticalOffsets).toEqual([43, 73, 103])
     })
 
-    it('marks the site with the same square well the labels use, holding a pin', () => {
+    it('marks the site with a small ringed square', () => {
       store.aprsStations = [station({ callsign: 'AAA' }), station({ callsign: 'BBB' })]
       addControl()
       const marker = dotMarkers()[0]!.element
-      // Same square + charcoal as a label's symbol well, so the two read as one
-      // family; a pin rather than a station symbol, because it marks a place.
-      expect(marker.classList.contains('adsb-arrow-wrap')).toBe(true)
+      expect(marker.style.width).toBe('12px')
+      expect(marker.style.height).toBe('12px')
+      // Dark grey centre in a black ring: the pairing that holds against both
+      // the pale roads and the dark water the basemap puts under it.
       expect(marker.style.background).toBe('rgb(21, 23, 29)')
-      expect(marker.style.width).toBe('26px')
-      // Square, not a letterbox: the well's stretch only resolves inside a
-      // label's flex row, so a standalone marker must set its own height.
-      expect(marker.style.height).toBe('26px')
-      expect(marker.querySelector('circle')).not.toBeNull()
-      expect(marker.querySelector('svg:not(.aprs-site-leaders) path')!.getAttribute('d')).toContain(
-        'M6 10.5',
-      )
+      expect(marker.style.boxShadow).toBe('0 0 0 2px #000000')
+      // Square, and with nothing drawn inside it but the leaders.
+      expect(marker.style.borderRadius).toBe('')
+      expect(marker.querySelector('svg:not(.aprs-site-leaders)')).toBeNull()
     })
 
     it('keeps the dot out of the way of clicks and screen readers', () => {

@@ -9,7 +9,6 @@ import {
   createGlyphWell,
   createHollowDotShape,
   createLabelPill,
-  createLocationPinShape,
   createNameSegment,
   isLeftFacing,
   MAP_LABEL_GLYPH_SIZE_PX,
@@ -96,15 +95,6 @@ describe('mapLabelParts', () => {
       const shape = createHollowDotShape('#00aaff')
       expect(shape).toContain('fill="none"')
       expect(shape).toContain('stroke="#00aaff"')
-    })
-
-    it('draws a map pin for a marker that points at a place', () => {
-      // Matches LocationPinIcon.vue's teardrop-and-dot, scaled into the shared
-      // 12-unit viewBox so the two read as the same icon.
-      const shape = createLocationPinShape('#ffffff')
-      expect(shape).toContain('stroke="#ffffff"')
-      expect(shape).toContain('<circle cx="6" cy="4.5"')
-      expect(shape).toContain('fill="none"')
     })
 
     it('draws a filled dot for static targets', () => {

@@ -2,7 +2,11 @@ import maplibregl from 'maplibre-gl'
 import { watch, type WatchStopHandle } from 'vue'
 import { SentinelControlBase } from '@/components/air/controls/sentinel-control-base/SentinelControlBase'
 import { aprsSymbolIcon, aprsSymbolSvg } from '@/utils/aprsSymbols'
-import { APRS_ACCENT_COLOR, APRS_BADGE_BACKGROUND } from '@/constants/aprs'
+import {
+  APRS_ACCENT_COLOR,
+  APRS_BADGE_BACKGROUND,
+  APRS_SITE_MARKER_BACKGROUND,
+} from '@/constants/aprs'
 import {
   appendMirrored,
   createAccentBadge,
@@ -11,7 +15,6 @@ import {
   createGlyphSvg,
   createGlyphWell,
   createLabelPill,
-  createLocationPinShape,
   createNameSegment,
   isLeftFacing,
   MAP_LABEL_GLYPH_SIZE_PX,
@@ -592,29 +595,38 @@ export function groupStationsBySite(stations: AprsStation[]): StationSite[] {
   return [...sites.values()]
 }
 
+/** Size of the site marker's inner square, in pixels. Small: it marks a point,
+ *  and has to sit under a column of labels without competing with them. */
+const SITE_MARKER_SIZE_PX = 12
+
+/** Width of the marker's black outer ring, in pixels. */
+const SITE_MARKER_RING_PX = 2
+
 /**
  * The marker showing a shared site's real position.
  *
- * Deliberately the same square well the labels carry their symbol icon in, so
- * it reads as part of the same family — a pin glyph rather than a station
- * symbol, because it points at a place, not a transmitter.
+ * A small square — a dark grey centre inside a black ring, which is what holds
+ * it against both the pale roads and the dark water the basemap puts under it.
+ * Nothing is drawn inside: a glyph here would compete with the station symbols
+ * on the labels it leads to.
  *
  * Purely a position cue: it takes no pointer events, so it never intercepts a
  * click meant for a label, and is hidden from assistive tech, which reads the
  * stations from the data table instead.
  */
 export function buildSiteMarker(branches: LeaderBranch[]): HTMLElement {
-  const marker = createGlyphWell(
-    createGlyphSvg(createLocationPinShape(APRS_ACCENT_COLOR)),
-    APRS_BADGE_BACKGROUND,
-  )
-  marker.classList.add('aprs-site-marker')
+  const marker = document.createElement('div')
+  marker.className = 'aprs-site-marker'
   marker.setAttribute('aria-hidden', 'true')
-  marker.style.pointerEvents = 'none'
-  // The well takes its height from `align-self:stretch`, which only resolves
-  // inside a label's flex row. Standing alone it would collapse to the glyph's
-  // height and read as a letterbox, so the square is set explicitly here.
-  marker.style.height = `${MAP_LABEL_SIZE_PX}px`
+  marker.style.cssText = [
+    `width:${SITE_MARKER_SIZE_PX}px`,
+    `height:${SITE_MARKER_SIZE_PX}px`,
+    `background:${APRS_BADGE_BACKGROUND}`,
+    // Drawn as a shadow rather than a border so the ring sits outside the box,
+    // leaving the marker's centre exactly on the site's position.
+    `box-shadow:0 0 0 ${SITE_MARKER_RING_PX}px ${APRS_SITE_MARKER_BACKGROUND}`,
+    'pointer-events:none',
+  ].join(';')
   renderSiteLeaders(marker, branches)
   return marker
 }
@@ -668,15 +680,15 @@ export function createSiteLeaders(branches: LeaderBranch[]): SVGSVGElement {
   const svg = document.createElementNS(svgNamespace, 'svg')
   svg.setAttribute('class', 'aprs-site-leaders')
   svg.setAttribute('aria-hidden', 'true')
-  svg.setAttribute('width', String(MAP_LABEL_SIZE_PX))
-  svg.setAttribute('height', String(MAP_LABEL_SIZE_PX))
-  svg.setAttribute('viewBox', `0 0 ${MAP_LABEL_SIZE_PX} ${MAP_LABEL_SIZE_PX}`)
+  svg.setAttribute('width', String(SITE_MARKER_SIZE_PX))
+  svg.setAttribute('height', String(SITE_MARKER_SIZE_PX))
+  svg.setAttribute('viewBox', `0 0 ${SITE_MARKER_SIZE_PX} ${SITE_MARKER_SIZE_PX}`)
   svg.setAttribute('fill', 'none')
   // Branches run well outside the marker's own box; `overflow:visible` is what
   // lets them draw there, and the marker square covers where they start.
   svg.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none'
 
-  const centre = MAP_LABEL_SIZE_PX / 2
+  const centre = SITE_MARKER_SIZE_PX / 2
   for (const branch of branches) {
     // Projected pixel deltas carry float noise; a sub-pixel path coordinate is
     // meaningless on screen and makes the markup unreadable.
