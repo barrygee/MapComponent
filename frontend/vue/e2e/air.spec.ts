@@ -92,7 +92,7 @@ test.describe('Air domain', () => {
     await filterInput.fill('Heathrow')
 
     // The matching airport row appears in the airports category list.
-    await expect(page.locator('.filter-result-item').first()).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.bfp-result-item').first()).toBeVisible({ timeout: 5000 })
     await expect(page.locator('#filter-results')).toContainText('EGLL')
   })
 
@@ -108,8 +108,8 @@ test.describe('Air domain', () => {
     })
     await filterInput.fill('XYZZYNOTFOUND')
 
-    await expect(page.locator('.filter-no-results')).toBeVisible()
-    await expect(page.locator('.filter-no-results')).toContainText(/no results/i)
+    await expect(page.locator('.bfp-no-results')).toBeVisible()
+    await expect(page.locator('.bfp-no-results')).toContainText(/no results/i)
   })
 
   test('FILTER rail exposes single-select category sub-tabs', async ({ page }) => {

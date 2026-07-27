@@ -107,10 +107,20 @@ function mountFilter(
   })
 }
 
+// Rows of one category, located by the per-category token their option id
+// carries. Only the active category renders rows, so this is also how a test
+// asserts that switching categories emptied the list of the previous one.
+function rowsOf(
+  wrapper: ReturnType<typeof mountFilter>,
+  kind: 'plane' | 'airport' | 'mil',
+): ReturnType<ReturnType<typeof mountFilter>['findAll']> {
+  return wrapper.findAll(`[id^="filter-opt-${kind}-"]`)
+}
+
 // The track/notify/centre controls live inside an aircraft row's expanded
 // accordion, so a row must be opened (clicked) before they exist.
 async function openPlane(wrapper: ReturnType<typeof mountFilter>, optionIndex = 0) {
-  await wrapper.findAll('.filter-result-option')[optionIndex]!.trigger('click')
+  await wrapper.findAll('.bfp-result-option')[optionIndex]!.trigger('click')
 }
 function accordionButton(
   wrapper: ReturnType<typeof mountFilter>,
@@ -143,24 +153,24 @@ describe('AirFilter', () => {
     it('lists only aircraft (excluding ground vehicles and towers) in the aircraft category', () => {
       const wrapper = mountFilter(makeAdsb(defaultPlanes()))
       // Default category is aircraft: 2 aircraft (C1 ground vehicle + C3 tower excluded).
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(2)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(2)
       expect(wrapper.text()).toContain('BAW1')
       expect(wrapper.text()).toContain('RCH2')
       expect(wrapper.text()).not.toContain('GND3')
       expect(wrapper.text()).not.toContain('TWR4')
       // The airport and base belong to their own categories, not shown here.
-      expect(wrapper.findAll('.filter-icon-airport')).toHaveLength(0)
-      expect(wrapper.findAll('.filter-icon-mil')).toHaveLength(0)
+      expect(rowsOf(wrapper, 'airport')).toHaveLength(0)
+      expect(rowsOf(wrapper, 'mil')).toHaveLength(0)
     })
 
     it('shows the airport and base only under their own category sub-tabs', async () => {
       const wrapper = mountFilter(makeAdsb(defaultPlanes()))
       await setCategory('airports')
-      expect(wrapper.findAll('.filter-icon-airport')).toHaveLength(1)
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(0)
+      expect(rowsOf(wrapper, 'airport')).toHaveLength(1)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(0)
       await setCategory('mil')
-      expect(wrapper.findAll('.filter-icon-mil')).toHaveLength(1)
-      expect(wrapper.findAll('.filter-icon-airport')).toHaveLength(0)
+      expect(rowsOf(wrapper, 'mil')).toHaveLength(1)
+      expect(rowsOf(wrapper, 'airport')).toHaveLength(0)
     })
 
     it('excludes ground vehicles and towers even in the ALL filter mode', () => {
@@ -173,7 +183,7 @@ describe('AirFilter', () => {
       ])
       adsb._typeFilter = 'all'
       const wrapper = mountFilter(adsb)
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(1)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(1)
       expect(wrapper.text()).toContain('BAW1')
       for (const excluded of ['CAR1', 'SVC2', 'OBS3', 'TOWER']) {
         expect(wrapper.text()).not.toContain(excluded)
@@ -184,7 +194,7 @@ describe('AirFilter', () => {
       const adsb = makeAdsb(defaultPlanes())
       adsb._allHidden = true
       const wrapper = mountFilter(adsb)
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(0)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(0)
     })
 
     it('restricts to civil aircraft, excluding military, ground and towers', async () => {
@@ -193,7 +203,7 @@ describe('AirFilter', () => {
       const wrapper = mountFilter(adsb)
       document.dispatchEvent(new CustomEvent('adsb-data-update'))
       await nextTick()
-      const primaries = wrapper.findAll('.filter-icon-plane')
+      const primaries = rowsOf(wrapper, 'plane')
       // Only the single civil aircraft (aa1) survives.
       expect(primaries).toHaveLength(1)
     })
@@ -204,7 +214,7 @@ describe('AirFilter', () => {
       const wrapper = mountFilter(adsb)
       document.dispatchEvent(new CustomEvent('adsb-data-update'))
       await nextTick()
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(1)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(1)
       expect(wrapper.text()).toContain('RCH2')
     })
 
@@ -212,28 +222,28 @@ describe('AirFilter', () => {
       const wrapper = mountFilter(makeAdsb(defaultPlanes()))
       const input = wrapper.find('#filter-input')
       await input.setValue('g-aaa') // registration of aa1
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(1)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(1)
       expect(wrapper.text()).toContain('BAW1')
     })
 
     it('shows the empty state when nothing matches', async () => {
       const wrapper = mountFilter(makeAdsb(defaultPlanes()))
       await wrapper.find('#filter-input').setValue('ZZZZZZ')
-      expect(wrapper.find('.filter-no-results').exists()).toBe(true)
+      expect(wrapper.find('.bfp-no-results').exists()).toBe(true)
     })
 
     it('renders an empty aircraft list when there is no adsb control', async () => {
       const wrapper = mountFilter(null)
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(0)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(0)
       // Airports still come from static data — visible under their own category.
       await setCategory('airports')
-      expect(wrapper.findAll('.filter-icon-airport')).toHaveLength(1)
+      expect(rowsOf(wrapper, 'airport')).toHaveLength(1)
     })
 
     it('builds the secondary plane line from hex, registration and squawk', () => {
       const wrapper = mountFilter(makeAdsb([planeFeature({ hex: 'aa1', flight: 'BAW1' })]))
       // hex only (no reg/squawk) → uppercased hex.
-      expect(wrapper.find('.filter-result-secondary').text()).toBe('AA1')
+      expect(wrapper.find('.bfp-result-secondary').text()).toBe('AA1')
     })
 
     it('handles an emergency flag and an aircraft with no hex', () => {
@@ -250,7 +260,7 @@ describe('AirFilter', () => {
         ]),
       )
       // Both rows render; the empty-hex plane shows its callsign as the primary.
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(2)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(2)
       expect(wrapper.text()).toContain('NOHEX')
     })
   })
@@ -260,32 +270,32 @@ describe('AirFilter', () => {
       const wrapper = mountFilter(makeAdsb(defaultPlanes()))
       // Default: aircraft rows only, no airport/base and no section headers.
       expect(wrapper.find('.filter-section-label').exists()).toBe(false)
-      expect(wrapper.findAll('.filter-icon-plane').length).toBeGreaterThan(0)
+      expect(rowsOf(wrapper, 'plane').length).toBeGreaterThan(0)
       await setCategory('airports')
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(0)
-      expect(wrapper.findAll('.filter-icon-airport')).toHaveLength(1)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(0)
+      expect(rowsOf(wrapper, 'airport')).toHaveLength(1)
     })
 
     it('shows the no-results state when the active category is empty', () => {
       // No aircraft in the feed → the (default) aircraft category is empty.
       const wrapper = mountFilter(makeAdsb([]))
-      expect(wrapper.find('.filter-no-results').exists()).toBe(true)
+      expect(wrapper.find('.bfp-no-results').exists()).toBe(true)
     })
 
     it('shows the no-results state for airports when the query matches none', async () => {
       const wrapper = mountFilter(makeAdsb([]))
       await setCategory('airports')
       await wrapper.find('#filter-input').setValue('ZZZZZZ')
-      expect(wrapper.find('.filter-no-results').exists()).toBe(true)
-      expect(wrapper.findAll('.filter-icon-airport')).toHaveLength(0)
+      expect(wrapper.find('.bfp-no-results').exists()).toBe(true)
+      expect(rowsOf(wrapper, 'airport')).toHaveLength(0)
     })
 
     it('shows the no-results state for military bases when the query matches none', async () => {
       const wrapper = mountFilter(makeAdsb([]))
       await setCategory('mil')
       await wrapper.find('#filter-input').setValue('ZZZZZZ')
-      expect(wrapper.find('.filter-no-results').exists()).toBe(true)
-      expect(wrapper.findAll('.filter-icon-mil')).toHaveLength(0)
+      expect(wrapper.find('.bfp-no-results').exists()).toBe(true)
+      expect(rowsOf(wrapper, 'mil')).toHaveLength(0)
     })
   })
 
@@ -311,14 +321,14 @@ describe('AirFilter', () => {
 
       await input.trigger('keydown', { key: 'ArrowDown' })
       await flushRaf()
-      expect(wrapper.find('.keyboard-focused').exists()).toBe(true)
+      expect(wrapper.find('.bfp-keyboard-focused').exists()).toBe(true)
       expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
 
       await input.trigger('keydown', { key: 'ArrowDown' }) // second item
       await input.trigger('keydown', { key: 'ArrowUp' }) // back to first
       await input.trigger('keydown', { key: 'ArrowUp' }) // clears focus
       await nextTick()
-      expect(wrapper.find('.keyboard-focused').exists()).toBe(false)
+      expect(wrapper.find('.bfp-keyboard-focused').exists()).toBe(false)
     })
 
     it('activates the focused plane on Enter', async () => {
@@ -334,7 +344,7 @@ describe('AirFilter', () => {
       const wrapper = mountFilter(makeAdsb(defaultPlanes()))
       await wrapper.find('#filter-input').trigger('keydown', { key: 'Enter' })
       await flushRaf()
-      expect(wrapper.find('.keyboard-focused').exists()).toBe(true)
+      expect(wrapper.find('.bfp-keyboard-focused').exists()).toBe(true)
     })
 
     it('wraps to the first item when arrowing past the end', async () => {
@@ -346,7 +356,7 @@ describe('AirFilter', () => {
       }
       await flushRaf()
       // Back on the first plane (aa1).
-      expect(wrapper.find('.keyboard-focused').exists()).toBe(true)
+      expect(wrapper.find('.bfp-keyboard-focused').exists()).toBe(true)
     })
 
     it('ignores keys that are not navigation keys', async () => {
@@ -507,19 +517,19 @@ describe('AirFilter', () => {
       const map = makeMap()
       const wrapper = mountFilter(makeAdsb([]), () => map)
       await setCategory('airports')
-      await wrapper.find('.filter-icon-airport').trigger('click')
+      await wrapper.find('.bfp-result-option').trigger('click')
       expect(map.fitBounds).toHaveBeenCalled()
       // tower + atis valid; radar (non-numeric) and approach (0) skipped.
       expect(wrapper.findAll('.apt-acc-freq')).toHaveLength(2)
       // collapse again
-      await wrapper.find('.filter-icon-airport').trigger('click')
+      await wrapper.find('.bfp-result-option').trigger('click')
       expect(wrapper.find('.apt-acc-body').exists()).toBe(false)
     })
 
     it('formats the latitude and longitude with hemisphere suffixes', async () => {
       const wrapper = mountFilter(makeAdsb([]))
       await setCategory('airports')
-      await wrapper.find('.filter-icon-airport').trigger('click')
+      await wrapper.find('.bfp-result-option').trigger('click')
       const text = wrapper.find('.apt-acc-body').text()
       expect(text).toContain('51.4700°N')
       expect(text).toContain('0.4600°W')
@@ -537,7 +547,7 @@ describe('AirFilter', () => {
       try {
         const wrapper = mountFilter(makeAdsb([]))
         await setCategory('airports')
-        await wrapper.find('.filter-icon-airport').trigger('click')
+        await wrapper.find('.bfp-result-option').trigger('click')
         const body = wrapper.find('.apt-acc-body').text()
         expect(body).toContain('10.0000°S')
         expect(body).toContain('10.0000°E')
@@ -554,7 +564,7 @@ describe('AirFilter', () => {
     it('shows an inline notice instead of tuning when no SDR is connected', async () => {
       const wrapper = mountFilter(makeAdsb([]))
       await setCategory('airports')
-      await wrapper.find('.filter-icon-airport').trigger('click')
+      await wrapper.find('.bfp-result-option').trigger('click')
       await wrapper.find('.apt-acc-freq').trigger('click')
       expect(wrapper.find('.apt-acc-notice').exists()).toBe(true)
     })
@@ -570,7 +580,7 @@ describe('AirFilter', () => {
       )
       const wrapper = mountFilter(makeAdsb([]))
       await setCategory('airports')
-      await wrapper.find('.filter-icon-airport').trigger('click')
+      await wrapper.find('.bfp-result-option').trigger('click')
       await wrapper.find('.apt-acc-freq').trigger('click')
       expect(tuneEvents).toHaveLength(1)
       expect(tuneEvents[0]!.detail).toMatchObject({ mode: 'AM', hz: 118_500_000 })
@@ -584,7 +594,7 @@ describe('AirFilter', () => {
       const adsb = makeAdsb(defaultPlanes())
       adsb._interpolatedCoords.mockReturnValue([1, 2])
       const wrapper = mountFilter(adsb, () => map)
-      await wrapper.findAll('.filter-result-info')[0]!.trigger('click')
+      await wrapper.findAll('.bfp-result-info')[0]!.trigger('click')
       expect(map.easeTo).toHaveBeenCalledWith(expect.objectContaining({ center: [1, 2] }))
     })
 
@@ -592,37 +602,35 @@ describe('AirFilter', () => {
       // Render planes, then drop the control so selectPlane sees null.
       const wrapper = mountFilter(makeAdsb(defaultPlanes()))
       await wrapper.setProps({ adsbControl: null } as never)
-      await expect(
-        wrapper.findAll('.filter-result-info')[0]!.trigger('click'),
-      ).resolves.not.toThrow()
+      await expect(wrapper.findAll('.bfp-result-info')[0]!.trigger('click')).resolves.not.toThrow()
     })
 
     it('fits the map to a military base on selection', async () => {
       const map = makeMap()
       const wrapper = mountFilter(makeAdsb([]), () => map)
       await setCategory('mil')
-      await wrapper.find('.filter-icon-mil').trigger('click')
+      await wrapper.find('.bfp-result-option').trigger('click')
       expect(map.fitBounds).toHaveBeenCalled()
     })
 
     it('fires the same handlers from each alternate row hit target', async () => {
       const map = makeMap()
-      // Airport + base only → predictable .filter-result-info ordering.
+      // Airport + base only → predictable .bfp-result-info ordering.
       const wrapper = mountFilter(makeAdsb([]), () => map)
       await setCategory('airports')
-      await wrapper.findAll('.filter-result-info')[0]!.trigger('click') // airport info
-      await wrapper.find('.filter-result-chevron').trigger('click') // airport chevron
+      await wrapper.findAll('.bfp-result-info')[0]!.trigger('click') // airport info
+      await wrapper.find('.bfp-item-chevron').trigger('click') // airport chevron
       await setCategory('mil')
-      await wrapper.findAll('.filter-result-info')[0]!.trigger('click') // base info
+      await wrapper.findAll('.bfp-result-info')[0]!.trigger('click') // base info
       expect(map.fitBounds).toHaveBeenCalled()
 
-      // Plane icon hit target (distinct from the info hit target).
+      // The row itself is a hit target too, not just the text inside it.
       await setCategory('aircraft')
       const planeWrapper = mountFilter(
         makeAdsb([planeFeature({ hex: 'aa1', flight: 'BAW1' })]),
         () => map,
       )
-      await planeWrapper.find('.filter-icon-plane').trigger('click')
+      await planeWrapper.find('.bfp-result-item').trigger('click')
       expect(map.easeTo).toHaveBeenCalled()
     })
 
@@ -633,12 +641,12 @@ describe('AirFilter', () => {
       const map = makeMap()
       const wrapper = mountFilter(makeAdsb([]), () => map)
       await setCategory('mil')
-      await wrapper.find('.filter-icon-mil').trigger('click')
+      await wrapper.find('.bfp-result-option').trigger('click')
       expect(map.fitBounds).toHaveBeenCalled()
 
       const wrapperNoMap = mountFilter(makeAdsb([]), () => null)
       await setCategory('mil')
-      await expect(wrapperNoMap.find('.filter-icon-mil').trigger('click')).resolves.not.toThrow()
+      await expect(wrapperNoMap.find('.bfp-result-option').trigger('click')).resolves.not.toThrow()
     })
   })
 
@@ -936,7 +944,7 @@ describe('AirFilter', () => {
         vi.advanceTimersByTime(15000)
         await wrapper.vm.$nextTick()
         expect(wrapper.find('.acft-acc-body').exists()).toBe(false)
-        expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(0)
+        expect(rowsOf(wrapper, 'plane')).toHaveLength(0)
       } finally {
         vi.useRealTimers()
       }
@@ -1030,7 +1038,7 @@ describe('AirFilter', () => {
       )
       await second.vm.$nextTick()
       expect(second.find('.acft-acc-body').exists()).toBe(true)
-      expect(second.find('.filter-result-primary').text()).toBe('BAW1')
+      expect(second.find('.bfp-result-primary').text()).toBe('BAW1')
       // The detail repopulates from the live feed (type cell shows the aircraft type).
       expect(second.find('.acft-acc-body').text()).toContain('A320')
       second.unmount()
@@ -1047,7 +1055,7 @@ describe('AirFilter', () => {
       // The row still renders from the persisted snapshot and flags SIGNAL LOST.
       expect(second.find('.acft-acc-body').exists()).toBe(true)
       expect(second.find('.acft-acc-signal-lost').exists()).toBe(true)
-      expect(second.find('.filter-result-primary').text()).toBe('BAW1')
+      expect(second.find('.bfp-result-primary').text()).toBe('BAW1')
       second.unmount()
     })
   })
@@ -1060,7 +1068,7 @@ describe('AirFilter', () => {
       const wrapper = mountFilter(
         makeAdsb([planeFeature({ hex: 'aa1', flight: 'BAW1', squawk: '7700', emergency: '7700' })]),
       )
-      const row = wrapper.find('.filter-result-item')
+      const row = wrapper.find('.bfp-result-item')
       expect(row.classes()).toContain('filter-result-item--emergency')
 
       await openPlane(wrapper)
@@ -1076,7 +1084,7 @@ describe('AirFilter', () => {
       const wrapper = mountFilter(
         makeAdsb([planeFeature({ hex: 'aa1', flight: 'BAW1', squawk: '1000' })]),
       )
-      expect(wrapper.find('.filter-result-item').classes()).not.toContain(
+      expect(wrapper.find('.bfp-result-item').classes()).not.toContain(
         'filter-result-item--emergency',
       )
       await openPlane(wrapper)
@@ -1087,12 +1095,13 @@ describe('AirFilter', () => {
   describe('row ordering', () => {
     // Returns [primary, secondary] text for each rendered aircraft row, in order.
     function planeRows(wrapper: ReturnType<typeof mountFilter>) {
+      // Only the active category renders rows, so with 'aircraft' selected every
+      // row in the list is an aircraft row.
       return wrapper
-        .findAll('.filter-result-item')
-        .filter((item) => item.find('.filter-icon-plane').exists())
+        .findAll('.bfp-result-item')
         .map((item) => [
-          item.find('.filter-result-primary').text(),
-          item.find('.filter-result-secondary').text(),
+          item.find('.bfp-result-primary').text(),
+          item.find('.bfp-result-secondary').text(),
         ])
     }
 
@@ -1148,7 +1157,7 @@ describe('AirFilter', () => {
       ])
       const wrapper = mountFilter(adsb)
       // Sorted order is AAA1, MMM1, ZZZ1; expand the last one.
-      await wrapper.findAll('.filter-result-option')[2]!.trigger('click')
+      await wrapper.findAll('.bfp-result-option')[2]!.trigger('click')
       // It jumps to the top; the rest stay in sorted order below it.
       expect(planeRows(wrapper).map((row) => row[0])).toEqual(['ZZZ1', 'AAA1', 'MMM1'])
 
@@ -1171,7 +1180,7 @@ describe('AirFilter', () => {
         planeFeature({ hex: 'zzz', flight: 'ZZZ1' }),
       ])
       const wrapper = mountFilter(adsb)
-      await wrapper.findAll('.filter-result-option')[1]!.trigger('click') // expand MMM1
+      await wrapper.findAll('.bfp-result-option')[1]!.trigger('click') // expand MMM1
       expect(planeRows(wrapper).map((row) => row[0])).toEqual(['MMM1', 'AAA1', 'ZZZ1'])
 
       // The pinned aircraft drops out; the other two remain live.
@@ -1279,7 +1288,7 @@ describe('AirFilter', () => {
           planeFeature({ hex: 'bb2', flight: 'BBB2' }),
         ]),
       )
-      await wrapper.findAll('.filter-result-option')[1]!.trigger('click') // open BBB2
+      await wrapper.findAll('.bfp-result-option')[1]!.trigger('click') // open BBB2
       await flushRaf()
       // The open row is pinned to the top and scrolled into view.
       expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
@@ -1301,7 +1310,7 @@ describe('AirFilter', () => {
       document.dispatchEvent(new CustomEvent('msb-tab-switch', { detail: 'search' }))
       await nextTick()
       // Only the 2 aircraft show; the ground vehicle and tower are excluded.
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(2)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(2)
     })
 
     it('ignores a tab switch to a non-search tab', async () => {
@@ -1310,7 +1319,7 @@ describe('AirFilter', () => {
       adsb._geojson.features = defaultPlanes()
       document.dispatchEvent(new CustomEvent('msb-tab-switch', { detail: 'tracking' }))
       await nextTick()
-      expect(wrapper.findAll('.filter-icon-plane')).toHaveLength(0)
+      expect(rowsOf(wrapper, 'plane')).toHaveLength(0)
     })
   })
 
