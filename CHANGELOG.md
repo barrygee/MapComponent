@@ -308,6 +308,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Open the Frequency Manager GROUPS accordion by default
 - Draw APRS site leaders as one comb instead of a curve per label
 - Keep APRS site leaders attached to their labels when zooming
+- Stub scrollIntoView so unhandled errors stop failing the run
 
 ### Chores
 
@@ -1118,6 +1119,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #254 from barrygee/fix/aprs-symbol-icon-colour
 - Merge pull request #255 from barrygee/fix/freq-manager-groups-open-by-default
 - Merge pull request #256 from barrygee/feat/aprs-label-styling
+- Merge pull request #257 from barrygee/fix/vitest-scrollintoview
 
 ### Refactoring
 
