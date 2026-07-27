@@ -33,4 +33,4 @@ export const APRS_COUNT_FILL = '#000000'
  * dark object rather than a light ring around a hole. Not quite black, so the
  * ring still separates from the centre where the two meet.
  */
-export const APRS_COUNT_RING = '#1b1e24'
+export const APRS_COUNT_RING = '#14171c'

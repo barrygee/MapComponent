@@ -627,7 +627,7 @@ describe('AprsStationsControl', () => {
       // construction the user-location marker uses. jsdom drops the shorthand
       // `background: none`, so the effective colour is what is checked.
       expect(marker.style.backgroundColor).toBe('')
-      expect(marker.style.border).toBe('3px solid rgb(27, 30, 36)')
+      expect(marker.style.border).toBe('3px solid rgb(20, 23, 28)')
       expect(marker.style.width).toBe('32px')
 
       const centre = marker.querySelector('.aprs-cluster-count') as HTMLElement
