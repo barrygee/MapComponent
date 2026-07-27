@@ -229,6 +229,19 @@ describe('LandFilter', () => {
       expect(wrapper.find('.land-filter-raw-body').exists()).toBe(false)
     })
 
+    it('points the raw chevron the same way as the row chevron', async () => {
+      store.aprsStations = [station()]
+      const wrapper = mount(LandFilter)
+      await wrapper.find('.bfp-result-item').trigger('click')
+      await flushPromises()
+
+      // Right when closed, down when open — the convention the row above uses.
+      const chevron = wrapper.find('.land-filter-raw-chevron')
+      expect(chevron.classes()).not.toContain('open')
+      await wrapper.find('.land-filter-raw-toggle').trigger('click')
+      expect(wrapper.find('.land-filter-raw-chevron').classes()).toContain('open')
+    })
+
     it('does not collapse the station row when the raw frame is toggled', async () => {
       store.aprsStations = [station()]
       const wrapper = mount(LandFilter)

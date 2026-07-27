@@ -61,7 +61,13 @@
                 @click.stop="rawExpanded = !rawExpanded"
               >
                 <span class="land-filter-raw-label">RAW</span>
-                <ChevronIcon :open="rawExpanded" />
+                <!-- Rotated by CSS, like the row chevron above, rather than by
+                     the icon's own `open` prop: that flips down to up, where a
+                     disclosure in this panel points right when closed and down
+                     when open. -->
+                <span class="land-filter-raw-chevron" :class="{ open: rawExpanded }">
+                  <ChevronIcon />
+                </span>
               </button>
               <div v-if="rawExpanded" :id="rawBodyId" class="land-filter-raw-body">
                 {{ stationFor(item.key)!.raw ?? '—' }}
@@ -222,6 +228,15 @@ watch(
   border: none;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.35);
+}
+.land-filter-raw-chevron {
+  display: flex;
+  align-items: center;
+  transform: rotate(-90deg);
+  transition: transform 0.2s ease;
+}
+.land-filter-raw-chevron.open {
+  transform: rotate(0deg);
 }
 .land-filter-raw-toggle:hover {
   color: rgba(255, 255, 255, 0.6);
