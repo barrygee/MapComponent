@@ -613,6 +613,24 @@ describe('AprsStationsControl', () => {
       expect(labelMarkers()).toHaveLength(1)
     })
 
+    it('draws the count as a ring, a gap and a filled centre', () => {
+      store.aprsStations = crowdedTrio()
+      addControl()
+      const marker = countMarkers()[0]!.element
+      // Transparent inside the ring, so the gap is the map itself — the
+      // construction the user-location marker uses. jsdom drops the shorthand
+      // `background: none`, so the effective colour is what is checked.
+      expect(marker.style.backgroundColor).toBe('')
+      expect(marker.style.border).toBe('2px solid rgb(139, 149, 161)')
+      expect(marker.style.width).toBe('32px')
+
+      const centre = marker.querySelector('.aprs-cluster-count') as HTMLElement
+      expect(centre.style.background).toBe('rgb(0, 0, 0)')
+      // Narrower than the ring's inner edge, which is what leaves the gap.
+      expect(centre.style.width).toBe('20px')
+      expect(centre.textContent).toBe('2')
+    })
+
     it('names the count for assistive tech, since nothing else stands for them', () => {
       store.aprsStations = crowdedTrio()
       addControl()

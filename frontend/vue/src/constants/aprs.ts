@@ -22,10 +22,15 @@ export const APRS_ACCENT_COLOR = '#ffffff'
  */
 export const APRS_BADGE_BACKGROUND = '#15171d'
 
-/** Fill of a count marker — black, as the labels' own background is, so a group
- *  reads as part of the same set as the labels it stands in for. */
+/** Fill of a count marker's centre — black, as the labels' own background is,
+ *  so a group reads as part of the same set as the labels it stands in for. */
 export const APRS_COUNT_FILL = '#000000'
 
-/** Ring around a count marker, holding it clear of whatever the basemap puts
- *  underneath it. */
-export const APRS_COUNT_RING = '#26292e'
+/**
+ * Ring around a count marker.
+ *
+ * Grey rather than black: the ring is the marker's outer edge, with the map
+ * showing through the gap inside it, so it has to read against the basemap the
+ * way the user-location marker's white ring does.
+ */
+export const APRS_COUNT_RING = '#8b95a1'

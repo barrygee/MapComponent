@@ -464,15 +464,29 @@ export class AprsStationsControl extends SentinelControlBase {
  */
 const LABEL_REVEAL_ZOOM = 7
 
-/** Diameter of a count marker, in pixels. Big enough to hold a two-digit
- *  count at the labels' own type size. */
-const CLUSTER_MARKER_SIZE_PX = 26
+/** Diameter of a count marker, in pixels — the ring's outer edge. */
+const CLUSTER_MARKER_SIZE_PX = 32
 
 /** Width of the ring around a count marker, in pixels. */
-const CLUSTER_MARKER_RING_PX = 1.6
+const CLUSTER_MARKER_RING_PX = 2
+
+/**
+ * Diameter of the filled centre the count sits on, in pixels.
+ *
+ * The difference from the ring's inner edge is the gap the map shows through.
+ * Wider than it looks on paper: the centre is black and the map behind the gap
+ * is nearly as dark, so a hairline would not read as a gap at all.
+ */
+const CLUSTER_MARKER_CENTRE_PX = 20
 
 /**
  * The marker standing for a group of stations too close together to label.
+ *
+ * Built like the user-location marker — a stroked ring with the map showing
+ * through the gap inside it, and a filled centre — so a marker that stands for
+ * a place reads the same wherever it appears. Its own colours, though: grey and
+ * black rather than the location marker's white and accent, which would claim
+ * more attention than a group of stations deserves.
  *
  * Interactive, unlike a label: it takes pointer events so a click can zoom in
  * to reveal what it stands for, and it carries a name for assistive tech
@@ -486,11 +500,26 @@ export function buildClusterMarker(count: number): HTMLElement {
   marker.style.cssText = [
     `width:${CLUSTER_MARKER_SIZE_PX}px`,
     `height:${CLUSTER_MARKER_SIZE_PX}px`,
+    'box-sizing:border-box',
     'padding:0',
-    'border:none',
+    `border:${CLUSTER_MARKER_RING_PX}px solid ${APRS_COUNT_RING}`,
+    'border-radius:50%',
+    // Transparent, so the gap between ring and centre is the map itself.
+    'background:none',
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    'cursor:pointer',
+    'pointer-events:auto',
+  ].join(';')
+
+  const centre = document.createElement('span')
+  centre.className = 'aprs-cluster-count'
+  centre.style.cssText = [
+    `width:${CLUSTER_MARKER_CENTRE_PX}px`,
+    `height:${CLUSTER_MARKER_CENTRE_PX}px`,
     'border-radius:50%',
     `background:${APRS_COUNT_FILL}`,
-    `box-shadow:0 0 0 ${CLUSTER_MARKER_RING_PX}px ${APRS_COUNT_RING}`,
     'display:flex',
     'align-items:center',
     'justify-content:center',
@@ -499,10 +528,12 @@ export function buildClusterMarker(count: number): HTMLElement {
     'font-size:13px',
     'font-weight:700',
     'letter-spacing:.04em',
-    'cursor:pointer',
-    'pointer-events:auto',
+    // The count is centred on the disc rather than filling it, so it never
+    // touches the edge however many digits it runs to.
+    'line-height:1',
   ].join(';')
-  marker.textContent = String(count)
+  centre.textContent = String(count)
+  marker.appendChild(centre)
   return marker
 }
 
