@@ -16,7 +16,13 @@
         <template v-if="stationFor(item.key)">
           <BaseDataGrid title="STATION" :columns="3">
             <BaseDataCell label="CALLSIGN" :value="stationFor(item.key)!.callsign" />
-            <BaseDataCell label="SYMBOL" :value="symbolLabel(stationFor(item.key)!)" />
+            <BaseDataCell label="SYMBOL">
+              <!-- The icon itself, not its name: the same glyph the map draws,
+                   so the panel and the map agree at a glance. It carries the
+                   type as its accessible name, so nothing is lost by dropping
+                   the text. -->
+              <SdrAprsSymbol :symbol="stationFor(item.key)!.symbol" />
+            </BaseDataCell>
             <BaseDataCell
               label="TIME"
               :value="formatHeardTime(stationFor(item.key)!.last_heard_ms)"
@@ -87,6 +93,7 @@ import BaseFilterPanel, {
 import BaseDataGrid from '@/components/base/BaseDataGrid.vue'
 import BaseDataCell from '@/components/base/BaseDataCell.vue'
 import ChevronIcon from '@/components/shared/ChevronIcon.vue'
+import SdrAprsSymbol from '@/components/sdr/SdrAprsSymbol.vue'
 import { useLandStore, type AprsStation } from '@/stores/land'
 import { aprsSymbolIcon } from '@/utils/aprsSymbols'
 import { useDocumentEvent } from '@/composables/useDocumentEvent'
@@ -197,13 +204,18 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 0 24px 14px;
+  /* Set off from the fields above: it is a control, not another field. */
+  padding: 12px 24px 14px;
 }
 /* Matches the data cells' own label, so the disclosure reads as another field
    in the section rather than a control bolted onto it. */
 .land-filter-raw-toggle {
   display: flex;
   align-items: center;
+  /* Full width with the chevron pushed to the far edge, so it lines up with
+     the row chevron above rather than floating beside the label. */
+  justify-content: space-between;
+  width: 100%;
   gap: 6px;
   padding: 0;
   background: none;
@@ -221,11 +233,15 @@ watch(
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
+/* Declared to match a packet field's value exactly — same family, size,
+   weight, line height, colour and spacing — so the frame reads as the same
+   kind of text as the COMMENT above it. */
 .land-filter-raw-body {
   font-family: var(--font-primary);
   font-size: 13px;
   font-weight: 400;
   line-height: 1.45;
+  letter-spacing: normal;
   color: rgba(255, 255, 255, 0.82);
   word-break: break-word;
 }

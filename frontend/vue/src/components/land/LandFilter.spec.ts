@@ -193,7 +193,6 @@ describe('LandFilter', () => {
 
       const text = wrapper.find('.bfp-accordion-body').text()
       expect(text).toContain('M0ABC-9')
-      expect(text).toContain('Car')
       expect(text).toContain('21:33:47')
       expect(text).toContain('51.50000')
       expect(text).toContain('-0.10000')
@@ -252,6 +251,20 @@ describe('LandFilter', () => {
       store.setSearchExpandedCallsign('MB7UMS')
       await flushPromises()
       expect(wrapper.find('.land-filter-raw-body').exists()).toBe(false)
+    })
+
+    it('shows the symbol as its icon, still named for assistive tech', async () => {
+      store.aprsStations = [station()]
+      const wrapper = mount(LandFilter)
+      await wrapper.find('.bfp-result-item').trigger('click')
+      await flushPromises()
+
+      // The same glyph the map draws, rather than the word for it — but the
+      // type is still announced, so nothing is lost by dropping the text.
+      const symbol = wrapper.find('.bfp-accordion-body .aprs-symbol')
+      expect(symbol.exists()).toBe(true)
+      expect(symbol.attributes('aria-label')).toBe('Car')
+      expect(wrapper.find('.bfp-accordion-body').text()).not.toContain('Car')
     })
 
     it('shows all fields even when they are hidden on the map label', async () => {
