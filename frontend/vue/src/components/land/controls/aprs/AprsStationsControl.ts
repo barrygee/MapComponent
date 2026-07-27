@@ -551,7 +551,9 @@ export function buildClusterMarker(count: number): HTMLElement {
     // Three characters ("99+") need a smaller face to keep clear of the disc's
     // edge; one or two have room at full size.
     `font-size:${text.length > 2 ? 10 : 13}px`,
-    'font-weight:700',
+    // The same weight a callsign carries on a label, so a count reads as part
+    // of the same set rather than as an alert.
+    'font-weight:400',
     'letter-spacing:.04em',
     // The count is centred on the disc rather than filling it, so it never
     // touches the edge however many digits it runs to.
