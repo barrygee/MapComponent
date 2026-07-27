@@ -425,8 +425,13 @@ defineExpose({ focus: () => inputRef.value?.focus() })
   transition: background 0.12s;
 }
 
-/* The chevron is absolutely positioned against .bfp-result-item, so the option
-   wrapper itself stays unpositioned. */
+/* The row header is the positioning context for the chevron and the trailing
+   slot: anchoring them to the row itself would centre them over the row PLUS its
+   expanded accordion, dragging them off the header they belong to. */
+.bfp-result-option {
+  position: relative;
+}
+
 .bfp-result-option > .bfp-result-info {
   display: flex;
   flex-direction: column;
@@ -438,14 +443,26 @@ defineExpose({ focus: () => inputRef.value?.focus() })
 /* Hover lights the chevron rather than washing the row; keyboard focus keeps a
    background + outline, since that is what marks the active row during arrow-key
    navigation, which the chevron cue alone does not track. */
-.bfp-result-item.bfp-expanded,
-.bfp-result-item.bfp-keyboard-focused {
-  /* Both tints are caller-overridable so a pane keeps the exact weight of
-     highlight it had before it moved onto this shell. */
+/* Both tints paint the header and the accordion body directly rather than the
+   row that contains them: painting the row would put a layer *under* whichever
+   of them is also tinted, and two translucent layers read lighter than either
+   one. Keeping them siblings means the focus tint below can replace the
+   expanded tint on the header instead of stacking on it. Both are
+   caller-overridable so a pane keeps the exact weight it had before it moved
+   onto this shell. */
+.bfp-result-item.bfp-expanded > .bfp-result-option,
+.bfp-result-item.bfp-expanded > .bfp-accordion-body {
   background: var(--bfp-row-highlight, rgba(255, 255, 255, 0.04));
 }
 
-.bfp-result-item.bfp-keyboard-focused {
+/* The keyboard cue marks the OPTION — the row header — not the row element,
+   which also contains the expanded accordion. Outlining the row would draw the
+   focus ring around the whole open accordion, which says the accordion is the
+   focused thing and swamps the cue on a tall one. Declared after the expanded
+   tint so a focused row that is also open shows the focus weight on its header.
+ */
+.bfp-result-item.bfp-keyboard-focused > .bfp-result-option {
+  background: var(--bfp-focus-highlight, var(--bfp-row-highlight, rgba(255, 255, 255, 0.04)));
   outline: 1px solid var(--bfp-focus-outline, var(--bfp-accent));
   outline-offset: -1px;
 }
@@ -474,7 +491,7 @@ defineExpose({ focus: () => inputRef.value?.focus() })
   position: absolute;
   right: 0;
   top: 0;
-  height: 44px;
+  bottom: 0;
   padding: 0 20px;
   display: flex;
   align-items: center;
@@ -493,7 +510,7 @@ defineExpose({ focus: () => inputRef.value?.focus() })
   position: absolute;
   right: 0;
   top: 0;
-  height: 44px;
+  bottom: 0;
   padding: 0 20px;
   display: flex;
   align-items: center;

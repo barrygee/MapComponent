@@ -935,8 +935,8 @@ defineExpose({
 #filter-results .bfp-result-item {
   --bfp-focus-outline: rgba(200, 255, 0, 0.4);
 }
-#filter-results .bfp-result-item.bfp-keyboard-focused {
-  --bfp-row-highlight: rgba(255, 255, 255, 0.06);
+#filter-results .bfp-result-item {
+  --bfp-focus-highlight: rgba(255, 255, 255, 0.06);
 }
 
 /* Emergency squawk (7500/7600/7700): the aircraft goes red on the map, so flag it
@@ -949,7 +949,10 @@ defineExpose({
 /* This pane centres its empty state and sets it smaller and dimmer than the
    shell's default. */
 #filter-results .bfp-no-results {
-  padding: 20px 18px;
+  /* The extra 10px on top stands in for the row list's own top padding, which
+     the empty state sits outside of — without it the message rides higher than
+     a first row would. */
+  padding: 30px 18px 20px;
   font-family: 'Barlow', sans-serif;
   font-size: 10px;
   font-weight: 400;
@@ -973,7 +976,9 @@ defineExpose({
 .apt-acc-body {
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.04);
+  /* No background of its own: the shell tints the whole expanded row, accordion
+     included. Repeating the tint here would layer it twice and lighten the
+     accordion relative to the row header it hangs from. */
   /* Extra breathing room before the next airport in the list. */
   padding-bottom: 12px;
 }
