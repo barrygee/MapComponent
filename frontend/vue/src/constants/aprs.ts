@@ -22,6 +22,15 @@ export const APRS_ACCENT_COLOR = '#ffffff'
  */
 export const APRS_BADGE_BACKGROUND = '#15171d'
 
-/** Fill of the site marker — the disc standing on a shared position. Black, as
- *  the labels' own background is, so a site reads as part of the same set. */
-export const APRS_SITE_MARKER_BACKGROUND = '#000000'
+/** Fill of a count marker's centre — black, as the labels' own background is,
+ *  so a group reads as part of the same set as the labels it stands in for. */
+export const APRS_COUNT_FILL = '#000000'
+
+/**
+ * Ring around a count marker.
+ *
+ * Very dark grey — nearly the black of the centre, so the marker reads as one
+ * dark object rather than a light ring around a hole. Not quite black, so the
+ * ring still separates from the centre where the two meet.
+ */
+export const APRS_COUNT_RING = '#14171c'

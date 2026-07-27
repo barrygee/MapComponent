@@ -19,11 +19,23 @@
 /** Height of the pill and the square glyph well, in pixels. */
 export const MAP_LABEL_SIZE_PX = 26
 
-/** Rendered size of the glyph inside the well, in pixels. Every domain draws at
- *  this size so an aircraft arrow and an APRS symbol read as one icon family.
- *  Sized against the label's 14px type rather than the 26px well, which carries
- *  its own padding. */
+/**
+ * Rendered size of a station symbol inside the well, in pixels.
+ *
+ * Sized against the label's 14px type rather than the 26px well, which carries
+ * its own padding.
+ */
 export const MAP_LABEL_GLYPH_SIZE_PX = 15
+
+/**
+ * Rendered size of a direction arrow or status dot, in pixels.
+ *
+ * Smaller than a symbol on purpose. These shapes are drawn in a 12-unit viewBox
+ * and fill it edge to edge, where the symbol artwork sits padded inside a
+ * 24-unit one — so at a common size the arrow reads as half again as large as
+ * the symbols beside it. The two sizes are what make them look alike.
+ */
+export const MAP_LABEL_ARROW_SIZE_PX = 11
 
 /** Shared type stack for every label segment. */
 const MAP_LABEL_FONT_STACK = "'Barlow Condensed','Barlow',sans-serif"
@@ -100,7 +112,7 @@ export function createGlyphWell(glyphMarkup: string, background = 'none'): HTMLS
  */
 export function createGlyphSvg(shapeMarkup: string, rotationDeg = 0): string {
   return (
-    `<svg class="adsb-arrow" width="${MAP_LABEL_GLYPH_SIZE_PX}" height="${MAP_LABEL_GLYPH_SIZE_PX}" viewBox="0 0 12 12" ` +
+    `<svg class="adsb-arrow" width="${MAP_LABEL_ARROW_SIZE_PX}" height="${MAP_LABEL_ARROW_SIZE_PX}" viewBox="0 0 12 12" ` +
     `style="transform:rotate(${rotationDeg}deg);transform-origin:center;transform-box:fill-box;` +
     `display:block;overflow:visible;flex-shrink:0" xmlns="http://www.w3.org/2000/svg">` +
     `${shapeMarkup}</svg>`

@@ -193,7 +193,6 @@ describe('LandFilter', () => {
 
       const text = wrapper.find('.bfp-accordion-body').text()
       expect(text).toContain('M0ABC-9')
-      expect(text).toContain('Car')
       expect(text).toContain('21:33:47')
       expect(text).toContain('51.50000')
       expect(text).toContain('-0.10000')
@@ -202,7 +201,83 @@ describe('LandFilter', () => {
       expect(text).toContain('30 KM/H')
       expect(text).toContain('WIDE1-1')
       expect(text).toContain('rolling')
-      expect(text).toContain('M0ABC-9>APRS:!x')
+
+      // The raw frame is reference material, so it starts collapsed.
+      expect(wrapper.find('.land-filter-raw-body').exists()).toBe(false)
+      await wrapper.find('.land-filter-raw-toggle').trigger('click')
+      expect(wrapper.find('.land-filter-raw-body').text()).toBe('M0ABC-9>APRS:!x')
+    })
+
+    it('keeps the raw frame collapsed until asked for, and labels the control', async () => {
+      store.aprsStations = [station()]
+      const wrapper = mount(LandFilter)
+      await wrapper.find('.bfp-result-item').trigger('click')
+      await flushPromises()
+
+      const toggle = wrapper.find('.land-filter-raw-toggle')
+      expect(toggle.attributes('aria-expanded')).toBe('false')
+      expect(toggle.text()).toContain('RAW')
+
+      await toggle.trigger('click')
+      expect(toggle.attributes('aria-expanded')).toBe('true')
+      // The control names the region it opens, for assistive tech.
+      expect(toggle.attributes('aria-controls')).toBe(
+        wrapper.find('.land-filter-raw-body').attributes('id'),
+      )
+
+      await toggle.trigger('click')
+      expect(wrapper.find('.land-filter-raw-body').exists()).toBe(false)
+    })
+
+    it('points the raw chevron the same way as the row chevron', async () => {
+      store.aprsStations = [station()]
+      const wrapper = mount(LandFilter)
+      await wrapper.find('.bfp-result-item').trigger('click')
+      await flushPromises()
+
+      // Right when closed, down when open — the convention the row above uses.
+      const chevron = wrapper.find('.land-filter-raw-chevron')
+      expect(chevron.classes()).not.toContain('open')
+      await wrapper.find('.land-filter-raw-toggle').trigger('click')
+      expect(wrapper.find('.land-filter-raw-chevron').classes()).toContain('open')
+    })
+
+    it('does not collapse the station row when the raw frame is toggled', async () => {
+      store.aprsStations = [station()]
+      const wrapper = mount(LandFilter)
+      await wrapper.find('.bfp-result-item').trigger('click')
+      await flushPromises()
+      await wrapper.find('.land-filter-raw-toggle').trigger('click')
+      // The toggle sits inside the row, whose own click collapses it.
+      expect(store.searchExpandedCallsign).toBe('M0ABC-9')
+      expect(wrapper.find('.bfp-accordion-body').exists()).toBe(true)
+    })
+
+    it('closes the raw frame again when a different station is opened', async () => {
+      store.aprsStations = [station(), station({ callsign: 'MB7UMS' })]
+      const wrapper = mount(LandFilter)
+      await wrapper.find('.bfp-result-item').trigger('click')
+      await flushPromises()
+      await wrapper.find('.land-filter-raw-toggle').trigger('click')
+      expect(wrapper.find('.land-filter-raw-body').exists()).toBe(true)
+
+      store.setSearchExpandedCallsign('MB7UMS')
+      await flushPromises()
+      expect(wrapper.find('.land-filter-raw-body').exists()).toBe(false)
+    })
+
+    it('shows the symbol as its icon, still named for assistive tech', async () => {
+      store.aprsStations = [station()]
+      const wrapper = mount(LandFilter)
+      await wrapper.find('.bfp-result-item').trigger('click')
+      await flushPromises()
+
+      // The same glyph the map draws, rather than the word for it — but the
+      // type is still announced, so nothing is lost by dropping the text.
+      const symbol = wrapper.find('.bfp-accordion-body .aprs-symbol')
+      expect(symbol.exists()).toBe(true)
+      expect(symbol.attributes('aria-label')).toBe('Car')
+      expect(wrapper.find('.bfp-accordion-body').text()).not.toContain('Car')
     })
 
     it('shows all fields even when they are hidden on the map label', async () => {
@@ -245,7 +320,10 @@ describe('LandFilter', () => {
       await flushPromises()
       const text = wrapper.find('.bfp-accordion-body').text()
       expect(text).not.toContain('KM/H')
-      expect(text.match(/—/g)!.length).toBeGreaterThanOrEqual(6)
+      expect(text.match(/—/g)!.length).toBeGreaterThanOrEqual(5)
+      // …including the raw frame, once its disclosure is opened.
+      await wrapper.find('.land-filter-raw-toggle').trigger('click')
+      expect(wrapper.find('.land-filter-raw-body').text()).toBe('—')
     })
 
     it('records the expansion on the store so it survives a remount', async () => {

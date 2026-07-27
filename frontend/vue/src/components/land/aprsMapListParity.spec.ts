@@ -34,23 +34,9 @@ const mocks = vi.hoisted(() => {
       return this
     }
   }
-  class MockPopup {
-    setLngLat(): this {
-      return this
-    }
-    setHTML(): this {
-      return this
-    }
-    addTo(): this {
-      return this
-    }
-    remove(): this {
-      return this
-    }
-  }
-  return { created, MockMarker, MockPopup }
+  return { created, MockMarker }
 })
-vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker, Popup: mocks.MockPopup } }))
+vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker } }))
 
 import { AprsStationsControl } from './controls/aprs/AprsStationsControl'
 import LandFilter from './LandFilter.vue'
@@ -108,7 +94,18 @@ describe('APRS map/list parity', () => {
     const control = new AprsStationsControl(store)
     const container = document.createElement('div')
     document.body.appendChild(container)
-    control.onAdd({ getContainer: () => container } as never)
+    // The control projects positions to decide what clusters, and regroups
+    // once a map movement settles, so the stand-in needs more than a container.
+    control.onAdd({
+      getContainer: () => container,
+      project: ([lon, lat]: [number, number]) => ({ x: lon * 1_000_000, y: -lat * 1_000_000 }),
+      // Zoomed in past the reveal level, so crowded stations are labelled and
+      // the map's plotted set matches the panel's list one-for-one.
+      getZoom: () => 10,
+      easeTo: () => {},
+      on: () => {},
+      off: () => {},
+    } as never)
     const panel = mount(LandFilter)
     /** Callsigns currently listed in the side panel. */
     const listed = () => panel.findAll('.bfp-result-primary').map((row) => row.text())

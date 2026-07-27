@@ -16,7 +16,13 @@
         <template v-if="stationFor(item.key)">
           <BaseDataGrid title="STATION" :columns="3">
             <BaseDataCell label="CALLSIGN" :value="stationFor(item.key)!.callsign" />
-            <BaseDataCell label="SYMBOL" :value="symbolLabel(stationFor(item.key)!)" />
+            <BaseDataCell label="SYMBOL">
+              <!-- The icon itself, not its name: the same glyph the map draws,
+                   so the panel and the map agree at a glance. It carries the
+                   type as its accessible name, so nothing is lost by dropping
+                   the text. -->
+              <SdrAprsSymbol :symbol="stationFor(item.key)!.symbol" />
+            </BaseDataCell>
             <BaseDataCell
               label="TIME"
               :value="formatHeardTime(stationFor(item.key)!.last_heard_ms)"
@@ -37,14 +43,36 @@
             />
             <BaseDataCell label="SPEED" :value="formatSpeed(stationFor(item.key)!.speed) ?? '—'" />
           </BaseDataGrid>
-          <!-- Free text, not telemetry: set in regular weight so a long path or
-               raw frame reads as prose rather than shouting like a value. -->
+          <!-- Free text, not telemetry: sized and weighted like the Space
+               pane's NOTES list so prose reads as prose across both panels. -->
           <div class="land-filter-packet">
             <BaseDataGrid title="PACKET" :columns="2" collapse-on-narrow>
               <BaseDataCell label="PATH" :value="stationFor(item.key)!.path ?? '—'" wide />
               <BaseDataCell label="COMMENT" :value="stationFor(item.key)!.comment ?? '—'" wide />
-              <BaseDataCell label="RAW" :value="stationFor(item.key)!.raw ?? '—'" wide />
             </BaseDataGrid>
+            <!-- The raw frame runs to several wrapped lines and is reference
+                 material, not something to read at a glance, so it collapses. -->
+            <div class="land-filter-raw">
+              <button
+                type="button"
+                class="land-filter-raw-toggle"
+                :aria-expanded="rawExpanded"
+                :aria-controls="rawBodyId"
+                @click.stop="rawExpanded = !rawExpanded"
+              >
+                <span class="land-filter-raw-label">RAW</span>
+                <!-- Rotated by CSS, like the row chevron above, rather than by
+                     the icon's own `open` prop: that flips down to up, where a
+                     disclosure in this panel points right when closed and down
+                     when open. -->
+                <span class="land-filter-raw-chevron" :class="{ open: rawExpanded }">
+                  <ChevronIcon />
+                </span>
+              </button>
+              <div v-if="rawExpanded" :id="rawBodyId" class="land-filter-raw-body">
+                {{ stationFor(item.key)!.raw ?? '—' }}
+              </div>
+            </div>
           </div>
         </template>
       </div>
@@ -64,12 +92,14 @@
  * plots, so a station that stops beaconing and ages out of the retention window
  * disappears from both at the same moment.
  */
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import BaseFilterPanel, {
   type FilterPanelItem,
 } from '@/components/shared/filter/BaseFilterPanel.vue'
 import BaseDataGrid from '@/components/base/BaseDataGrid.vue'
 import BaseDataCell from '@/components/base/BaseDataCell.vue'
+import ChevronIcon from '@/components/shared/ChevronIcon.vue'
+import SdrAprsSymbol from '@/components/sdr/SdrAprsSymbol.vue'
 import { useLandStore, type AprsStation } from '@/stores/land'
 import { aprsSymbolIcon } from '@/utils/aprsSymbols'
 import { useDocumentEvent } from '@/composables/useDocumentEvent'
@@ -81,6 +111,18 @@ import {
 } from './controls/aprs/AprsStationsControl'
 
 const landStore = useLandStore()
+
+// Whether the expanded station's raw frame is showing. Only one station is open
+// at a time, so one flag covers the pane; it closes again whenever a different
+// station is opened, so a frame never appears already-expanded.
+const rawExpanded = ref(false)
+const rawBodyId = 'land-filter-raw-body'
+watch(
+  () => landStore.searchExpandedCallsign,
+  () => {
+    rawExpanded.value = false
+  },
+)
 
 function symbolLabel(station: AprsStation): string {
   return aprsSymbolIcon(station.symbol).label
@@ -148,14 +190,74 @@ watch(
   padding-bottom: 12px;
 }
 /* Only the free-text packet fields deviate from the shared cell styling the
-   Space pane uses: they wrap rather than being ellipsized at the column edge (a
-   raw frame is unreadable truncated to one line) and sit in regular weight, so
-   they read as prose instead of shouting like a telemetry value. */
+   Space pane uses for telemetry: they wrap rather than being ellipsized at the
+   column edge (a raw frame is unreadable truncated to one line) and take the
+   size, weight and colour of that pane's NOTES list, so prose reads the same in
+   both panels. */
 .land-filter-packet {
   display: contents;
   --ba-cell-value-white-space: normal;
   --ba-cell-value-word-break: break-word;
   --ba-cell-align: flex-start;
+  --ba-cell-value-font-size: 13px;
   --ba-cell-value-font-weight: 400;
+  --ba-cell-value-line-height: 1.45;
+  --ba-cell-value-letter-spacing: normal;
+  --ba-cell-value-color: rgba(255, 255, 255, 0.82);
+}
+
+.land-filter-raw {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Set off from the fields above: it is a control, not another field. */
+  padding: 12px 24px 14px;
+}
+/* Matches the data cells' own label, so the disclosure reads as another field
+   in the section rather than a control bolted onto it. */
+.land-filter-raw-toggle {
+  display: flex;
+  align-items: center;
+  /* Full width with the chevron pushed to the far edge, so it lines up with
+     the row chevron above rather than floating beside the label. */
+  justify-content: space-between;
+  width: 100%;
+  gap: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.35);
+}
+.land-filter-raw-chevron {
+  display: flex;
+  align-items: center;
+  transform: rotate(-90deg);
+  transition: transform 0.2s ease;
+}
+.land-filter-raw-chevron.open {
+  transform: rotate(0deg);
+}
+.land-filter-raw-toggle:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+.land-filter-raw-label {
+  font-family: var(--font-primary);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+/* Declared to match a packet field's value exactly — same family, size,
+   weight, line height, colour and spacing — so the frame reads as the same
+   kind of text as the COMMENT above it. */
+.land-filter-raw-body {
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: normal;
+  color: rgba(255, 255, 255, 0.82);
+  word-break: break-word;
 }
 </style>

@@ -13,6 +13,17 @@ export interface AprsSymbolIcon {
   label: string
   /** Inner SVG markup, wrapped by the renderer in a stroke-styled <svg>. */
   paths: string
+  /**
+   * Where the artwork actually sits in the 24-unit viewBox, when that isn't its
+   * centre — a truck drawn along the bottom, an aircraft pushed to one side.
+   * Taken from each icon's rendered bounding box; {@link aprsSymbolIcon} shifts
+   * the artwork by the difference so every symbol is centred in its well.
+   *
+   * Recorded per icon rather than corrected in the coordinates so the drawings
+   * stay legible to edit, and rather than measured at run time because the icons
+   * render inside MapLibre markers, where nothing can measure them first.
+   */
+  centre?: readonly [number, number]
 }
 
 /** Generic beacon used when the symbol is unknown (a filled dot inside a ring). */
@@ -28,36 +39,42 @@ export const FALLBACK_SYMBOL: AprsSymbolIcon = {
 const SYMBOLS: Record<string, AprsSymbolIcon> = {
   // ── vehicles ──────────────────────────────────────────────────────────────
   '>': {
+    centre: [12.0, 14.1],
     label: 'Car',
     paths:
       '<path d="M2.5 14.5l1.8-4.3A2 2 0 0 1 6.1 9h9.4a2 2 0 0 1 1.7 1l2.3 4.5M2.5 14.5h19M2.5 14.5v3H4M21.5 14.5v3H20" />' +
       '<circle cx="7" cy="17.5" r="1.7" /><circle cx="16.5" cy="17.5" r="1.7" />',
   },
   '<': {
+    centre: [12.0, 14.0],
     label: 'Motorcycle',
     paths:
       '<circle cx="6" cy="16" r="3" /><circle cx="18" cy="16" r="3" />' +
       '<path d="M6 16l4-5h4l2 5M9.5 11h5M14 11l1.5-2H18" />',
   },
   b: {
+    centre: [12.0, 13.1],
     label: 'Bicycle',
     paths:
       '<circle cx="6" cy="16" r="3.2" /><circle cx="18" cy="16" r="3.2" />' +
       '<path d="M6 16l4-6 4 6M10 10l4 6M9 8h2.5M14 10l1.5-3H18" />',
   },
   k: {
+    centre: [11.25, 13.3],
     label: 'Truck',
     paths:
       '<path d="M2.5 8h10v8.5h-10z" /><path d="M12.5 11h4l3.5 3.5v2h-7.5z" />' +
       '<circle cx="6" cy="17" r="1.6" /><circle cx="16.5" cy="17" r="1.6" />',
   },
   u: {
+    centre: [11.25, 13.3],
     label: 'Truck',
     paths:
       '<path d="M2.5 8h10v8.5h-10z" /><path d="M12.5 11h4l3.5 3.5v2h-7.5z" />' +
       '<circle cx="6" cy="17" r="1.6" /><circle cx="16.5" cy="17" r="1.6" />',
   },
   v: {
+    centre: [8.75, 13.05],
     label: 'Van',
     paths:
       '<path d="M2.5 8h12.5a2 2 0 0 1 2 2v6.5h-16.5z" />' +
@@ -70,6 +87,7 @@ const SYMBOLS: Record<string, AprsSymbolIcon> = {
       '<circle cx="7.5" cy="18" r="1.3" /><circle cx="16.5" cy="18" r="1.3" />',
   },
   a: {
+    centre: [11.25, 13.75],
     label: 'Ambulance',
     paths:
       '<path d="M2.5 9h10v7.5h-10z" /><path d="M12.5 11h4l3.5 3.5v2h-7.5z" />' +
@@ -77,12 +95,14 @@ const SYMBOLS: Record<string, AprsSymbolIcon> = {
       '<path d="M5.5 11.5v3M4 13h3" />',
   },
   R: {
+    centre: [11.0, 12.95],
     label: 'Recreational vehicle',
     paths:
       '<rect x="2.5" y="7" width="17" height="9.5" rx="1.5" /><path d="M14 7v9.5M6 10h5v3H6z" />' +
       '<circle cx="7" cy="17.5" r="1.4" /><circle cx="16" cy="17.5" r="1.4" />',
   },
   j: {
+    centre: [12.0, 12.8],
     label: 'Jeep',
     paths:
       '<path d="M2.5 10h19l-1 5h-17z" /><path d="M5 10l1.5-3h11L19 10M8 10v5M13 10v5" />' +
@@ -91,16 +111,19 @@ const SYMBOLS: Record<string, AprsSymbolIcon> = {
 
   // ── aircraft & marine ──────────────────────────────────────────────────────
   "'": {
+    centre: [10.0, 11.7],
     label: 'Aircraft',
     paths:
       '<path d="M12 2.5l1.1 7.2 6.9 4-.2 1.8-7.5-2.1.3 4.3 2.2 1.7-.2 1.5-4.6-1.3-4.6 1.3-.2-1.5 2.2-1.7.3-4.3-7.5 2.1-.2-1.8 6.9-4L12 2.5z" />',
   },
   '^': {
+    centre: [10.0, 11.7],
     label: 'Large aircraft',
     paths:
       '<path d="M12 2.5l1.1 7.2 6.9 4-.2 1.8-7.5-2.1.3 4.3 2.2 1.7-.2 1.5-4.6-1.3-4.6 1.3-.2-1.5 2.2-1.7.3-4.3-7.5 2.1-.2-1.8 6.9-4L12 2.5z" />',
   },
   g: {
+    centre: [12.0, 13.0],
     label: 'Glider',
     paths: '<path d="M3 8h18l-8 3M12 11v7M9 18h6" />',
   },
@@ -111,10 +134,12 @@ const SYMBOLS: Record<string, AprsSymbolIcon> = {
       '<path d="M16 13h3.5M11 16v3h4M19.5 7.5v6" />',
   },
   s: {
+    centre: [12.0, 13.5],
     label: 'Boat',
     paths: '<path d="M3 15h18l-2.2 4H5.2z" /><path d="M6.5 15v-4h8.5l3 4M9.5 11V8h4" />',
   },
   Y: {
+    centre: [10.75, 12.0],
     label: 'Sailboat',
     paths:
       '<path d="M4 17h13.5l-1.5 3H5.5z" /><path d="M11 15V4l6 11z" /><path d="M11 15H7l1.2-3H11" />',
@@ -166,18 +191,21 @@ const SYMBOLS: Record<string, AprsSymbolIcon> = {
       '<path d="M12 4c2.6 2.4 2.6 13.2 0 16M12 4c-2.6 2.4-2.6 13.2 0 16" />',
   },
   _: {
+    centre: [11.83, 13.28],
     label: 'Weather station',
     paths:
       '<path d="M8 16h8a3.2 3.2 0 0 0 .4-6.4A4.5 4.5 0 0 0 8 8.5 3.5 3.5 0 0 0 8 16z" />' +
       '<path d="M9 19l-.6 1.5M13 19l-.6 1.5" />',
   },
   W: {
+    centre: [11.83, 13.28],
     label: 'Weather service',
     paths:
       '<path d="M8 16h8a3.2 3.2 0 0 0 .4-6.4A4.5 4.5 0 0 0 8 8.5 3.5 3.5 0 0 0 8 16z" />' +
       '<path d="M9 19l-.6 1.5M13 19l-.6 1.5" />',
   },
   O: {
+    centre: [12.0, 11.0],
     label: 'Balloon',
     paths:
       '<path d="M12 3a6 6 0 0 1 6 6c0 3.6-3 6.2-6 8-3-1.8-6-4.4-6-8a6 6 0 0 1 6-6z" />' +
@@ -194,11 +222,13 @@ const SYMBOLS: Record<string, AprsSymbolIcon> = {
       '<path d="M9.5 12l1.7 1.7 3.3-3.4" />',
   },
   ':': {
+    centre: [12.0, 9.0],
     label: 'Fire',
     paths:
       '<path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-2 1-3.2 2-4.2.3 1 .9 1.6 1.6 1.9C15 6.2 12 5 12 3z" />',
   },
   f: {
+    centre: [11.25, 13.3],
     label: 'Fire truck',
     paths:
       '<path d="M2.5 8h10v8.5h-10z" /><path d="M12.5 11h4l3.5 3.5v2h-7.5z" />' +
@@ -224,11 +254,33 @@ const SYMBOLS: Record<string, AprsSymbolIcon> = {
   },
 }
 
-/** Resolve an APRS symbol code to its icon, falling back to a generic beacon. */
+/** Middle of the 24-unit viewBox every icon is drawn in. */
+const ICON_VIEWBOX_CENTRE = 12
+
+/**
+ * Shift an icon's artwork so it sits centred in the viewBox.
+ *
+ * Icons that are already centred are returned untouched, so the common case
+ * adds no wrapper element.
+ */
+function centreArtwork(icon: AprsSymbolIcon): AprsSymbolIcon {
+  if (!icon.centre) return icon
+  const shiftX = Math.round((ICON_VIEWBOX_CENTRE - icon.centre[0]) * 100) / 100
+  const shiftY = Math.round((ICON_VIEWBOX_CENTRE - icon.centre[1]) * 100) / 100
+  return { ...icon, paths: `<g transform="translate(${shiftX},${shiftY})">${icon.paths}</g>` }
+}
+
+/**
+ * Resolve an APRS symbol code to its icon, falling back to a generic beacon.
+ *
+ * The returned artwork is centred: every consumer draws the icon inside a
+ * square — a map label's glyph well, the decode table's cell — where an icon
+ * sitting low or off to one side reads as a mistake.
+ */
 export function aprsSymbolIcon(symbol: string | null | undefined): AprsSymbolIcon {
   if (!symbol) return FALLBACK_SYMBOL
   const code = symbol.length >= 2 ? symbol[1] : symbol[0]
-  return SYMBOLS[code] ?? FALLBACK_SYMBOL
+  return centreArtwork(SYMBOLS[code] ?? FALLBACK_SYMBOL)
 }
 
 export interface AprsSymbolSvgOptions {
