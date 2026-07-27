@@ -468,7 +468,7 @@ const LABEL_REVEAL_ZOOM = 7
 const CLUSTER_MARKER_SIZE_PX = 32
 
 /** Width of the ring around a count marker, in pixels. */
-const CLUSTER_MARKER_RING_PX = 2
+const CLUSTER_MARKER_RING_PX = 3
 
 /**
  * Diameter of the filled centre the count sits on, in pixels.

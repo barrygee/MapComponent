@@ -29,8 +29,8 @@ export const APRS_COUNT_FILL = '#000000'
 /**
  * Ring around a count marker.
  *
- * Grey rather than black: the ring is the marker's outer edge, with the map
- * showing through the gap inside it, so it has to read against the basemap the
- * way the user-location marker's white ring does.
+ * Very dark grey — nearly the black of the centre, so the marker reads as one
+ * dark object rather than a light ring around a hole. Not quite black, so the
+ * ring still separates from the centre where the two meet.
  */
-export const APRS_COUNT_RING = '#8b95a1'
+export const APRS_COUNT_RING = '#1b1e24'
