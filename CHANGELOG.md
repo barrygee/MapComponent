@@ -316,6 +316,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Label every APRS station that fits, count only the rest
 - Keep an APRS count to the stations actually huddled together
 - Rebuild spa-dist after the logo/brand change
+- Fetch single satellites by CATNR and honour offgrid fallback (#261)
 
 ### Chores
 
