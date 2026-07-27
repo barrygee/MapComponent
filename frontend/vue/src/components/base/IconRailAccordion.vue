@@ -38,7 +38,7 @@ const { open, toggle } = useDisclosure(props.initiallyOpen)
 </template>
 
 <style scoped>
-/* Sub-items stack vertically on a grey panel (the logo mark's ring grey);
+/* Sub-items stack vertically on a grey panel (the --color-button-bg control grey);
    `sm-accordion-panel` is kept as a passthrough class for legacy
    CSS/selectors that already key off it. */
 .icon-rail-accordion__panel {
