@@ -13,6 +13,8 @@ TTL rules:
   manual/upload/url  — 30 days, only replaced by another explicit write
 """
 
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
 import httpx
 from backend.cache import is_fresh, is_within_stale, now_ms
 from backend.config import settings
@@ -247,6 +249,28 @@ async def store_tle_bulk(
 # ── Single-satellite fetch (used by /api/space/iss) ──────────────────────────
 
 
+def _single_satellite_url(feed_url: str, norad_id: str) -> str | None:
+    """Return the per-satellite variant of a Celestrak-style GP feed URL, or None.
+
+    The configured domain URL is normally a *bulk group* feed
+    (``gp.php?GROUP=active&FORMAT=tle``). Fetching one satellite from it means
+    downloading the whole catalogue, and it silently fails for any satellite
+    that group happens not to contain. Swapping ``GROUP=<name>`` for
+    ``CATNR=<norad_id>`` asks the same host for exactly the satellite wanted.
+
+    Returns None when the URL has no GROUP parameter (an offgrid/local mirror or
+    a plain .txt file), so those are fetched unchanged.
+    """
+    parsed = urlparse(feed_url)
+    query = parse_qs(parsed.query)
+    if "GROUP" not in query:
+        return None
+
+    query.pop("GROUP")
+    query["CATNR"] = [norad_id]
+    return urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
+
+
 async def fetch_tle(
     norad_id: str,
     db: AsyncSession,
@@ -282,7 +306,18 @@ async def fetch_tle(
         else (f"https://celestrak.org/NORAD/elements/gp.php?CATNR={norad_id}&FORMAT=tle")
     )
     primary = online_url if online_url else default_url
-    fetch_urls = [u for u in [primary, offline_url] if u]
+
+    # Try each configured feed's per-satellite form before its bulk form: a group
+    # feed that omits this satellite would otherwise fetch ~15k entries and still
+    # fail, and the precise URL was previously unreachable whenever a domain URL
+    # was configured (which is always).
+    fetch_urls: list[str] = []
+    for feed_url in [primary, offline_url]:
+        if not feed_url:
+            continue
+        for candidate in [_single_satellite_url(feed_url, norad_id), feed_url]:
+            if candidate and candidate not in fetch_urls:
+                fetch_urls.append(candidate)
 
     for url in fetch_urls:
         try:
