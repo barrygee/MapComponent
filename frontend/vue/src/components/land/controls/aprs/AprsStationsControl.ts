@@ -46,6 +46,7 @@ export class AprsStationsControl extends SentinelControlBase {
   /** Signature of each site's leader geometry, so a marker is only rebuilt when
    *  the stations sharing the site change. */
   private _siteSignatures = new Map<string, string>()
+  private _onMapMoveEnd: (() => void) | null = null
   private _stopWatch: WatchStopHandle | null = null
   private _a11yRegion: HTMLDivElement | null = null
 
@@ -80,6 +81,12 @@ export class AprsStationsControl extends SentinelControlBase {
     // Poll the station snapshot while this control is on the map, and re-render
     // markers + the a11y table whenever the list changes.
     this._landStore.startAprsPolling()
+    // Which stations are close enough to collapse into a count depends on the
+    // zoom, so the whole set is regrouped once a movement settles. `moveend`
+    // rather than `zoomend`: a pan can bring the projection's scale distortion
+    // into play at high latitudes, and it fires for zooms too.
+    this._onMapMoveEnd = () => this._render(this._landStore.aprsStations)
+    this.map.on('moveend', this._onMapMoveEnd)
     // Re-render on either input: a new station snapshot, or the operator
     // switching label fields on/off in Settings. Watching the store directly is
     // enough — unlike the Air domain, no DOM CustomEvent bridge is needed.
@@ -111,6 +118,11 @@ export class AprsStationsControl extends SentinelControlBase {
   }
 
   onRemove(): void {
+    /* v8 ignore start -- defensive: onInit always assigns the handler, and
+       MapLibre never removes a control it did not add */
+    if (this._onMapMoveEnd) this.map.off('moveend', this._onMapMoveEnd)
+    /* v8 ignore stop */
+    this._onMapMoveEnd = null
     this._stopWatch?.()
     this._stopWatch = null
     this._landStore.stopAprsPolling()
@@ -131,14 +143,26 @@ export class AprsStationsControl extends SentinelControlBase {
   private _syncMarkers(stations: AprsStation[]): void {
     const seen = new Set<string>()
     const seenSites = new Set<string>()
-    for (const { site, layout } of planSiteLayout(groupStationsBySite(stations))) {
+
+    // Sites close enough on screen to collide share one column of labels, each
+    // still tethered to its own marker. Which sites those are changes with the
+    // zoom, so the grouping is recomputed whenever the view settles.
+    const clusters = clusterSites(groupStationsBySite(stations), (position) =>
+      this.map.project(position),
+    )
+    for (const { site, layout } of planSiteLayout(clusters)) {
       // A station standing alone sits on its own position and needs no tether.
       // Anywhere labels would pile up, each site gets a marker on its real
       // position and its labels are displaced into the shared column below.
       const isShared = layout.displaced
+      // Every label in a cluster hangs from the cluster's anchor rather than
+      // from its own site, or a column drawn from sites tens of pixels apart is
+      // smeared by that much and the labels overlap anyway. Measured in pixels,
+      // so it is recomputed whenever the view settles.
+      const fromAnchor = isShared ? this._pixelsFromAnchor(site, layout.anchor) : [0, 0]
       if (isShared) {
         seenSites.add(site.key)
-        this._syncSiteMarker(site, layout.startIndex)
+        this._syncSiteMarker(site, layout.startIndex, fromAnchor as [number, number])
       }
       site.stations.forEach((station, indexInSite) => {
         const stackIndex = layout.startIndex + indexInSite
@@ -147,7 +171,10 @@ export class AprsStationsControl extends SentinelControlBase {
         // A displaced label steps clear of the site marker's own square; a lone
         // station stays on its true position.
         const offset: [number, number] = isShared
-          ? [this._labelHorizontalOffset(station), labelVerticalOffset(stackIndex)]
+          ? [
+              fromAnchor[0]! + this._labelHorizontalOffset(station),
+              fromAnchor[1]! + labelVerticalOffset(stackIndex),
+            ]
           : [0, 0]
         const signature = this._markerSignature(station, offset)
         const existing = this._markers.get(station.callsign)
@@ -190,7 +217,7 @@ export class AprsStationsControl extends SentinelControlBase {
         this._markerPositions.delete(callsign)
       }
     }
-    // …and dots for sites that no longer hold more than one station.
+    // …and dots for sites that no longer need one.
     for (const [key, marker] of this._siteMarkers) {
       if (!seenSites.has(key)) {
         marker.remove()
@@ -204,9 +231,13 @@ export class AprsStationsControl extends SentinelControlBase {
    * Place (or move) the marker showing a shared site's real position, together
    * with the leaders reaching each of its labels.
    */
-  private _syncSiteMarker(site: StationSite, startIndex: number): void {
+  private _syncSiteMarker(
+    site: StationSite,
+    startIndex: number,
+    fromAnchor: [number, number],
+  ): void {
     const coords: [number, number] = [site.longitude, site.latitude]
-    const branches = this._leaderBranches(site, startIndex)
+    const branches = this._leaderBranches(site, startIndex, fromAnchor)
     const signature = JSON.stringify(branches)
     const existing = this._siteMarkers.get(site.key)
     if (existing) {
@@ -231,15 +262,25 @@ export class AprsStationsControl extends SentinelControlBase {
   /**
    * Where each of a site's labels sits, relative to the site marker, in pixels.
    *
-   * Fixed offsets, not projected positions: every station in a site reports the
-   * same fix, and a label keeps its place in the column relative to its own
-   * marker, so the geometry never changes with the view.
+   * `fromAnchor` carries the site's own displacement from the column's anchor,
+   * so a leader still lands on the label wherever the column was drawn from.
    */
-  private _leaderBranches(site: StationSite, startIndex: number): LeaderBranch[] {
+  private _leaderBranches(
+    site: StationSite,
+    startIndex: number,
+    fromAnchor: [number, number],
+  ): LeaderBranch[] {
     return site.stations.map((station, indexInSite) => ({
-      dx: this._labelHorizontalOffset(station),
-      dy: labelVerticalOffset(startIndex + indexInSite),
+      dx: fromAnchor[0] + this._labelHorizontalOffset(station),
+      dy: fromAnchor[1] + labelVerticalOffset(startIndex + indexInSite),
     }))
+  }
+
+  /** How far a site sits from its cluster's anchor, in screen pixels. */
+  private _pixelsFromAnchor(site: StationSite, anchor: [number, number]): [number, number] {
+    const anchorPoint = this.map.project(anchor)
+    const sitePoint = this.map.project([site.longitude, site.latitude])
+    return [anchorPoint.x - sitePoint.x, anchorPoint.y - sitePoint.y]
   }
 
   /** Which way a label is displaced: away from the marker, on the side its
@@ -471,9 +512,82 @@ function labelVerticalOffset(stackIndex: number): number {
   return MAP_LABEL_SIZE_PX / 2 + (stackIndex + 1) * STACKED_LABEL_OFFSET_PX
 }
 
-/** Decimal places at which two sites are near enough for their labels to pile
- *  up and need one shared column (3 dp ≈ 110 m). */
-const NEIGHBOURHOOD_PRECISION_DP = 3
+/**
+ * How close two sites' markers may sit on screen, in pixels, before their
+ * labels are collapsed into a single count. Roughly two label heights: closer
+ * than that and the columns collide however they are laid out.
+ */
+const CLUSTER_RADIUS_PX = 56
+
+/** A group of sites close enough on screen to be shown as one count. */
+export interface SiteCluster {
+  /** Identity of the group, stable while its membership is. */
+  key: string
+  /** Sites in the group, in the order they were given. */
+  sites: StationSite[]
+  /** Every station the group stands for. */
+  stations: AprsStation[]
+  /** Where the count marker sits — the first site's position. */
+  longitude: number
+  latitude: number
+}
+
+/**
+ * Group sites that sit within {@link CLUSTER_RADIUS_PX} of each other on screen.
+ *
+ * Zoomed out, a county's worth of stations lands in a few pixels and no amount
+ * of label layout can help; a count says how much is there and zooming in takes
+ * it apart. `project` maps a position to screen pixels, which is what makes the
+ * grouping change with the view: the same stations cluster at one zoom and
+ * separate at the next.
+ *
+ * Grouping is single-linkage — a site joins a group if it is close to *any*
+ * member, and two groups merge when a site bridges them. Measuring against only
+ * the first member instead leaves chains of sites in separate groups that each
+ * start their own column, and those columns then overlap: the very collision
+ * the column exists to prevent.
+ */
+export function clusterSites(
+  sites: StationSite[],
+  project: (position: [number, number]) => { x: number; y: number },
+): SiteCluster[] {
+  const positions = new Map<string, { x: number; y: number }>()
+  for (const site of sites) {
+    positions.set(site.key, project([site.longitude, site.latitude]))
+  }
+  const isNear = (left: StationSite, right: StationSite) => {
+    const a = positions.get(left.key)!
+    const b = positions.get(right.key)!
+    return Math.hypot(a.x - b.x, a.y - b.y) < CLUSTER_RADIUS_PX
+  }
+
+  const clusters: SiteCluster[] = []
+  for (const site of sites) {
+    const touching = clusters.filter((cluster) =>
+      cluster.sites.some((member) => isNear(member, site)),
+    )
+    if (touching.length === 0) {
+      clusters.push({
+        key: site.key,
+        sites: [site],
+        stations: [...site.stations],
+        longitude: site.longitude,
+        latitude: site.latitude,
+      })
+      continue
+    }
+    // The new site bridges every group it touches, so they become one.
+    const [first, ...rest] = touching as [SiteCluster, ...SiteCluster[]]
+    first.sites.push(site)
+    first.stations.push(...site.stations)
+    for (const merged of rest) {
+      first.sites.push(...merged.sites)
+      first.stations.push(...merged.stations)
+      clusters.splice(clusters.indexOf(merged), 1)
+    }
+  }
+  return clusters
+}
 
 /** Where a site's labels sit in the column shared with its neighbours. */
 export interface SiteLayout {
@@ -482,35 +596,32 @@ export interface SiteLayout {
   /** Whether its labels are displaced into the column at all — false for a
    *  station standing on its own, which keeps its position and needs no marker. */
   displaced: boolean
+  /** The position the whole column hangs from, so labels from different sites
+   *  line up with each other instead of each hanging off its own marker. */
+  anchor: [number, number]
 }
 
 /**
  * Decide where each site's labels sit.
  *
- * Sites are exact positions, but two masts a few metres apart still collide on
- * screen when zoomed out — so neighbouring sites share one column of labels,
- * numbered straight through, while each keeps its own marker on its own real
- * position. Because a label's offset is measured from its own marker, the two
- * stay joined however far apart the sites drift as the map zooms in.
+ * Sites are exact positions, but sites that land close together on screen still
+ * collide — so everything in one cluster shares a single column of labels,
+ * numbered straight through, while each site keeps its own marker on its own
+ * real position. Because a label's offset is measured from its own marker, the
+ * two stay joined however far apart the sites drift as the map zooms in.
  */
-export function planSiteLayout(sites: StationSite[]): { site: StationSite; layout: SiteLayout }[] {
-  const neighbourhoodKey = (site: StationSite) =>
-    `${site.latitude.toFixed(NEIGHBOURHOOD_PRECISION_DP)},${site.longitude.toFixed(NEIGHBOURHOOD_PRECISION_DP)}`
-
-  const neighbourhoods = new Map<string, StationSite[]>()
-  for (const site of sites) {
-    const key = neighbourhoodKey(site)
-    const neighbours = neighbourhoods.get(key)
-    if (neighbours) neighbours.push(site)
-    else neighbourhoods.set(key, [site])
-  }
-
+export function planSiteLayout(
+  clusters: SiteCluster[],
+): { site: StationSite; layout: SiteLayout }[] {
   const planned: { site: StationSite; layout: SiteLayout }[] = []
-  for (const neighbours of neighbourhoods.values()) {
-    const population = neighbours.reduce((total, site) => total + site.stations.length, 0)
+  for (const cluster of clusters) {
+    // A single station standing alone needs no column and no marker; anything
+    // more would pile up without one.
+    const displaced = cluster.stations.length > 1
+    const anchor: [number, number] = [cluster.longitude, cluster.latitude]
     let startIndex = 0
-    for (const site of neighbours) {
-      planned.push({ site, layout: { startIndex, displaced: population > 1 } })
+    for (const site of cluster.sites) {
+      planned.push({ site, layout: { startIndex, displaced, anchor } })
       startIndex += site.stations.length
     }
   }
