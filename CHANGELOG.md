@@ -120,6 +120,9 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Add APRS label data point controls
 - Add searchable APRS station side panel
 - Tether co-sited APRS labels to a dot with curved leaders
+- Open APRS stations in the side panel instead of a map popup
+- Group crowded APRS labels into one column, by zoom
+- Show a count for crowded APRS stations, labels once zoomed in
 
 ### Bug Fixes
 
@@ -309,6 +312,9 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Draw APRS site leaders as one comb instead of a curve per label
 - Keep APRS site leaders attached to their labels when zooming
 - Stub scrollIntoView so unhandled errors stop failing the run
+- Centre APRS symbol artwork in its viewBox
+- Label every APRS station that fits, count only the rest
+- Keep an APRS count to the stations actually huddled together
 
 ### Chores
 
@@ -1120,6 +1126,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #255 from barrygee/fix/freq-manager-groups-open-by-default
 - Merge pull request #256 from barrygee/feat/aprs-label-styling
 - Merge pull request #257 from barrygee/fix/vitest-scrollintoview
+- Merge pull request #258 from barrygee/style/aprs-marker-and-symbols
 
 ### Refactoring
 
@@ -1235,6 +1242,19 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Rebuild bundle
 - Rebuild bundle
 - Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
+- Rebuild bundle
 
 ### Continuous Integration
 
@@ -1278,6 +1298,15 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Draw label glyphs larger
 - Reduce the APRS site marker to a small ringed square
 - Round the APRS site marker into concentric circles
+- Match the packet fields to the Space pane's prose, and collapse RAW
+- Build the APRS site marker as a ring and centre dot
+- Show the symbol icon in the panel and settle the RAW disclosure
+- Point the RAW chevron the way the row chevron does
+- Build the APRS count marker like the location marker
+- Darken and thicken the APRS count marker's ring
+- Draw direction arrows smaller than station symbols
+- Set the APRS count in the callsign's weight
+- Darken the APRS count marker's ring a shade further
 
 ### Dependencies
 
