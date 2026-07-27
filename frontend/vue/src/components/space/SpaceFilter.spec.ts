@@ -160,7 +160,7 @@ async function mountReady(opts: MountOpts = {}): Promise<VueWrapper> {
 
 // Expand the first result item and flush the accordion fetch.
 async function expandFirstItem(wrapper: VueWrapper): Promise<void> {
-  await wrapper.find('.space-filter-result-item').trigger('click')
+  await wrapper.find('.bfp-result-item').trigger('click')
   await flushPromises()
   await wrapper.vm.$nextTick()
 }
@@ -196,24 +196,24 @@ describe('SpaceFilter — loading & list rendering', () => {
     // Hold the list fetch open so the not-yet-loaded state is observable.
     fetchOverride = () => new Promise(() => {})
     const wrapper = mountFilter()
-    expect(wrapper.find('.space-filter-no-results').text()).toBe('Loading satellite database…')
+    expect(wrapper.find('.bfp-no-results').text()).toBe('Loading satellite database…')
     wrapper.unmount()
   })
 
   it('renders a satellite result once the database loads', async () => {
     const wrapper = await mountReady()
     expect(global.fetch).toHaveBeenCalledWith('/api/space/tle/list')
-    const item = wrapper.find('.space-filter-result-item')
+    const item = wrapper.find('.bfp-result-item')
     expect(item.exists()).toBe(true)
-    expect(item.find('.space-filter-result-primary').text()).toBe('ISS (ZARYA)')
-    expect(item.find('.space-filter-result-secondary').text()).toBe('STATION · NORAD 25544')
+    expect(item.find('.bfp-result-primary').text()).toBe('ISS (ZARYA)')
+    expect(item.find('.bfp-result-secondary').text()).toBe('STATION · NORAD 25544')
   })
 
   it('falls back to the norad id and a NORAD-only secondary when fields are missing', async () => {
     listResult.body = { satellites: [makeSat({ name: '', norad_id: '40069', category: null })] }
     const wrapper = await mountReady()
-    expect(wrapper.find('.space-filter-result-primary').text()).toBe('40069')
-    expect(wrapper.find('.space-filter-result-secondary').text()).toBe('NORAD 40069')
+    expect(wrapper.find('.bfp-result-primary').text()).toBe('40069')
+    expect(wrapper.find('.bfp-result-secondary').text()).toBe('NORAD 40069')
   })
 
   it('publishes an unknown-in-order category and renders its sats when selected', async () => {
@@ -222,32 +222,32 @@ describe('SpaceFilter — loading & list rendering', () => {
     listResult.body = { satellites: [makeSat({ category: 'odd_cat' })] }
     const wrapper = await mountReady()
     expect(useSpaceStore().spaceAvailableCategories).toEqual([])
-    expect(wrapper.find('.space-filter-result-item').exists()).toBe(false)
+    expect(wrapper.find('.bfp-result-item').exists()).toBe(false)
   })
 
   it('shows "No satellites found" when the loaded database is empty', async () => {
     listResult.body = { satellites: [] }
     const wrapper = await mountReady()
-    expect(wrapper.find('.space-filter-no-results').text()).toBe('No satellites found')
+    expect(wrapper.find('.bfp-no-results').text()).toBe('No satellites found')
   })
 
   it('treats a missing satellites array as empty', async () => {
     listResult.body = {}
     const wrapper = await mountReady()
-    expect(wrapper.find('.space-filter-no-results').text()).toBe('No satellites found')
+    expect(wrapper.find('.bfp-no-results').text()).toBe('No satellites found')
   })
 
   it('marks the database loaded (no error) when the list request is non-OK', async () => {
     listResult = { ok: false, status: 500, body: {} }
     const wrapper = await mountReady()
-    expect(wrapper.find('.space-filter-no-results').text()).toBe('No satellites found')
+    expect(wrapper.find('.bfp-no-results').text()).toBe('No satellites found')
   })
 
   it('marks the database loaded when the list request rejects', async () => {
     fetchOverride = (url) =>
       url.includes('/tle/list') ? Promise.reject(new Error('offline')) : defaultRouter(url)
     const wrapper = await mountReady()
-    expect(wrapper.find('.space-filter-no-results').text()).toBe('No satellites found')
+    expect(wrapper.find('.bfp-no-results').text()).toBe('No satellites found')
   })
 
   it('caps each category section at 20 satellites', async () => {
@@ -257,7 +257,7 @@ describe('SpaceFilter — loading & list rendering', () => {
       ),
     }
     const wrapper = await mountReady()
-    expect(wrapper.findAll('.space-filter-result-item')).toHaveLength(20)
+    expect(wrapper.findAll('.bfp-result-item')).toHaveLength(20)
   })
 })
 
@@ -285,7 +285,7 @@ describe('SpaceFilter — search, grouping & query clearing', () => {
     ])
     // Default selection is the first available category → only the ISS renders.
     expect(useSpaceStore().spaceFilterCategory).toBe('space_station')
-    expect(wrapper.findAll('.space-filter-result-primary').map((node) => node.text())).toEqual([
+    expect(wrapper.findAll('.bfp-result-primary').map((node) => node.text())).toEqual([
       'ISS (ZARYA)',
     ])
   })
@@ -297,7 +297,7 @@ describe('SpaceFilter — search, grouping & query clearing', () => {
     await wrapper.find('#space-filter-input').setValue('noaa')
     await wrapper.vm.$nextTick()
     const names = wrapper
-      .findAll('.space-filter-result-primary')
+      .findAll('.bfp-result-primary')
       .map((node) => node.text())
       .sort()
     expect(names).toEqual(['NOAA 18', 'NOAA 19'])
@@ -308,8 +308,8 @@ describe('SpaceFilter — search, grouping & query clearing', () => {
     const wrapper = await mountReady()
     await wrapper.find('#space-filter-input').setValue('25544')
     await wrapper.vm.$nextTick()
-    expect(wrapper.findAll('.space-filter-result-item')).toHaveLength(1)
-    expect(wrapper.find('.space-filter-result-primary').text()).toBe('ISS (ZARYA)')
+    expect(wrapper.findAll('.bfp-result-item')).toHaveLength(1)
+    expect(wrapper.find('.bfp-result-primary').text()).toBe('ISS (ZARYA)')
   })
 
   it('filters by category alias and sorts prefix matches ahead of category-only matches', async () => {
@@ -325,7 +325,7 @@ describe('SpaceFilter — search, grouping & query clearing', () => {
     // "weather" is a category alias (matches both) AND a name prefix of WEATHERBIRD.
     await wrapper.find('#space-filter-input').setValue('weather')
     await wrapper.vm.$nextTick()
-    const names = wrapper.findAll('.space-filter-result-primary').map((node) => node.text())
+    const names = wrapper.findAll('.bfp-result-primary').map((node) => node.text())
     // Name-prefix match (score 1) sorts ahead of the category-only match (score 4).
     expect(names).toEqual(['WEATHERBIRD', 'NOAA 19'])
   })
@@ -335,7 +335,7 @@ describe('SpaceFilter — search, grouping & query clearing', () => {
     const wrapper = await mountReady()
     await wrapper.find('#space-filter-input').setValue('zzzznomatch')
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('.space-filter-no-results').text()).toBe('No satellites found')
+    expect(wrapper.find('.bfp-no-results').text()).toBe('No satellites found')
   })
 
   it('scores an exact name match ahead of a substring match within a group', async () => {
@@ -348,7 +348,7 @@ describe('SpaceFilter — search, grouping & query clearing', () => {
     const wrapper = await mountReady()
     await wrapper.find('#space-filter-input').setValue('iss')
     await wrapper.vm.$nextTick()
-    const names = wrapper.findAll('.space-filter-result-primary').map((node) => node.text())
+    const names = wrapper.findAll('.bfp-result-primary').map((node) => node.text())
     expect(names).toEqual(['ISS', 'XISSX'])
   })
 
@@ -364,7 +364,7 @@ describe('SpaceFilter — search, grouping & query clearing', () => {
     const wrapper = await mountReady()
     await wrapper.find('#space-filter-input').setValue('123')
     await wrapper.vm.$nextTick()
-    const names = wrapper.findAll('.space-filter-result-primary').map((node) => node.text())
+    const names = wrapper.findAll('.bfp-result-primary').map((node) => node.text())
     expect(names).toEqual(['SAT123', 'ALPHA'])
   })
 
@@ -381,7 +381,7 @@ describe('SpaceFilter — search, grouping & query clearing', () => {
     await setCategory(wrapper, 'military')
     await wrapper.find('#space-filter-input').setValue('m') // 'm' must NOT alias to 'military'
     await wrapper.vm.$nextTick()
-    const names = wrapper.findAll('.space-filter-result-primary').map((node) => node.text())
+    const names = wrapper.findAll('.bfp-result-primary').map((node) => node.text())
     // MILSTAR matches 'm' by name; the alias threshold (≥2 chars) pulls in nothing
     // extra by category.
     expect(names).toEqual(['MILSTAR'])
@@ -393,15 +393,13 @@ describe('SpaceFilter — search, grouping & query clearing', () => {
     await setCategory(wrapper, 'weather') // two NOAA sats
     await wrapper.find('#space-filter-input').setValue('19') // narrows to NOAA 19
     await wrapper.vm.$nextTick()
-    expect(wrapper.findAll('.space-filter-result-item')).toHaveLength(1)
-    expect(wrapper.find('#space-filter-clear-btn').classes()).toContain(
-      'space-filter-clear-visible',
-    )
+    expect(wrapper.findAll('.bfp-result-item')).toHaveLength(1)
+    expect(wrapper.find('#space-filter-clear-btn').classes()).toContain('bfp-clear-visible')
     await wrapper.find('#space-filter-clear-btn').trigger('click')
     await wrapper.vm.$nextTick()
     expect((wrapper.find('#space-filter-input').element as HTMLInputElement).value).toBe('')
     // Both weather sats visible again.
-    expect(wrapper.findAll('.space-filter-result-item')).toHaveLength(2)
+    expect(wrapper.findAll('.bfp-result-item')).toHaveLength(2)
   })
 })
 
@@ -420,13 +418,11 @@ describe('SpaceFilter — category sub-tabs (single-select)', () => {
     multiSat()
     const wrapper = await mountReady()
     // Default: first available category (space_station) → ISS only.
-    expect(wrapper.findAll('.space-filter-result-primary').map((node) => node.text())).toEqual([
+    expect(wrapper.findAll('.bfp-result-primary').map((node) => node.text())).toEqual([
       'ISS (ZARYA)',
     ])
     await setCategory(wrapper, 'weather')
-    expect(wrapper.findAll('.space-filter-result-primary').map((node) => node.text())).toEqual([
-      'NOAA 19',
-    ])
+    expect(wrapper.findAll('.bfp-result-primary').map((node) => node.text())).toEqual(['NOAA 19'])
   })
 
   it('shows the no-results state when the selected category has no matching sats', async () => {
@@ -435,8 +431,8 @@ describe('SpaceFilter — category sub-tabs (single-select)', () => {
     // A stale/invalid selection with data present renders no rows for that category.
     useSpaceStore().setSpaceFilterCategory('navigation')
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('.space-filter-result-item').exists()).toBe(false)
-    expect(wrapper.find('.space-filter-no-results').text()).toBe('No satellites found')
+    expect(wrapper.find('.bfp-result-item').exists()).toBe(false)
+    expect(wrapper.find('.bfp-no-results').text()).toBe('No satellites found')
   })
 
   it('repairs the selected category to the first available when data changes', async () => {
@@ -468,12 +464,12 @@ describe('SpaceFilter — keyboard navigation', () => {
     const input = wrapper.find('#space-filter-input')
     await input.trigger('keydown', { key: 'ArrowDown' }) // → ALPHA
     await wrapper.vm.$nextTick()
-    expect(wrapper.findAll('.space-filter-result-item')[0].classes()).toContain('keyboard-focused')
+    expect(wrapper.findAll('.bfp-result-item')[0].classes()).toContain('bfp-keyboard-focused')
     await input.trigger('keydown', { key: 'ArrowDown' }) // → BRAVO
     await input.trigger('keydown', { key: 'ArrowDown' }) // → CHARLIE
     await input.trigger('keydown', { key: 'ArrowDown' }) // wraps → ALPHA
     await wrapper.vm.$nextTick()
-    expect(wrapper.findAll('.space-filter-result-item')[0].classes()).toContain('keyboard-focused')
+    expect(wrapper.findAll('.bfp-result-item')[0].classes()).toContain('bfp-keyboard-focused')
   })
 
   it('moves focus up and clears focus when stepping above the first item', async () => {
@@ -484,13 +480,13 @@ describe('SpaceFilter — keyboard navigation', () => {
     await input.trigger('keydown', { key: 'ArrowDown' }) // BRAVO
     await input.trigger('keydown', { key: 'ArrowUp' }) // → ALPHA
     await wrapper.vm.$nextTick()
-    expect(wrapper.findAll('.space-filter-result-item')[0].classes()).toContain('keyboard-focused')
+    expect(wrapper.findAll('.bfp-result-item')[0].classes()).toContain('bfp-keyboard-focused')
     await input.trigger('keydown', { key: 'ArrowUp' }) // → none
     await wrapper.vm.$nextTick()
     expect(
       wrapper
-        .findAll('.space-filter-result-item')
-        .some((node) => node.classes().includes('keyboard-focused')),
+        .findAll('.bfp-result-item')
+        .some((node) => node.classes().includes('bfp-keyboard-focused')),
     ).toBe(false)
   })
 
@@ -504,7 +500,7 @@ describe('SpaceFilter — keyboard navigation', () => {
     await flushPromises()
     await wrapper.vm.$nextTick()
     expect(control.switchSatellite).toHaveBeenCalledWith('1', 'ALPHA')
-    expect(wrapper.find('.sfr-accordion-body').exists()).toBe(true)
+    expect(wrapper.find('.bfp-accordion-body').exists()).toBe(true)
   })
 
   it('opens the first item on Enter when nothing is focused', async () => {
@@ -516,21 +512,22 @@ describe('SpaceFilter — keyboard navigation', () => {
     expect(control.switchSatellite).toHaveBeenCalledWith('1', 'ALPHA')
   })
 
-  it('does nothing on Enter when the focused item has been filtered out', async () => {
+  it('drops a focus the query filtered away, so Enter opens the first remaining row', async () => {
     multiSat()
     const control = makeFakeControl()
     const wrapper = await mountReady({ control })
     const input = wrapper.find('#space-filter-input')
     await input.trigger('keydown', { key: 'ArrowDown' }) // focus ALPHA (norad 1)
     await wrapper.vm.$nextTick()
-    // Filter to BRAVO only — the focused ALPHA is no longer in the visible list,
-    // so Enter resolves to no target and opens nothing.
+    // Filter to BRAVO only. The focused ALPHA is gone from the list, so the
+    // virtual focus goes with it rather than lingering on a row that is no
+    // longer there — Enter then acts on the first row still shown.
     await input.setValue('bravo')
     await wrapper.vm.$nextTick()
+    expect(wrapper.find('.bfp-keyboard-focused').exists()).toBe(false)
     await input.trigger('keydown', { key: 'Enter' })
     await flushPromises()
-    expect(control.switchSatellite).not.toHaveBeenCalled()
-    expect(wrapper.find('.sfr-accordion-body').exists()).toBe(false)
+    expect(control.switchSatellite).toHaveBeenCalledWith('2', 'BRAVO')
   })
 
   it('clears the query on Escape', async () => {
@@ -548,7 +545,7 @@ describe('SpaceFilter — keyboard navigation', () => {
     const wrapper = await mountReady()
     // No throw, focus stays null.
     await wrapper.find('#space-filter-input').trigger('keydown', { key: 'ArrowDown' })
-    expect(wrapper.find('.space-filter-no-results').exists()).toBe(true)
+    expect(wrapper.find('.bfp-no-results').exists()).toBe(true)
   })
 
   it('does nothing on an unhandled key', async () => {
@@ -558,8 +555,8 @@ describe('SpaceFilter — keyboard navigation', () => {
     await wrapper.vm.$nextTick()
     expect(
       wrapper
-        .findAll('.space-filter-result-item')
-        .some((node) => node.classes().includes('keyboard-focused')),
+        .findAll('.bfp-result-item')
+        .some((node) => node.classes().includes('bfp-keyboard-focused')),
     ).toBe(false)
   })
 })
@@ -651,28 +648,28 @@ describe('SpaceFilter — accordion expand/collapse', () => {
     const control = makeFakeControl()
     const wrapper = await mountReady({ control })
     await expandFirstItem(wrapper)
-    expect(wrapper.find('.space-filter-result-item').classes()).toContain('sfr-expanded')
+    expect(wrapper.find('.bfp-result-item').classes()).toContain('bfp-expanded')
     expect(control.switchSatellite).toHaveBeenCalledWith('25544', 'ISS (ZARYA)')
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/space/satellite/25544/passes'),
       expect.anything(),
     )
-    expect(wrapper.find('.sfr-accordion-body').exists()).toBe(true)
+    expect(wrapper.find('.bfp-accordion-body').exists()).toBe(true)
   })
 
   it('collapses an already-expanded item when clicked again', async () => {
     const wrapper = await mountReady()
     await expandFirstItem(wrapper)
-    expect(wrapper.find('.sfr-accordion-body').exists()).toBe(true)
-    await wrapper.find('.space-filter-result-item').trigger('click')
+    expect(wrapper.find('.bfp-accordion-body').exists()).toBe(true)
+    await wrapper.find('.bfp-result-item').trigger('click')
     await flushPromises()
-    expect(wrapper.find('.sfr-accordion-body').exists()).toBe(false)
+    expect(wrapper.find('.bfp-accordion-body').exists()).toBe(false)
   })
 
   it('works without a satellite control (null-prop path)', async () => {
     const wrapper = await mountReady({ control: null })
     await expandFirstItem(wrapper)
-    expect(wrapper.find('.sfr-accordion-body').exists()).toBe(true)
+    expect(wrapper.find('.bfp-accordion-body').exists()).toBe(true)
   })
 
   it('renders live telemetry from a sat-position-update with look-angles', async () => {
@@ -726,7 +723,7 @@ describe('SpaceFilter — accordion expand/collapse', () => {
       }),
     )
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('.sfr-accordion-body').exists()).toBe(false)
+    expect(wrapper.find('.bfp-accordion-body').exists()).toBe(false)
   })
 
   it('updates telemetry but hides the live marker when look-angles are absent', async () => {
@@ -810,7 +807,7 @@ describe('SpaceFilter — accordion expand/collapse', () => {
     const wrapper = await mountReady()
     const abortSpy = vi.spyOn(AbortController.prototype, 'abort')
     await expandFirstItem(wrapper) // opens ALPHA (itemFetchAbort set)
-    await wrapper.findAll('.space-filter-result-item')[1].trigger('click') // collapse ALPHA + open BRAVO
+    await wrapper.findAll('.bfp-result-item')[1].trigger('click') // collapse ALPHA + open BRAVO
     await flushPromises()
     expect(abortSpy).toHaveBeenCalled()
     abortSpy.mockRestore()
@@ -838,14 +835,14 @@ describe('SpaceFilter — accordion expand/collapse', () => {
       }
       return defaultRouter(url)
     }
-    const items = wrapper.findAll('.space-filter-result-item')
+    const items = wrapper.findAll('.bfp-result-item')
     await items[0].trigger('click') // open ALPHA → gated fetch #1 (itemFetchAbort = ctrl1)
     await items[1].trigger('click') // collapse ALPHA (aborts ctrl1) + open BRAVO → fetch #2
     release(null) // fetch #1 resolves into an aborted signal → returns early
     await flushPromises()
     await wrapper.vm.$nextTick()
     // BRAVO is the open accordion; ALPHA's late resolve did not clobber it.
-    expect(wrapper.findAll('.space-filter-result-item')[1].classes()).toContain('sfr-expanded')
+    expect(wrapper.findAll('.bfp-result-item')[1].classes()).toContain('bfp-expanded')
   })
 })
 
@@ -858,7 +855,7 @@ describe('SpaceFilter — persisted expansion restore', () => {
     spaceStore.searchExpandedNorad = '25544'
     await flushPromises()
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('.sfr-accordion-body').exists()).toBe(true)
+    expect(wrapper.find('.bfp-accordion-body').exists()).toBe(true)
     expect(control.switchSatellite).toHaveBeenCalledWith('25544', 'ISS (ZARYA)')
   })
 
@@ -869,7 +866,7 @@ describe('SpaceFilter — persisted expansion restore', () => {
     await flushPromises()
     await wrapper.vm.$nextTick()
     expect(spaceStore.searchExpandedNorad).toBe('')
-    expect(wrapper.find('.sfr-accordion-body').exists()).toBe(false)
+    expect(wrapper.find('.bfp-accordion-body').exists()).toBe(false)
   })
 
   it('restores to the "unknown" category when the restored satellite has no category', async () => {
@@ -883,7 +880,7 @@ describe('SpaceFilter — persisted expansion restore', () => {
     await flushPromises()
     await wrapper.vm.$nextTick()
     expect(spaceStore.spaceFilterCategory).toBe('unknown')
-    expect(wrapper.find('.sfr-accordion-body').exists()).toBe(true)
+    expect(wrapper.find('.bfp-accordion-body').exists()).toBe(true)
   })
 })
 
@@ -895,7 +892,7 @@ describe('SpaceFilter — hover preview', () => {
     const wrapper = mountFilter({ control })
     await vi.advanceTimersByTimeAsync(0)
     await flushPromises()
-    const item = wrapper.find('.space-filter-result-item')
+    const item = wrapper.find('.bfp-result-item')
     await item.trigger('mouseenter')
     expect(control.previewSatellite).toHaveBeenCalledWith('25544', 'ISS (ZARYA)')
     await item.trigger('mouseleave')
@@ -912,7 +909,7 @@ describe('SpaceFilter — hover preview', () => {
     const wrapper = mountFilter({ control })
     await vi.advanceTimersByTimeAsync(0)
     await flushPromises()
-    const item = wrapper.find('.space-filter-result-item')
+    const item = wrapper.find('.bfp-result-item')
     await item.trigger('mouseleave') // schedules clear
     await item.trigger('mouseenter') // cancels it
     await vi.advanceTimersByTimeAsync(100)
@@ -927,7 +924,7 @@ describe('SpaceFilter — hover preview', () => {
     const wrapper = mountFilter({ control })
     await vi.advanceTimersByTimeAsync(0)
     await flushPromises()
-    const item = wrapper.find('.space-filter-result-item')
+    const item = wrapper.find('.bfp-result-item')
     await item.trigger('mouseleave')
     await item.trigger('mouseleave') // sees pending timer → clears + reschedules
     await vi.advanceTimersByTimeAsync(50)
@@ -938,7 +935,7 @@ describe('SpaceFilter — hover preview', () => {
 
   it('does not throw on hover without a control', async () => {
     const wrapper = await mountReady({ control: null })
-    const item = wrapper.find('.space-filter-result-item')
+    const item = wrapper.find('.bfp-result-item')
     await item.trigger('mouseenter')
     await item.trigger('mouseleave')
     expect(wrapper.exists()).toBe(true)
@@ -1058,14 +1055,14 @@ describe('SpaceFilter — track & pass-notification buttons', () => {
   it('seeds notif state from the control when pass notifications are already on at mount', async () => {
     const control = makeFakeControl({ passNotificationsEnabled: true, activeNoradId: '25544' })
     const wrapper = await mountReady({ control })
-    expect(wrapper.find('.space-filter-result-item').exists()).toBe(true)
+    expect(wrapper.find('.bfp-result-item').exists()).toBe(true)
   })
 
   it('uses the norad id for an unnamed sat across hover, track and notif', async () => {
     const control = makeFakeControl({ activeNoradId: '00000' })
     listResult.body = { satellites: [makeSat({ name: '', norad_id: '40069', category: 'active' })] }
     const wrapper = await mountReady({ control })
-    const item = wrapper.find('.space-filter-result-item')
+    const item = wrapper.find('.bfp-result-item')
     await item.trigger('mouseenter')
     expect(control.previewSatellite).toHaveBeenCalledWith('40069', '40069')
     await expandFirstItem(wrapper)
@@ -1581,7 +1578,7 @@ describe('SpaceFilter — polar plot & upcoming-passes section', () => {
     const wrapper = mountFilter()
     await vi.advanceTimersByTimeAsync(0)
     await flushPromises() // loadSatellites
-    await wrapper.find('.space-filter-result-item').trigger('click')
+    await wrapper.find('.bfp-result-item').trigger('click')
     await flushPromises() // accordion fetch → startItemTick under fake timers
     await wrapper.vm.$nextTick()
     await vi.advanceTimersByTimeAsync(1000) // fires countdownTick (with passes) + itemTickInterval
@@ -1597,7 +1594,7 @@ describe('SpaceFilter — polar plot & upcoming-passes section', () => {
     await vi.advanceTimersByTimeAsync(0)
     await flushPromises()
     await vi.advanceTimersByTimeAsync(1000) // countdownTick fires while accordionPasses is empty
-    expect(wrapper.find('.space-filter-result-item').exists()).toBe(true)
+    expect(wrapper.find('.bfp-result-item').exists()).toBe(true)
     wrapper.unmount()
     vi.useRealTimers()
   })
@@ -1662,7 +1659,7 @@ describe('SpaceFilter — lifecycle & focus', () => {
     const clearIntervalSpy = vi.spyOn(global, 'clearInterval')
     const wrapper = await mountReady()
     await expandFirstItem(wrapper) // starts the item tick + sets itemFetchAbort
-    await wrapper.find('.space-filter-result-item').trigger('mouseleave') // schedules a preview clear
+    await wrapper.find('.bfp-result-item').trigger('mouseleave') // schedules a preview clear
     wrapper.unmount()
     expect(clearIntervalSpy).toHaveBeenCalled()
     clearIntervalSpy.mockRestore()

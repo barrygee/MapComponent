@@ -71,6 +71,8 @@
           },
         ]"
         @click="toggleExpanded(item.key)"
+        @mouseenter="emit('rowEnter', item.key)"
+        @mouseleave="emit('rowLeave')"
       >
         <!-- The option is just the row header (identity + chevron); the expanded
              accordion is a sibling so its content isn't nested inside the option. -->
@@ -196,6 +198,12 @@ const emit = defineEmits<{
    * more than the text.
    */
   clear: []
+  /**
+   * The pointer entered/left a row — for a caller that previews the row's
+   * subject elsewhere (highlighting it on the map, say) while it is hovered.
+   */
+  rowEnter: [key: string]
+  rowLeave: []
 }>()
 
 const inputRef = ref<HTMLInputElement | null>(null)

@@ -419,6 +419,20 @@ describe('BaseFilterPanel', () => {
     })
   })
 
+  describe('row hover', () => {
+    it('reports the row the pointer is over, and when it leaves', async () => {
+      const wrapper = mountPanel()
+      const row = wrapper.findAll('.bfp-result-item')[1]!
+
+      await row.trigger('mouseenter')
+      expect(wrapper.emitted('rowEnter')![0]).toEqual(['MB7UMS'])
+      expect(wrapper.emitted('rowLeave')).toBeUndefined()
+
+      await row.trigger('mouseleave')
+      expect(wrapper.emitted('rowLeave')).toHaveLength(1)
+    })
+  })
+
   describe('click containment', () => {
     it('does not collapse the row when the accordion content is used', async () => {
       // The accordion is nested in the row, whose click handler toggles it —
