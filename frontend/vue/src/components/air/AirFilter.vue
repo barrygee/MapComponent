@@ -946,6 +946,18 @@ defineExpose({
   color: #ff4040;
 }
 
+/* This pane centres its empty state and sets it smaller and dimmer than the
+   shell's default. */
+#filter-results .bfp-no-results {
+  padding: 20px 18px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.25);
+  text-align: center;
+}
+
 .filter-result-badge {
   font-size: 9px;
   font-weight: 700;
