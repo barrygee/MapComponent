@@ -39,6 +39,16 @@ for (const target of [globalThis, globalThis.window].filter(Boolean)) {
   Object.defineProperty(target, 'sessionStorage', { configurable: true, value: sessionStorageMock })
 }
 
+// jsdom implements no layout, so it ships no `Element.prototype.scrollIntoView`
+// at all. Any component that keeps a selection in view (the filter panes) throws
+// on it — and because those calls sit in watchers, the throw surfaces as an
+// unhandled error that fails the run *without* failing a test, which is easy to
+// miss when reading the summary. A no-op keeps the DOM honest: the method exists,
+// as it does in a browser, and does nothing since there is nothing to scroll.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView(): void {}
+}
+
 // Storage persists across tests in a file — start each test with a clean slate.
 beforeEach(() => {
   localStorageMock.clear()
