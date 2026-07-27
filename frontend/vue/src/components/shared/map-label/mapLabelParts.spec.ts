@@ -11,6 +11,7 @@ import {
   createLabelPill,
   createNameSegment,
   isLeftFacing,
+  MAP_LABEL_ARROW_SIZE_PX,
   MAP_LABEL_GLYPH_SIZE_PX,
   MAP_LABEL_SIZE_PX,
 } from './mapLabelParts'
@@ -67,14 +68,18 @@ describe('mapLabelParts', () => {
       expect(createGlyphSvg('<polygon/>', 45)).toContain('overflow:visible')
     })
 
-    it('renders every domain’s glyph at the shared size', () => {
-      // Air arrows and APRS symbols draw from this one constant, so they can
-      // never end up different sizes on the same map.
+    it('renders arrows and dots at the arrow size', () => {
       const svg = createGlyphSvg('<polygon/>')
-      expect(svg).toContain(`width="${MAP_LABEL_GLYPH_SIZE_PX}"`)
-      expect(svg).toContain(`height="${MAP_LABEL_GLYPH_SIZE_PX}"`)
+      expect(svg).toContain(`width="${MAP_LABEL_ARROW_SIZE_PX}"`)
+      expect(svg).toContain(`height="${MAP_LABEL_ARROW_SIZE_PX}"`)
       // Comfortably inside the well, which carries its own padding.
-      expect(MAP_LABEL_GLYPH_SIZE_PX).toBeLessThan(MAP_LABEL_SIZE_PX)
+      expect(MAP_LABEL_ARROW_SIZE_PX).toBeLessThan(MAP_LABEL_SIZE_PX)
+    })
+
+    it('draws an arrow smaller than a station symbol', () => {
+      // An arrow fills its 12-unit viewBox where symbol artwork sits padded
+      // inside a 24-unit one, so equal sizes make the arrow look far bigger.
+      expect(MAP_LABEL_ARROW_SIZE_PX).toBeLessThan(MAP_LABEL_GLYPH_SIZE_PX)
     })
 
     it('embeds the shape markup it was given', () => {
