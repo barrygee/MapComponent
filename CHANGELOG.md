@@ -315,6 +315,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Centre APRS symbol artwork in its viewBox
 - Label every APRS station that fits, count only the rest
 - Keep an APRS count to the stations actually huddled together
+- Rebuild spa-dist after the logo/brand change
 
 ### Chores
 
@@ -1128,6 +1129,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #257 from barrygee/fix/vitest-scrollintoview
 - Merge pull request #258 from barrygee/style/aprs-marker-and-symbols
 - Merge pull request #259 from barrygee/style/logo-white-ring
+- Merge pull request #260 from barrygee/fix/rebuild-spa-dist
 
 ### Refactoring
 
