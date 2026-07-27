@@ -64,8 +64,8 @@ async def _get_satellite_data(
 
     Raises RuntimeError if TLE is unavailable, or re-raises other exceptions.
     """
-    online_url, _ = await resolve_domain_urls("space", db)
-    tle_text = await tle_service.fetch_tle(norad_id, db, online_url)
+    primary_url, fallback_url = await resolve_domain_urls("space", db)
+    tle_text = await tle_service.fetch_tle(norad_id, db, primary_url, fallback_url)
     _, line1, line2 = tle_service.parse_tle_lines(tle_text)
 
     position = sat_service.compute_position(line1, line2)
@@ -143,8 +143,8 @@ async def _compute_passes_response(
     db: AsyncSession,
 ) -> JSONResponse:
     """Fetch TLE, compute passes, and return the standard passes JSON response."""
-    online_url, _ = await resolve_domain_urls("space", db)
-    tle_text = await tle_service.fetch_tle(norad_id, db, online_url)
+    primary_url, fallback_url = await resolve_domain_urls("space", db)
+    tle_text = await tle_service.fetch_tle(norad_id, db, primary_url, fallback_url)
     _, line1, line2 = tle_service.parse_tle_lines(tle_text)
 
     passes = sat_service.compute_passes(
@@ -262,13 +262,13 @@ async def get_multi_satellite_passes(
             }
         )
 
-    online_url, _ = await resolve_domain_urls("space", db)
+    primary_url, fallback_url = await resolve_domain_urls("space", db)
     all_passes = []
 
     for row in satellites[:500]:
         norad_id, name, category = row[0], row[1], row[2]
         try:
-            tle_text = await tle_service.fetch_tle(norad_id, db, online_url)
+            tle_text = await tle_service.fetch_tle(norad_id, db, primary_url, fallback_url)
             _, line1, line2 = tle_service.parse_tle_lines(tle_text)
             passes = sat_service.compute_passes(
                 line1,

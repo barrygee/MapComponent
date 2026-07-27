@@ -101,3 +101,98 @@ class TestTleDelete:
         resp = client.delete("/api/space/tle", params={"confirm": "true"})
         assert resp.status_code == 200
         assert resp.json() == {"cleared": True}
+
+
+# ── Domain URL resolution → fetch_tle (offgrid fallback pass-through) ────────
+
+class TestDomainUrlsReachFetchTle:
+    """The space domain's offgrid fallback URL must reach fetch_tle.
+
+    All three TLE-backed endpoints resolve (primary, fallback) for the domain;
+    dropping the fallback silently disables the configured offgrid mirror
+    whenever the primary feed is unreachable.
+    """
+
+    PRIMARY_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle"
+    FALLBACK_URL = "http://192.168.1.50/tle/active.txt"
+    NOAA_20_TLE = (
+        "NOAA 20\n"
+        "1 43013U 17073A   24001.50000000  .00000073  00000-0  52843-4 0  9993\n"
+        "2 43013  98.7234 100.0000 0001000  90.0000 270.0000 14.19554400320000\n"
+    )
+
+    def _capture_fetch_tle_urls(self, monkeypatch) -> list[tuple]:
+        """Stub resolve_domain_urls + fetch_tle; return the list capturing URL args."""
+        from backend.routers import space as space_router
+
+        captured: list[tuple] = []
+
+        async def fake_resolve(domain, db, online_default=None):
+            return self.PRIMARY_URL, self.FALLBACK_URL
+
+        async def fake_fetch_tle(norad_id, db, online_url=None, offline_url=None):
+            captured.append((online_url, offline_url))
+            return self.NOAA_20_TLE
+
+        monkeypatch.setattr(space_router, "resolve_domain_urls", fake_resolve)
+        monkeypatch.setattr(space_router.tle_service, "fetch_tle", fake_fetch_tle)
+        return captured
+
+    def test_satellite_position_passes_both_urls(self, client, monkeypatch):
+        from backend.routers import space as space_router
+
+        captured = self._capture_fetch_tle_urls(monkeypatch)
+        # Bypass the empty-database guard so the request reaches fetch_tle.
+        monkeypatch.setattr(space_router, "_tle_database_is_empty", lambda db: _false())
+
+        resp = client.get("/api/space/satellite/43013")
+
+        assert resp.status_code == 200
+        assert captured == [(self.PRIMARY_URL, self.FALLBACK_URL)]
+
+    def test_satellite_passes_endpoint_passes_both_urls(self, client, monkeypatch):
+        captured = self._capture_fetch_tle_urls(monkeypatch)
+
+        resp = client.get("/api/space/satellite/43013/passes", params={"lat": 51.5, "lon": 0.0})
+
+        assert resp.status_code == 200
+        assert captured == [(self.PRIMARY_URL, self.FALLBACK_URL)]
+
+    def test_multi_satellite_passes_endpoint_passes_both_urls(self, client, monkeypatch):
+        from backend.models import SatelliteCatalogue
+        from backend.database import get_db
+
+        captured = self._capture_fetch_tle_urls(monkeypatch)
+
+        # One catalogue row so the endpoint gets past its "no satellites" short-circuit.
+        async def _seed():
+            async for session in client.app.dependency_overrides[get_db]():
+                session.add(
+                    SatelliteCatalogue(
+                        norad_id="43013", name="NOAA 20", category="weather", updated_at=0
+                    )
+                )
+                await session.commit()
+                break
+
+        _run(_seed())
+
+        resp = client.get(
+            "/api/space/passes",
+            params={"lat": 51.5, "lon": 0.0, "categories": "weather"},
+        )
+
+        assert resp.status_code == 200
+        assert captured == [(self.PRIMARY_URL, self.FALLBACK_URL)]
+
+
+async def _false() -> bool:
+    """Awaitable False — stands in for the async _tle_database_is_empty guard."""
+    return False
+
+
+def _run(coro):
+    """Run a coroutine from a sync test body."""
+    import asyncio
+
+    return asyncio.run(coro)
