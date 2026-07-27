@@ -19,6 +19,7 @@ import {
   createNameSegment,
   isLeftFacing,
   MAP_LABEL_GLYPH_SIZE_PX,
+  MAP_LABEL_SIZE_PX,
 } from '@/components/shared/map-label/mapLabelParts'
 import type { AprsStation, useLandStore } from '@/stores/land'
 
@@ -143,19 +144,16 @@ export class AprsStationsControl extends SentinelControlBase {
     const seen = new Set<string>()
     const seenClusters = new Set<string>()
 
-    for (const cluster of this._clustersInView(stations)) {
-      // A group of stations sitting on top of each other is shown as a count
-      // until the map is zoomed in far enough to read them; anything that
-      // stands clear is labelled as normal at every zoom.
-      if (this._collapsesToCount(cluster)) {
-        seenClusters.add(cluster.key)
-        this._syncClusterMarker(cluster)
-        continue
-      }
-      for (const station of cluster.stations) {
+    const { labelled, counts } = this._planLabels(stations)
+    for (const site of labelled) {
+      for (const station of site.stations) {
         seen.add(station.callsign)
         this._syncStationMarker(station)
       }
+    }
+    for (const cluster of counts) {
+      seenClusters.add(cluster.key)
+      this._syncClusterMarker(cluster)
     }
 
     // Drop markers for stations no longer plotted — expired, hidden, or now
@@ -178,21 +176,17 @@ export class AprsStationsControl extends SentinelControlBase {
     }
   }
 
-  /** The stations grouped as they read at the current zoom. */
-  private _clustersInView(stations: AprsStation[]): SiteCluster[] {
-    return clusterSites(groupStationsBySite(stations), (position) => this.map.project(position))
-  }
-
   /**
-   * Whether a group is shown as a count rather than as labels.
+   * Split the stations into those that get labels and those that are counted.
    *
-   * Only groups — a station standing clear is always labelled, at every zoom.
-   * Past the reveal zoom the labels are shown regardless: by then the operator
-   * has asked for that area specifically, and overlapping labels they can pan
-   * around beat a number they cannot open.
+   * Past the reveal zoom nothing is counted: by then the operator has asked for
+   * that area specifically, and overlapping labels they can pan around beat a
+   * number they cannot open.
    */
-  private _collapsesToCount(cluster: SiteCluster): boolean {
-    return cluster.stations.length > 1 && this.map.getZoom() < LABEL_REVEAL_ZOOM
+  private _planLabels(stations: AprsStation[]): LabelPlan {
+    const sites = groupStationsBySite(stations)
+    if (this.map.getZoom() >= LABEL_REVEAL_ZOOM) return { labelled: sites, counts: [] }
+    return planLabels(sites, (position) => this.map.project(position))
   }
 
   /** Add, move or rebuild one station's label. */
@@ -513,13 +507,51 @@ export function buildClusterMarker(count: number): HTMLElement {
 }
 
 /**
- * How close two sites' markers may sit on screen, in pixels, before their
- * labels are collapsed into a single count. Roughly two label heights: closer
- * than that and the columns collide however they are laid out.
+ * Width of a station label, in pixels, estimated from its callsign.
+ *
+ * Measured from rendered labels, which fit `41.5 + 7.5 × characters` almost
+ * exactly: the fixed part is the glyph well and padding, the rest is condensed
+ * 14px type. An estimate rather than a measurement because grouping is decided
+ * before any label exists — and it only has to be close enough to tell a
+ * genuine overlap from a near miss.
+ *
+ * Deliberately ignores optional fields (speed, altitude, path…). Assuming the
+ * widest possible label would collapse stations that do not actually collide,
+ * which is the failure this replaces.
  */
-const CLUSTER_RADIUS_PX = 56
+export function estimateLabelWidth(callsign: string): number {
+  return LABEL_BASE_WIDTH_PX + LABEL_CHARACTER_WIDTH_PX * callsign.length
+}
 
-/** A group of sites close enough on screen to be shown as one count. */
+const LABEL_BASE_WIDTH_PX = 41.5
+const LABEL_CHARACTER_WIDTH_PX = 7.5
+
+/** A rectangle in screen pixels. */
+interface Rect {
+  left: number
+  right: number
+  top: number
+  bottom: number
+}
+
+/** Where a station's label lands on screen, given its anchor point. */
+function labelRect(station: AprsStation, at: { x: number; y: number }, leftFacing: boolean): Rect {
+  const width = estimateLabelWidth(station.callsign)
+  const halfHeight = MAP_LABEL_SIZE_PX / 2
+  return {
+    left: leftFacing ? at.x - width : at.x,
+    right: leftFacing ? at.x : at.x + width,
+    top: at.y - halfHeight,
+    bottom: at.y + halfHeight,
+  }
+}
+
+/** Whether two rectangles share any area. */
+function overlaps(a: Rect, b: Rect): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+}
+
+/** A group of sites whose labels would land on top of each other. */
 export interface SiteCluster {
   /** Identity of the group, stable while its membership is. */
   key: string
@@ -527,44 +559,85 @@ export interface SiteCluster {
   sites: StationSite[]
   /** Every station the group stands for. */
   stations: AprsStation[]
-  /** Where the count marker sits — the first site's position. */
+  /** Where the count sits — the first site's position. */
   longitude: number
   latitude: number
 }
 
+/** How the sites in view are split between labels and counts. */
+export interface LabelPlan {
+  /** Sites whose labels fit, in the order they were placed. */
+  labelled: StationSite[]
+  /** Groups of sites left over, each shown as one count. */
+  counts: SiteCluster[]
+}
+
 /**
- * Group sites that sit within {@link CLUSTER_RADIUS_PX} of each other on screen.
+ * Decide which stations get labels and which are counted.
  *
- * Zoomed out, a county's worth of stations lands in a few pixels and no amount
- * of label layout can help; a count says how much is there and zooming in takes
- * it apart. `project` maps a position to screen pixels, which is what makes the
- * grouping change with the view: the same stations cluster at one zoom and
- * separate at the next.
+ * Labels are placed one at a time and kept whenever they land clear of the ones
+ * already placed, so a crowded view still shows every station it has room for
+ * rather than collapsing the lot. Only what genuinely will not fit is counted,
+ * which is the difference between "this area is busy" and "this area is
+ * unreadable" — and a count that would stand for a single station is dropped in
+ * favour of its label, since a "1" says less than the callsign it replaced.
  *
- * Grouping is single-linkage — a site joins a group if it is close to *any*
- * member, and two groups merge when a site bridges them. Measuring against only
- * the first member instead leaves chains of sites in separate groups that each
- * start their own column, and those columns then overlap: the very collision
- * the column exists to prevent.
+ * Placement order is by callsign, not by how recently a station was heard: an
+ * arrival order would reshuffle which stations are labelled on every poll, and
+ * a label appearing and vanishing under the cursor is worse than an arbitrary
+ * but stable choice.
  */
-export function clusterSites(
+export function planLabels(
   sites: StationSite[],
   project: (position: [number, number]) => { x: number; y: number },
-): SiteCluster[] {
-  const positions = new Map<string, { x: number; y: number }>()
+): LabelPlan {
+  const rects = new Map<string, Rect>()
   for (const site of sites) {
-    positions.set(site.key, project([site.longitude, site.latitude]))
-  }
-  const isNear = (left: StationSite, right: StationSite) => {
-    const a = positions.get(left.key)!
-    const b = positions.get(right.key)!
-    return Math.hypot(a.x - b.x, a.y - b.y) < CLUSTER_RADIUS_PX
+    const station = site.stations[0]!
+    const leftFacing = typeof station.course === 'number' && isLeftFacing(station.course)
+    rects.set(site.key, labelRect(station, project([site.longitude, site.latitude]), leftFacing))
   }
 
+  const ordered = [...sites].sort((left, right) =>
+    left.stations[0]!.callsign.localeCompare(right.stations[0]!.callsign),
+  )
+
+  const labelled: StationSite[] = []
+  const placedRects: Rect[] = []
+  const leftOver: StationSite[] = []
+  for (const site of ordered) {
+    const rect = rects.get(site.key)!
+    if (placedRects.some((placed) => overlaps(placed, rect))) {
+      leftOver.push(site)
+      continue
+    }
+    labelled.push(site)
+    placedRects.push(rect)
+  }
+
+  // A count standing for one station says less than the label it replaced, so
+  // a lone leftover is drawn anyway and allowed to overlap.
+  const grouped = groupOverlapping(leftOver, rects)
+  const counts: SiteCluster[] = []
+  for (const cluster of grouped) {
+    if (cluster.stations.length === 1) labelled.push(...cluster.sites)
+    else counts.push(cluster)
+  }
+  return { labelled, counts }
+}
+
+/**
+ * Gather the sites that could not be labelled into counts.
+ *
+ * Single-linkage on true overlap: if A's label covers B's and B's covers C's,
+ * the three are one pile and belong under one count.
+ */
+function groupOverlapping(sites: StationSite[], rects: Map<string, Rect>): SiteCluster[] {
   const clusters: SiteCluster[] = []
   for (const site of sites) {
+    const rect = rects.get(site.key)!
     const touching = clusters.filter((cluster) =>
-      cluster.sites.some((member) => isNear(member, site)),
+      cluster.sites.some((member) => overlaps(rects.get(member.key)!, rect)),
     )
     if (touching.length === 0) {
       clusters.push({
@@ -576,7 +649,6 @@ export function clusterSites(
       })
       continue
     }
-    // The new site bridges every group it touches, so they become one.
     const [first, ...rest] = touching as [SiteCluster, ...SiteCluster[]]
     first.sites.push(site)
     first.stations.push(...site.stations)

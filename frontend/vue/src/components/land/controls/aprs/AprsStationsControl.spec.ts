@@ -51,7 +51,8 @@ vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker } }))
 
 import {
   AprsStationsControl,
-  clusterSites,
+  planLabels,
+  estimateLabelWidth,
   groupStationsBySite,
   formatAltitude,
   formatCourse,
@@ -591,26 +592,29 @@ describe('AprsStationsControl', () => {
         (marker) => marker.element.classList.contains('aprs-cluster-marker') && !marker.removed,
       )
     }
-    /** Two stations 20px apart under the fake projection — inside the cluster
-     *  radius, so their labels would sit on top of each other. */
-    function crowdedPair() {
+    /** Three stations a few pixels apart under the fake projection, so only
+     *  the first label fits and the other two are counted. */
+    function crowdedTrio() {
       return [
         station({ callsign: 'AAA', course: null, latitude: 54.9, longitude: -1.5 }),
         station({ callsign: 'BBB', course: null, latitude: 54.9, longitude: -1.50002 }),
+        station({ callsign: 'CCC', course: null, latitude: 54.9, longitude: -1.50004 }),
       ]
     }
 
     it('shows a count in place of labels that would sit on top of each other', () => {
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       addControl()
+      // The first label is placed and the two that land on it are counted —
+      // a crowded view still shows every station it has room for.
       const counts = countMarkers()
       expect(counts).toHaveLength(1)
       expect(counts[0]!.element.textContent).toBe('2')
-      expect(labelMarkers()).toHaveLength(0)
+      expect(labelMarkers()).toHaveLength(1)
     })
 
     it('names the count for assistive tech, since nothing else stands for them', () => {
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       addControl()
       expect(countMarkers()[0]!.element.getAttribute('aria-label')).toBe(
         '2 APRS stations here — zoom in to see them',
@@ -635,7 +639,7 @@ describe('AprsStationsControl', () => {
     })
 
     it('reveals the labels once the map is zoomed past the reveal level', () => {
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       const { map } = addControl()
       expect(countMarkers()).toHaveLength(1)
 
@@ -644,24 +648,24 @@ describe('AprsStationsControl', () => {
       // Past the reveal zoom the operator has asked for this area, so the
       // stations are shown even though they still crowd each other.
       expect(countMarkers()).toHaveLength(0)
-      expect(labelMarkers()).toHaveLength(2)
+      expect(labelMarkers()).toHaveLength(3)
     })
 
     it('collapses back to a count when zoomed out again', () => {
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       const { map } = addControl()
       map.zoom = 7
       map._emit('moveend')
-      expect(labelMarkers()).toHaveLength(2)
+      expect(labelMarkers()).toHaveLength(3)
 
       map.zoom = 6
       map._emit('moveend')
       expect(countMarkers()).toHaveLength(1)
-      expect(labelMarkers()).toHaveLength(0)
+      expect(labelMarkers()).toHaveLength(1)
     })
 
     it('regroups once a map movement settles', () => {
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       const { map } = addControl()
       expect(map._handlerCount('moveend')).toBe(1)
       expect(countMarkers()).toHaveLength(1)
@@ -674,49 +678,51 @@ describe('AprsStationsControl', () => {
       })
       map._emit('moveend')
       expect(countMarkers()).toHaveLength(0)
-      expect(labelMarkers()).toHaveLength(2)
+      expect(labelMarkers()).toHaveLength(3)
     })
 
     it('stops regrouping once the control is removed', () => {
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       const { control, map } = addControl()
       control.onRemove()
       expect(map._handlerCount('moveend')).toBe(0)
     })
 
     it('zooms in on the group when its count is clicked', () => {
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       const { map } = addControl()
       countMarkers()[0]!.element.dispatchEvent(new Event('click'))
+      // Centred on the group it stands for — the leftovers, not the station
+      // that kept its label.
       expect(map.easeTo).toHaveBeenCalledWith(
-        expect.objectContaining({ center: [-1.5, 54.9], zoom: 7 }),
+        expect.objectContaining({ center: [-1.50002, 54.9], zoom: 7 }),
       )
     })
 
     it('keeps the count in place across polls rather than rebuilding it', async () => {
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       addControl()
       const first = countMarkers()[0]!
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       await nextTick()
       expect(countMarkers()).toHaveLength(1)
       expect(countMarkers()[0]).toBe(first)
     })
 
     it('updates the count when a station joins the group', async () => {
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       addControl()
       expect(countMarkers()[0]!.element.textContent).toBe('2')
       store.aprsStations = [
-        ...crowdedPair(),
-        station({ callsign: 'CCC', course: null, latitude: 54.9, longitude: -1.50001 }),
+        ...crowdedTrio(),
+        station({ callsign: 'DDD', course: null, latitude: 54.9, longitude: -1.50006 }),
       ]
       await nextTick()
       expect(countMarkers()[0]!.element.textContent).toBe('3')
     })
 
     it('drops the count when the layer is hidden', () => {
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       const { control } = addControl()
       expect(countMarkers()).toHaveLength(1)
       control.setVisible(false)
@@ -726,7 +732,7 @@ describe('AprsStationsControl', () => {
     it('still lists every counted station in the accessible table', () => {
       // The count is a display grouping; a screen-reader user reads the table,
       // which must not lose the stations behind it.
-      store.aprsStations = crowdedPair()
+      store.aprsStations = crowdedTrio()
       const { map } = addControl()
       const table = map._container.querySelector('[role="region"]')!
       expect(table.textContent).toContain('AAA')
@@ -928,8 +934,17 @@ describe('groupStationsBySite', () => {
   })
 })
 
-describe('clusterSites', () => {
-  /** A projection where one degree is one pixel, so distances read directly. */
+describe('estimateLabelWidth', () => {
+  it('scales with the callsign, from measured labels', () => {
+    // Rendered labels fit 41.5 + 7.5 × characters almost exactly.
+    expect(estimateLabelWidth('A')).toBe(49)
+    expect(estimateLabelWidth('M0IGA')).toBe(79)
+    expect(estimateLabelWidth('M0LONGCALL-15')).toBe(139)
+  })
+})
+
+describe('planLabels', () => {
+  /** One degree to one pixel, so distances read directly. */
   const project = ([lon, lat]: [number, number]) => ({ x: lon, y: lat })
 
   function site(key: string, longitude: number, latitude: number, count = 1) {
@@ -938,7 +953,7 @@ describe('clusterSites', () => {
       longitude,
       latitude,
       stations: Array.from({ length: count }, (_unused, index) => ({
-        callsign: `${key}-${index}`,
+        callsign: index === 0 ? key : `${key}-${index}`,
         latitude,
         longitude,
         symbol: null,
@@ -952,296 +967,122 @@ describe('clusterSites', () => {
       })),
     }
   }
+  const keys = (sites: { key: string }[]) => sites.map((each) => each.key)
 
-  it('leaves sites that are far apart on screen in groups of their own', () => {
-    const clusters = clusterSites([site('a', 0, 0), site('b', 500, 0)], project)
-    expect(clusters).toHaveLength(2)
-    expect(clusters.map((cluster) => cluster.sites.length)).toEqual([1, 1])
+  it('labels every station when none of their labels collide', () => {
+    // Far enough apart that no label reaches another.
+    const plan = planLabels([site('AAA', 0, 0), site('BBB', 0, 400)], project)
+    expect(keys(plan.labelled)).toEqual(['AAA', 'BBB'])
+    expect(plan.counts).toEqual([])
   })
 
-  it('groups sites that land within the cluster radius', () => {
-    // 20px apart: their labels could not both be read.
-    const clusters = clusterSites([site('a', 0, 0), site('b', 20, 0)], project)
-    expect(clusters).toHaveLength(1)
-    expect(clusters[0]!.sites.map((each) => each.key)).toEqual(['a', 'b'])
+  it('labels what fits and counts only the rest', () => {
+    // Three stations in a heap: the first label is placed, the other two land
+    // on it and are counted — rather than all three disappearing into a count.
+    const plan = planLabels([site('AAA', 0, 0), site('BBB', 5, 0), site('CCC', 10, 0)], project)
+    expect(keys(plan.labelled)).toEqual(['AAA'])
+    expect(plan.counts).toHaveLength(1)
+    expect(keys(plan.counts[0]!.sites)).toEqual(['BBB', 'CCC'])
+    expect(plan.counts[0]!.stations).toHaveLength(2)
+  })
+
+  it('labels a lone leftover rather than counting it', () => {
+    // A count of one says less than the callsign it replaced, so the label is
+    // drawn and allowed to overlap.
+    const plan = planLabels([site('AAA', 0, 0), site('BBB', 5, 0)], project)
+    expect(keys(plan.labelled).sort()).toEqual(['AAA', 'BBB'])
+    expect(plan.counts).toEqual([])
+  })
+
+  it('places a label that clears the ones already placed', () => {
+    // BBB and DDD land on AAA and are counted, but CCC is clear — so it keeps
+    // its label rather than being swept up with the pile beside it.
+    const plan = planLabels(
+      [site('AAA', 0, 0), site('BBB', 10, 0), site('CCC', 200, 0), site('DDD', 15, 0)],
+      project,
+    )
+    expect(keys(plan.labelled)).toEqual(['AAA', 'CCC'])
+    expect(plan.counts).toHaveLength(1)
+    expect(keys(plan.counts[0]!.sites)).toEqual(['BBB', 'DDD'])
+  })
+
+  it('separates counts that are nowhere near each other', () => {
+    const plan = planLabels(
+      [
+        site('AAA', 0, 0),
+        site('BBB', 5, 0),
+        site('CCC', 10, 0),
+        site('XXX', 400, 0),
+        site('YYY', 405, 0),
+        site('ZZZ', 410, 0),
+      ],
+      project,
+    )
+    expect(keys(plan.labelled)).toEqual(['AAA', 'XXX'])
+    expect(plan.counts).toHaveLength(2)
+  })
+
+  it('merges two counts when a later label bridges them', () => {
+    // A wide label blocks everything else. Among the leftovers BBB and DDD
+    // start as separate piles, then EEE lands across both — so the two become
+    // one count rather than two overlapping ones.
+    const plan = planLabels(
+      [
+        site('AAAAAAAAAAAAAAAAAAAA', 0, 0),
+        site('BBB', 10, 0),
+        site('DDD', 120, 0),
+        site('EEE', 70, 0),
+      ],
+      project,
+    )
+    expect(keys(plan.labelled)).toEqual(['AAAAAAAAAAAAAAAAAAAA'])
+    expect(plan.counts).toHaveLength(1)
+    expect(keys(plan.counts[0]!.sites).sort()).toEqual(['BBB', 'DDD', 'EEE'])
+  })
+
+  it('keeps leftovers that chain through one another in a single count', () => {
+    // BBB overlaps CCC and CCC overlaps DDD, while BBB and DDD do not touch.
+    const plan = planLabels(
+      [site('AAAAAAAAAA', 0, 0), site('BBB', 10, 0), site('CCC', 60, 0), site('DDD', 110, 0)],
+      project,
+    )
+    expect(plan.counts).toHaveLength(1)
+    expect(keys(plan.counts[0]!.sites).sort()).toEqual(['BBB', 'CCC', 'DDD'])
+  })
+
+  it('ignores labels that miss each other vertically', () => {
+    // Same longitude, a label's height apart: they share no area.
+    const plan = planLabels([site('AAA', 0, 0), site('BBB', 0, 30)], project)
+    expect(plan.counts).toEqual([])
   })
 
   it('counts every station a group stands for, not just its sites', () => {
-    const clusters = clusterSites([site('a', 0, 0, 3), site('b', 10, 0, 2)], project)
-    expect(clusters[0]!.stations).toHaveLength(5)
-  })
-
-  it('takes the group apart as the projection spreads it out', () => {
-    // The same two sites, once the map has zoomed in: the projection now puts
-    // them 200px apart, so they stop being one count and get their own labels.
-    const zoomedOut = clusterSites([site('a', 0, 0), site('b', 20, 0)], project)
-    const zoomedIn = clusterSites([site('a', 0, 0), site('b', 20, 0)], ([lon, lat]) => ({
-      x: lon * 10,
-      y: lat * 10,
-    }))
-    expect(zoomedOut).toHaveLength(1)
-    expect(zoomedIn).toHaveLength(2)
-  })
-
-  it('anchors a group at its first site, so the count sits on a real position', () => {
-    const clusters = clusterSites([site('a', 4, 8), site('b', 20, 8)], project)
-    expect([clusters[0]!.longitude, clusters[0]!.latitude]).toEqual([4, 8])
-  })
-
-  it('measures distance in both axes, not one', () => {
-    // 40px on each axis is 56.6px apart — outside the radius, despite each
-    // axis on its own being inside it.
-    expect(clusterSites([site('a', 0, 0), site('b', 40, 40)], project)).toHaveLength(2)
-  })
-
-  it('merges two groups when a later site bridges them', () => {
-    // a and c are 80px apart — too far to group on their own — but b sits
-    // between them. Measuring only against a group's first member leaves them
-    // in separate groups, each starting its own column, and those columns then
-    // overlap: the collision the column exists to prevent.
-    const clusters = clusterSites([site('a', 0, 0), site('c', 80, 0), site('b', 40, 0)], project)
-    expect(clusters).toHaveLength(1)
-    expect(clusters[0]!.sites.map((each) => each.key).sort()).toEqual(['a', 'b', 'c'])
-  })
-
-  it('keeps every station when groups merge', () => {
-    const clusters = clusterSites(
-      [site('a', 0, 0, 2), site('c', 80, 0, 3), site('b', 40, 0, 1)],
+    const plan = planLabels(
+      [site('AAA', 0, 0, 2), site('BBB', 5, 0, 3), site('CCC', 10, 0, 1)],
       project,
     )
-    expect(clusters[0]!.stations).toHaveLength(6)
+    expect(plan.labelled[0]!.stations).toHaveLength(2)
+    expect(plan.counts[0]!.stations).toHaveLength(4)
   })
 
-  it('handles an empty snapshot', () => {
-    expect(clusterSites([], project)).toEqual([])
-  })
-})
-
-describe('APRS field formatters', () => {
-  it('formatHeardTime renders 24-hour local wall time', () => {
-    const heard = new Date(2026, 6, 25, 21, 33, 47).getTime()
-    expect(formatHeardTime(heard)).toBe('21:33:47')
+  it('places in callsign order, so the choice is stable across polls', () => {
+    const sites = [site('AAA', 0, 0), site('BBB', 5, 0), site('CCC', 10, 0)]
+    const forwards = planLabels(sites, project)
+    const backwards = planLabels([...sites].reverse(), project)
+    expect(keys(forwards.labelled)).toEqual(keys(backwards.labelled))
+    expect(keys(forwards.counts[0]!.sites)).toEqual(keys(backwards.counts[0]!.sites))
   })
 
-  it('formatCourse rounds to whole degrees, or null when unreported', () => {
-    expect(formatCourse(274.6)).toBe('275°')
-    expect(formatCourse(0)).toBe('0°')
-    expect(formatCourse(null)).toBeNull()
+  it('takes the pile apart as the projection spreads it out', () => {
+    const sites = [site('AAA', 0, 0), site('BBB', 5, 0), site('CCC', 10, 0)]
+    const packed = planLabels(sites, project)
+    const spread = planLabels(sites, ([lon, lat]) => ({ x: lon * 40, y: lat }))
+    expect(packed.counts).toHaveLength(1)
+    expect(spread.counts).toEqual([])
+    expect(keys(spread.labelled)).toEqual(['AAA', 'BBB', 'CCC'])
   })
 
-  it('formatSpeed labels km/h — the unit aprslib normalises to', () => {
-    expect(formatSpeed(48.4)).toBe('48 KM/H')
-    expect(formatSpeed(0)).toBe('0 KM/H')
-    expect(formatSpeed(null)).toBeNull()
-  })
-
-  it('formatAltitude labels metres — likewise already converted', () => {
-    expect(formatAltitude(121.9)).toBe('122 M')
-    expect(formatAltitude(0)).toBe('0 M')
-    expect(formatAltitude(null)).toBeNull()
-  })
-
-  describe('truncate', () => {
-    it('returns short text unchanged, trimmed', () => {
-      expect(truncate('  WIDE1-1  ')).toBe('WIDE1-1')
-    })
-
-    it('treats null, empty and whitespace-only text as absent', () => {
-      expect(truncate(null)).toBeNull()
-      expect(truncate('')).toBeNull()
-      expect(truncate('   ')).toBeNull()
-    })
-
-    it('keeps text at exactly the limit intact', () => {
-      const exact = 'x'.repeat(24)
-      expect(truncate(exact)).toBe(exact)
-    })
-
-    it('clips text over the limit and marks it with an ellipsis', () => {
-      const clipped = truncate('y'.repeat(25))!
-      expect(clipped).toHaveLength(24)
-      expect(clipped.endsWith('…')).toBe(true)
-    })
-  })
-})
-
-// ── co-sited stations ─────────────────────────────────────────────────────────
-
-describe('groupStationsBySite', () => {
-  /** Stack position by callsign, for readable assertions. */
-  function stackIndexByCallsign(stations: AprsStation[]): Map<string, number> {
-    const indices = new Map<string, number>()
-    for (const site of groupStationsBySite(stations)) {
-      site.stations.forEach((station, index) => indices.set(station.callsign, index))
-    }
-    return indices
-  }
-
-  function at(callsign: string, latitude: number, longitude: number): AprsStation {
-    return {
-      callsign,
-      latitude,
-      longitude,
-      symbol: '/>',
-      comment: null,
-      course: null,
-      speed: null,
-      altitude: null,
-      path: null,
-      raw: null,
-      last_heard_ms: 0,
-    }
-  }
-
-  it('gives every station index 0 when none share a site', () => {
-    const indices = stackIndexByCallsign([at('A', 54.9, -1.5), at('B', 55.2, -1.9)])
-    expect(indices.get('A')).toBe(0)
-    expect(indices.get('B')).toBe(0)
-  })
-
-  it('stacks stations beaconing identical coordinates', () => {
-    // Real case: a repeater and a gateway on one mast.
-    const indices = stackIndexByCallsign([
-      at('MB7IAE-L', 54.898666, -2.243833),
-      at('M0UKB-L', 54.898666, -2.243833),
-    ])
-    expect(indices.get('M0UKB-L')).toBe(0)
-    expect(indices.get('MB7IAE-L')).toBe(1)
-  })
-
-  it('groups only stations reporting the very same fix', () => {
-    // Real data: GB3CD and GB3CD-R beacon an identical position, while
-    // MB7VU-10 is ~11 m west. Grouping on the reported values rather than a
-    // tolerance keeps a site a genuine single point, so its labels can never
-    // drift away from the leaders drawn to them as the map zooms in.
-    const sites = groupStationsBySite([
-      at('GB3CD', 54.735166, -1.7448333),
-      at('GB3CD-R', 54.735166, -1.7448333),
-      at('MB7VU-10', 54.735166, -1.745),
-    ])
-    expect(sites).toHaveLength(2)
-    expect(sites[0]!.stations.map((each) => each.callsign)).toEqual(['GB3CD', 'GB3CD-R'])
-    expect(sites[1]!.stations.map((each) => each.callsign)).toEqual(['MB7VU-10'])
-  })
-
-  it('keeps stations far enough apart on their own true positions', () => {
-    const indices = stackIndexByCallsign([at('A', 54.9, -1.5), at('B', 54.9, -1.51)])
-    expect(indices.get('A')).toBe(0)
-    expect(indices.get('B')).toBe(0)
-  })
-
-  it('orders a stack by callsign, so it is stable across polls', () => {
-    const first = stackIndexByCallsign([at('ZZZ', 54.9, -1.5), at('AAA', 54.9, -1.5)])
-    // Same stations, opposite arrival order → identical stack positions.
-    const second = stackIndexByCallsign([at('AAA', 54.9, -1.5), at('ZZZ', 54.9, -1.5)])
-    expect(first.get('AAA')).toBe(0)
-    expect(first.get('ZZZ')).toBe(1)
-    expect(second).toEqual(first)
-  })
-
-  it('handles an empty snapshot', () => {
-    expect(groupStationsBySite([])).toEqual([])
-  })
-
-  it('carries each site’s position, so its dot can be placed', () => {
-    const sites = groupStationsBySite([
-      at('A', 54.9, -1.5),
-      at('B', 54.9, -1.5),
-      at('C', 55.4, -2.2),
-    ])
-    expect(sites).toHaveLength(2)
-    expect(sites[0]!.stations.map((each) => each.callsign)).toEqual(['A', 'B'])
-    expect(sites[0]!.latitude).toBe(54.9)
-    expect(sites[0]!.longitude).toBe(-1.5)
-    expect(sites[1]!.stations).toHaveLength(1)
-  })
-})
-
-describe('clusterSites', () => {
-  /** A projection where one degree is one pixel, so distances read directly. */
-  const project = ([lon, lat]: [number, number]) => ({ x: lon, y: lat })
-
-  function site(key: string, longitude: number, latitude: number, count = 1) {
-    return {
-      key,
-      longitude,
-      latitude,
-      stations: Array.from({ length: count }, (_unused, index) => ({
-        callsign: `${key}-${index}`,
-        latitude,
-        longitude,
-        symbol: null,
-        comment: null,
-        course: null,
-        speed: null,
-        altitude: null,
-        path: null,
-        raw: null,
-        last_heard_ms: 0,
-      })),
-    }
-  }
-
-  it('leaves sites that are far apart on screen in groups of their own', () => {
-    const clusters = clusterSites([site('a', 0, 0), site('b', 500, 0)], project)
-    expect(clusters).toHaveLength(2)
-    expect(clusters.map((cluster) => cluster.sites.length)).toEqual([1, 1])
-  })
-
-  it('groups sites that land within the cluster radius', () => {
-    // 20px apart: their labels could not both be read.
-    const clusters = clusterSites([site('a', 0, 0), site('b', 20, 0)], project)
-    expect(clusters).toHaveLength(1)
-    expect(clusters[0]!.sites.map((each) => each.key)).toEqual(['a', 'b'])
-  })
-
-  it('counts every station a group stands for, not just its sites', () => {
-    const clusters = clusterSites([site('a', 0, 0, 3), site('b', 10, 0, 2)], project)
-    expect(clusters[0]!.stations).toHaveLength(5)
-  })
-
-  it('takes the group apart as the projection spreads it out', () => {
-    // The same two sites, once the map has zoomed in: the projection now puts
-    // them 200px apart, so they stop being one count and get their own labels.
-    const zoomedOut = clusterSites([site('a', 0, 0), site('b', 20, 0)], project)
-    const zoomedIn = clusterSites([site('a', 0, 0), site('b', 20, 0)], ([lon, lat]) => ({
-      x: lon * 10,
-      y: lat * 10,
-    }))
-    expect(zoomedOut).toHaveLength(1)
-    expect(zoomedIn).toHaveLength(2)
-  })
-
-  it('anchors a group at its first site, so the count sits on a real position', () => {
-    const clusters = clusterSites([site('a', 4, 8), site('b', 20, 8)], project)
-    expect([clusters[0]!.longitude, clusters[0]!.latitude]).toEqual([4, 8])
-  })
-
-  it('measures distance in both axes, not one', () => {
-    // 40px on each axis is 56.6px apart — outside the radius, despite each
-    // axis on its own being inside it.
-    expect(clusterSites([site('a', 0, 0), site('b', 40, 40)], project)).toHaveLength(2)
-  })
-
-  it('merges two groups when a later site bridges them', () => {
-    // a and c are 80px apart — too far to group on their own — but b sits
-    // between them. Measuring only against a group's first member leaves them
-    // in separate groups, each starting its own column, and those columns then
-    // overlap: the collision the column exists to prevent.
-    const clusters = clusterSites([site('a', 0, 0), site('c', 80, 0), site('b', 40, 0)], project)
-    expect(clusters).toHaveLength(1)
-    expect(clusters[0]!.sites.map((each) => each.key).sort()).toEqual(['a', 'b', 'c'])
-  })
-
-  it('keeps every station when groups merge', () => {
-    const clusters = clusterSites(
-      [site('a', 0, 0, 2), site('c', 80, 0, 3), site('b', 40, 0, 1)],
-      project,
-    )
-    expect(clusters[0]!.stations).toHaveLength(6)
-  })
-
-  it('handles an empty snapshot', () => {
-    expect(clusterSites([], project)).toEqual([])
+  it('plans nothing for an empty snapshot', () => {
+    expect(planLabels([], project)).toEqual({ labelled: [], counts: [] })
   })
 })
