@@ -1127,6 +1127,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #256 from barrygee/feat/aprs-label-styling
 - Merge pull request #257 from barrygee/fix/vitest-scrollintoview
 - Merge pull request #258 from barrygee/style/aprs-marker-and-symbols
+- Merge pull request #259 from barrygee/style/logo-white-ring
 
 ### Refactoring
 
@@ -1307,6 +1308,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Draw direction arrows smaller than station symbols
 - Set the APRS count in the callsign's weight
 - Darken the APRS count marker's ring a shade further
+- White ring on the logo mark and app icon, lighter wordmark
 
 ### Dependencies
 
