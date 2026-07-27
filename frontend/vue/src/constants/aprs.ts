@@ -22,9 +22,10 @@ export const APRS_ACCENT_COLOR = '#ffffff'
  */
 export const APRS_BADGE_BACKGROUND = '#15171d'
 
-/** Ring around the site marker — black, as the labels' own background is. */
-export const APRS_SITE_MARKER_RING = '#000000'
+/** Fill of a count marker — black, as the labels' own background is, so a group
+ *  reads as part of the same set as the labels it stands in for. */
+export const APRS_COUNT_FILL = '#000000'
 
-/** Centre dot of the site marker — the app's panel grey, dark but distinct
- *  from the black ring around it. */
-export const APRS_SITE_MARKER_CENTRE = '#26292e'
+/** Ring around a count marker, holding it clear of whatever the basemap puts
+ *  underneath it. */
+export const APRS_COUNT_RING = '#26292e'

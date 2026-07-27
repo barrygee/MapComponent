@@ -5,8 +5,8 @@ import { aprsSymbolIcon, aprsSymbolSvg } from '@/utils/aprsSymbols'
 import {
   APRS_ACCENT_COLOR,
   APRS_BADGE_BACKGROUND,
-  APRS_SITE_MARKER_CENTRE,
-  APRS_SITE_MARKER_RING,
+  APRS_COUNT_FILL,
+  APRS_COUNT_RING,
 } from '@/constants/aprs'
 import {
   appendMirrored,
@@ -19,7 +19,6 @@ import {
   createNameSegment,
   isLeftFacing,
   MAP_LABEL_GLYPH_SIZE_PX,
-  MAP_LABEL_SIZE_PX,
 } from '@/components/shared/map-label/mapLabelParts'
 import type { AprsStation, useLandStore } from '@/stores/land'
 
@@ -42,10 +41,10 @@ export class AprsStationsControl extends SentinelControlBase {
   private _markers = new Map<string, maplibregl.Marker>()
   private _markerSignatures = new Map<string, string>()
   private _markerPositions = new Map<string, [number, number]>()
-  private _siteMarkers = new Map<string, maplibregl.Marker>()
-  /** Signature of each site's leader geometry, so a marker is only rebuilt when
-   *  the stations sharing the site change. */
-  private _siteSignatures = new Map<string, string>()
+  private _clusterMarkers = new Map<string, maplibregl.Marker>()
+  /** How many stations each count stands for, so it is only rebuilt when that
+   *  number changes. */
+  private _clusterCounts = new Map<string, number>()
   private _onMapMoveEnd: (() => void) | null = null
   private _stopWatch: WatchStopHandle | null = null
   private _a11yRegion: HTMLDivElement | null = null
@@ -142,73 +141,25 @@ export class AprsStationsControl extends SentinelControlBase {
   /** Add/update/remove markers so the on-map set matches `stations` by callsign. */
   private _syncMarkers(stations: AprsStation[]): void {
     const seen = new Set<string>()
-    const seenSites = new Set<string>()
+    const seenClusters = new Set<string>()
 
-    // Sites close enough on screen to collide share one column of labels, each
-    // still tethered to its own marker. Which sites those are changes with the
-    // zoom, so the grouping is recomputed whenever the view settles.
-    const clusters = clusterSites(groupStationsBySite(stations), (position) =>
-      this.map.project(position),
-    )
-    for (const { site, layout } of planSiteLayout(clusters)) {
-      // A station standing alone sits on its own position and needs no tether.
-      // Anywhere labels would pile up, each site gets a marker on its real
-      // position and its labels are displaced into the shared column below.
-      const isShared = layout.displaced
-      // Every label in a cluster hangs from the cluster's anchor rather than
-      // from its own site, or a column drawn from sites tens of pixels apart is
-      // smeared by that much and the labels overlap anyway. Measured in pixels,
-      // so it is recomputed whenever the view settles.
-      const fromAnchor = isShared ? this._pixelsFromAnchor(site, layout.anchor) : [0, 0]
-      if (isShared) {
-        seenSites.add(site.key)
-        this._syncSiteMarker(site, layout.startIndex, fromAnchor as [number, number])
+    for (const cluster of this._clustersInView(stations)) {
+      // A group of stations sitting on top of each other is shown as a count
+      // until the map is zoomed in far enough to read them; anything that
+      // stands clear is labelled as normal at every zoom.
+      if (this._collapsesToCount(cluster)) {
+        seenClusters.add(cluster.key)
+        this._syncClusterMarker(cluster)
+        continue
       }
-      site.stations.forEach((station, indexInSite) => {
-        const stackIndex = layout.startIndex + indexInSite
+      for (const station of cluster.stations) {
         seen.add(station.callsign)
-        const coords: [number, number] = [station.longitude, station.latitude]
-        // A displaced label steps clear of the site marker's own square; a lone
-        // station stays on its true position.
-        const offset: [number, number] = isShared
-          ? [
-              fromAnchor[0]! + this._labelHorizontalOffset(station),
-              fromAnchor[1]! + labelVerticalOffset(stackIndex),
-            ]
-          : [0, 0]
-        const signature = this._markerSignature(station, offset)
-        const existing = this._markers.get(station.callsign)
-        // Label content unchanged → keep the existing marker. A station only
-        // ever moves when its beacon actually reports a new fix: re-plotting on
-        // an unchanged position would make a stationary marker twitch as the
-        // poll repeats the same snapshot.
-        if (existing && this._markerSignatures.get(station.callsign) === signature) {
-          if (this._hasMoved(station.callsign, coords)) {
-            existing.setLngLat(coords)
-            this._markerPositions.set(station.callsign, coords)
-          }
-          return
-        }
-        // Anything else (a new field value, a course change that flips the
-        // pill's direction, or a change in how many stations share the site)
-        // needs the marker rebuilding, since MapLibre fixes the element, anchor
-        // and offset at construction.
-        existing?.remove()
-        const marker = new maplibregl.Marker({
-          element: this._buildMarkerElement(station),
-          // Keep the leading edge over the station's position: a left-facing
-          // pill extends leftward, so it anchors by its right edge.
-          anchor: this._isLeftFacing(station) ? 'right' : 'left',
-          offset,
-        })
-          .setLngLat(coords)
-          .addTo(this.map)
-        this._markers.set(station.callsign, marker)
-        this._markerSignatures.set(station.callsign, signature)
-        this._markerPositions.set(station.callsign, coords)
-      })
+        this._syncStationMarker(station)
+      }
     }
-    // Drop markers for stations no longer present (expired or hidden).
+
+    // Drop markers for stations no longer plotted — expired, hidden, or now
+    // inside a count.
     for (const [callsign, marker] of this._markers) {
       if (!seen.has(callsign)) {
         marker.remove()
@@ -217,76 +168,91 @@ export class AprsStationsControl extends SentinelControlBase {
         this._markerPositions.delete(callsign)
       }
     }
-    // …and dots for sites that no longer need one.
-    for (const [key, marker] of this._siteMarkers) {
-      if (!seenSites.has(key)) {
+    // …and counts for groups the zoom has since taken apart.
+    for (const [key, marker] of this._clusterMarkers) {
+      if (!seenClusters.has(key)) {
         marker.remove()
-        this._siteMarkers.delete(key)
-        this._siteSignatures.delete(key)
+        this._clusterMarkers.delete(key)
+        this._clusterCounts.delete(key)
       }
     }
   }
 
+  /** The stations grouped as they read at the current zoom. */
+  private _clustersInView(stations: AprsStation[]): SiteCluster[] {
+    return clusterSites(groupStationsBySite(stations), (position) => this.map.project(position))
+  }
+
   /**
-   * Place (or move) the marker showing a shared site's real position, together
-   * with the leaders reaching each of its labels.
+   * Whether a group is shown as a count rather than as labels.
+   *
+   * Only groups — a station standing clear is always labelled, at every zoom.
+   * Past the reveal zoom the labels are shown regardless: by then the operator
+   * has asked for that area specifically, and overlapping labels they can pan
+   * around beat a number they cannot open.
    */
-  private _syncSiteMarker(
-    site: StationSite,
-    startIndex: number,
-    fromAnchor: [number, number],
-  ): void {
-    const coords: [number, number] = [site.longitude, site.latitude]
-    const branches = this._leaderBranches(site, startIndex, fromAnchor)
-    const signature = JSON.stringify(branches)
-    const existing = this._siteMarkers.get(site.key)
-    if (existing) {
-      existing.setLngLat(coords)
-      // Only redraw the leaders when the stations sharing the site change.
-      if (this._siteSignatures.get(site.key) !== signature) {
-        renderSiteLeaders(existing.getElement(), branches)
-        this._siteSignatures.set(site.key, signature)
+  private _collapsesToCount(cluster: SiteCluster): boolean {
+    return cluster.stations.length > 1 && this.map.getZoom() < LABEL_REVEAL_ZOOM
+  }
+
+  /** Add, move or rebuild one station's label. */
+  private _syncStationMarker(station: AprsStation): void {
+    const coords: [number, number] = [station.longitude, station.latitude]
+    const signature = this._markerSignature(station)
+    const existing = this._markers.get(station.callsign)
+    // Label content unchanged → keep the existing marker. A station only ever
+    // moves when its beacon actually reports a new fix: re-plotting on an
+    // unchanged position would make a stationary marker twitch as the poll
+    // repeats the same snapshot.
+    if (existing && this._markerSignatures.get(station.callsign) === signature) {
+      if (this._hasMoved(station.callsign, coords)) {
+        existing.setLngLat(coords)
+        this._markerPositions.set(station.callsign, coords)
       }
       return
     }
+    // Anything else (a new field value, or a course change that flips the
+    // pill's direction) needs the marker rebuilding, since MapLibre fixes the
+    // element and anchor at construction.
+    existing?.remove()
     const marker = new maplibregl.Marker({
-      element: buildSiteMarker(branches),
-      anchor: 'center',
+      element: this._buildMarkerElement(station),
+      // Keep the leading edge over the station's position: a left-facing pill
+      // extends leftward, so it anchors by its right edge.
+      anchor: this._isLeftFacing(station) ? 'right' : 'left',
     })
       .setLngLat(coords)
       .addTo(this.map)
-    this._siteMarkers.set(site.key, marker)
-    this._siteSignatures.set(site.key, signature)
+    this._markers.set(station.callsign, marker)
+    this._markerSignatures.set(station.callsign, signature)
+    this._markerPositions.set(station.callsign, coords)
   }
 
   /**
-   * Where each of a site's labels sits, relative to the site marker, in pixels.
-   *
-   * `fromAnchor` carries the site's own displacement from the column's anchor,
-   * so a leader still lands on the label wherever the column was drawn from.
+   * Place (or move) the count standing for a group of stations, and zoom in on
+   * the group when it is clicked.
    */
-  private _leaderBranches(
-    site: StationSite,
-    startIndex: number,
-    fromAnchor: [number, number],
-  ): LeaderBranch[] {
-    return site.stations.map((station, indexInSite) => ({
-      dx: fromAnchor[0] + this._labelHorizontalOffset(station),
-      dy: fromAnchor[1] + labelVerticalOffset(startIndex + indexInSite),
-    }))
-  }
-
-  /** How far a site sits from its cluster's anchor, in screen pixels. */
-  private _pixelsFromAnchor(site: StationSite, anchor: [number, number]): [number, number] {
-    const anchorPoint = this.map.project(anchor)
-    const sitePoint = this.map.project([site.longitude, site.latitude])
-    return [anchorPoint.x - sitePoint.x, anchorPoint.y - sitePoint.y]
-  }
-
-  /** Which way a label is displaced: away from the marker, on the side its
-   *  leading edge faces. */
-  private _labelHorizontalOffset(station: AprsStation): number {
-    return this._isLeftFacing(station) ? -LEADER_HORIZONTAL_OFFSET_PX : LEADER_HORIZONTAL_OFFSET_PX
+  private _syncClusterMarker(cluster: SiteCluster): void {
+    const coords: [number, number] = [cluster.longitude, cluster.latitude]
+    const existing = this._clusterMarkers.get(cluster.key)
+    if (existing && this._clusterCounts.get(cluster.key) === cluster.stations.length) {
+      existing.setLngLat(coords)
+      return
+    }
+    existing?.remove()
+    const element = buildClusterMarker(cluster.stations.length)
+    element.addEventListener('click', (domEvent: Event) => {
+      domEvent.stopPropagation()
+      // Straight to the zoom where labels appear, centred on the group — the
+      // count's whole purpose is to say "there is something here", so one click
+      // should show what.
+      this.map.easeTo({ center: coords, zoom: LABEL_REVEAL_ZOOM, duration: 300 })
+    })
+    const marker = new maplibregl.Marker({ element, anchor: 'center' })
+      .setLngLat(coords)
+      .addTo(this.map)
+    this._clusterMarkers.set(cluster.key, marker)
+    this._clusterCounts.set(cluster.key, cluster.stations.length)
   }
 
   /** Whether this snapshot carries a genuinely new fix for the station, rather
@@ -315,14 +281,11 @@ export class AprsStationsControl extends SentinelControlBase {
    * cheaper `setLngLat` path. Facing is always included because it decides the
    * marker's anchor, not just its content.
    */
-  private _markerSignature(station: AprsStation, offset: [number, number]): string {
+  private _markerSignature(station: AprsStation): string {
     const fields = this._landStore.aprsLabelFields
     const shown = (enabled: boolean, value: unknown) => (enabled ? value : null)
     return JSON.stringify([
       this._isLeftFacing(station),
-      // The offset is fixed when the marker is constructed, so a change in how
-      // many stations share this site has to rebuild it.
-      offset,
       fields,
       shown(fields.callsign, station.callsign),
       shown(fields.symbolText, station.symbol),
@@ -492,24 +455,61 @@ export class AprsStationsControl extends SentinelControlBase {
     this._markers.clear()
     this._markerSignatures.clear()
     this._markerPositions.clear()
-    for (const marker of this._siteMarkers.values()) marker.remove()
-    this._siteMarkers.clear()
-    this._siteSignatures.clear()
+    for (const marker of this._clusterMarkers.values()) marker.remove()
+    this._clusterMarkers.clear()
+    this._clusterCounts.clear()
   }
 }
 
-/** Vertical step between the labels of stations sharing one site, in pixels —
- *  just over a label's height, so stacked pills read as a list without touching. */
-const STACKED_LABEL_OFFSET_PX = 30
+/**
+ * The zoom at which a crowded group gives way to its labels.
+ *
+ * The Land map opens at zoom 6 (see LandView), so this is the first step in
+ * from the standard view: counts summarise the picture at a glance, and moving
+ * closer to an area is the operator asking to see what is in it.
+ */
+const LABEL_REVEAL_ZOOM = 7
 
-/** How far a displaced label is pushed sideways from its site marker, in pixels.
- *  Gives the tether room to curve rather than doubling back on itself. */
-const LEADER_HORIZONTAL_OFFSET_PX = 28
+/** Diameter of a count marker, in pixels. Big enough to hold a two-digit
+ *  count at the labels' own type size. */
+const CLUSTER_MARKER_SIZE_PX = 26
 
-/** How far below a shared site's marker the nth label sits, in pixels. Clears
- *  the marker's own square before stepping, so the first leader can curve. */
-function labelVerticalOffset(stackIndex: number): number {
-  return MAP_LABEL_SIZE_PX / 2 + (stackIndex + 1) * STACKED_LABEL_OFFSET_PX
+/** Width of the ring around a count marker, in pixels. */
+const CLUSTER_MARKER_RING_PX = 1.6
+
+/**
+ * The marker standing for a group of stations too close together to label.
+ *
+ * Interactive, unlike a label: it takes pointer events so a click can zoom in
+ * to reveal what it stands for, and it carries a name for assistive tech
+ * because it is the only thing on the map representing those stations.
+ */
+export function buildClusterMarker(count: number): HTMLElement {
+  const marker = document.createElement('button')
+  marker.type = 'button'
+  marker.className = 'aprs-cluster-marker'
+  marker.setAttribute('aria-label', `${count} APRS stations here — zoom in to see them`)
+  marker.style.cssText = [
+    `width:${CLUSTER_MARKER_SIZE_PX}px`,
+    `height:${CLUSTER_MARKER_SIZE_PX}px`,
+    'padding:0',
+    'border:none',
+    'border-radius:50%',
+    `background:${APRS_COUNT_FILL}`,
+    `box-shadow:0 0 0 ${CLUSTER_MARKER_RING_PX}px ${APRS_COUNT_RING}`,
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    `color:${APRS_ACCENT_COLOR}`,
+    "font-family:'Barlow Condensed','Barlow',sans-serif",
+    'font-size:13px',
+    'font-weight:700',
+    'letter-spacing:.04em',
+    'cursor:pointer',
+    'pointer-events:auto',
+  ].join(';')
+  marker.textContent = String(count)
+  return marker
 }
 
 /**
@@ -589,45 +589,6 @@ export function clusterSites(
   return clusters
 }
 
-/** Where a site's labels sit in the column shared with its neighbours. */
-export interface SiteLayout {
-  /** Position of the site's first label in the column. */
-  startIndex: number
-  /** Whether its labels are displaced into the column at all — false for a
-   *  station standing on its own, which keeps its position and needs no marker. */
-  displaced: boolean
-  /** The position the whole column hangs from, so labels from different sites
-   *  line up with each other instead of each hanging off its own marker. */
-  anchor: [number, number]
-}
-
-/**
- * Decide where each site's labels sit.
- *
- * Sites are exact positions, but sites that land close together on screen still
- * collide — so everything in one cluster shares a single column of labels,
- * numbered straight through, while each site keeps its own marker on its own
- * real position. Because a label's offset is measured from its own marker, the
- * two stay joined however far apart the sites drift as the map zooms in.
- */
-export function planSiteLayout(
-  clusters: SiteCluster[],
-): { site: StationSite; layout: SiteLayout }[] {
-  const planned: { site: StationSite; layout: SiteLayout }[] = []
-  for (const cluster of clusters) {
-    // A single station standing alone needs no column and no marker; anything
-    // more would pile up without one.
-    const displaced = cluster.stations.length > 1
-    const anchor: [number, number] = [cluster.longitude, cluster.latitude]
-    let startIndex = 0
-    for (const site of cluster.sites) {
-      planned.push({ site, layout: { startIndex, displaced, anchor } })
-      startIndex += site.stations.length
-    }
-  }
-  return planned
-}
-
 /** Stations sharing one position, with the position they share. */
 export interface StationSite {
   /** The shared "lat,lon" identifying the site. */
@@ -674,158 +635,6 @@ export function groupStationsBySite(stations: AprsStation[]): StationSite[] {
     site.stations.sort((left, right) => left.callsign.localeCompare(right.callsign))
   }
   return [...sites.values()]
-}
-
-/** Diameter of the site marker's inner dot, in pixels. Small: it marks a point,
- *  and has to sit under a column of labels without competing with them. */
-const SITE_MARKER_SIZE_PX = 12
-
-/** XML namespace every SVG element the control builds must be created in. */
-const SVG_NAMESPACE = 'http://www.w3.org/2000/svg'
-
-/** Width of the marker's black outer ring, in pixels. */
-const SITE_MARKER_RING_PX = 1.6
-
-/** Radius of the dot at the marker's centre, in pixels. Sized against the ring
- *  in the same proportion the user-location marker uses. */
-const SITE_MARKER_DOT_RADIUS_PX = 2.2
-
-/**
- * The marker showing a shared site's real position.
- *
- * Built on the same ring-and-dot the user-location marker uses — a stroked
- * ring with the map showing through, and a separate dot at the centre — so a
- * position reads as a position wherever it appears. Its own colours, though:
- * a black ring around the app's panel grey, rather than the location marker's
- * white and accent, which would claim more attention than a site deserves.
- *
- * Nothing else is drawn inside: a glyph here would compete with the station
- * symbols on the labels it leads to.
- *
- * Purely a position cue: it takes no pointer events, so it never intercepts a
- * click meant for a label, and is hidden from assistive tech, which reads the
- * stations from the data table instead.
- */
-export function buildSiteMarker(branches: LeaderBranch[]): HTMLElement {
-  const marker = document.createElement('div')
-  marker.className = 'aprs-site-marker'
-  marker.setAttribute('aria-hidden', 'true')
-  marker.style.cssText = [
-    `width:${SITE_MARKER_SIZE_PX}px`,
-    `height:${SITE_MARKER_SIZE_PX}px`,
-    'pointer-events:none',
-  ].join(';')
-  renderSiteLeaders(marker, branches)
-
-  const centre = SITE_MARKER_SIZE_PX / 2
-  // The ring's stroke straddles its radius, so the radius is pulled in by half
-  // the stroke to keep the whole marker inside its box.
-  const ringRadius = centre - SITE_MARKER_RING_PX / 2
-  const rings = document.createElementNS(SVG_NAMESPACE, 'svg')
-  rings.setAttribute('width', String(SITE_MARKER_SIZE_PX))
-  rings.setAttribute('height', String(SITE_MARKER_SIZE_PX))
-  rings.setAttribute('viewBox', `0 0 ${SITE_MARKER_SIZE_PX} ${SITE_MARKER_SIZE_PX}`)
-  rings.setAttribute('fill', 'none')
-  rings.style.cssText = 'position:absolute;left:0;top:0'
-  rings.innerHTML =
-    `<circle cx="${centre}" cy="${centre}" r="${ringRadius}" fill="none" ` +
-    `stroke="${APRS_SITE_MARKER_RING}" stroke-width="${SITE_MARKER_RING_PX}"/>` +
-    `<circle cx="${centre}" cy="${centre}" r="${SITE_MARKER_DOT_RADIUS_PX}" ` +
-    `fill="${APRS_SITE_MARKER_CENTRE}"/>`
-  marker.appendChild(rings)
-  return marker
-}
-
-/**
- * Draw (or redraw) a site marker's leaders.
- *
- * Separate from building the marker because the branches are screen-space: two
- * stations inside one site's tolerance are the same point when zoomed out and
- * metres apart when zoomed in, so the leaders have to be recomputed as the map
- * zooms or the labels drift away from them.
- */
-export function renderSiteLeaders(marker: HTMLElement, branches: LeaderBranch[]): void {
-  marker.querySelector('.aprs-site-leaders')?.remove()
-  // Behind the square, so each leader appears to emerge from under the marker
-  // rather than from a point floating on top of it.
-  marker.insertBefore(createSiteLeaders(branches), marker.firstChild)
-}
-
-/** Where a displaced label's leading edge sits, relative to its site marker. */
-export interface LeaderBranch {
-  /** Horizontal offset in pixels; negative for a left-facing label. */
-  dx: number
-  /** Vertical offset in pixels, always below the marker. */
-  dy: number
-}
-
-/** Radius of the corner where a leader turns out of its vertical run. */
-const LEADER_CORNER_PX = 26
-
-/** Round a path coordinate to a tenth of a pixel — finer than the screen can
- *  show, without dragging float noise into the markup. */
-function roundToPixelFraction(value: number): number {
-  return Math.round(value * 10) / 10
-}
-
-/**
- * Build the leader graphic joining a shared site's marker to each of its
- * displaced labels.
- *
- * Drawn once per site rather than once per label: separate full-length curves
- * from every label overlap into a braid under the marker, where a single comb —
- * one vertical run with a rounded turn into each label — stays legible however
- * many stations share the mast.
- *
- * Dashed rather than solid so a leader never reads as a track or route, which
- * the Air domain draws solid.
- */
-export function createSiteLeaders(branches: LeaderBranch[]): SVGSVGElement {
-  const svg = document.createElementNS(SVG_NAMESPACE, 'svg')
-  svg.setAttribute('class', 'aprs-site-leaders')
-  svg.setAttribute('aria-hidden', 'true')
-  svg.setAttribute('width', String(SITE_MARKER_SIZE_PX))
-  svg.setAttribute('height', String(SITE_MARKER_SIZE_PX))
-  svg.setAttribute('viewBox', `0 0 ${SITE_MARKER_SIZE_PX} ${SITE_MARKER_SIZE_PX}`)
-  svg.setAttribute('fill', 'none')
-  // Branches run well outside the marker's own box; `overflow:visible` is what
-  // lets them draw there, and the marker square covers where they start.
-  svg.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none'
-
-  const centre = SITE_MARKER_SIZE_PX / 2
-  for (const branch of branches) {
-    // Projected pixel deltas carry float noise; a sub-pixel path coordinate is
-    // meaningless on screen and makes the markup unreadable.
-    const endY = roundToPixelFraction(centre + branch.dy)
-    const endX = roundToPixelFraction(centre + branch.dx)
-    // Starts at the marker's lower edge rather than its centre: the ring has a
-    // gap the map shows through, and a leader begun at the centre puts a dash
-    // inside it. A straight run, a rounded corner, then a short reach to the
-    // label. Drawn as explicit segments rather than one sweeping curve so that
-    // every branch's
-    // vertical run lies on exactly the same line — and, sharing a start point,
-    // the same dash phase — collapsing into one clean stem instead of the fan a
-    // single curve per label produces.
-    const towardLabel = Math.sign(branch.dx)
-    const corner = roundToPixelFraction(
-      Math.min(LEADER_CORNER_PX, Math.abs(branch.dx), Math.abs(branch.dy) - centre),
-    )
-    const path = document.createElementNS(SVG_NAMESPACE, 'path')
-    path.setAttribute(
-      'd',
-      `M ${centre} ${SITE_MARKER_SIZE_PX} ` +
-        `L ${centre} ${endY - corner} ` +
-        `Q ${centre} ${endY} ${centre + corner * towardLabel} ${endY} ` +
-        `L ${endX} ${endY}`,
-    )
-    path.setAttribute('stroke', 'rgba(255,255,255,0.5)')
-    path.setAttribute('stroke-width', '1.6')
-    path.setAttribute('stroke-dasharray', '2.5 3.5')
-    path.setAttribute('stroke-linecap', 'round')
-    path.setAttribute('fill', 'none')
-    svg.appendChild(path)
-  }
-  return svg
 }
 
 /** Time a station was last heard, as 24-hour local wall time. */

@@ -99,7 +99,10 @@ describe('APRS map/list parity', () => {
     control.onAdd({
       getContainer: () => container,
       project: ([lon, lat]: [number, number]) => ({ x: lon * 1_000_000, y: -lat * 1_000_000 }),
-      fitBounds: () => {},
+      // Zoomed in past the reveal level, so crowded stations are labelled and
+      // the map's plotted set matches the panel's list one-for-one.
+      getZoom: () => 10,
+      easeTo: () => {},
       on: () => {},
       off: () => {},
     } as never)
