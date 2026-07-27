@@ -10,9 +10,10 @@
     --color-text-muted: rgba(255, 255, 255, 0.75);
     --color-border: rgba(255, 255, 255, 0.08);
     --color-border-mid: rgba(255, 255, 255, 0.1);
-    /* Stealth-grey control fill (rail buttons/panels, slider tracks) — matches
-       the logo mark's outer ring (frontend/assets/logo.svg); keep the two in
-       sync (guarded by designTokens.spec.ts). */
+    /* Stealth-grey control fill (rail buttons/panels, slider tracks). This was
+       originally taken from the logo mark's outer ring; the ring is now white,
+       so the two are no longer linked — this grey stands on its own as the
+       control surface and must NOT follow the mark. */
     --color-button-bg: #26292e;
     /* Search/filter field rows (Air + Space sidebar filters, SDR recordings).
        A translucent black scrim rather than a fixed hex so the field always
