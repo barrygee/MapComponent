@@ -464,8 +464,28 @@ export class AprsStationsControl extends SentinelControlBase {
  */
 const LABEL_REVEAL_ZOOM = 7
 
+/**
+ * Largest count shown as a number; beyond it the marker reads "99+".
+ *
+ * The marker is a fixed circle, so the text has to fit it — and past a hundred
+ * the exact figure tells an operator nothing the "+" does not. Capping the
+ * displayed text rather than the group keeps every station inside one marker;
+ * splitting a huddle into several 99s would just stack markers on one spot.
+ */
+const MAX_DISPLAYED_COUNT = 99
+
+/** Text for a count marker, capped so it always fits the circle. */
+export function formatCount(count: number): string {
+  return count > MAX_DISPLAYED_COUNT ? `${MAX_DISPLAYED_COUNT}+` : String(count)
+}
+
 /** Diameter of a count marker, in pixels — the ring's outer edge. */
 const CLUSTER_MARKER_SIZE_PX = 32
+
+/** How close two unlabelled stations must be to share a count, in pixels.
+ *  The marker's own width, so a count never covers more ground than it draws
+ *  over, and two counts never land on top of each other. */
+const COUNT_GROUP_RADIUS_PX = CLUSTER_MARKER_SIZE_PX
 
 /** Width of the ring around a count marker, in pixels. */
 const CLUSTER_MARKER_RING_PX = 3
@@ -493,9 +513,12 @@ const CLUSTER_MARKER_CENTRE_PX = 20
  * because it is the only thing on the map representing those stations.
  */
 export function buildClusterMarker(count: number): HTMLElement {
+  const text = formatCount(count)
   const marker = document.createElement('button')
   marker.type = 'button'
   marker.className = 'aprs-cluster-marker'
+  // The name carries the true figure even when the face is capped: a screen
+  // reader has room for it where the circle does not.
   marker.setAttribute('aria-label', `${count} APRS stations here — zoom in to see them`)
   marker.style.cssText = [
     `width:${CLUSTER_MARKER_SIZE_PX}px`,
@@ -525,14 +548,16 @@ export function buildClusterMarker(count: number): HTMLElement {
     'justify-content:center',
     `color:${APRS_ACCENT_COLOR}`,
     "font-family:'Barlow Condensed','Barlow',sans-serif",
-    'font-size:13px',
+    // Three characters ("99+") need a smaller face to keep clear of the disc's
+    // edge; one or two have room at full size.
+    `font-size:${text.length > 2 ? 10 : 13}px`,
     'font-weight:700',
     'letter-spacing:.04em',
     // The count is centred on the disc rather than filling it, so it never
     // touches the edge however many digits it runs to.
     'line-height:1',
   ].join(';')
-  centre.textContent = String(count)
+  centre.textContent = text
   marker.appendChild(centre)
   return marker
 }
@@ -623,10 +648,13 @@ export function planLabels(
   project: (position: [number, number]) => { x: number; y: number },
 ): LabelPlan {
   const rects = new Map<string, Rect>()
+  const positions = new Map<string, { x: number; y: number }>()
   for (const site of sites) {
     const station = site.stations[0]!
     const leftFacing = typeof station.course === 'number' && isLeftFacing(station.course)
-    rects.set(site.key, labelRect(station, project([site.longitude, site.latitude]), leftFacing))
+    const at = project([site.longitude, site.latitude])
+    positions.set(site.key, at)
+    rects.set(site.key, labelRect(station, at, leftFacing))
   }
 
   const ordered = [...sites].sort((left, right) =>
@@ -648,7 +676,7 @@ export function planLabels(
 
   // A count standing for one station says less than the label it replaced, so
   // a lone leftover is drawn anyway and allowed to overlap.
-  const grouped = groupOverlapping(leftOver, rects)
+  const grouped = groupNearby(leftOver, positions)
   const counts: SiteCluster[] = []
   for (const cluster of grouped) {
     if (cluster.stations.length === 1) labelled.push(...cluster.sites)
@@ -660,15 +688,30 @@ export function planLabels(
 /**
  * Gather the sites that could not be labelled into counts.
  *
- * Single-linkage on true overlap: if A's label covers B's and B's covers C's,
- * the three are one pile and belong under one count.
+ * Grouped by how close the stations actually are, not by whether their labels
+ * would have overlapped. A label is far wider than the station it names, so
+ * grouping on label overlap chains across a whole region and produces one count
+ * standing for places nowhere near each other. The radius here is the count
+ * marker's own width, which keeps each group to what a single marker can
+ * honestly cover — and stops two counts landing on top of each other.
+ *
+ * Single-linkage within that radius: if A is beside B and B beside C, the three
+ * are one huddle and belong under one count.
  */
-function groupOverlapping(sites: StationSite[], rects: Map<string, Rect>): SiteCluster[] {
+function groupNearby(
+  sites: StationSite[],
+  positions: Map<string, { x: number; y: number }>,
+): SiteCluster[] {
+  const isNear = (left: StationSite, right: StationSite) => {
+    const a = positions.get(left.key)!
+    const b = positions.get(right.key)!
+    return Math.hypot(a.x - b.x, a.y - b.y) < COUNT_GROUP_RADIUS_PX
+  }
+
   const clusters: SiteCluster[] = []
   for (const site of sites) {
-    const rect = rects.get(site.key)!
     const touching = clusters.filter((cluster) =>
-      cluster.sites.some((member) => overlaps(rects.get(member.key)!, rect)),
+      cluster.sites.some((member) => isNear(member, site)),
     )
     if (touching.length === 0) {
       clusters.push({

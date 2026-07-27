@@ -51,6 +51,8 @@ vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker } }))
 
 import {
   AprsStationsControl,
+  buildClusterMarker,
+  formatCount,
   planLabels,
   estimateLabelWidth,
   groupStationsBySite,
@@ -278,18 +280,22 @@ describe('AprsStationsControl', () => {
       expect(well.style.background).toBe('rgb(21, 23, 29)')
     })
 
-    it('draws the station symbol at the same size as an aircraft arrow', () => {
-      // Mixed glyph sizes read as two icon families on one map.
+    it('draws a course arrow smaller than a station symbol', () => {
+      // An arrow fills its 12-unit viewBox where symbol artwork sits padded
+      // inside a 24-unit one, so drawing both at one size makes the arrow read
+      // as half again as large as the symbols beside it.
       store.aprsStations = [
         station({ callsign: 'MOVING', course: 90 }),
         station({ callsign: 'FIXED', course: null, latitude: 55, longitude: -2 }),
       ]
       addControl()
-      const sizes = created.markers.map((marker) => {
-        const glyph = marker.element.querySelector('.adsb-arrow-wrap svg')!
-        return glyph.getAttribute('width')
-      })
-      expect(sizes).toEqual(['15', '15'])
+      const sizeOf = (callsign: string) =>
+        created.markers
+          .find((marker) => marker.element.dataset.callsign === callsign)!
+          .element.querySelector('.adsb-arrow-wrap svg')!
+          .getAttribute('width')
+      expect(sizeOf('MOVING')).toBe('11')
+      expect(sizeOf('FIXED')).toBe('15')
     })
 
     it('draws the glyph and dim field labels in white', () => {
@@ -631,6 +637,13 @@ describe('AprsStationsControl', () => {
       expect(centre.textContent).toBe('2')
     })
 
+    it('keeps the true figure in the accessible name when the face is capped', () => {
+      // A screen reader has room for the exact number where the circle does not.
+      const marker = buildClusterMarker(250)
+      expect(marker.querySelector('.aprs-cluster-count')!.textContent).toBe('99+')
+      expect(marker.getAttribute('aria-label')).toBe('250 APRS stations here — zoom in to see them')
+    })
+
     it('names the count for assistive tech, since nothing else stands for them', () => {
       store.aprsStations = crowdedTrio()
       addControl()
@@ -952,6 +965,21 @@ describe('groupStationsBySite', () => {
   })
 })
 
+describe('formatCount', () => {
+  it('shows the figure while it fits the circle', () => {
+    expect(formatCount(1)).toBe('1')
+    expect(formatCount(42)).toBe('42')
+    expect(formatCount(99)).toBe('99')
+  })
+
+  it('caps at 99+ beyond that', () => {
+    // The marker is a fixed circle, and past a hundred the exact figure tells
+    // an operator nothing the "+" does not.
+    expect(formatCount(100)).toBe('99+')
+    expect(formatCount(2500)).toBe('99+')
+  })
+})
+
 describe('estimateLabelWidth', () => {
   it('scales with the callsign, from measured labels', () => {
     // Rendered labels fit 41.5 + 7.5 × characters almost exactly.
@@ -1040,16 +1068,16 @@ describe('planLabels', () => {
     expect(plan.counts).toHaveLength(2)
   })
 
-  it('merges two counts when a later label bridges them', () => {
+  it('merges two counts when a later station bridges them', () => {
     // A wide label blocks everything else. Among the leftovers BBB and DDD
-    // start as separate piles, then EEE lands across both — so the two become
-    // one count rather than two overlapping ones.
+    // start as separate huddles, then EEE lands between them — so the two
+    // become one count rather than two markers on top of each other.
     const plan = planLabels(
       [
         site('AAAAAAAAAAAAAAAAAAAA', 0, 0),
         site('BBB', 10, 0),
-        site('DDD', 120, 0),
-        site('EEE', 70, 0),
+        site('DDD', 66, 0),
+        site('EEE', 38, 0),
       ],
       project,
     )
@@ -1058,14 +1086,18 @@ describe('planLabels', () => {
     expect(keys(plan.counts[0]!.sites).sort()).toEqual(['BBB', 'DDD', 'EEE'])
   })
 
-  it('keeps leftovers that chain through one another in a single count', () => {
-    // BBB overlaps CCC and CCC overlaps DDD, while BBB and DDD do not touch.
+  it('keeps a count to the stations actually huddled together', () => {
+    // BBB and CCC are a few pixels apart; DDD is well clear of both. Grouping
+    // on label overlap would sweep all three together, because a label is far
+    // wider than the station it names.
     const plan = planLabels(
-      [site('AAAAAAAAAA', 0, 0), site('BBB', 10, 0), site('CCC', 60, 0), site('DDD', 110, 0)],
+      [site('AAAAAAAAAA', 0, 0), site('BBB', 10, 0), site('CCC', 20, 0), site('DDD', 100, 0)],
       project,
     )
     expect(plan.counts).toHaveLength(1)
-    expect(keys(plan.counts[0]!.sites).sort()).toEqual(['BBB', 'CCC', 'DDD'])
+    expect(keys(plan.counts[0]!.sites).sort()).toEqual(['BBB', 'CCC'])
+    // DDD could not be placed either, but alone it keeps its label.
+    expect(keys(plan.labelled)).toContain('DDD')
   })
 
   it('ignores labels that miss each other vertically', () => {
