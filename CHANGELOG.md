@@ -124,6 +124,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Group crowded APRS labels into one column, by zoom
 - Show a count for crowded APRS stations, labels once zoomed in
 - Add FILTER and MAP LAYERS menus, shared across maps (#266)
+- Trim the layer menus, unify the location-names tooltip (#268)
 
 ### Bug Fixes
 
