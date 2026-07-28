@@ -101,7 +101,7 @@ test.describe('Space domain', () => {
     await filterInput.fill('ISS')
 
     // Should show a result (section header with satellite)
-    await expect(page.locator('.space-filter-result-item').first()).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.bfp-result-item').first()).toBeVisible({ timeout: 5000 })
   })
 
   test('Space filter shows "No satellites found" for non-matching query', async ({ page }) => {
@@ -113,7 +113,7 @@ test.describe('Space domain', () => {
     const filterInput = page.getByRole('combobox', { name: /filter satellites/i })
     await filterInput.fill('XYZZY_NO_SATELLITE')
 
-    await expect(page.locator('.space-filter-no-results')).toBeVisible()
+    await expect(page.locator('.bfp-no-results')).toBeVisible()
   })
 
   test('FILTER rail exposes data-driven category sub-tabs', async ({ page }) => {
@@ -138,7 +138,7 @@ test.describe('Space domain', () => {
 
     // Selecting it shows that category's satellite rows.
     await firstSubTab.click()
-    await expect(page.locator('.space-filter-result-item').first()).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.bfp-result-item').first()).toBeVisible({ timeout: 5000 })
   })
 
   test('PASSES tab is visible on /space/ route', async ({ page }) => {
@@ -199,7 +199,7 @@ test.describe('Space domain', () => {
     await expect(page.locator('.spp-pass-card').first()).toBeVisible({ timeout: 8000 })
   })
 
-  test('SpaceFilter (#space-filter-input-wrap) and SpacePasses (#spp-list) coexist in DOM', async ({
+  test('SpaceFilter (#space-filter-input) and SpacePasses (#spp-list) coexist in DOM', async ({
     page,
   }) => {
     await page.goto('/space/')
@@ -207,7 +207,7 @@ test.describe('Space domain', () => {
 
     // Open the search pane first — use data-tab to avoid strict-mode ambiguity
     await page.locator('[data-tab="search"]').click()
-    await expect(page.locator('#space-filter-input-wrap')).toBeAttached()
+    await expect(page.locator('#space-filter-input')).toBeAttached()
 
     // SpacePasses teleports into #msb-pane-passes — also attached
     await expect(page.locator('#spp-list')).toBeAttached()
@@ -229,13 +229,13 @@ test.describe('Space domain', () => {
     const filterInput = page.getByRole('combobox', { name: /filter satellites/i })
     await filterInput.fill('ISS')
 
-    const resultItem = page.locator('.space-filter-result-item').first()
+    const resultItem = page.locator('.bfp-result-item').first()
     await expect(resultItem).toBeVisible({ timeout: 5000 })
     await resultItem.click()
 
     // After clicking, the item should be expanded — the option div has expanded class
     // The pass-card header button has aria-expanded
-    const expandedItem = page.locator('.sfr-expanded')
+    const expandedItem = page.locator('.bfp-expanded')
     await expect(expandedItem).toBeAttached()
   })
 
