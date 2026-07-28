@@ -226,6 +226,7 @@
 import { computed } from 'vue'
 import { useSpaceStore } from '@/stores/space'
 import { useAppStore } from '@/stores/app'
+import { useBasemapStore } from '@/stores/basemap'
 import { useUserLocation } from '@/composables/useUserLocation'
 import MyLocationIcon from '@/components/shared/MyLocationIcon.vue'
 import BaseIconButton from '@/components/base/BaseIconButton.vue'
@@ -244,6 +245,7 @@ const mapRef = {
 
 const spaceStore = useSpaceStore()
 const appStore = useAppStore()
+const basemapStore = useBasemapStore()
 const { location: userLocation } = useUserLocation()
 
 const locActive = computed(() => userLocation.value !== null)
@@ -251,7 +253,9 @@ const locActive = computed(() => userLocation.value !== null)
 const trackActive = computed(() => spaceStore.overlayStates.groundTrack)
 const footprintActive = computed(() => spaceStore.overlayStates.footprint)
 const daynightActive = computed(() => spaceStore.overlayStates.daynight)
-const namesActive = computed(() => spaceStore.overlayStates.names)
+// Place names are a shared base-map layer (see stores/basemap.ts), so this
+// mirrors the same flag the Air and Land maps drive.
+const namesActive = computed(() => basemapStore.layers.names)
 
 // The satellite overlays expand from a single MAP LAYERS icon accordion; the
 // group button is highlighted (green) while its panel is open. The

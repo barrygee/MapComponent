@@ -19,6 +19,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import type { Map as MapLibreGlMap } from 'maplibre-gl'
 import { useAppStore } from '@/stores/app'
 import { useAirStore } from '@/stores/air'
+import { useBasemapStore } from '@/stores/basemap'
 import { useNotificationsStore, registerAircraftClickHandler } from '@/stores/notifications'
 import { useAirNotifStore } from '@/stores/airNotif'
 import { useTrackingStore } from '@/stores/tracking'
@@ -29,8 +30,8 @@ import { useMapContextMenu } from '@/composables/useMapContextMenu'
 import MapLibreMap from '@/components/shared/MapLibreMap.vue'
 import { UserLocationMarker } from '@/components/shared/UserLocationMarker'
 
-import { NamesToggleControl } from './controls/names/NamesToggleControl'
-import { RoadsToggleControl } from './controls/roads/RoadsToggleControl'
+import { NamesToggleControl } from '@/components/shared/controls/names/NamesToggleControl'
+import { RoadsToggleControl } from '@/components/shared/controls/roads/RoadsToggleControl'
 import { RangeRingsControl } from './controls/range-rings/RangeRingsControl'
 import { OverheadZoneControl } from './controls/overhead-zone/OverheadZoneControl'
 import { AdsbLabelsToggleControl } from './controls/adsb-labels/AdsbLabelsToggleControl'
@@ -45,6 +46,7 @@ import { usePlaybackStore, PLAYBACK_SPEEDS } from '@/stores/playback'
 
 const appStore = useAppStore()
 const airStore = useAirStore()
+const basemapStore = useBasemapStore()
 const notificationsStore = useNotificationsStore()
 const airNotifStore = useAirNotifStore()
 const trackingStore = useTrackingStore()
@@ -152,8 +154,8 @@ useConnectivity((online) => {
   m.setStyle(targetStyle)
   // Re-init layers after style reload, clear aircraft
   m.once('style.load', () => {
-    roadsControl?._applyVisibility()
-    namesControl?._applyVisibility()
+    roadsControl?.applyVisibility()
+    namesControl?.applyVisibility()
     rangeRingsControl?._initRings()
     overheadZoneControl?.reinit()
     airportsControl?.initLayers()
@@ -206,8 +208,8 @@ function onStyleLoaded(m: MapLibreGlMap) {
   registerAircraftClickHandler((hex: string) => {
     adsbControl?.selectByHex(hex)
   })
-  roadsControl = new RoadsToggleControl(airStore)
-  namesControl = new NamesToggleControl(airStore)
+  roadsControl = new RoadsToggleControl(basemapStore)
+  namesControl = new NamesToggleControl(basemapStore)
   airportsControl = new AirportsToggleControl(airStore)
   militaryBasesControl = new MilitaryBasesToggleControl(airStore, is3DActive)
   aaraControl = new AaraToggleControl(airStore)
@@ -249,8 +251,8 @@ function onStyleLoaded(m: MapLibreGlMap) {
     _currentStyleUrl = desiredStyle
     m.setStyle(desiredStyle)
     m.once('style.load', () => {
-      roadsControl?._applyVisibility()
-      namesControl?._applyVisibility()
+      roadsControl?.applyVisibility()
+      namesControl?.applyVisibility()
       rangeRingsControl?._initRings()
       airportsControl?.initLayers()
       militaryBasesControl?.initLayers()

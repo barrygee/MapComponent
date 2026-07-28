@@ -101,6 +101,65 @@ vi.mock('@/components/land/controls/aprs/AprsStationsControl', () => ({
   },
 }))
 
+// The shared base-map layer controls (place names / roads). Mocked for the same
+// reason as the others — they own real maplibre layer visibility and have their
+// own specs — but each keeps the basemap store wired up, since the side menu
+// reads its active state straight off that store rather than from a prop.
+const namesSpies = vi.hoisted(() => ({
+  onAdd: vi.fn(),
+  onRemove: vi.fn(),
+  handleClickPublic: vi.fn(),
+  applyVisibility: vi.fn(),
+}))
+vi.mock('@/components/shared/controls/names/NamesToggleControl', () => ({
+  NamesToggleControl: class {
+    private _store: {
+      setLayer: (key: string, visible: boolean) => void
+      layers: { names: boolean }
+    }
+    constructor(store: {
+      setLayer: (key: string, visible: boolean) => void
+      layers: { names: boolean }
+    }) {
+      this._store = store
+    }
+    onAdd = namesSpies.onAdd
+    onRemove = namesSpies.onRemove
+    applyVisibility = namesSpies.applyVisibility
+    handleClickPublic = (...args: unknown[]) => {
+      this._store.setLayer('names', !this._store.layers.names)
+      return namesSpies.handleClickPublic(...args)
+    }
+  },
+}))
+const roadsSpies = vi.hoisted(() => ({
+  onAdd: vi.fn(),
+  onRemove: vi.fn(),
+  handleClickPublic: vi.fn(),
+  applyVisibility: vi.fn(),
+}))
+vi.mock('@/components/shared/controls/roads/RoadsToggleControl', () => ({
+  RoadsToggleControl: class {
+    private _store: {
+      setLayer: (key: string, visible: boolean) => void
+      layers: { roads: boolean }
+    }
+    constructor(store: {
+      setLayer: (key: string, visible: boolean) => void
+      layers: { roads: boolean }
+    }) {
+      this._store = store
+    }
+    onAdd = roadsSpies.onAdd
+    onRemove = roadsSpies.onRemove
+    applyVisibility = roadsSpies.applyVisibility
+    handleClickPublic = (...args: unknown[]) => {
+      this._store.setLayer('roads', !this._store.layers.roads)
+      return roadsSpies.handleClickPublic(...args)
+    }
+  },
+}))
+
 const MapLibreMapStub = defineComponent({
   name: 'MapLibreMap',
   props: {
@@ -127,6 +186,8 @@ const LandSideMenuStub = defineComponent({
     'goToLocation',
     'toggleRangeRings',
     'toggleAprs',
+    'toggleNames',
+    'toggleRoads',
     'rangeRingsActive',
     'aprsActive',
     'locationActive',
@@ -140,6 +201,7 @@ const LandSideMenuStub = defineComponent({
 import LandView from './LandView.vue'
 import { useAppStore } from '@/stores/app'
 import { useLandStore } from '@/stores/land'
+import { useBasemapStore } from '@/stores/basemap'
 
 const ONLINE_STYLE = '/assets/fiord-online.json'
 const OFFLINE_STYLE = '/assets/fiord.json'
@@ -153,6 +215,11 @@ function makeFakeMap() {
     zoomOut: vi.fn(),
     flyTo: vi.fn(),
     getZoom: vi.fn(() => 6),
+    // The shared place-names/roads controls query and restyle base-map layers.
+    isStyleLoaded: vi.fn(() => true),
+    once: vi.fn(),
+    getLayer: vi.fn(() => undefined),
+    setLayoutProperty: vi.fn(),
     _container: container,
   }
 }
@@ -387,6 +454,61 @@ describe('LandView', () => {
       expect(sideMenuProps!.aprsActive).toBe(false)
     })
 
+    it('initialises the shared place-names and roads controls on the map', () => {
+      const map = makeFakeMap()
+      mountView()
+      shared.emit!('map-created', map)
+      expect(namesSpies.onAdd).toHaveBeenCalledWith(map)
+      expect(roadsSpies.onAdd).toHaveBeenCalledWith(map)
+    })
+
+    it('toggling place names drives the control and flips the shared basemap flag', async () => {
+      const map = makeFakeMap()
+      const basemapStore = useBasemapStore()
+      mountView()
+      shared.emit!('map-created', map)
+      expect(basemapStore.layers.names).toBe(false)
+      ;(sideMenuProps!.toggleNames as () => void)()
+      await nextTick()
+      expect(namesSpies.handleClickPublic).toHaveBeenCalledOnce()
+      expect(basemapStore.layers.names).toBe(true)
+    })
+
+    it('toggling roads drives the control and flips the shared basemap flag', async () => {
+      const map = makeFakeMap()
+      const basemapStore = useBasemapStore()
+      mountView()
+      shared.emit!('map-created', map)
+      expect(basemapStore.layers.roads).toBe(false)
+      ;(sideMenuProps!.toggleRoads as () => void)()
+      await nextTick()
+      expect(roadsSpies.handleClickPublic).toHaveBeenCalledOnce()
+      expect(basemapStore.layers.roads).toBe(true)
+    })
+
+    it('does nothing when the base-map toggles fire before the map exists', () => {
+      mountView()
+      expect(() => (sideMenuProps!.toggleNames as () => void)()).not.toThrow()
+      expect(() => (sideMenuProps!.toggleRoads as () => void)()).not.toThrow()
+      expect(namesSpies.handleClickPublic).not.toHaveBeenCalled()
+      expect(roadsSpies.handleClickPublic).not.toHaveBeenCalled()
+    })
+
+    it('re-asserts the base-map layer visibility on every style load', () => {
+      const map = makeFakeMap()
+      mountView()
+      shared.emit!('map-created', map)
+      namesSpies.applyVisibility.mockClear()
+      roadsSpies.applyVisibility.mockClear()
+      // A fresh style ships its own layer visibilities, so both must reapply.
+      shared.emit!('style-loaded', map)
+      expect(namesSpies.applyVisibility).toHaveBeenCalledOnce()
+      expect(roadsSpies.applyVisibility).toHaveBeenCalledOnce()
+      shared.emit!('style-loaded', map)
+      expect(namesSpies.applyVisibility).toHaveBeenCalledTimes(2)
+      expect(roadsSpies.applyVisibility).toHaveBeenCalledTimes(2)
+    })
+
     it('updates the marker + range-rings centre when a location fix arrives', async () => {
       const map = makeFakeMap()
       mountView()
@@ -418,6 +540,8 @@ describe('LandView', () => {
       wrapper.unmount()
       expect(ringsSpies.onRemove).toHaveBeenCalledOnce()
       expect(aprsSpies.onRemove).toHaveBeenCalledOnce()
+      expect(namesSpies.onRemove).toHaveBeenCalledOnce()
+      expect(roadsSpies.onRemove).toHaveBeenCalledOnce()
       expect(markerSpies.remove).toHaveBeenCalled()
     })
 

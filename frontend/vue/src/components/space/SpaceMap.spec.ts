@@ -22,7 +22,7 @@ const controlMocks = vi.hoisted(() => {
       onAdd = vi.fn()
       onRemove = vi.fn()
       initLayers = vi.fn()
-      applyNamesVisibility = vi.fn()
+      applyVisibility = vi.fn()
       toggleDaynight = vi.fn()
       focusSatellite = vi.fn()
       constructor(...args: unknown[]) {
@@ -45,8 +45,8 @@ vi.mock('./controls/satellite/SatelliteControl', () => ({
 vi.mock('./controls/daynight/DaynightControl', () => ({
   DaynightControl: controlMocks.make('daynight'),
 }))
-vi.mock('./controls/names/SpaceNamesToggleControl', () => ({
-  SpaceNamesToggleControl: controlMocks.make('names'),
+vi.mock('@/components/shared/controls/names/NamesToggleControl', () => ({
+  NamesToggleControl: controlMocks.make('names'),
 }))
 
 vi.mock('@/components/shared/UserLocationMarker', () => ({
@@ -259,7 +259,7 @@ describe('SpaceMap', () => {
       // The post-reload handler re-inits all layers.
       map.onceHandlers['style.load']!()
       expect(last('daynight').initLayers).toHaveBeenCalled()
-      expect(last('names').applyNamesVisibility).toHaveBeenCalled()
+      expect(last('names').applyVisibility).toHaveBeenCalled()
       expect(last('satellite').initLayers).toHaveBeenCalled()
     })
 
@@ -286,7 +286,7 @@ describe('SpaceMap', () => {
       expect(map.setStyle).toHaveBeenCalledWith('/assets/fiord.json')
       map.onceHandlers['style.load']!()
       expect(last('daynight').initLayers).toHaveBeenCalled()
-      expect(last('names').applyNamesVisibility).toHaveBeenCalled()
+      expect(last('names').applyVisibility).toHaveBeenCalled()
       expect(last('satellite').initLayers).toHaveBeenCalled()
     })
 

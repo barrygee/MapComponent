@@ -17,6 +17,7 @@ import { useDocumentEvent } from '@/composables/useDocumentEvent'
 import type { Map as MapLibreGlMap } from 'maplibre-gl'
 import { useAppStore } from '@/stores/app'
 import { useSpaceStore } from '@/stores/space'
+import { useBasemapStore } from '@/stores/basemap'
 import {
   useNotificationsStore,
   registerSatelliteClickHandler,
@@ -30,10 +31,11 @@ import MapLibreMap from '@/components/shared/MapLibreMap.vue'
 import { UserLocationMarker } from '@/components/shared/UserLocationMarker'
 import { SatelliteControl } from './controls/satellite/SatelliteControl'
 import { DaynightControl } from './controls/daynight/DaynightControl'
-import { SpaceNamesToggleControl } from './controls/names/SpaceNamesToggleControl'
+import { NamesToggleControl } from '@/components/shared/controls/names/NamesToggleControl'
 
 const appStore = useAppStore()
 const spaceStore = useSpaceStore()
+const basemapStore = useBasemapStore()
 const notificationsStore = useNotificationsStore()
 const trackingStore = useTrackingStore()
 const { location: userLocation, start: startLocation } = useUserLocation()
@@ -51,7 +53,7 @@ let _map: MapLibreGlMap | null = null
 const satelliteControlRef = shallowRef<SatelliteControl | null>(null)
 let satelliteControl: SatelliteControl | null = null
 let daynightControl: DaynightControl | null = null
-let namesControl: SpaceNamesToggleControl | null = null
+let namesControl: NamesToggleControl | null = null
 const _locationMarker = new UserLocationMarker('space-user-location-marker')
 const ctxMenu = useMapContextMenu()
 
@@ -66,7 +68,7 @@ useConnectivity((online) => {
   m.setStyle(online ? STYLE_ONLINE : STYLE_OFFLINE)
   m.once('style.load', () => {
     daynightControl?.initLayers()
-    namesControl?.applyNamesVisibility()
+    namesControl?.applyVisibility()
     satelliteControl?.initLayers()
   })
 })
@@ -125,7 +127,7 @@ function onStyleLoaded(m: MapLibreGlMap) {
     satelliteControlRef.value = satelliteControl
   })
   daynightControl = new DaynightControl(spaceStore)
-  namesControl = new SpaceNamesToggleControl(spaceStore)
+  namesControl = new NamesToggleControl(basemapStore)
 
   m.addControl(satelliteControl, 'top-right')
   m.addControl(daynightControl, 'top-right')
@@ -148,7 +150,7 @@ function onStyleLoaded(m: MapLibreGlMap) {
     m.setStyle(desiredStyle)
     m.once('style.load', () => {
       daynightControl?.initLayers()
-      namesControl?.applyNamesVisibility()
+      namesControl?.applyVisibility()
       satelliteControl?.initLayers()
     })
   }

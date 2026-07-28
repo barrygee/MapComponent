@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import maplibregl from 'maplibre-gl'
 import { RoadsToggleControl } from './RoadsToggleControl'
-import { useAirStore } from '@/stores/air'
-import type { AirStore } from '../types'
+import { useBasemapStore, type BasemapStore } from '@/stores/basemap'
 
 interface FakeMap {
   map: maplibregl.Map
@@ -27,25 +26,25 @@ function fakeMap(options: { styleLoaded?: boolean; existingLayers?: string[] } =
   return { map, once, getLayer, setLayoutProperty, styleLoadHandlers }
 }
 
-let airStore: AirStore
+let basemapStore: BasemapStore
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  airStore = useAirStore()
+  basemapStore = useBasemapStore()
 })
 
 describe('RoadsToggleControl constructor', () => {
-  it('seeds visibility from the air store overlay state (default off)', () => {
-    expect(new RoadsToggleControl(airStore).roadsVisible).toBe(false)
+  it('seeds visibility from the shared basemap store (default off)', () => {
+    expect(new RoadsToggleControl(basemapStore).roadsVisible).toBe(false)
   })
 
   it('seeds visibility as on when the store has roads enabled', () => {
-    airStore.setOverlay('roads', true)
-    expect(new RoadsToggleControl(airStore).roadsVisible).toBe(true)
+    basemapStore.setLayer('roads', true)
+    expect(new RoadsToggleControl(basemapStore).roadsVisible).toBe(true)
   })
 
   it('exposes its label and title', () => {
-    const control = new RoadsToggleControl(airStore)
+    const control = new RoadsToggleControl(basemapStore)
     expect(control.buttonLabel).toBe('R')
     expect(control.buttonTitle).toBe('Toggle road lines and names')
   })
@@ -53,8 +52,8 @@ describe('RoadsToggleControl constructor', () => {
 
 describe('RoadsToggleControl.onInit', () => {
   it('applies visibility immediately when the style is already loaded', () => {
-    airStore.setOverlay('roads', true)
-    const control = new RoadsToggleControl(airStore)
+    basemapStore.setLayer('roads', true)
+    const control = new RoadsToggleControl(basemapStore)
     const map = fakeMap({ styleLoaded: true, existingLayers: ['highway_minor', 'road_pier'] })
     control.onAdd(map.map)
 
@@ -64,7 +63,7 @@ describe('RoadsToggleControl.onInit', () => {
   })
 
   it('defers visibility application to the style.load event when the style is not ready', () => {
-    const control = new RoadsToggleControl(airStore)
+    const control = new RoadsToggleControl(basemapStore)
     const map = fakeMap({ styleLoaded: false, existingLayers: ['highway_minor'] })
     control.onAdd(map.map)
 
@@ -78,7 +77,7 @@ describe('RoadsToggleControl.onInit', () => {
 
 describe('RoadsToggleControl.handleClick', () => {
   it('toggles roads on, shows the present layers, and persists the new state', () => {
-    const control = new RoadsToggleControl(airStore)
+    const control = new RoadsToggleControl(basemapStore)
     const map = fakeMap({ existingLayers: ['highway_minor'] })
     control.onAdd(map.map)
     map.setLayoutProperty.mockClear()
@@ -87,13 +86,13 @@ describe('RoadsToggleControl.handleClick', () => {
 
     expect(control.roadsVisible).toBe(true)
     expect(map.setLayoutProperty).toHaveBeenCalledWith('highway_minor', 'visibility', 'visible')
-    expect(airStore.overlayStates.roads).toBe(true)
+    expect(basemapStore.layers.roads).toBe(true)
     expect(control.button.style.opacity).toBe('1')
   })
 
   it('toggles roads off, hides the present layers, and persists the new state', () => {
-    airStore.setOverlay('roads', true)
-    const control = new RoadsToggleControl(airStore)
+    basemapStore.setLayer('roads', true)
+    const control = new RoadsToggleControl(basemapStore)
     const map = fakeMap({ existingLayers: ['highway_minor'] })
     control.onAdd(map.map)
     map.setLayoutProperty.mockClear()
@@ -102,12 +101,12 @@ describe('RoadsToggleControl.handleClick', () => {
 
     expect(control.roadsVisible).toBe(false)
     expect(map.setLayoutProperty).toHaveBeenCalledWith('highway_minor', 'visibility', 'none')
-    expect(airStore.overlayStates.roads).toBe(false)
+    expect(basemapStore.layers.roads).toBe(false)
     expect(control.button.style.opacity).toBe('0.3')
   })
 
   it('skips layers absent from the current style', () => {
-    const control = new RoadsToggleControl(airStore)
+    const control = new RoadsToggleControl(basemapStore)
     const map = fakeMap({ existingLayers: [] })
     control.onAdd(map.map)
 

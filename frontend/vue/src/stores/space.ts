@@ -4,12 +4,13 @@ import { usePersistedObject, usePersistedRef, usePersistedStringSet } from './_p
 
 const LS_OVERLAYS = 'sentinel_space_overlayStates'
 
+/** Space-specific overlays. Base-map layers that every domain shares (place
+ *  names, roads) live on the `basemap` store instead. */
 export interface SpaceOverlayStates {
   iss: boolean
   groundTrack: boolean
   footprint: boolean
   daynight: boolean
-  names: boolean
 }
 
 const DEFAULTS: SpaceOverlayStates = {
@@ -17,7 +18,6 @@ const DEFAULTS: SpaceOverlayStates = {
   groundTrack: true,
   footprint: true,
   daynight: true,
-  names: true,
 }
 
 export const useSpaceStore = defineStore('space', () => {

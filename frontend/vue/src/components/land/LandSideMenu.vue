@@ -1,7 +1,9 @@
 <template>
   <!-- Fixed icon rail pinned to the right edge, mirroring the Air and Space side
-       menus. Buttons drive the map/controls via handlers passed from LandView;
-       the shell (rail, collapse, tooltips) lives in IconRail/BaseIconButton. -->
+       menus — zoom, location, then the FILTER and MAP LAYERS accordions in the
+       same order those maps use. Buttons drive the map/controls via handlers
+       passed from LandView; the shell (rail, accordion, collapse, tooltips)
+       lives in IconRail/IconRailAccordion/BaseIconButton. -->
   <IconRail
     container-id="land-side-menu"
     accessible-name="Land map controls"
@@ -39,54 +41,189 @@
     >
       <MyLocationIcon />
     </BaseIconButton>
-    <BaseIconButton
-      class="sm-btn"
-      title="Range rings"
-      tooltip-side="left"
-      tooltip="Range rings"
-      accessible-name="Range rings"
-      :class="{ active: rangeRingsActive }"
-      :active="rangeRingsActive"
-      @click="toggleRangeRings"
-    >
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
-        <circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.8" />
-        <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-      </svg>
-    </BaseIconButton>
-    <BaseIconButton
-      class="sm-btn"
-      title="APRS stations"
-      tooltip-side="left"
-      tooltip="APRS stations"
-      accessible-name="APRS stations"
-      :class="{ active: aprsActive }"
-      :active="aprsActive"
-      @click="toggleAprs"
-    >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 16 16"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.4"
-        stroke-linecap="round"
-        aria-hidden="true"
-      >
-        <circle cx="8" cy="11" r="1.6" fill="currentColor" stroke="none" />
-        <path d="M5.2 8.2a4 4 0 0 1 5.6 0" />
-        <path d="M3.4 6.4a6.6 6.6 0 0 1 9.2 0" />
-      </svg>
-    </BaseIconButton>
+
+    <!-- FILTER group: which station types are plotted. APRS is the only Land
+         feed today, so it is the sole entry — more join it as they land. -->
+    <IconRailAccordion panel-id="land-filter-panel">
+      <template #trigger="{ open: filterAccordionOpen, toggle: toggleFilterAccordion }">
+        <BaseIconButton
+          id="land-filter-btn"
+          class="sm-btn"
+          tooltip-side="left"
+          tooltip="FILTER"
+          accessible-name="Filter stations"
+          :class="{ active: filterAccordionOpen }"
+          :active="filterAccordionOpen"
+          aria-controls="land-filter-panel"
+          :aria-expanded="filterAccordionOpen"
+          @click="toggleFilterAccordion"
+        >
+          <FilterFunnelIcon />
+        </BaseIconButton>
+      </template>
+      <template #panel>
+        <BaseIconButton
+          class="sm-btn sm-sub-btn"
+          style="
+            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
+            --ba-rail-transition: color 0.15s ease;
+          "
+          tooltip-side="left"
+          tooltip="APRS STATIONS"
+          accessible-name="APRS stations"
+          :class="{ active: aprsActive }"
+          :active="aprsActive"
+          @click="toggleAprs"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <circle cx="8" cy="11" r="1.6" fill="currentColor" stroke="none" />
+            <path d="M5.2 8.2a4 4 0 0 1 5.6 0" />
+            <path d="M3.4 6.4a6.6 6.6 0 0 1 9.2 0" />
+          </svg>
+        </BaseIconButton>
+      </template>
+    </IconRailAccordion>
+
+    <!-- MAP LAYERS group: the map-annotation overlay (range rings) first, then
+         the shared base-map layers, matching the Air rail's panel order. -->
+    <IconRailAccordion panel-id="land-layers-panel">
+      <template #trigger="{ open: layersAccordionOpen, toggle: toggleLayersAccordion }">
+        <BaseIconButton
+          id="land-layers-btn"
+          class="sm-btn"
+          tooltip-side="left"
+          tooltip="MAP LAYERS"
+          accessible-name="Map layers"
+          :class="{ active: layersAccordionOpen }"
+          :active="layersAccordionOpen"
+          aria-controls="land-layers-panel"
+          :aria-expanded="layersAccordionOpen"
+          @click="toggleLayersAccordion"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path
+              d="M12 3 L21 8 L12 13 L3 8 Z"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linejoin="round"
+              fill="none"
+            />
+            <path d="M3 12 L12 17 L21 12" stroke="currentColor" stroke-width="1.6" fill="none" />
+            <path d="M3 16 L12 21 L21 16" stroke="currentColor" stroke-width="1.6" fill="none" />
+          </svg>
+        </BaseIconButton>
+      </template>
+      <template #panel>
+        <BaseIconButton
+          class="sm-btn sm-sub-btn"
+          style="
+            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
+            --ba-rail-transition: color 0.15s ease;
+          "
+          tooltip-side="left"
+          tooltip="RANGE RINGS"
+          accessible-name="Range rings"
+          :class="{ active: rangeRingsActive }"
+          :active="rangeRingsActive"
+          @click="toggleRangeRings"
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
+            <circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.8" />
+            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+          </svg>
+        </BaseIconButton>
+        <BaseIconButton
+          class="sm-btn sm-sub-btn"
+          style="
+            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
+            --ba-rail-transition: color 0.15s ease;
+          "
+          tooltip-side="left"
+          tooltip="PLACE NAMES"
+          accessible-name="Place name labels"
+          :class="{ active: basemapStore.layers.names }"
+          :active="basemapStore.layers.names"
+          @click="toggleNames"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path
+              d="M12 22C12 22 19 14 19 9A7 7 0 1 0 5 9C5 14 12 22 12 22Z"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linejoin="round"
+              fill="none"
+            />
+            <circle cx="12" cy="9" r="2.4" stroke="currentColor" stroke-width="1.6" fill="none" />
+          </svg>
+        </BaseIconButton>
+        <BaseIconButton
+          class="sm-btn sm-sub-btn"
+          style="
+            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
+            --ba-rail-transition: color 0.15s ease;
+          "
+          tooltip-side="left"
+          tooltip="ROADS"
+          accessible-name="Roads"
+          :class="{ active: basemapStore.layers.roads }"
+          :active="basemapStore.layers.roads"
+          @click="toggleRoads"
+        >
+          <svg
+            width="14"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path
+              d="M8 22 L10 2 M16 22 L14 2"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
+            <line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" stroke-width="1.6" />
+            <line x1="12" y1="11" x2="12" y2="15" stroke="currentColor" stroke-width="1.6" />
+            <line x1="12" y1="18" x2="12" y2="21" stroke="currentColor" stroke-width="1.6" />
+          </svg>
+        </BaseIconButton>
+      </template>
+    </IconRailAccordion>
   </IconRail>
 </template>
 
 <script setup lang="ts">
 import { useAppStore } from '@/stores/app'
+import { useBasemapStore } from '@/stores/basemap'
 import BaseIconButton from '@/components/base/BaseIconButton.vue'
 import IconRail from '@/components/base/IconRail.vue'
+import IconRailAccordion from '@/components/base/IconRailAccordion.vue'
+import FilterFunnelIcon from '@/components/shared/FilterFunnelIcon.vue'
 import MyLocationIcon from '@/components/shared/MyLocationIcon.vue'
 
 defineProps<{
@@ -95,12 +232,17 @@ defineProps<{
   goToLocation: () => void
   toggleRangeRings: () => void
   toggleAprs: () => void
+  toggleNames: () => void
+  toggleRoads: () => void
   rangeRingsActive: boolean
   aprsActive: boolean
   locationActive: boolean
 }>()
 
 const appStore = useAppStore()
+// Place names and roads are shared base-map layers, so their active state is
+// read straight off the cross-domain store rather than passed in from LandView.
+const basemapStore = useBasemapStore()
 </script>
 
 <style>
