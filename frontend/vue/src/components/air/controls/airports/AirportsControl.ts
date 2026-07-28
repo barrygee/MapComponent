@@ -377,7 +377,7 @@ export class AirportsToggleControl extends SentinelControlBase {
         label.style.cssText =
           "color:#fff;font-family:'Barlow Condensed','Barlow',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;line-height:1.5;white-space:nowrap;pointer-events:none"
         label.innerHTML =
-          `<span class="apt-icao" style="color:#c8ff00">${airportProperties.icao}</span>` +
+          `<span class="apt-icao" style="color:#fff">${airportProperties.icao}</span>` +
           `<br><span class="apt-name" style="opacity:0.7;font-weight:400">${airportProperties.name.toUpperCase()}</span>`
         el.appendChild(label)
 
