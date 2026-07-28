@@ -619,22 +619,59 @@ describe('AprsStationsControl', () => {
       expect(labelMarkers()).toHaveLength(1)
     })
 
-    it('draws the count as a ring, a gap and a filled centre', () => {
+    it('draws the count as a semitransparent ring flush against a filled centre', () => {
       store.aprsStations = crowdedTrio()
       addControl()
       const marker = countMarkers()[0]!.element
-      // Transparent inside the ring, so the gap is the map itself — the
-      // construction the user-location marker uses. jsdom drops the shorthand
-      // `background: none`, so the effective colour is what is checked.
+      // No fill of its own: the ring is the border alone, blended with the map
+      // behind it. jsdom drops the shorthand `background: none`, so the
+      // effective colour is what is checked.
       expect(marker.style.backgroundColor).toBe('')
-      expect(marker.style.border).toBe('3px solid rgb(20, 23, 28)')
+      expect(marker.style.border).toBe('6px solid rgba(20, 23, 28, 0.55)')
+      // 20px centre + a 6px ring either side: the ring meets the centre with
+      // no gap between them.
       expect(marker.style.width).toBe('32px')
 
       const centre = marker.querySelector('.aprs-cluster-count') as HTMLElement
       expect(centre.style.background).toBe('rgb(0, 0, 0)')
-      // Narrower than the ring's inner edge, which is what leaves the gap.
       expect(centre.style.width).toBe('20px')
       expect(centre.textContent).toBe('2')
+    })
+
+    it('leaves no gap between the ring and the centre, whatever the count', () => {
+      // The geometry, not the literal pixel values: the outer diameter is
+      // derived from the centre plus a ring either side, so a gap can only
+      // reappear by breaking that relationship. Checked across a one-digit,
+      // two-digit and capped face, since the face's width is the one thing
+      // that varies between them.
+      for (const count of [1, 42, 250]) {
+        const marker = buildClusterMarker(count)
+        const centre = marker.querySelector('.aprs-cluster-count') as HTMLElement
+        const outer = parseFloat(marker.style.width)
+        const ring = parseFloat(marker.style.borderWidth)
+        expect(outer - ring * 2).toBe(parseFloat(centre.style.width))
+        // Square, so the ring stays a circle rather than an ellipse.
+        expect(marker.style.height).toBe(marker.style.width)
+        expect(centre.style.height).toBe(centre.style.width)
+      }
+    })
+
+    it('lets the map through the ring', () => {
+      // Semitransparent by design — the widened ring covers enough ground that
+      // a solid fill would blank out what the marker stands over. An opaque
+      // colour (any `rgb(…)`, or an alpha of 1) fails here.
+      const alpha = /rgba\([^)]*,\s*([\d.]+)\)/.exec(buildClusterMarker(2).style.borderColor)?.[1]
+      expect(alpha).toBeDefined()
+      expect(Number(alpha)).toBeGreaterThan(0)
+      expect(Number(alpha)).toBeLessThan(1)
+    })
+
+    it('has no accessibility violations', async () => {
+      const region = document.createElement('div')
+      region.setAttribute('role', 'region')
+      region.setAttribute('aria-label', 'APRS stations')
+      region.appendChild(buildClusterMarker(2))
+      expect(await axe(region)).toHaveNoViolations()
     })
 
     it('keeps the true figure in the accessible name when the face is capped', () => {

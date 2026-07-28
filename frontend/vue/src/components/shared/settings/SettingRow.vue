@@ -203,6 +203,9 @@ const emit = defineEmits<{
 }>()
 
 const WIDE_TYPES = new Set(['sdr-channelmaps-file'])
+// Every JSON-textarea editor sits here (or in WIDE_TYPES) so a config document
+// never gets squeezed into a single 300px column — two columns is the minimum
+// readable width for indented JSON.
 const HALF_TYPES = new Set([
   'sdr-devices',
   'space-tle-online',
@@ -212,6 +215,9 @@ const HALF_TYPES = new Set([
   'space-hover-preview',
   'air-tag-fields',
   'land-aprs-label-fields',
+  'sdr-frequencies-file',
+  'sdr-bandplan-file',
+  'config-current',
 ])
 const NATURAL_HEIGHT_TYPES = new Set(['location'])
 const isWide = WIDE_TYPES.has(props.item.type)
