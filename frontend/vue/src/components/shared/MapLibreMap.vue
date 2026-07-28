@@ -63,6 +63,10 @@ onMounted(() => {
     pitch: props.pitch ?? 0,
     bearing: props.bearing ?? 0,
     attributionControl: false,
+    // MapLibre cross-fades symbol layers over 300ms by default, so toggling the
+    // LOCATION NAMES layer made the labels drift in rather than snap on. Zero
+    // makes every symbol layer (labels included) appear instantly.
+    fadeDuration: 0,
   })
 
   map.on('load', () => {
