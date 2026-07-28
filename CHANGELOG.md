@@ -1189,6 +1189,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Extract shared map-label primitives
 - Group APRS sites on the reported position, not a tolerance
 - Move the Air FILTER pane onto BaseFilterPanel
+- Move the Space FILTER pane onto BaseFilterPanel (#265)
 
 ### Documentation
 
