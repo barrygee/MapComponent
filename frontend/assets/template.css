@@ -101,11 +101,11 @@ html {
    padding), so this height IS the rendered artwork height. Both dimensions are
    pinned because Safari cannot be trusted to derive an SVG <img>'s intrinsic
    ratio for `width: auto` (it falls back to a default size and renders the
-   logo tiny): 156px = 26px x the SVG's 209.54/34.90 aspect. Keep in step with
+   logo tiny): 142px = 26px x the SVG's 190.80/34.90 aspect. Keep in step with
    logo.svg's viewBox if it is regenerated. */
 #logo-img {
     height: 26px;
-    width: 156px;
+    width: 142px;
     display: block;
 }
 
