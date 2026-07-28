@@ -317,6 +317,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Keep an APRS count to the stations actually huddled together
 - Rebuild spa-dist after the logo/brand change
 - Fetch single satellites by CATNR and honour offgrid fallback (#261)
+- Correct the row tints and chevron anchoring on the shared shell
 
 ### Chores
 
@@ -1131,6 +1132,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #258 from barrygee/style/aprs-marker-and-symbols
 - Merge pull request #259 from barrygee/style/logo-white-ring
 - Merge pull request #260 from barrygee/fix/rebuild-spa-dist
+- Merge pull request #264 from barrygee/refactor/air-filter-base-panel
 
 ### Refactoring
 
@@ -1186,6 +1188,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Extract SdrPanel engine spine into composables (P8) (#218)
 - Extract shared map-label primitives
 - Group APRS sites on the reported position, not a tolerance
+- Move the Air FILTER pane onto BaseFilterPanel
 
 ### Documentation
 
@@ -1313,7 +1316,9 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Set the APRS count in the callsign's weight
 - Darken the APRS count marker's ring a shade further
 - White ring on the logo mark and app icon, lighter wordmark
+- Keep the pane's own empty-state styling on the shared shell
 
 ### Dependencies
 
 - Patch three high-severity transitive advisories
+- Bump vue-tsc to v3 to drop a vulnerable brace-expansion path (#263)
