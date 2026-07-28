@@ -1319,6 +1319,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Darken the APRS count marker's ring a shade further
 - White ring on the logo mark and app icon, lighter wordmark
 - Keep the pane's own empty-state styling on the shared shell
+- Reduce header logo wordmark height (#267)
 
 ### Dependencies
 
