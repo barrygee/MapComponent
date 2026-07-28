@@ -64,6 +64,16 @@ describe('MapLibreMap', () => {
     expect(created.options.container).toBeInstanceOf(HTMLElement)
   })
 
+  // Every domain map is built through this component, so disabling MapLibre's
+  // 300ms symbol cross-fade here is what makes base-map labels (and every other
+  // symbol layer) appear instantly rather than drifting in when a layer is
+  // toggled on. Asserted explicitly because nothing else in the app would fail
+  // if the option were dropped — the fade would just quietly come back.
+  it('disables the symbol fade so toggled layers appear instantly', () => {
+    mount(MapLibreMap, { props: { styleUrl: STYLE, regionLabel: 'Test map' } })
+    expect(mapRegistry.instances[0]!.options.fadeDuration).toBe(0)
+  })
+
   it('falls back to default view options when view props are omitted', () => {
     mount(MapLibreMap, { props: { styleUrl: STYLE, regionLabel: 'Test map' } })
     expect(mapRegistry.instances[0]!.options).toMatchObject({
