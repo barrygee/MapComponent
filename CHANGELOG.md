@@ -125,6 +125,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Show a count for crowded APRS stations, labels once zoomed in
 - Add FILTER and MAP LAYERS menus, shared across maps (#266)
 - Trim the layer menus, unify the location-names tooltip (#268)
+- Thicken the APRS count ring and let the map through it
 
 ### Bug Fixes
 
@@ -320,6 +321,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Rebuild spa-dist after the logo/brand change
 - Fetch single satellites by CATNR and honour offgrid fallback (#261)
 - Correct the row tints and chevron anchoring on the shared shell
+- Widen the JSON config editors to two grid columns
 
 ### Chores
 
@@ -1135,6 +1137,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #259 from barrygee/style/logo-white-ring
 - Merge pull request #260 from barrygee/fix/rebuild-spa-dist
 - Merge pull request #264 from barrygee/refactor/air-filter-base-panel
+- Merge pull request #269 from barrygee/fix/settings-json-editors-two-columns
 
 ### Refactoring
 
