@@ -28,7 +28,7 @@ const controlMocks = vi.hoisted(() => {
       onAdd = vi.fn()
       onRemove = vi.fn()
       initLayers = vi.fn()
-      _applyVisibility = vi.fn()
+      applyVisibility = vi.fn()
       _initRings = vi.fn()
       reinit = vi.fn()
       handleConnectivityChange = vi.fn()
@@ -55,10 +55,10 @@ function last(name: string): Record<string, ReturnType<typeof vi.fn>> {
   return arr[arr.length - 1] as unknown as Record<string, ReturnType<typeof vi.fn>>
 }
 
-vi.mock('./controls/names/NamesToggleControl', () => ({
+vi.mock('@/components/shared/controls/names/NamesToggleControl', () => ({
   NamesToggleControl: controlMocks.make('names'),
 }))
-vi.mock('./controls/roads/RoadsToggleControl', () => ({
+vi.mock('@/components/shared/controls/roads/RoadsToggleControl', () => ({
   RoadsToggleControl: controlMocks.make('roads'),
 }))
 vi.mock('./controls/range-rings/RangeRingsControl', () => ({
@@ -354,7 +354,7 @@ describe('AirMap', () => {
       shared.connectivityCb!(false) // online → offline
       expect(map.setStyle).toHaveBeenCalledWith('/assets/fiord.json')
       map.onceHandlers['style.load']!()
-      expect(last('roads')._applyVisibility).toHaveBeenCalled()
+      expect(last('roads').applyVisibility).toHaveBeenCalled()
       expect(last('overheadZone').reinit).toHaveBeenCalled()
       expect(last('adsb').initLayers).toHaveBeenCalled()
     })

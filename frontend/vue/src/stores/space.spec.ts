@@ -18,7 +18,6 @@ describe('space store', () => {
       groundTrack: true,
       footprint: true,
       daynight: true,
-      names: true,
     })
   })
 

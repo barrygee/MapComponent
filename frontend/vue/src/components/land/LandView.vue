@@ -18,6 +18,8 @@
       :go-to-location="goToLocation"
       :toggle-range-rings="toggleRangeRings"
       :toggle-aprs="toggleAprs"
+      :toggle-names="toggleNames"
+      :toggle-roads="toggleRoads"
       :range-rings-active="rangeRingsActive"
       :aprs-active="aprsActive"
       :location-active="locationActive"
@@ -36,6 +38,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import type { Map } from 'maplibre-gl'
 import { useAppStore } from '@/stores/app'
 import { useLandStore } from '@/stores/land'
+import { useBasemapStore } from '@/stores/basemap'
 import { useConnectivity } from '@/composables/useConnectivity'
 import { useUserLocation } from '@/composables/useUserLocation'
 import { useMapContextMenu } from '@/composables/useMapContextMenu'
@@ -48,12 +51,15 @@ import { useSidebarPaneTarget } from '@/composables/useSidebarPaneTarget'
 import { UserLocationMarker } from '@/components/shared/UserLocationMarker'
 import { AprsStationsControl } from '@/components/land/controls/aprs/AprsStationsControl'
 import { LandRangeRingsControl } from '@/components/land/controls/range-rings/LandRangeRingsControl'
+import { NamesToggleControl } from '@/components/shared/controls/names/NamesToggleControl'
+import { RoadsToggleControl } from '@/components/shared/controls/roads/RoadsToggleControl'
 
 /** Zoom level the map flies to when centring on the user's location. */
 const LOCATE_ZOOM = 10
 
 const appStore = useAppStore()
 const landStore = useLandStore()
+const basemapStore = useBasemapStore()
 const mapRef = ref<InstanceType<typeof MapLibreMap> | null>(null)
 const { ready: searchPaneReady } = useSidebarPaneTarget('search')
 
@@ -73,6 +79,8 @@ let _map: Map | null = null
 let _initialStyleUrl: string | null = null
 let _aprsControl: AprsStationsControl | null = null
 let _rangeRingsControl: LandRangeRingsControl | null = null
+let _namesControl: NamesToggleControl | null = null
+let _roadsControl: RoadsToggleControl | null = null
 
 // Reactive toggle state backing the side-menu buttons' active (green) styling.
 // APRS visibility lives on the store, so the map and the side panel's station
@@ -98,8 +106,14 @@ function onMapCreated(m: Map) {
   // owns the visible controls — and hide the native control corner.
   _rangeRingsControl = new LandRangeRingsControl(getUserLocation)
   _aprsControl = new AprsStationsControl(landStore)
+  // Place names and roads are shared base-map layers driven by the cross-domain
+  // basemap store, so Land shows whatever Air and Space were last set to.
+  _namesControl = new NamesToggleControl(basemapStore)
+  _roadsControl = new RoadsToggleControl(basemapStore)
   _rangeRingsControl.onAdd(m)
   _aprsControl.onAdd(m)
+  _namesControl.onAdd(m)
+  _roadsControl.onAdd(m)
   // APRS starts visible per the land.defaultLayers config (default ["aprs"]).
   _aprsControl.setVisible(landStore.defaultLayers.includes('aprs'))
   rangeRingsActive.value = _rangeRingsControl.visible
@@ -134,6 +148,13 @@ function toggleAprs() {
   // The control flips the shared store flag, which `aprsActive` tracks.
   _aprsControl?.handleClickPublic()
 }
+function toggleNames() {
+  // Both controls flip the basemap store, which LandSideMenu reads directly.
+  _namesControl?.handleClickPublic()
+}
+function toggleRoads() {
+  _roadsControl?.handleClickPublic()
+}
 
 onMounted(() => {
   // Load the default-layers config, then apply it to the APRS layer (and keep it
@@ -167,8 +188,11 @@ onUnmounted(() => {
   ctxMenu.detach(_map)
   _rangeRingsControl?.onRemove()
   _aprsControl?.onRemove()
+  _namesControl?.onRemove()
+  _roadsControl?.onRemove()
   _locationMarker.remove()
   _rangeRingsControl = _aprsControl = null
+  _namesControl = _roadsControl = null
 })
 
 function onStyleLoaded(m: Map) {
@@ -177,5 +201,9 @@ function onStyleLoaded(m: Map) {
     m.setStyle(desiredStyle)
   }
   _initialStyleUrl = null
+  // A fresh style ships with its own layer visibilities, so re-assert the
+  // base-map toggles every time one loads.
+  _namesControl?.applyVisibility()
+  _roadsControl?.applyVisibility()
 }
 </script>

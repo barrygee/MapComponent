@@ -1,6 +1,7 @@
-import { SentinelControlBase } from '../sentinel-control-base/SentinelControlBase'
-import type { AirStore } from '../types'
+import { SentinelControlBase } from '@/components/air/controls/sentinel-control-base/SentinelControlBase'
+import type { BasemapStore } from '@/stores/basemap'
 
+/** Base-style layers carrying road geometry, names and shields. */
 const ROAD_LAYERS = [
   'highway_path',
   'highway_minor',
@@ -19,14 +20,19 @@ const ROAD_LAYERS = [
   'road_pier',
 ]
 
+/**
+ * Toggles the base map's road lines and labels. Shared by every domain map —
+ * the visibility it reads and writes lives on the cross-domain basemap store,
+ * so the choice follows the operator from one map to the next.
+ */
 export class RoadsToggleControl extends SentinelControlBase {
   roadsVisible: boolean
-  private _airStore: AirStore
+  private _basemapStore: BasemapStore
 
-  constructor(airStore: AirStore) {
+  constructor(basemapStore: BasemapStore) {
     super()
-    this._airStore = airStore
-    this.roadsVisible = airStore.overlayStates.roads
+    this._basemapStore = basemapStore
+    this.roadsVisible = basemapStore.layers.roads
   }
 
   get buttonLabel(): string {
@@ -38,19 +44,21 @@ export class RoadsToggleControl extends SentinelControlBase {
 
   protected onInit(): void {
     if (this.map.isStyleLoaded()) {
-      this._applyVisibility()
+      this.applyVisibility()
     } else {
-      this.map.once('style.load', () => this._applyVisibility())
+      this.map.once('style.load', () => this.applyVisibility())
     }
   }
 
   protected handleClick(): void {
     this.roadsVisible = !this.roadsVisible
-    this._applyVisibility()
-    this._airStore.setOverlay('roads', this.roadsVisible)
+    this.applyVisibility()
+    this._basemapStore.setLayer('roads', this.roadsVisible)
   }
 
-  _applyVisibility(): void {
+  /** Push the current visibility onto the style. Public because a map that
+   *  swaps its style (online↔offline) must re-apply it after the reload. */
+  applyVisibility(): void {
     const visibility = this.roadsVisible ? 'visible' : 'none'
     ROAD_LAYERS.forEach((id) => {
       if (this.map.getLayer(id)) this.map.setLayoutProperty(id, 'visibility', visibility)

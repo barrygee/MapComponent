@@ -17,6 +17,7 @@ vi.mock('@/composables/useUserLocation', async () => {
 
 import SpaceSideMenu from './SpaceSideMenu.vue'
 import { useSpaceStore } from '@/stores/space'
+import { useBasemapStore } from '@/stores/basemap'
 import { useAppStore } from '@/stores/app'
 
 // Map-control stubs the menu delegates to.
@@ -51,12 +52,14 @@ function mountMenu(mapRef: unknown) {
 }
 
 let spaceStore: ReturnType<typeof useSpaceStore>
+let basemapStore: ReturnType<typeof useBasemapStore>
 
 enableAutoUnmount(afterEach)
 
 beforeEach(() => {
   setActivePinia(createPinia())
   spaceStore = useSpaceStore()
+  basemapStore = useBasemapStore()
   if (shared.locationRef) shared.locationRef.value = null
   localStorage.clear()
 })
@@ -182,7 +185,7 @@ describe('SpaceSideMenu overlay toggles', () => {
     spaceStore.overlayStates.groundTrack = true
     spaceStore.overlayStates.footprint = false
     spaceStore.overlayStates.daynight = true
-    spaceStore.overlayStates.names = false
+    basemapStore.layers.names = false
     const wrapper = mountMenu(makeMapProxy(makeControls()))
     expect(wrapper.find('button[data-tooltip="GROUND TRACK"]').classes()).toContain('active')
     expect(wrapper.find('button[data-tooltip="FOOTPRINT"]').classes()).not.toContain('active')

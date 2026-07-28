@@ -141,9 +141,9 @@ describe('air store', () => {
 
   it('setOverlay updates and persists a single overlay', () => {
     const store = useAirStore()
-    store.setOverlay('roads', true)
-    expect(store.overlayStates.roads).toBe(true)
-    expect(JSON.parse(localStorage.getItem(LS_OVERLAYS)!).roads).toBe(true)
+    store.setOverlay('airports', false)
+    expect(store.overlayStates.airports).toBe(false)
+    expect(JSON.parse(localStorage.getItem(LS_OVERLAYS)!).airports).toBe(false)
   })
 
   it('setAdsbLabelFields and setAdsbTagFields replace the field config', () => {

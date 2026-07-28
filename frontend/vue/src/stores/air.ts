@@ -10,13 +10,13 @@ function isAirFilterCategory(value: unknown): value is AirFilterCategory {
   return typeof value === 'string' && (AIR_FILTER_CATEGORIES as readonly string[]).includes(value)
 }
 
+/** Air-specific overlays. Base-map layers that every domain shares (place
+ *  names, roads) live on the `basemap` store instead. */
 export interface OverlayStates {
   adsb: boolean
   adsbLabels: boolean
   airports: boolean
   militaryBases: boolean
-  roads: boolean
-  names: boolean
   rangeRings: boolean
   aara: boolean
   awacs: boolean
@@ -104,8 +104,6 @@ const DEFAULTS: OverlayStates = {
   adsbLabels: true,
   airports: true,
   militaryBases: true,
-  roads: false,
-  names: false,
   rangeRings: false,
   aara: true,
   awacs: true,

@@ -155,93 +155,6 @@
       </template>
     </IconRailAccordion>
 
-    <!-- RANGE RING -->
-    <BaseIconButton
-      class="sm-btn"
-      style="--ba-rail-transition: color 0.15s ease"
-      :class="{ active: airStore.overlayStates.rangeRings }"
-      :active="airStore.overlayStates.rangeRings"
-      tooltip-side="left"
-      tooltip="RANGE RING"
-      accessible-name="Range ring"
-      @click="mapRef.value?.getRangeRings()?.handleClickPublic()"
-    >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
-        <circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.5" />
-        <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5" />
-        <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-      </svg>
-    </BaseIconButton>
-
-    <!-- A2A REFUELING -->
-    <BaseIconButton
-      class="sm-btn"
-      style="--ba-rail-transition: color 0.15s ease"
-      :class="{ active: airStore.overlayStates.aara }"
-      :active="airStore.overlayStates.aara"
-      tooltip-side="left"
-      tooltip="A2A REFUELING"
-      accessible-name="A2A refueling"
-      @click="mapRef.value?.getAara()?.toggle()"
-    >
-      <svg
-        width="14"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
-        <!-- Fuel droplet — the air-to-air refuelling track. -->
-        <path
-          d="M12 2 C7 9 5 12 5 15 a7 7 0 1 0 14 0 c0 -3 -2 -6 -7 -13 z"
-          stroke="currentColor"
-          stroke-width="1.6"
-          stroke-linejoin="round"
-          fill="none"
-        />
-      </svg>
-    </BaseIconButton>
-
-    <!-- AWACS -->
-    <BaseIconButton
-      class="sm-btn"
-      style="--ba-rail-transition: color 0.15s ease"
-      :class="{ active: airStore.overlayStates.awacs }"
-      :active="airStore.overlayStates.awacs"
-      tooltip-side="left"
-      tooltip="AWACS"
-      accessible-name="AWACS"
-      @click="mapRef.value?.getAwacs()?.toggle()"
-    >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
-        <!-- Mirrors the AWACS map overlay: a circle with a semi-transparent fill. -->
-        <circle
-          cx="12"
-          cy="12"
-          r="8"
-          fill="currentColor"
-          fill-opacity="0.2"
-          stroke="currentColor"
-          stroke-width="1.6"
-        />
-      </svg>
-    </BaseIconButton>
-
     <!-- 3D VIEW -->
     <BaseIconButton
       class="sm-btn"
@@ -272,9 +185,10 @@
       </svg>
     </BaseIconButton>
 
-    <!-- LAYERS group: a click-to-expand accordion of map-layer toggles
-         (planes, ground vehicles, towers, airports, military bases, roads,
-         place names) shown below the icon. -->
+    <!-- LAYERS group: a click-to-expand accordion of every map overlay shown
+         below the icon — the map-annotation overlays first (range ring, A2A
+         refuelling, AWACS), then the data/base-map layers (planes, ground
+         vehicles, towers, place names, airports, military bases, roads). -->
     <IconRailAccordion panel-id="layers-panel">
       <template #trigger="{ open: layersAccordionOpen, toggle: toggleLayersAccordion }">
         <BaseIconButton
@@ -311,6 +225,101 @@
         </BaseIconButton>
       </template>
       <template #panel>
+        <!-- RANGE RING -->
+        <BaseIconButton
+          class="sm-btn sm-sub-btn"
+          style="
+            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
+            --ba-rail-transition: color 0.15s ease;
+          "
+          :class="{ active: airStore.overlayStates.rangeRings }"
+          :active="airStore.overlayStates.rangeRings"
+          tooltip-side="left"
+          tooltip="RANGE RING"
+          accessible-name="Range ring"
+          @click="mapRef.value?.getRangeRings()?.handleClickPublic()"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.5" />
+            <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5" />
+            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+          </svg>
+        </BaseIconButton>
+
+        <!-- A2A REFUELING -->
+        <BaseIconButton
+          class="sm-btn sm-sub-btn"
+          style="
+            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
+            --ba-rail-transition: color 0.15s ease;
+          "
+          :class="{ active: airStore.overlayStates.aara }"
+          :active="airStore.overlayStates.aara"
+          tooltip-side="left"
+          tooltip="A2A REFUELING"
+          accessible-name="A2A refueling"
+          @click="mapRef.value?.getAara()?.toggle()"
+        >
+          <svg
+            width="14"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <!-- Fuel droplet — the air-to-air refuelling track. -->
+            <path
+              d="M12 2 C7 9 5 12 5 15 a7 7 0 1 0 14 0 c0 -3 -2 -6 -7 -13 z"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linejoin="round"
+              fill="none"
+            />
+          </svg>
+        </BaseIconButton>
+
+        <!-- AWACS -->
+        <BaseIconButton
+          class="sm-btn sm-sub-btn"
+          style="
+            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
+            --ba-rail-transition: color 0.15s ease;
+          "
+          :class="{ active: airStore.overlayStates.awacs }"
+          :active="airStore.overlayStates.awacs"
+          tooltip-side="left"
+          tooltip="AWACS"
+          accessible-name="AWACS"
+          @click="mapRef.value?.getAwacs()?.toggle()"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <!-- Mirrors the AWACS map overlay: a circle with a semi-transparent fill. -->
+            <circle
+              cx="12"
+              cy="12"
+              r="8"
+              fill="currentColor"
+              fill-opacity="0.2"
+              stroke="currentColor"
+              stroke-width="1.6"
+            />
+          </svg>
+        </BaseIconButton>
         <BaseIconButton
           class="sm-btn sm-sub-btn"
           :class="{ active: airStore.overlayStates.adsb }"
@@ -407,8 +416,8 @@
         </BaseIconButton>
         <BaseIconButton
           class="sm-btn sm-sub-btn"
-          :class="{ active: airStore.overlayStates.names }"
-          :active="airStore.overlayStates.names"
+          :class="{ active: basemapStore.layers.names }"
+          :active="basemapStore.layers.names"
           style="
             --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
             --ba-rail-transition: color 0.15s ease;
@@ -527,8 +536,8 @@
         </BaseIconButton>
         <BaseIconButton
           class="sm-btn sm-sub-btn"
-          :class="{ active: airStore.overlayStates.roads }"
-          :active="airStore.overlayStates.roads"
+          :class="{ active: basemapStore.layers.roads }"
+          :active="basemapStore.layers.roads"
           style="
             --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
             --ba-rail-transition: color 0.15s ease;
@@ -609,6 +618,7 @@
 import { ref, computed } from 'vue'
 import { useAirStore } from '@/stores/air'
 import { useAppStore } from '@/stores/app'
+import { useBasemapStore } from '@/stores/basemap'
 import { useUserLocation } from '@/composables/useUserLocation'
 import MyLocationIcon from '@/components/shared/MyLocationIcon.vue'
 import FilterFunnelIcon from '@/components/shared/FilterFunnelIcon.vue'
@@ -633,6 +643,7 @@ const mapRef = {
 
 const airStore = useAirStore()
 const appStore = useAppStore()
+const basemapStore = useBasemapStore()
 const { location: userLocation } = useUserLocation()
 
 const tiltActive = ref(localStorage.getItem('sentinel_3d') === '1')
