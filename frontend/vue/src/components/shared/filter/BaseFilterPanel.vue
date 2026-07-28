@@ -59,20 +59,23 @@
     <div v-else class="bfp-results-body">
       <div
         v-for="item in items"
-        :id="`${idPrefix}-row-${item.key}`"
+        :id="`${idPrefix}-row-${idToken(item)}`"
         :key="item.key"
         :ref="(element) => registerRow(item.key, element)"
         class="bfp-result-item"
-        :class="{
-          'bfp-expanded': expandedKey === item.key,
-          'bfp-keyboard-focused': focusedKey === item.key,
-        }"
+        :class="[
+          item.rowClass,
+          {
+            'bfp-expanded': expandedKey === item.key,
+            'bfp-keyboard-focused': focusedKey === item.key,
+          },
+        ]"
         @click="toggleExpanded(item.key)"
       >
         <!-- The option is just the row header (identity + chevron); the expanded
              accordion is a sibling so its content isn't nested inside the option. -->
         <div
-          :id="`${idPrefix}-opt-${item.key}`"
+          :id="`${idPrefix}-opt-${idToken(item)}`"
           role="option"
           :aria-selected="focusedKey === item.key"
           :aria-label="item.optionLabel ?? optionLabel(item)"
@@ -82,11 +85,22 @@
             <div class="bfp-result-primary">{{ item.primary }}</div>
             <div v-if="item.secondary" class="bfp-result-secondary">{{ item.secondary }}</div>
           </div>
-          <span class="bfp-item-chevron">
+          <!-- A row that carries no accordion shows no chevron: the disclosure
+               cue would promise an expansion that never happens. Its trailing
+               slot (a badge, say) takes the same place. -->
+          <span v-if="item.expandable !== false" class="bfp-item-chevron">
             <ChevronIcon />
           </span>
+          <span v-else class="bfp-item-trailing">
+            <slot name="row-trailing" :item="item" />
+          </span>
         </div>
-        <div v-if="expandedKey === item.key" class="bfp-accordion-body">
+        <!-- The accordion is nested in the row so it moves with it, but it is
+             disclosed content, not part of the row's hit target: without
+             stopping the click here, using anything inside it (a button, or
+             just a stray click on a value) would bubble to the row handler and
+             shut the accordion under the user's cursor. -->
+        <div v-if="expandedKey === item.key" class="bfp-accordion-body" @click.stop>
           <slot name="accordion" :item="item" />
         </div>
       </div>
@@ -119,6 +133,21 @@ export interface FilterPanelItem {
   secondary?: string
   /** Accessible name for the option, when the visible text isn't enough. */
   optionLabel?: string
+  /**
+   * Token used to build this row's element ids, when `key` is unsuitable —
+   * a key holding a space (a base name, say) would split the `aria-owns`
+   * list, which is space-separated, into dangling IDREFs. Must be unique
+   * within the rendered set. Defaults to `key`.
+   */
+  idKey?: string
+  /** Extra class(es) on the row, for a caller's state styling. */
+  rowClass?: string
+  /**
+   * Whether clicking this row opens an accordion. `false` suppresses the
+   * chevron and shows the `row-trailing` slot instead — the row is still a
+   * selectable option, it just has nothing to disclose.
+   */
+  expandable?: boolean
 }
 
 const props = withDefaults(
@@ -135,10 +164,25 @@ const props = withDefaults(
     listboxLabel: string
     emptyMessage?: string
     accentColor?: string
+    /**
+     * What Enter does when no row is virtually focused yet: activate the first
+     * row (the default), or only move the virtual focus onto it, leaving a
+     * second Enter to activate. The latter suits a pane whose activation moves
+     * the map, where acting on a row the user never pointed at is a surprise.
+     */
+    enterActivatesFirstRow?: boolean
+    /**
+     * Whether typing drops the virtual focus. Suits a list whose rows are
+     * re-ordered by the query, where keeping the focus on a row that has just
+     * moved is more confusing than starting the walk again.
+     */
+    clearFocusOnInput?: boolean
   }>(),
   {
     emptyMessage: 'No results',
     accentColor: 'var(--color-accent)',
+    enterActivatesFirstRow: true,
+    clearFocusOnInput: false,
   },
 )
 
@@ -146,6 +190,12 @@ const emit = defineEmits<{
   'update:query': [query: string]
   'update:expandedKey': [key: string]
   select: [key: string]
+  /**
+   * The query was cleared deliberately (Escape or the clear button) rather
+   * than edited down to empty — distinct because a caller may want to reset
+   * more than the text.
+   */
+  clear: []
 }>()
 
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -153,11 +203,16 @@ const inputRef = ref<HTMLInputElement | null>(null)
 // Distinct from the expanded row: you can walk the list without opening rows.
 const focusedKey = ref<string | null>(null)
 
+/** The token a row's element ids are built from (see FilterPanelItem.idKey). */
+function idToken(item: FilterPanelItem): string {
+  return item.idKey ?? item.key
+}
+
 // Space-separated ids of every rendered option, in visual order. The listbox
 // claims these via aria-owns — they live outside it in the DOM so the row's
 // chevron and accordion chrome stay valid.
 const ownedOptionIds = computed<string>(() =>
-  props.items.map((item) => `${props.idPrefix}-opt-${item.key}`).join(' '),
+  props.items.map((item) => `${props.idPrefix}-opt-${idToken(item)}`).join(' '),
 )
 
 // The combobox popup only exists when at least one option is rendered — an empty
@@ -167,9 +222,10 @@ const listboxShown = computed<boolean>(() => ownedOptionIds.value.length > 0)
 
 // Always references a rendered option: `focusedKey` is only ever set to a key
 // taken from `items`, and the watcher below clears it the moment that row goes.
-const activeDescId = computed<string | undefined>(() =>
-  focusedKey.value ? `${props.idPrefix}-opt-${focusedKey.value}` : undefined,
-)
+const activeDescId = computed<string | undefined>(() => {
+  const focused = props.items.find((item) => item.key === focusedKey.value)
+  return focused ? `${props.idPrefix}-opt-${idToken(focused)}` : undefined
+})
 
 function optionLabel(item: FilterPanelItem): string {
   return item.secondary ? `${item.primary}, ${item.secondary}` : item.primary
@@ -177,10 +233,12 @@ function optionLabel(item: FilterPanelItem): string {
 
 function onInput(event: Event): void {
   emit('update:query', (event.target as HTMLInputElement).value)
+  if (props.clearFocusOnInput) focusedKey.value = null
 }
 
 function clearQuery(): void {
   emit('update:query', '')
+  emit('clear')
   inputRef.value?.focus()
 }
 
@@ -200,7 +258,7 @@ function onKeydown(event: KeyboardEvent): void {
   const index = items.findIndex((item) => item.key === focusedKey.value)
   if (event.key === 'ArrowDown') {
     event.preventDefault()
-    focusedKey.value = (items[index + 1] ?? items[0]).key
+    focusKey((items[index + 1] ?? items[0]).key)
   } else if (event.key === 'ArrowUp') {
     event.preventDefault()
     // Stepping up past the first row returns focus to the text field itself,
@@ -209,14 +267,27 @@ function onKeydown(event: KeyboardEvent): void {
       focusedKey.value = null
       return
     }
-    focusedKey.value = items[index - 1].key
+    focusKey(items[index - 1].key)
   } else if (event.key === 'Enter') {
     event.preventDefault()
-    // With nothing focused yet, Enter opens the first row (the list is known
-    // non-empty here), so there is always a target.
-    const target = items.find((item) => item.key === focusedKey.value) ?? items[0]
-    toggleExpanded(target.key)
+    const focused = items.find((item) => item.key === focusedKey.value)
+    if (focused) {
+      toggleExpanded(focused.key)
+      return
+    }
+    // Nothing focused yet. The list is known non-empty here, so the first row
+    // is always a valid target — either to act on or just to focus.
+    if (props.enterActivatesFirstRow) toggleExpanded(items[0].key)
+    else focusKey(items[0].key)
   }
+}
+
+// Move the virtual focus and keep the row it lands on visible: the rows are
+// never tabbable (the combobox drives them via aria-activedescendant), so
+// nothing else scrolls the list as the keyboard walks past the fold.
+function focusKey(key: string): void {
+  focusedKey.value = key
+  void nextTick(() => rowElements.get(key)?.scrollIntoView({ block: 'nearest' }))
 }
 
 // Row elements by key, so the scroll-into-view below can reach a row directly.
@@ -354,8 +425,13 @@ defineExpose({ focus: () => inputRef.value?.focus() })
   transition: background 0.12s;
 }
 
-/* The chevron is absolutely positioned against .bfp-result-item, so the option
-   wrapper itself stays unpositioned. */
+/* The row header is the positioning context for the chevron and the trailing
+   slot: anchoring them to the row itself would centre them over the row PLUS its
+   expanded accordion, dragging them off the header they belong to. */
+.bfp-result-option {
+  position: relative;
+}
+
 .bfp-result-option > .bfp-result-info {
   display: flex;
   flex-direction: column;
@@ -367,13 +443,27 @@ defineExpose({ focus: () => inputRef.value?.focus() })
 /* Hover lights the chevron rather than washing the row; keyboard focus keeps a
    background + outline, since that is what marks the active row during arrow-key
    navigation, which the chevron cue alone does not track. */
-.bfp-result-item.bfp-expanded,
-.bfp-result-item.bfp-keyboard-focused {
-  background: rgba(255, 255, 255, 0.04);
+/* Both tints paint the header and the accordion body directly rather than the
+   row that contains them: painting the row would put a layer *under* whichever
+   of them is also tinted, and two translucent layers read lighter than either
+   one. Keeping them siblings means the focus tint below can replace the
+   expanded tint on the header instead of stacking on it. Both are
+   caller-overridable so a pane keeps the exact weight it had before it moved
+   onto this shell. */
+.bfp-result-item.bfp-expanded > .bfp-result-option,
+.bfp-result-item.bfp-expanded > .bfp-accordion-body {
+  background: var(--bfp-row-highlight, rgba(255, 255, 255, 0.04));
 }
 
-.bfp-result-item.bfp-keyboard-focused {
-  outline: 1px solid var(--bfp-accent);
+/* The keyboard cue marks the OPTION — the row header — not the row element,
+   which also contains the expanded accordion. Outlining the row would draw the
+   focus ring around the whole open accordion, which says the accordion is the
+   focused thing and swamps the cue on a tall one. Declared after the expanded
+   tint so a focused row that is also open shows the focus weight on its header.
+ */
+.bfp-result-item.bfp-keyboard-focused > .bfp-result-option {
+  background: var(--bfp-focus-highlight, var(--bfp-row-highlight, rgba(255, 255, 255, 0.04)));
+  outline: 1px solid var(--bfp-focus-outline, var(--bfp-accent));
   outline-offset: -1px;
 }
 
@@ -401,7 +491,7 @@ defineExpose({ focus: () => inputRef.value?.focus() })
   position: absolute;
   right: 0;
   top: 0;
-  height: 44px;
+  bottom: 0;
   padding: 0 20px;
   display: flex;
   align-items: center;
@@ -412,6 +502,19 @@ defineExpose({ focus: () => inputRef.value?.focus() })
     color 0.15s;
   transform: rotate(-90deg);
   pointer-events: none;
+}
+
+/* Sits where the chevron would, so a row's trailing chrome lines up down the
+   list whether it discloses an accordion or not. */
+.bfp-item-trailing {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .bfp-result-item:hover .bfp-item-chevron,

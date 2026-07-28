@@ -322,6 +322,167 @@ describe('BaseFilterPanel', () => {
     })
   })
 
+  describe('caller options', () => {
+    it('builds a row’s ids from idKey when the key is not id-safe', () => {
+      // A key holding a space would split the space-separated aria-owns list
+      // into dangling IDREFs, so a caller can supply a safe token instead.
+      const wrapper = mountPanel({
+        items: [{ key: 'RAF Fairford', primary: 'EGVA', idKey: 'mil-0' }],
+      })
+      expect(wrapper.find('#test-filter-listbox').attributes('aria-owns')).toBe(
+        'test-filter-opt-mil-0',
+      )
+      expect(wrapper.find('[role="option"]').attributes('id')).toBe('test-filter-opt-mil-0')
+      expect(wrapper.find('.bfp-result-item').attributes('id')).toBe('test-filter-row-mil-0')
+    })
+
+    it('points aria-activedescendant at the idKey-derived option id', async () => {
+      const wrapper = mountPanel({
+        items: [{ key: 'RAF Fairford', primary: 'EGVA', idKey: 'mil-0' }],
+      })
+      await wrapper.find('input').trigger('keydown', { key: 'ArrowDown' })
+      expect(wrapper.find('input').attributes('aria-activedescendant')).toBe(
+        'test-filter-opt-mil-0',
+      )
+    })
+
+    it('puts a caller class on the row', () => {
+      const wrapper = mountPanel({
+        items: [{ key: 'a', primary: 'A', rowClass: 'row--emergency' }],
+      })
+      expect(wrapper.find('.bfp-result-item').classes()).toContain('row--emergency')
+    })
+
+    it('swaps the chevron for the trailing slot on a row that cannot expand', () => {
+      const wrapper = mount(BaseFilterPanel, {
+        props: {
+          items: [{ key: 'a', primary: 'A', expandable: false }],
+          query: '',
+          expandedKey: '',
+          idPrefix: 'test-filter',
+          inputLabel: 'Filter stations',
+          placeholder: 'CALLSIGN',
+          listboxLabel: 'Stations',
+        },
+        slots: { 'row-trailing': '<span class="badge">MIL</span>' },
+      })
+      expect(wrapper.find('.bfp-item-chevron').exists()).toBe(false)
+      expect(wrapper.find('.bfp-item-trailing .badge').text()).toBe('MIL')
+    })
+
+    it('keeps the chevron on a row that can expand', () => {
+      const wrapper = mountPanel({ items: [{ key: 'a', primary: 'A', expandable: true }] })
+      expect(wrapper.find('.bfp-item-chevron').exists()).toBe(true)
+      expect(wrapper.find('.bfp-item-trailing').exists()).toBe(false)
+    })
+
+    it('Enter only moves the focus onto the first row when told not to activate it', async () => {
+      const wrapper = mountPanel({ enterActivatesFirstRow: false })
+      await wrapper.find('input').trigger('keydown', { key: 'Enter' })
+      // Focused, but nothing asked to open — that takes a second Enter.
+      expect(wrapper.find('#test-filter-row-M0ABC').classes()).toContain('bfp-keyboard-focused')
+      expect(wrapper.emitted('update:expandedKey')).toBeUndefined()
+      expect(wrapper.emitted('select')).toBeUndefined()
+
+      await wrapper.find('input').trigger('keydown', { key: 'Enter' })
+      expect(wrapper.emitted('update:expandedKey')![0]).toEqual(['M0ABC'])
+    })
+
+    it('drops the virtual focus as the caller types when asked to', async () => {
+      const wrapper = mountPanel({ clearFocusOnInput: true })
+      await wrapper.find('input').trigger('keydown', { key: 'ArrowDown' })
+      expect(wrapper.find('.bfp-keyboard-focused').exists()).toBe(true)
+      await wrapper.find('input').setValue('M0')
+      expect(wrapper.find('.bfp-keyboard-focused').exists()).toBe(false)
+      expect(wrapper.find('input').attributes('aria-activedescendant')).toBeUndefined()
+    })
+
+    it('keeps the virtual focus while typing by default', async () => {
+      const wrapper = mountPanel()
+      await wrapper.find('input').trigger('keydown', { key: 'ArrowDown' })
+      await wrapper.find('input').setValue('M0')
+      expect(wrapper.find('.bfp-keyboard-focused').exists()).toBe(true)
+    })
+
+    it('reports a deliberate clear separately from an edit down to empty', async () => {
+      const wrapper = mountPanel({ query: 'M0' })
+      await wrapper.find('input').setValue('')
+      // Edited to empty: the text changed, but nothing was "cleared".
+      expect(wrapper.emitted('update:query')![0]).toEqual([''])
+      expect(wrapper.emitted('clear')).toBeUndefined()
+
+      await wrapper.find('.bfp-clear-btn').trigger('click')
+      expect(wrapper.emitted('clear')).toHaveLength(1)
+
+      await wrapper.find('input').trigger('keydown', { key: 'Escape' })
+      expect(wrapper.emitted('clear')).toHaveLength(2)
+    })
+  })
+
+  describe('click containment', () => {
+    it('does not collapse the row when the accordion content is used', async () => {
+      // The accordion is nested in the row, whose click handler toggles it —
+      // without containment, using a control inside would shut it mid-click.
+      const wrapper = mount(BaseFilterPanel, {
+        props: {
+          items: ITEMS,
+          query: '',
+          expandedKey: 'M0ABC',
+          idPrefix: 'test-filter',
+          inputLabel: 'Filter stations',
+          placeholder: 'CALLSIGN',
+          listboxLabel: 'Stations',
+        },
+        slots: { accordion: '<button class="detail-action">Tune</button>' },
+      })
+      await wrapper.find('.detail-action').trigger('click')
+      expect(wrapper.emitted('update:expandedKey')).toBeUndefined()
+    })
+
+    it('still collapses when the row header itself is clicked', async () => {
+      const wrapper = mountPanel({ expandedKey: 'M0ABC' })
+      await wrapper.find('.bfp-result-option').trigger('click')
+      expect(wrapper.emitted('update:expandedKey')![0]).toEqual([''])
+    })
+  })
+
+  describe('keeping the focused row in view', () => {
+    it('scrolls the row the keyboard walks onto into view', async () => {
+      const wrapper = mountPanel()
+      const scrollIntoView = vi.fn()
+      wrapper.find('#test-filter-row-MB7UMS').element.scrollIntoView = scrollIntoView
+
+      await wrapper.find('input').trigger('keydown', { key: 'ArrowDown' })
+      await wrapper.find('input').trigger('keydown', { key: 'ArrowDown' })
+      await nextTick()
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    })
+
+    it('scrolls the row stepped back onto into view', async () => {
+      const wrapper = mountPanel()
+      const scrollIntoView = vi.fn()
+      wrapper.find('#test-filter-row-M0ABC').element.scrollIntoView = scrollIntoView
+
+      await wrapper.find('input').trigger('keydown', { key: 'ArrowDown' })
+      await wrapper.find('input').trigger('keydown', { key: 'ArrowDown' })
+      await wrapper.find('input').trigger('keydown', { key: 'ArrowUp' })
+      await nextTick()
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    })
+
+    it('does not scroll when ArrowUp leaves the list for the text field', async () => {
+      const wrapper = mountPanel()
+      await wrapper.find('input').trigger('keydown', { key: 'ArrowDown' })
+      const scrollIntoView = vi.fn()
+      wrapper.find('#test-filter-row-M0ABC').element.scrollIntoView = scrollIntoView
+
+      await wrapper.find('input').trigger('keydown', { key: 'ArrowUp' })
+      await nextTick()
+      expect(wrapper.find('.bfp-keyboard-focused').exists()).toBe(false)
+      expect(scrollIntoView).not.toHaveBeenCalled()
+    })
+  })
+
   it('exposes focus() so a host can put the caret in the field', () => {
     const wrapper = mountPanel()
     ;(wrapper.vm as unknown as { focus: () => void }).focus()
