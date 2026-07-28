@@ -19,7 +19,6 @@
       :toggle-range-rings="toggleRangeRings"
       :toggle-aprs="toggleAprs"
       :toggle-names="toggleNames"
-      :toggle-roads="toggleRoads"
       :range-rings-active="rangeRingsActive"
       :aprs-active="aprsActive"
       :location-active="locationActive"
@@ -106,8 +105,10 @@ function onMapCreated(m: Map) {
   // owns the visible controls — and hide the native control corner.
   _rangeRingsControl = new LandRangeRingsControl(getUserLocation)
   _aprsControl = new AprsStationsControl(landStore)
-  // Place names and roads are shared base-map layers driven by the cross-domain
-  // basemap store, so Land shows whatever Air and Space were last set to.
+  // Location names and roads are shared base-map layers driven by the
+  // cross-domain basemap store, so Land shows whatever the other domains were
+  // last set to. Roads has no button of its own — the control exists purely to
+  // apply the stored visibility to this map's style.
   _namesControl = new NamesToggleControl(basemapStore)
   _roadsControl = new RoadsToggleControl(basemapStore)
   _rangeRingsControl.onAdd(m)
@@ -149,11 +150,8 @@ function toggleAprs() {
   _aprsControl?.handleClickPublic()
 }
 function toggleNames() {
-  // Both controls flip the basemap store, which LandSideMenu reads directly.
+  // The control flips the basemap store, which LandSideMenu reads directly.
   _namesControl?.handleClickPublic()
-}
-function toggleRoads() {
-  _roadsControl?.handleClickPublic()
 }
 
 onMounted(() => {

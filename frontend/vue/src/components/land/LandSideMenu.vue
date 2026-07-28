@@ -156,8 +156,8 @@
             --ba-rail-transition: color 0.15s ease;
           "
           tooltip-side="left"
-          tooltip="PLACE NAMES"
-          accessible-name="Place name labels"
+          tooltip="LOCATION NAMES"
+          accessible-name="Location name labels"
           :class="{ active: basemapStore.layers.names }"
           :active="basemapStore.layers.names"
           @click="toggleNames"
@@ -178,38 +178,6 @@
               fill="none"
             />
             <circle cx="12" cy="9" r="2.4" stroke="currentColor" stroke-width="1.6" fill="none" />
-          </svg>
-        </BaseIconButton>
-        <BaseIconButton
-          class="sm-btn sm-sub-btn"
-          style="
-            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
-            --ba-rail-transition: color 0.15s ease;
-          "
-          tooltip-side="left"
-          tooltip="ROADS"
-          accessible-name="Roads"
-          :class="{ active: basemapStore.layers.roads }"
-          :active="basemapStore.layers.roads"
-          @click="toggleRoads"
-        >
-          <svg
-            width="14"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <path
-              d="M8 22 L10 2 M16 22 L14 2"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-            />
-            <line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" stroke-width="1.6" />
-            <line x1="12" y1="11" x2="12" y2="15" stroke="currentColor" stroke-width="1.6" />
-            <line x1="12" y1="18" x2="12" y2="21" stroke="currentColor" stroke-width="1.6" />
           </svg>
         </BaseIconButton>
       </template>
@@ -233,15 +201,14 @@ defineProps<{
   toggleRangeRings: () => void
   toggleAprs: () => void
   toggleNames: () => void
-  toggleRoads: () => void
   rangeRingsActive: boolean
   aprsActive: boolean
   locationActive: boolean
 }>()
 
 const appStore = useAppStore()
-// Place names and roads are shared base-map layers, so their active state is
-// read straight off the cross-domain store rather than passed in from LandView.
+// Location names are a shared base-map layer, so the active state is read
+// straight off the cross-domain store rather than passed in from LandView.
 const basemapStore = useBasemapStore()
 </script>
 

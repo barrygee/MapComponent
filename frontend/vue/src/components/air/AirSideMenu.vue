@@ -187,8 +187,8 @@
 
     <!-- LAYERS group: a click-to-expand accordion of every map overlay shown
          below the icon — the map-annotation overlays first (range ring, A2A
-         refuelling, AWACS), then the data/base-map layers (planes, ground
-         vehicles, towers, place names, airports, military bases, roads). -->
+         refuelling, AWACS), then the data/base-map layers (ground vehicles,
+         towers, location names, airports, military bases). -->
     <IconRailAccordion panel-id="layers-panel">
       <template #trigger="{ open: layersAccordionOpen, toggle: toggleLayersAccordion }">
         <BaseIconButton
@@ -322,34 +322,6 @@
         </BaseIconButton>
         <BaseIconButton
           class="sm-btn sm-sub-btn"
-          :class="{ active: airStore.overlayStates.adsb }"
-          :active="airStore.overlayStates.adsb"
-          style="
-            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
-            --ba-rail-transition: color 0.15s ease;
-          "
-          data-loc="planes"
-          tooltip-side="left"
-          tooltip="AIRCRAFT"
-          accessible-name="Aircraft"
-          @click="togglePlanes"
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <path
-              d="M12 2C12.8 2 13.2 3.6 13.2 6.6 L21 11.5 V13.4 L13.2 11 V16.5 L15.5 18.5 V20 L12 19 L8.5 20 V18.5 L10.8 16.5 V11 L3 13.4 V11.5 L10.8 6.6 C10.8 3.6 11.2 2 12 2Z"
-              fill="currentColor"
-            />
-          </svg>
-        </BaseIconButton>
-        <BaseIconButton
-          class="sm-btn sm-sub-btn"
           :class="{ active: !hideGnd }"
           :active="!hideGnd"
           style="
@@ -424,8 +396,8 @@
           "
           data-loc="names"
           tooltip-side="left"
-          tooltip="PLACE NAMES"
-          accessible-name="Place name labels"
+          tooltip="LOCATION NAMES"
+          accessible-name="Location name labels"
           @click="mapRef.value?.getNamesControl()?.handleClickPublic()"
         >
           <svg
@@ -532,39 +504,6 @@
               stroke-linejoin="round"
               fill="none"
             />
-          </svg>
-        </BaseIconButton>
-        <BaseIconButton
-          class="sm-btn sm-sub-btn"
-          :class="{ active: basemapStore.layers.roads }"
-          :active="basemapStore.layers.roads"
-          style="
-            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
-            --ba-rail-transition: color 0.15s ease;
-          "
-          data-loc="roads"
-          tooltip-side="left"
-          tooltip="ROADS"
-          accessible-name="Roads"
-          @click="mapRef.value?.getRoadsControl()?.handleClickPublic()"
-        >
-          <svg
-            width="14"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <path
-              d="M8 22 L10 2 M16 22 L14 2"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-            />
-            <line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" stroke-width="1.6" />
-            <line x1="12" y1="11" x2="12" y2="15" stroke="currentColor" stroke-width="1.6" />
-            <line x1="12" y1="18" x2="12" y2="21" stroke="currentColor" stroke-width="1.6" />
           </svg>
         </BaseIconButton>
       </template>
@@ -695,29 +634,12 @@ function getAdsb() {
       | null) ?? null
   )
 }
-function getAdsbLabels() {
-  return (
-    (mapRef.value?.getAdsbLabels?.() as
-      | import('./controls/adsb-labels/AdsbLabelsToggleControl').AdsbLabelsToggleControl
-      | null) ?? null
-  )
-}
-
 // ---- Location ----
 function goToLocation() {
   const m = getMap()
   const loc = userLocation.value
   if (!m || !loc) return
   m.flyTo({ center: [loc.lon, loc.lat], zoom: Math.max(m.getZoom(), 10), duration: 800 })
-}
-
-// ---- Plane overlay ----
-function togglePlanes() {
-  const c = getAdsb()
-  if (!c) return
-  c.toggle()
-  const labels = getAdsbLabels()
-  if (labels) labels.syncToAdsb(c.visible)
 }
 
 function toggleGround() {
