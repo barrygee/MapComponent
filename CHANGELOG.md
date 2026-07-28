@@ -1230,6 +1230,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Close remaining coverage gaps and restore the 100% gate (#186)
 - Cover per-radio decode muting and the decode-mute setting
 - Update e2e specs for the restored frequency manager tab
+- Put the reconnect-cancel test on fake timers (#262)
 
 ### Build System
 
