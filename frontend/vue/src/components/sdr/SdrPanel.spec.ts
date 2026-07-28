@@ -203,6 +203,11 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  // restoreAllMocks does NOT restore timers, and a test that fails while fake
+  // timers are installed never reaches its own useRealTimers() — which would
+  // leave every later test in the file running on a frozen clock. Reset here so
+  // one failure can't cascade.
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   // Teleported rails/menus can linger between mounts — clear them so document
@@ -3081,6 +3086,10 @@ describe('SdrPanel — branch coverage C (socket, scan/search engine)', () => {
     await flushPromises()
     lastSocket().open()
     await flushPromises()
+    // Fake timers so the reconnect backoff cannot fire on wall-clock time between
+    // the close and the deselect below (it would open a stray socket for a radio
+    // this test has already let go of).
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     lastSocket().serverClose() // schedules a reconnect timer
     // Clear the selection → closeControlSocket cancels the reconnect + closes.
     await dd.trigger('click')
@@ -4061,6 +4070,13 @@ describe('SdrPanel — branch coverage I (resume callbacks & remaining guards)',
   })
 
   it('cancels a pending control-socket reconnect when the radio is deselected', async () => {
+    // The close below schedules the transport's 500 ms reconnect backoff. On real
+    // timers that is a wall-clock race against the deselect steps: a loaded run
+    // that takes >500 ms between the two lets the reconnect land and open a
+    // second socket, failing the count for reasons unrelated to the cancellation
+    // under test. Fake timers put the backoff under this test's control, as in
+    // every other reconnect test in this file.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const { wrapper, socket } = await mountConnected()
     socket.serverClose() // schedules a reconnect timer (_ctrlReconnect)
     const before = sockets.length
@@ -4071,6 +4087,11 @@ describe('SdrPanel — branch coverage I (resume callbacks & remaining guards)',
     ;(document.querySelector('.sdr-device-menu-placeholder') as HTMLElement).click()
     await flushPromises()
     expect(wrapper.find('.sdr-device-dropdown-text').text()).toContain('select radio')
+    // Run time past the backoff the close scheduled: a cancelled timer opens
+    // nothing, a live one would reconnect here. Without advancing, the assertion
+    // below would also hold for a timer that simply hadn't fired yet.
+    vi.advanceTimersByTime(5000)
+    await flushPromises()
     // No reconnect socket was opened after the cancel.
     expect(sockets.length).toBe(before)
   })
