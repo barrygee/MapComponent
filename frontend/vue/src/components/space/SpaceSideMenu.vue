@@ -193,8 +193,8 @@
             --ba-rail-transition: color 0.15s ease;
           "
           tooltip-side="left"
-          tooltip="LOCATIONS"
-          accessible-name="Locations"
+          tooltip="LOCATION NAMES"
+          accessible-name="Location name labels"
           :class="{ active: namesActive }"
           :active="namesActive"
           @click="toggleNames"

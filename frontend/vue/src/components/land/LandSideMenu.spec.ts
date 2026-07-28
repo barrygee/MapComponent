@@ -13,7 +13,6 @@ function makeProps(overrides: Record<string, unknown> = {}) {
     toggleRangeRings: vi.fn(),
     toggleAprs: vi.fn(),
     toggleNames: vi.fn(),
-    toggleRoads: vi.fn(),
     rangeRingsActive: false,
     aprsActive: true,
     locationActive: false,
@@ -53,8 +52,7 @@ describe('LandSideMenu', () => {
       'APRS stations',
       'Map layers',
       'Range rings',
-      'Place name labels',
-      'Roads',
+      'Location name labels',
     ]) {
       expect(wrapper.find(`[aria-label="${name}"]`).exists()).toBe(true)
     }
@@ -98,10 +96,8 @@ describe('LandSideMenu', () => {
     expect(props.toggleAprs).toHaveBeenCalledOnce()
     await wrapper.find('[aria-label="Range rings"]').trigger('click')
     expect(props.toggleRangeRings).toHaveBeenCalledOnce()
-    await wrapper.find('[aria-label="Place name labels"]').trigger('click')
+    await wrapper.find('[aria-label="Location name labels"]').trigger('click')
     expect(props.toggleNames).toHaveBeenCalledOnce()
-    await wrapper.find('[aria-label="Roads"]').trigger('click')
-    expect(props.toggleRoads).toHaveBeenCalledOnce()
   })
 
   it('reflects the active (green) state of each prop-driven toggle', () => {
@@ -126,19 +122,16 @@ describe('LandSideMenu', () => {
     expect(wrapper.find('[aria-label="Go to my location"]').classes()).not.toContain('active')
   })
 
-  it('reads the base-map toggles straight off the shared basemap store', async () => {
+  it('reads the base-map toggle straight off the shared basemap store', async () => {
     const basemapStore = useBasemapStore()
     const { wrapper } = mountMenu()
-    expect(wrapper.find('[aria-label="Place name labels"]').classes()).not.toContain('active')
-    expect(wrapper.find('[aria-label="Roads"]').classes()).not.toContain('active')
+    expect(wrapper.find('[aria-label="Location name labels"]').classes()).not.toContain('active')
 
-    // A change made on another map (or restored from storage) lights them up
+    // A change made on another map (or restored from storage) lights it up
     // here without LandView passing anything down.
     basemapStore.setLayer('names', true)
-    basemapStore.setLayer('roads', true)
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('[aria-label="Place name labels"]').classes()).toContain('active')
-    expect(wrapper.find('[aria-label="Roads"]').classes()).toContain('active')
+    expect(wrapper.find('[aria-label="Location name labels"]').classes()).toContain('active')
   })
 })
 
@@ -201,7 +194,7 @@ describe('LandSideMenu accordions', () => {
     const labels = wrapper
       .findAll('#land-layers-panel button')
       .map((button) => button.attributes('aria-label'))
-    expect(labels).toEqual(['Range rings', 'Place name labels', 'Roads'])
+    expect(labels).toEqual(['Range rings', 'Location name labels'])
   })
 })
 

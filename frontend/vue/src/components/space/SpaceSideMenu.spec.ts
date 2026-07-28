@@ -77,7 +77,7 @@ describe('SpaceSideMenu rail', () => {
       expect(button.attributes('aria-label')).toBeTruthy()
     }
     // The satellite overlays live inside the MAP LAYERS accordion panel.
-    for (const label of ['GROUND TRACK', 'FOOTPRINT', 'DAY / NIGHT', 'LOCATIONS']) {
+    for (const label of ['GROUND TRACK', 'FOOTPRINT', 'DAY / NIGHT', 'LOCATION NAMES']) {
       const subButton = wrapper.find(`#space-layers-panel button[data-tooltip="${label}"]`)
       expect(subButton.exists()).toBe(true)
       expect(subButton.attributes('aria-label')).toBeTruthy()
@@ -163,7 +163,7 @@ describe('SpaceSideMenu overlay toggles', () => {
     await wrapper.find('button[data-tooltip="GROUND TRACK"]').trigger('click')
     await wrapper.find('button[data-tooltip="FOOTPRINT"]').trigger('click')
     await wrapper.find('button[data-tooltip="DAY / NIGHT"]').trigger('click')
-    await wrapper.find('button[data-tooltip="LOCATIONS"]').trigger('click')
+    await wrapper.find('button[data-tooltip="LOCATION NAMES"]').trigger('click')
 
     expect(controls.satellite.toggleTrack).toHaveBeenCalledTimes(1)
     expect(controls.satellite.toggleFootprint).toHaveBeenCalledTimes(1)
@@ -177,7 +177,7 @@ describe('SpaceSideMenu overlay toggles', () => {
     await wrapper.find('button[data-tooltip="FOOTPRINT"]').trigger('click')
     await wrapper.find('button[data-tooltip="DAY / NIGHT"]').trigger('click')
     await expect(
-      wrapper.find('button[data-tooltip="LOCATIONS"]').trigger('click'),
+      wrapper.find('button[data-tooltip="LOCATION NAMES"]').trigger('click'),
     ).resolves.toBeUndefined()
   })
 
@@ -190,7 +190,7 @@ describe('SpaceSideMenu overlay toggles', () => {
     expect(wrapper.find('button[data-tooltip="GROUND TRACK"]').classes()).toContain('active')
     expect(wrapper.find('button[data-tooltip="FOOTPRINT"]').classes()).not.toContain('active')
     expect(wrapper.find('button[data-tooltip="DAY / NIGHT"]').classes()).toContain('active')
-    expect(wrapper.find('button[data-tooltip="LOCATIONS"]').classes()).not.toContain('active')
+    expect(wrapper.find('button[data-tooltip="LOCATION NAMES"]').classes()).not.toContain('active')
   })
 })
 

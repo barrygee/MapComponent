@@ -54,7 +54,6 @@ function makeControls() {
     airports: { toggle: vi.fn() },
     mil: { toggle: vi.fn() },
     names: { handleClickPublic: vi.fn() },
-    roads: { handleClickPublic: vi.fn() },
     clear: { toggle: vi.fn(), _cleared: true },
     set3DActive: vi.fn(),
     setTargetPitch: vi.fn(),
@@ -74,7 +73,6 @@ function makeAirMap(controls: Controls) {
     getAirports: () => controls.airports,
     getMilBases: () => controls.mil,
     getNamesControl: () => controls.names,
-    getRoadsControl: () => controls.roads,
     getClearControl: () => controls.clear,
     set3DActive: controls.set3DActive,
     setTargetPitch: controls.setTargetPitch,
@@ -129,10 +127,10 @@ describe('AirSideMenu', () => {
       }
       // Callsigns is removed entirely.
       expect(wrapper.find(tip('CALLSIGNS')).exists()).toBe(false)
-      // Planes, ground vehicles, towers, place names, airports, military bases
-      // and roads live inside the LAYERS accordion panel (as icon buttons with
+      // Ground vehicles, towers, location names, airports, military bases and
+      // live inside the LAYERS accordion panel (as icon buttons with
       // their own tooltips), not as standalone rail icons.
-      for (const layer of ['planes', 'ground', 'towers', 'names', 'airports', 'mil', 'roads']) {
+      for (const layer of ['ground', 'towers', 'names', 'airports', 'mil']) {
         const subButton = wrapper.find(`#layers-panel [data-loc="${layer}"]`)
         expect(subButton.exists()).toBe(true)
         expect(subButton.attributes('aria-label')).toBeTruthy()
@@ -181,20 +179,6 @@ describe('AirSideMenu', () => {
       expect(controls.map.flyTo).not.toHaveBeenCalled()
     })
 
-    it('toggles planes and syncs the label control', async () => {
-      await wrapper.find(tip('AIRCRAFT')).trigger('click')
-      expect(controls.adsb.toggle).toHaveBeenCalled()
-      expect(controls.labels.syncToAdsb).toHaveBeenCalledWith(true)
-    })
-
-    it('toggles planes without throwing when no label control is present', async () => {
-      const localControls = makeControls()
-      const localWrapper = mountMenu({ ...makeAirMap(localControls), getAdsbLabels: () => null })
-      await localWrapper.find(tip('AIRCRAFT')).trigger('click')
-      expect(localControls.adsb.toggle).toHaveBeenCalled()
-      expect(localControls.labels.syncToAdsb).not.toHaveBeenCalled()
-    })
-
     it('toggles ground vehicles and towers', async () => {
       await wrapper.find(tip('GROUND VEHICLES')).trigger('click')
       expect(controls.adsb.setHideGroundVehicles).toHaveBeenCalledWith(true)
@@ -211,15 +195,13 @@ describe('AirSideMenu', () => {
       expect(controls.awacs.toggle).toHaveBeenCalled()
     })
 
-    it('toggles place names, airports, bases and roads from the LAYERS panel', async () => {
+    it('toggles location names, airports and bases from the LAYERS panel', async () => {
       await wrapper.find('[data-loc="names"]').trigger('click')
       await wrapper.find('[data-loc="airports"]').trigger('click')
       await wrapper.find('[data-loc="mil"]').trigger('click')
-      await wrapper.find('[data-loc="roads"]').trigger('click')
       expect(controls.names.handleClickPublic).toHaveBeenCalled()
       expect(controls.airports.toggle).toHaveBeenCalled()
       expect(controls.mil.toggle).toHaveBeenCalled()
-      expect(controls.roads.handleClickPublic).toHaveBeenCalled()
     })
 
     it('expands the LAYERS accordion on click and highlights the button while open', async () => {
@@ -372,7 +354,7 @@ describe('AirSideMenu', () => {
         await expect(wrapper.find(tip(label)).trigger('click')).resolves.not.toThrow()
       }
       // The LAYERS panel toggles are also safe without a map.
-      for (const layer of ['planes', 'ground', 'towers', 'names', 'airports', 'mil', 'roads']) {
+      for (const layer of ['ground', 'towers', 'names', 'airports', 'mil']) {
         await expect(wrapper.find(`[data-loc="${layer}"]`).trigger('click')).resolves.not.toThrow()
       }
     })

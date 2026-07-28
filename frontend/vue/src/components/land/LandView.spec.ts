@@ -101,7 +101,7 @@ vi.mock('@/components/land/controls/aprs/AprsStationsControl', () => ({
   },
 }))
 
-// The shared base-map layer controls (place names / roads). Mocked for the same
+// The shared base-map layer controls (location names / roads). Mocked for the same
 // reason as the others — they own real maplibre layer visibility and have their
 // own specs — but each keeps the basemap store wired up, since the side menu
 // reads its active state straight off that store rather than from a prop.
@@ -187,7 +187,6 @@ const LandSideMenuStub = defineComponent({
     'toggleRangeRings',
     'toggleAprs',
     'toggleNames',
-    'toggleRoads',
     'rangeRingsActive',
     'aprsActive',
     'locationActive',
@@ -215,7 +214,7 @@ function makeFakeMap() {
     zoomOut: vi.fn(),
     flyTo: vi.fn(),
     getZoom: vi.fn(() => 6),
-    // The shared place-names/roads controls query and restyle base-map layers.
+    // The shared location-names/roads controls query and restyle base-map layers.
     isStyleLoaded: vi.fn(() => true),
     once: vi.fn(),
     getLayer: vi.fn(() => undefined),
@@ -454,7 +453,7 @@ describe('LandView', () => {
       expect(sideMenuProps!.aprsActive).toBe(false)
     })
 
-    it('initialises the shared place-names and roads controls on the map', () => {
+    it('initialises the shared location-names and roads controls on the map', () => {
       const map = makeFakeMap()
       mountView()
       shared.emit!('map-created', map)
@@ -474,24 +473,10 @@ describe('LandView', () => {
       expect(basemapStore.layers.names).toBe(true)
     })
 
-    it('toggling roads drives the control and flips the shared basemap flag', async () => {
-      const map = makeFakeMap()
-      const basemapStore = useBasemapStore()
-      mountView()
-      shared.emit!('map-created', map)
-      expect(basemapStore.layers.roads).toBe(false)
-      ;(sideMenuProps!.toggleRoads as () => void)()
-      await nextTick()
-      expect(roadsSpies.handleClickPublic).toHaveBeenCalledOnce()
-      expect(basemapStore.layers.roads).toBe(true)
-    })
-
-    it('does nothing when the base-map toggles fire before the map exists', () => {
+    it('does nothing when the base-map toggle fires before the map exists', () => {
       mountView()
       expect(() => (sideMenuProps!.toggleNames as () => void)()).not.toThrow()
-      expect(() => (sideMenuProps!.toggleRoads as () => void)()).not.toThrow()
       expect(namesSpies.handleClickPublic).not.toHaveBeenCalled()
-      expect(roadsSpies.handleClickPublic).not.toHaveBeenCalled()
     })
 
     it('re-asserts the base-map layer visibility on every style load', () => {
