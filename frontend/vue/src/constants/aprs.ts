@@ -32,5 +32,9 @@ export const APRS_COUNT_FILL = '#000000'
  * Very dark grey — nearly the black of the centre, so the marker reads as one
  * dark object rather than a light ring around a hole. Not quite black, so the
  * ring still separates from the centre where the two meet.
+ *
+ * Semitransparent: the ring sits flush against the centre and is wide enough to
+ * hide a fair patch of ground, so letting the map through keeps a group of
+ * stations from blanking out what it stands over.
  */
-export const APRS_COUNT_RING = '#14171c'
+export const APRS_COUNT_RING = 'rgba(20, 23, 28, 0.55)'

@@ -479,33 +479,29 @@ export function formatCount(count: number): string {
   return count > MAX_DISPLAYED_COUNT ? `${MAX_DISPLAYED_COUNT}+` : String(count)
 }
 
-/** Diameter of a count marker, in pixels — the ring's outer edge. */
-const CLUSTER_MARKER_SIZE_PX = 32
+/** Width of the ring around a count marker, in pixels. */
+const CLUSTER_MARKER_RING_PX = 6
+
+/** Diameter of the filled centre the count sits on, in pixels. */
+const CLUSTER_MARKER_CENTRE_PX = 20
+
+/** Diameter of a count marker, in pixels — the ring's outer edge. Derived, so
+ *  the ring always meets the centre exactly: no gap, whatever the two are set
+ *  to. */
+const CLUSTER_MARKER_SIZE_PX = CLUSTER_MARKER_CENTRE_PX + CLUSTER_MARKER_RING_PX * 2
 
 /** How close two unlabelled stations must be to share a count, in pixels.
  *  The marker's own width, so a count never covers more ground than it draws
  *  over, and two counts never land on top of each other. */
 const COUNT_GROUP_RADIUS_PX = CLUSTER_MARKER_SIZE_PX
 
-/** Width of the ring around a count marker, in pixels. */
-const CLUSTER_MARKER_RING_PX = 3
-
-/**
- * Diameter of the filled centre the count sits on, in pixels.
- *
- * The difference from the ring's inner edge is the gap the map shows through.
- * Wider than it looks on paper: the centre is black and the map behind the gap
- * is nearly as dark, so a hairline would not read as a gap at all.
- */
-const CLUSTER_MARKER_CENTRE_PX = 20
-
 /**
  * The marker standing for a group of stations too close together to label.
  *
- * Built like the user-location marker — a stroked ring with the map showing
- * through the gap inside it, and a filled centre — so a marker that stands for
- * a place reads the same wherever it appears. Its own colours, though: grey and
- * black rather than the location marker's white and accent, which would claim
+ * Built like the user-location marker — a broad ring sitting flush against a
+ * filled centre — so a marker that stands for a place reads the same wherever
+ * it appears. Its own colours, though: a semitransparent grey ring and a black
+ * centre rather than the location marker's white and accent, which would claim
  * more attention than a group of stations deserves.
  *
  * Interactive, unlike a label: it takes pointer events so a click can zoom in
@@ -527,7 +523,8 @@ export function buildClusterMarker(count: number): HTMLElement {
     'padding:0',
     `border:${CLUSTER_MARKER_RING_PX}px solid ${APRS_COUNT_RING}`,
     'border-radius:50%',
-    // Transparent, so the gap between ring and centre is the map itself.
+    // No fill of its own: the ring is the border alone, and it blends with the
+    // map behind it rather than with a backing disc.
     'background:none',
     'display:flex',
     'align-items:center',
