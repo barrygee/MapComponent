@@ -123,6 +123,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Open APRS stations in the side panel instead of a map popup
 - Group crowded APRS labels into one column, by zoom
 - Show a count for crowded APRS stations, labels once zoomed in
+- Add FILTER and MAP LAYERS menus, shared across maps (#266)
 
 ### Bug Fixes
 
