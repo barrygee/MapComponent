@@ -924,10 +924,13 @@ defineExpose({
   max-height: 340px;
 }
 
-/* Rows are separated by a 1px seam of the panel background. */
+/* Rows are separated by a 1px seam of the panel background, and this pane's
+   input→first-row gap is a touch wider than the shell default. The gap is set
+   as the shell's custom property because the shell holds that space inside the
+   first row's header, where an expanded row's tint covers it. */
 #filter-results .bfp-results-body {
   gap: 1px;
-  padding-top: 10px;
+  --bfp-results-top-gap: 10px;
 }
 
 /* Keyboard focus is a touch stronger here, and its outline keeps the softened

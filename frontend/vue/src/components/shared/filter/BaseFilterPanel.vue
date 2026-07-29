@@ -411,8 +411,6 @@ defineExpose({ focus: () => inputRef.value?.focus() })
 .bfp-results-body {
   display: flex;
   flex-direction: column;
-  /* Match the between-row gap so the input→first-row gap reads the same. */
-  padding-top: 9px;
 }
 
 .bfp-no-results {
@@ -446,6 +444,15 @@ defineExpose({ focus: () => inputRef.value?.focus() })
   gap: 1px;
   padding: 13px 52px 13px 24px;
   min-width: 0;
+}
+
+/* The input→first-row breathing room lives INSIDE the first row's header rather
+   than as padding on the list above it: an expanded row paints a background, and
+   a gap held outside the row leaves that background starting below a torn strip
+   of untinted space. Kept as a custom property so a pane can retune the gap
+   (see AirFilter) without moving it back outside the tint. */
+.bfp-result-item:first-child > .bfp-result-option > .bfp-result-info {
+  padding-top: calc(13px + var(--bfp-results-top-gap, 9px));
 }
 
 /* Hover lights the chevron rather than washing the row; keyboard focus keeps a
