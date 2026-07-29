@@ -322,6 +322,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Fetch single satellites by CATNR and honour offgrid fallback (#261)
 - Correct the row tints and chevron anchoring on the shared shell
 - Widen the JSON config editors to two grid columns
+- Close the gap above an expanded first filter row
 
 ### Chores
 
@@ -1138,6 +1139,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #260 from barrygee/fix/rebuild-spa-dist
 - Merge pull request #264 from barrygee/refactor/air-filter-base-panel
 - Merge pull request #269 from barrygee/fix/settings-json-editors-two-columns
+- Merge pull request #270 from barrygee/fix/filter-first-row-expanded-gap
 
 ### Refactoring
 
