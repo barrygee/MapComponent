@@ -37,7 +37,9 @@ ISS_TLE = (
 )
 
 GROUP_FEED_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle"
-DERIVED_CATNR_URL = f"https://celestrak.org/NORAD/elements/gp.php?FORMAT=tle&CATNR={NOAA_20_NORAD}"
+DERIVED_CATNR_URL = (
+    f"https://celestrak.org/NORAD/elements/gp.php?FORMAT=tle&CATNR={NOAA_20_NORAD}"
+)
 OFFGRID_FEED_URL = "http://192.168.1.50/tle/active.txt"
 
 # Celestrak answers an unknown/unavailable CATNR with HTTP 200 and this body,
@@ -57,7 +59,9 @@ class _StubResponse:
             raise httpx.HTTPStatusError("upstream error", request=None, response=None)  # type: ignore[arg-type]
 
 
-def _install_stub_upstream(monkeypatch, responses: dict[str, str], requested: list[str]):
+def _install_stub_upstream(
+    monkeypatch, responses: dict[str, str], requested: list[str]
+):
     """Replace httpx.AsyncClient so fetch_tle hits `responses` instead of the network.
 
     `requested` accumulates every URL in request order. A URL missing from
@@ -86,7 +90,9 @@ def _install_stub_upstream(monkeypatch, responses: dict[str, str], requested: li
 @pytest.fixture()
 async def db(test_engine, db_setup) -> AsyncSession:
     """Async session on the shared in-memory test engine."""
-    session_factory = sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
+    session_factory = sessionmaker(
+        bind=test_engine, class_=AsyncSession, expire_on_commit=False
+    )
     async with session_factory() as session:
         yield session
 
@@ -112,15 +118,23 @@ class TestSingleSatelliteUrl:
     def test_plain_file_url_is_not_rewritten(self):
         # An offgrid mirror serving a static file has no GROUP to swap — leaving
         # it alone is what keeps offgrid mode from reaching for a CATNR endpoint.
-        assert tle_service._single_satellite_url(OFFGRID_FEED_URL, NOAA_20_NORAD) is None
+        assert (
+            tle_service._single_satellite_url(OFFGRID_FEED_URL, NOAA_20_NORAD) is None
+        )
 
     def test_url_without_query_is_not_rewritten(self):
-        assert tle_service._single_satellite_url("https://celestrak.org/gp.php", NOAA_20_NORAD) is None
+        assert (
+            tle_service._single_satellite_url(
+                "https://celestrak.org/gp.php", NOAA_20_NORAD
+            )
+            is None
+        )
 
     def test_already_per_satellite_url_is_not_rewritten(self):
         assert (
             tle_service._single_satellite_url(
-                "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=tle", NOAA_20_NORAD
+                "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=tle",
+                NOAA_20_NORAD,
             )
             is None
         )
@@ -141,7 +155,9 @@ class TestFetchTleUpstreamOrdering:
         assert requested == [DERIVED_CATNR_URL]
         assert result.splitlines()[0] == "NOAA 20"
 
-    async def test_falls_back_to_group_feed_when_per_satellite_url_has_no_data(self, db, monkeypatch):
+    async def test_falls_back_to_group_feed_when_per_satellite_url_has_no_data(
+        self, db, monkeypatch
+    ):
         requested: list[str] = []
         _install_stub_upstream(
             monkeypatch,
@@ -164,21 +180,29 @@ class TestFetchTleUpstreamOrdering:
         # mode must not silently reach a public endpoint.
         assert requested == [OFFGRID_FEED_URL]
 
-    async def test_fallback_feed_is_tried_when_primary_is_unreachable(self, db, monkeypatch):
+    async def test_fallback_feed_is_tried_when_primary_is_unreachable(
+        self, db, monkeypatch
+    ):
         requested: list[str] = []
         _install_stub_upstream(monkeypatch, {OFFGRID_FEED_URL: NOAA_20_TLE}, requested)
 
-        result = await tle_service.fetch_tle(NOAA_20_NORAD, db, GROUP_FEED_URL, OFFGRID_FEED_URL)
+        result = await tle_service.fetch_tle(
+            NOAA_20_NORAD, db, GROUP_FEED_URL, OFFGRID_FEED_URL
+        )
 
         assert requested == [DERIVED_CATNR_URL, GROUP_FEED_URL, OFFGRID_FEED_URL]
         assert result.splitlines()[0] == "NOAA 20"
 
-    async def test_identical_primary_and_fallback_are_not_requested_twice(self, db, monkeypatch):
+    async def test_identical_primary_and_fallback_are_not_requested_twice(
+        self, db, monkeypatch
+    ):
         requested: list[str] = []
         _install_stub_upstream(monkeypatch, {}, requested)
 
         with pytest.raises(RuntimeError):
-            await tle_service.fetch_tle(NOAA_20_NORAD, db, GROUP_FEED_URL, GROUP_FEED_URL)
+            await tle_service.fetch_tle(
+                NOAA_20_NORAD, db, GROUP_FEED_URL, GROUP_FEED_URL
+            )
 
         assert requested == [DERIVED_CATNR_URL, GROUP_FEED_URL]
 
@@ -191,9 +215,13 @@ class TestFetchTleUpstreamOrdering:
 
         # Built-in default for a non-ISS satellite is already per-satellite, so
         # it yields no separate derived URL.
-        assert requested == [f"https://celestrak.org/NORAD/elements/gp.php?CATNR={NOAA_20_NORAD}&FORMAT=tle"]
+        assert requested == [
+            f"https://celestrak.org/NORAD/elements/gp.php?CATNR={NOAA_20_NORAD}&FORMAT=tle"
+        ]
 
-    async def test_iss_default_group_url_yields_per_satellite_url_first(self, db, monkeypatch):
+    async def test_iss_default_group_url_yields_per_satellite_url_first(
+        self, db, monkeypatch
+    ):
         requested: list[str] = []
         _install_stub_upstream(monkeypatch, {}, requested)
 
@@ -243,10 +271,15 @@ class TestFetchTleCache:
         )
         await db.commit()
 
-        assert await tle_service.fetch_tle(NOAA_20_NORAD, db, GROUP_FEED_URL) == NOAA_20_TLE
+        assert (
+            await tle_service.fetch_tle(NOAA_20_NORAD, db, GROUP_FEED_URL)
+            == NOAA_20_TLE
+        )
         assert requested == []
 
-    async def test_expired_row_within_stale_window_served_when_upstreams_fail(self, db, monkeypatch):
+    async def test_expired_row_within_stale_window_served_when_upstreams_fail(
+        self, db, monkeypatch
+    ):
         requested: list[str] = []
         _install_stub_upstream(monkeypatch, {}, requested)
         db.add(
@@ -265,7 +298,9 @@ class TestFetchTleCache:
         assert requested == [DERIVED_CATNR_URL, GROUP_FEED_URL]
         assert result == NOAA_20_TLE
 
-    async def test_raises_when_upstreams_fail_and_row_is_beyond_stale_window(self, db, monkeypatch):
+    async def test_raises_when_upstreams_fail_and_row_is_beyond_stale_window(
+        self, db, monkeypatch
+    ):
         requested: list[str] = []
         _install_stub_upstream(monkeypatch, {}, requested)
         db.add(
@@ -285,5 +320,7 @@ class TestFetchTleCache:
     async def test_raises_when_upstreams_fail_and_nothing_cached(self, db, monkeypatch):
         _install_stub_upstream(monkeypatch, {}, [])
 
-        with pytest.raises(RuntimeError, match=f"TLE unavailable for NORAD {NOAA_20_NORAD}"):
+        with pytest.raises(
+            RuntimeError, match=f"TLE unavailable for NORAD {NOAA_20_NORAD}"
+        ):
             await tle_service.fetch_tle(NOAA_20_NORAD, db, GROUP_FEED_URL)

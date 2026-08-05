@@ -87,6 +87,36 @@ class RadioIn(BaseModel):
     bandwidth: int | None = None
     rf_gain: float | None = None
     agc: bool | None = None
+    # Sentry mirror fields (ADR-0009). `sentry_host_id` is None for a radio the
+    # operator typed in by hand — that radio must keep behaving exactly as it
+    # does today. When set, this radio mirrors one device on that Sentry host,
+    # identified by `sentry_device_id` ("serial:<value>" or "usb:<path>").
+    sentry_host_id: int | None = None
+    sentry_device_id: str | None = None
+    notes: str = ""
+    antenna: str = ""
+    visibility: str = "public"
+
+    @field_validator("sentry_device_id")
+    @classmethod
+    def _bound_sentry_device_id(cls, value: str | None) -> str | None:
+        if value is not None and len(value) > 256:
+            raise ValueError("sentry_device_id too long (max 256 characters)")
+        return value
+
+    @field_validator("notes", "antenna")
+    @classmethod
+    def _bound_text(cls, value: str) -> str:
+        if len(value) > 2000:
+            raise ValueError("text too long (max 2000 characters)")
+        return value
+
+    @field_validator("visibility")
+    @classmethod
+    def _validate_visibility(cls, value: str) -> str:
+        if value not in ("public", "private"):
+            raise ValueError("visibility must be 'public' or 'private'")
+        return value
 
 
 class GroupIn(BaseModel):

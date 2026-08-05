@@ -16,6 +16,7 @@ from backend.cache import is_fresh, is_within_stale, now_ms
 
 # ── now_ms ────────────────────────────────────────────────────────────────────
 
+
 class TestNowMs:
     def test_returns_integer(self):
         assert isinstance(now_ms(), int)
@@ -38,6 +39,7 @@ class TestNowMs:
 
 
 # ── is_fresh ──────────────────────────────────────────────────────────────────
+
 
 class TestIsFresh:
     def test_future_expiry_is_fresh(self):
@@ -63,20 +65,21 @@ class TestIsFresh:
 
 # ── is_within_stale ───────────────────────────────────────────────────────────
 
+
 class TestIsWithinStale:
     def test_recent_fetch_within_stale_window(self):
-        fetched_at = now_ms() - 5_000   # fetched 5 seconds ago
-        stale_ms   = 30_000             # 30-second stale window
+        fetched_at = now_ms() - 5_000  # fetched 5 seconds ago
+        stale_ms = 30_000  # 30-second stale window
         assert is_within_stale(fetched_at, stale_ms) is True
 
     def test_old_fetch_outside_stale_window(self):
         fetched_at = now_ms() - 60_000  # fetched 60 seconds ago
-        stale_ms   = 30_000             # 30-second stale window
+        stale_ms = 30_000  # 30-second stale window
         assert is_within_stale(fetched_at, stale_ms) is False
 
     def test_fetch_exactly_at_stale_boundary_is_not_within(self):
         # fetched_at + stale_ms == now  →  not strictly within (now < boundary)
-        stale_ms   = 30_000
+        stale_ms = 30_000
         fetched_at = now_ms() - stale_ms
         # At this instant fetched_at + stale_ms ≈ now, so the check is borderline.
         # We allow either result — just confirm no exception is raised.
@@ -90,7 +93,7 @@ class TestIsWithinStale:
 
     def test_very_large_stale_window_is_always_within(self):
         fetched_at = now_ms() - 3_600_000  # fetched 1 hour ago
-        stale_ms   = 7_200_000             # 2-hour stale window
+        stale_ms = 7_200_000  # 2-hour stale window
         assert is_within_stale(fetched_at, stale_ms) is True
 
     def test_epoch_zero_fetch_outside_reasonable_stale_window(self):

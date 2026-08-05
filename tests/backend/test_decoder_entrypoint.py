@@ -76,7 +76,9 @@ class TestBuildLogEvent:
         assert entrypoint.build_log_event("") is None
 
     def test_wraps_line_as_log_event(self):
-        event = entrypoint.build_log_event("Sync: +DMR  slot1  [slot2] | Color Code=02 | IDLE\n")
+        event = entrypoint.build_log_event(
+            "Sync: +DMR  slot1  [slot2] | Color Code=02 | IDLE\n"
+        )
         assert event == {
             "type": "log",
             "line": "Sync: +DMR  slot1  [slot2] | Color Code=02 | IDLE",
@@ -124,14 +126,18 @@ class TestPostEvent:
 
     def test_http_409_is_quiet(self, capsys):
         # 409 = "decode not active" (idle) — returns False without logging noise.
-        err = entrypoint.urllib.error.HTTPError("http://app/ingest", 409, "Conflict", {}, None)
+        err = entrypoint.urllib.error.HTTPError(
+            "http://app/ingest", 409, "Conflict", {}, None
+        )
         with patch.object(entrypoint.urllib.request, "urlopen", side_effect=err):
             ok = entrypoint.post_event("http://app/ingest", "secret", {"mode": "DMR"})
         assert ok is False
         assert "ingest POST failed" not in capsys.readouterr().err
 
     def test_other_http_error_is_logged(self, capsys):
-        err = entrypoint.urllib.error.HTTPError("http://app/ingest", 500, "err", {}, None)
+        err = entrypoint.urllib.error.HTTPError(
+            "http://app/ingest", 500, "err", {}, None
+        )
         with patch.object(entrypoint.urllib.request, "urlopen", side_effect=err):
             ok = entrypoint.post_event("http://app/ingest", "secret", {"mode": "DMR"})
         assert ok is False
@@ -212,7 +218,9 @@ class TestRunDsdOnceDecoding:
 
     def test_popen_decodes_with_errors_replace(self):
         process = self._fake_process([])
-        with patch.object(entrypoint.subprocess, "Popen", return_value=process) as popen:
+        with patch.object(
+            entrypoint.subprocess, "Popen", return_value=process
+        ) as popen:
             entrypoint.run_dsd_once(_queue.Queue())
         # The exact kwargs that make the read loop tolerant of bad bytes; if any
         # regresses (e.g. back to the strict-decode default) this assertion fails.

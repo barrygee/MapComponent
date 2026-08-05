@@ -1,9 +1,11 @@
 """Characterization tests for the air router (excluding the ADS-B upstream
 proxy, which hits external HTTP)."""
+
 from __future__ import annotations
 
 
 # ── /api/air/messages ─────────────────────────────────────────────────────────
+
 
 class TestAirMessages:
     def test_list_empty(self, client):
@@ -12,7 +14,13 @@ class TestAirMessages:
         assert resp.json() == []
 
     def test_create_returns_201(self, client):
-        body = {"msg_id": "m1", "type": "flight", "title": "X", "detail": "Y", "ts": 100}
+        body = {
+            "msg_id": "m1",
+            "type": "flight",
+            "title": "X",
+            "detail": "Y",
+            "ts": 100,
+        }
         resp = client.post("/api/air/messages", json=body)
         assert resp.status_code == 201
         assert resp.json() == {"status": "created"}
@@ -73,6 +81,7 @@ class TestAirMessages:
 
 # ── /api/air/tracking ─────────────────────────────────────────────────────────
 
+
 class TestAirTracking:
     def test_list_empty(self, client):
         resp = client.get("/api/air/tracking")
@@ -127,6 +136,7 @@ class TestAirTracking:
 
 # ── /api/air/recordings/available-dates ───────────────────────────────────────
 
+
 class TestRecordingsAvailableDates:
     def test_empty_returns_empty_list(self, client):
         resp = client.get("/api/air/recordings/available-dates")
@@ -135,6 +145,7 @@ class TestRecordingsAvailableDates:
 
 
 # ── /api/air/snapshots ────────────────────────────────────────────────────────
+
 
 class TestSnapshotsWindow:
     def test_empty_window_returns_aircraft_empty(self, client):
@@ -146,7 +157,9 @@ class TestSnapshotsWindow:
     def test_window_over_24h_returns_400(self, client):
         # 24h + 1ms exceeds the cap → 400
         cap = 24 * 3600 * 1000
-        resp = client.get("/api/air/snapshots", params={"start_ms": 0, "end_ms": cap + 1})
+        resp = client.get(
+            "/api/air/snapshots", params={"start_ms": 0, "end_ms": cap + 1}
+        )
         assert resp.status_code == 400
 
     def test_window_exactly_24h_is_accepted(self, client):
@@ -156,6 +169,7 @@ class TestSnapshotsWindow:
 
 
 # ── /api/air/flights ──────────────────────────────────────────────────────────
+
 
 class TestFlightsList:
     def test_empty(self, client):

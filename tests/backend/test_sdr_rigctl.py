@@ -68,7 +68,9 @@ class TestPlanRetune:
 
     def test_just_past_usable_edge_is_hardware(self):
         past = _CENTER_HZ + 999_001
-        assert plan_retune(past, _CENTER_HZ, _SAMPLE_RATE, _GUARD_HZ).method == "hardware"
+        assert (
+            plan_retune(past, _CENTER_HZ, _SAMPLE_RATE, _GUARD_HZ).method == "hardware"
+        )
 
     def test_guard_wider_than_half_span_always_hardware(self):
         # A tiny span with a guard exceeding the half-span leaves no usable room.
@@ -81,9 +83,15 @@ class TestPlanRetune:
 
 class TestParseRigctlCommand:
     def test_set_freq_short_and_long(self):
-        assert parse_rigctl_command("F 855512500") == RigctlCommand("set_freq", frequency_hz=855_512_500)
-        assert parse_rigctl_command("set_freq 100") == RigctlCommand("set_freq", frequency_hz=100)
-        assert parse_rigctl_command("\\set_freq 100") == RigctlCommand("set_freq", frequency_hz=100)
+        assert parse_rigctl_command("F 855512500") == RigctlCommand(
+            "set_freq", frequency_hz=855_512_500
+        )
+        assert parse_rigctl_command("set_freq 100") == RigctlCommand(
+            "set_freq", frequency_hz=100
+        )
+        assert parse_rigctl_command("\\set_freq 100") == RigctlCommand(
+            "set_freq", frequency_hz=100
+        )
 
     def test_set_freq_float_token_truncated(self):
         assert parse_rigctl_command("F 855512500.7").frequency_hz == 855_512_500
@@ -151,7 +159,9 @@ class TestTrunkConfigState:
             sdr_rigctl.set_trunk_config(enabled=True)
 
     def test_enable_with_map_sets_state(self):
-        config = sdr_rigctl.set_trunk_config(enabled=True, channel_map="sys.csv", group_list="grp.csv")
+        config = sdr_rigctl.set_trunk_config(
+            enabled=True, channel_map="sys.csv", group_list="grp.csv"
+        )
         assert config.enabled is True
         assert config.channel_map == "sys.csv"
         assert config.group_list == "grp.csv"
@@ -276,15 +286,21 @@ def _server(bridge: _FakeBridge | None) -> RigctlServer:
 class TestHandleCommand:
     async def test_set_freq_ok(self):
         bridge = _FakeBridge(_FakeConn())
-        result = await _server(bridge).handle_command(RigctlCommand("set_freq", frequency_hz=855_100_000))
+        result = await _server(bridge).handle_command(
+            RigctlCommand("set_freq", frequency_hz=855_100_000)
+        )
         assert result == RIGCTL_OK
 
     async def test_set_freq_missing_arg_errors(self):
-        result = await _server(_FakeBridge(_FakeConn())).handle_command(RigctlCommand("set_freq", frequency_hz=None))
+        result = await _server(_FakeBridge(_FakeConn())).handle_command(
+            RigctlCommand("set_freq", frequency_hz=None)
+        )
         assert result == RIGCTL_ERR
 
     async def test_set_freq_no_session_errors(self):
-        result = await _server(None).handle_command(RigctlCommand("set_freq", frequency_hz=855_100_000))
+        result = await _server(None).handle_command(
+            RigctlCommand("set_freq", frequency_hz=855_100_000)
+        )
         assert result == RIGCTL_ERR
 
     async def test_get_freq_returns_value(self):
@@ -294,28 +310,49 @@ class TestHandleCommand:
         assert result == f"{_CENTER_HZ + 1_000}\n".encode()
 
     async def test_get_freq_no_session_errors(self):
-        assert await _server(None).handle_command(RigctlCommand("get_freq")) == RIGCTL_ERR
+        assert (
+            await _server(None).handle_command(RigctlCommand("get_freq")) == RIGCTL_ERR
+        )
 
     async def test_set_mode_applies_bandwidth(self):
         bridge = _FakeBridge(_FakeConn())
-        result = await _server(bridge).handle_command(RigctlCommand("set_mode", bandwidth_hz=12_500))
+        result = await _server(bridge).handle_command(
+            RigctlCommand("set_mode", bandwidth_hz=12_500)
+        )
         assert result == RIGCTL_OK
         assert bridge.channel_calls == [(0, 12_500)]
 
     async def test_set_mode_without_bandwidth_noop(self):
         bridge = _FakeBridge(_FakeConn())
-        result = await _server(bridge).handle_command(RigctlCommand("set_mode", bandwidth_hz=None))
+        result = await _server(bridge).handle_command(
+            RigctlCommand("set_mode", bandwidth_hz=None)
+        )
         assert result == RIGCTL_OK
         assert bridge.channel_calls == []
 
     async def test_get_level_constant(self):
-        assert await _server(_FakeBridge(_FakeConn())).handle_command(RigctlCommand("get_level")) == b"0\n"
+        assert (
+            await _server(_FakeBridge(_FakeConn())).handle_command(
+                RigctlCommand("get_level")
+            )
+            == b"0\n"
+        )
 
     async def test_quit_closes(self):
-        assert await _server(_FakeBridge(_FakeConn())).handle_command(RigctlCommand("quit")) is None
+        assert (
+            await _server(_FakeBridge(_FakeConn())).handle_command(
+                RigctlCommand("quit")
+            )
+            is None
+        )
 
     async def test_unknown_acknowledged(self):
-        assert await _server(_FakeBridge(_FakeConn())).handle_command(RigctlCommand("unknown")) == RIGCTL_OK
+        assert (
+            await _server(_FakeBridge(_FakeConn())).handle_command(
+                RigctlCommand("unknown")
+            )
+            == RIGCTL_OK
+        )
 
 
 # ── RigctlServer lifecycle + socket I/O ──────────────────────────────────────────
@@ -357,7 +394,10 @@ class TestRigctlServerLifecycle:
 
             writer.write(b"f\n")
             await writer.drain()
-            assert await reader.readline() == f"{bridge.connection.center_hz + bridge.current_offset_hz}\n".encode()
+            assert (
+                await reader.readline()
+                == f"{bridge.connection.center_hz + bridge.current_offset_hz}\n".encode()
+            )
 
             writer.write(b"q\n")  # quit closes the connection
             await writer.drain()

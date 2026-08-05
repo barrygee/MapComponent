@@ -9,6 +9,7 @@ reads `datetime.now()` directly, so we pin behavior rather than exact output:
 
 compute_footprint is time-independent, so its output is pinned exactly.
 """
+
 from __future__ import annotations
 
 import math
@@ -30,6 +31,7 @@ ISS_LINE2 = "2 25544  51.6422 113.7124 0001234  17.6634  73.0732 15.497737644393
 
 
 # ── compute_position ─────────────────────────────────────────────────────────
+
 
 class TestComputePosition:
     def test_output_shape(self):
@@ -79,6 +81,7 @@ class TestComputePosition:
 
 # ── compute_footprint (time-independent — pin exact outputs) ─────────────────
 
+
 class TestComputeFootprint:
     def test_returns_polygon_or_multipolygon(self):
         geom = compute_footprint(lat=0.0, lon=0.0, alt_km=400.0)
@@ -100,7 +103,7 @@ class TestComputeFootprint:
             assert ring[0] == ring[-1]
 
     def test_higher_altitude_gives_larger_footprint(self):
-        low  = compute_footprint(lat=0.0, lon=0.0, alt_km=400.0)
+        low = compute_footprint(lat=0.0, lon=0.0, alt_km=400.0)
         high = compute_footprint(lat=0.0, lon=0.0, alt_km=35_786.0)  # GEO
 
         def _max_extent(geom: dict) -> float:
@@ -129,6 +132,7 @@ class TestComputeFootprint:
 
 
 # ── compute_ground_track ─────────────────────────────────────────────────────
+
 
 class TestComputeGroundTrack:
     def test_returns_feature_collection(self):
