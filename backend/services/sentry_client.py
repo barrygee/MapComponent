@@ -29,6 +29,13 @@ import httpx
 from backend.config import settings
 
 # The header Sentry stamps on every /api response (including errors) per ADR-0009.
+RESERVATION_HOLDER_HEADER = "X-Sentry-Reservation-Holder"
+"""Proves to Sentry which reservation holder is making a request.
+
+Part of the wire contract with Sentry (its `routers/devices.py`), like the paths
+and payload shapes above.
+"""
+
 SESSION_COOKIE_NAME = "sentry_session"
 """Sentry's session cookie (its `services/console_auth.py`).
 
@@ -203,7 +210,14 @@ class SentryClient:
         self._session_cookie = cookie
         return True
 
-    async def _request(self, method: str, path: str, *, json_body: dict[str, Any] | None = None) -> SentryResponse:
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json_body: dict[str, Any] | None = None,
+        holder: str | None = None,
+    ) -> SentryResponse:
         """Perform one request, translating transport/HTTP failures into the typed errors above.
 
         Signs in and retries **once** on a 401. A session outlives many requests
@@ -213,9 +227,9 @@ class SentryClient:
         only: a second 401 means the password is wrong, and looping on it would
         turn a typo into a login flood.
         """
-        response = await self._send(method, path, json_body=json_body)
+        response = await self._send(method, path, json_body=json_body, holder=holder)
         if response.status_code == 401 and await self._sign_in():
-            response = await self._send(method, path, json_body=json_body)
+            response = await self._send(method, path, json_body=json_body, holder=holder)
 
         api_version = response.headers.get(API_VERSION_HEADER)
         if response.status_code >= 400:
@@ -231,12 +245,22 @@ class SentryClient:
             ) from exc
         return SentryResponse(data=payload, api_version=api_version)
 
-    async def _send(self, method: str, path: str, *, json_body: dict[str, Any] | None = None) -> httpx.Response:
+    async def _send(
+        self,
+        method: str,
+        path: str,
+        *,
+        json_body: dict[str, Any] | None = None,
+        holder: str | None = None,
+    ) -> httpx.Response:
         """One HTTP round trip, with transport failures raised as `SentryUnreachableError`."""
         url = f"{self.base_url}{path}"
+        headers = self._headers()
+        if holder:
+            headers[RESERVATION_HOLDER_HEADER] = holder
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
-                return await client.request(method, url, headers=self._headers(), json=json_body)
+                return await client.request(method, url, headers=headers, json=json_body)
         except httpx.TimeoutException as exc:
             raise SentryUnreachableError(f"Timed out reaching Sentry host {self._address}:{self._port}.") from exc
         except httpx.HTTPError as exc:
@@ -252,13 +276,72 @@ class SentryClient:
         return await self._request("GET", "/api/status")
 
     # ── devices ──────────────────────────────────────────────────────────────
+    async def get_sdr_export(self) -> SentryResponse:
+        """`GET /api/v1/sdrs` — the versioned, unauthenticated export of public devices.
+
+        Unauthenticated by Sentry's design (its ADR-0010), so this is the one
+        device view that still works against a Sentry whose password Sentinel
+        does not hold — which is why the decoder's config lookup uses it rather
+        than `/api/devices`.
+        """
+        return await self._request("GET", "/api/v1/sdrs")
+
     async def get_devices(self) -> SentryResponse:
         """`GET /api/devices` — configured + detected devices, port suggestion, constraints."""
         return await self._request("GET", "/api/devices")
 
-    async def patch_device(self, device_id: str, patch: dict[str, Any]) -> SentryResponse:
-        """`PATCH /api/devices/{device_id}` — partial update; Sentry validates and may reject."""
-        return await self._request("PATCH", f"/api/devices/{_encode_path_segment(device_id)}", json_body=patch)
+    async def patch_device(self, device_id: str, patch: dict[str, Any], *, holder: str | None = None) -> SentryResponse:
+        """`PATCH /api/devices/{device_id}` — partial update; Sentry validates and may reject.
+
+        `holder` proves we are the device's current reservation holder. Sentry
+        refuses tuning changes to a claimed device from anyone else, so a caller
+        that holds a lease must present it or be refused by its own lock.
+        """
+        return await self._request(
+            "PATCH",
+            f"/api/devices/{_encode_path_segment(device_id)}",
+            json_body=patch,
+            holder=holder,
+        )
+
+    async def acquire_reservation(
+        self,
+        device_id: str,
+        *,
+        holder: str,
+        label: str,
+        ttl_seconds: int,
+        force: bool = False,
+    ) -> SentryResponse:
+        """`POST /api/devices/{id}/reservation` — claim the device, or renew our claim.
+
+        Acquire and renew are one call on Sentry's side, so a renewal that
+        arrives after the lease lapsed simply becomes a fresh claim rather than
+        an error this caller would have to distinguish and retry.
+        """
+        return await self._request(
+            "POST",
+            f"/api/devices/{_encode_path_segment(device_id)}/reservation",
+            json_body={
+                "holder": holder,
+                "label": label,
+                "ttl_seconds": ttl_seconds,
+                "force": force,
+            },
+        )
+
+    async def release_reservation(self, device_id: str, *, holder: str) -> SentryResponse:
+        """`DELETE /api/devices/{id}/reservation` — give the device back.
+
+        Best effort by nature: the lease expires on its own, so a release that
+        never lands costs a couple of minutes of a device nobody is using, not a
+        device locked for ever.
+        """
+        return await self._request(
+            "DELETE",
+            f"/api/devices/{_encode_path_segment(device_id)}/reservation",
+            holder=holder,
+        )
 
     async def delete_device(self, device_id: str) -> SentryResponse:
         """`DELETE /api/devices/{device_id}` — remove a persisted (not-present) device's config."""

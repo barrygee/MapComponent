@@ -60,19 +60,27 @@ class TestRecognisingAReadsbSource:
         assert _is_readsb(url) is False
 
     def test_resolves_the_file_from_a_directory_url(self) -> None:
-        assert _readsb_url("http://adsb:8080/data") == "http://adsb:8080/data/aircraft.json"
+        assert (
+            _readsb_url("http://adsb:8080/data")
+            == "http://adsb:8080/data/aircraft.json"
+        )
 
     def test_accepts_the_file_url_unchanged(self) -> None:
         url = "http://adsb:8080/data/aircraft.json"
         assert _readsb_url(url) == url
 
     def test_tolerates_a_trailing_slash(self) -> None:
-        assert _readsb_url("http://adsb:8080/data/") == "http://adsb:8080/data/aircraft.json"
+        assert (
+            _readsb_url("http://adsb:8080/data/")
+            == "http://adsb:8080/data/aircraft.json"
+        )
 
 
 class TestMappingOntoTheAppsShape:
     def test_renames_the_aircraft_list(self) -> None:
-        payload = readsb_payload({"hex": "4009f5", "lat": CENTRE_LAT, "lon": CENTRE_LON})
+        payload = readsb_payload(
+            {"hex": "4009f5", "lat": CENTRE_LAT, "lon": CENTRE_LON}
+        )
 
         result = _readsb_to_airplanes(payload, CENTRE_LAT, CENTRE_LON, 50)
 
@@ -96,12 +104,16 @@ class TestMappingOntoTheAppsShape:
             "t": "A320",
         }
 
-        result = _readsb_to_airplanes(readsb_payload(aircraft), CENTRE_LAT, CENTRE_LON, 50)
+        result = _readsb_to_airplanes(
+            readsb_payload(aircraft), CENTRE_LAT, CENTRE_LON, 50
+        )
 
         assert result["ac"][0] == aircraft
 
     def test_converts_the_timestamp_to_milliseconds(self) -> None:
-        result = _readsb_to_airplanes(readsb_payload(now=1_786_639_319.4), CENTRE_LAT, CENTRE_LON, 50)
+        result = _readsb_to_airplanes(
+            readsb_payload(now=1_786_639_319.4), CENTRE_LAT, CENTRE_LON, 50
+        )
 
         assert result["now"] == 1_786_639_319_400
 
@@ -109,7 +121,9 @@ class TestMappingOntoTheAppsShape:
         near = {"hex": "near", "lat": 54.98, "lon": -1.60}
         far = {"hex": "far", "lat": 51.50, "lon": -0.12}
 
-        result = _readsb_to_airplanes(readsb_payload(near, far), CENTRE_LAT, CENTRE_LON, 50)
+        result = _readsb_to_airplanes(
+            readsb_payload(near, far), CENTRE_LAT, CENTRE_LON, 50
+        )
 
         assert result["total"] == 1
 
@@ -124,7 +138,9 @@ class TestTheRadiusFilter:
     def test_keeps_an_aircraft_inside_the_circle(self) -> None:
         overhead = {"hex": "near", "lat": 54.96, "lon": -1.54}
 
-        result = _readsb_to_airplanes(readsb_payload(overhead), CENTRE_LAT, CENTRE_LON, 50)
+        result = _readsb_to_airplanes(
+            readsb_payload(overhead), CENTRE_LAT, CENTRE_LON, 50
+        )
 
         assert len(result["ac"]) == 1
 
@@ -133,21 +149,30 @@ class TestTheRadiusFilter:
         # comfortably within a good aerial's actual range.
         london = {"hex": "far", "lat": 51.50, "lon": -0.12}
 
-        result = _readsb_to_airplanes(readsb_payload(london), CENTRE_LAT, CENTRE_LON, 50)
+        result = _readsb_to_airplanes(
+            readsb_payload(london), CENTRE_LAT, CENTRE_LON, 50
+        )
 
         assert result["ac"] == []
 
     def test_a_wider_radius_admits_what_a_narrow_one_excluded(self) -> None:
         london = {"hex": "far", "lat": 51.50, "lon": -0.12}
 
-        assert _readsb_to_airplanes(readsb_payload(london), CENTRE_LAT, CENTRE_LON, 250)["total"] == 1
+        assert (
+            _readsb_to_airplanes(readsb_payload(london), CENTRE_LAT, CENTRE_LON, 250)[
+                "total"
+            ]
+            == 1
+        )
 
     def test_drops_an_aircraft_with_no_position(self) -> None:
         # Heard but not yet located: it cannot be plotted, and passing it
         # through would inflate the count against an empty patch of map.
         heard_only = {"hex": "nopos", "flight": "GHOST1  "}
 
-        result = _readsb_to_airplanes(readsb_payload(heard_only), CENTRE_LAT, CENTRE_LON, 50)
+        result = _readsb_to_airplanes(
+            readsb_payload(heard_only), CENTRE_LAT, CENTRE_LON, 50
+        )
 
         assert result["ac"] == []
 
@@ -156,13 +181,19 @@ class TestTheRadiusFilter:
         [
             pytest.param({"hex": "a", "lat": None, "lon": -1.5}, id="null-latitude"),
             pytest.param({"hex": "b", "lat": 54.9, "lon": None}, id="null-longitude"),
-            pytest.param({"hex": "c", "lat": "54.9", "lon": "-1.5"}, id="string-coordinates"),
+            pytest.param(
+                {"hex": "c", "lat": "54.9", "lon": "-1.5"}, id="string-coordinates"
+            ),
         ],
     )
-    def test_drops_an_unusable_position_rather_than_raising(self, aircraft: dict) -> None:
+    def test_drops_an_unusable_position_rather_than_raising(
+        self, aircraft: dict
+    ) -> None:
         # readsb omits fields it has not determined yet, so a partial entry is
         # ordinary traffic — it must not take the whole poll down.
-        result = _readsb_to_airplanes(readsb_payload(aircraft), CENTRE_LAT, CENTRE_LON, 50)
+        result = _readsb_to_airplanes(
+            readsb_payload(aircraft), CENTRE_LAT, CENTRE_LON, 50
+        )
 
         assert result["ac"] == []
 
@@ -174,7 +205,9 @@ class TestMalformedPayloads:
         assert result["ac"] == []
 
     def test_a_non_list_aircraft_value_is_treated_as_empty(self) -> None:
-        result = _readsb_to_airplanes({"aircraft": "nonsense"}, CENTRE_LAT, CENTRE_LON, 50)
+        result = _readsb_to_airplanes(
+            {"aircraft": "nonsense"}, CENTRE_LAT, CENTRE_LON, 50
+        )
 
         assert result["ac"] == []
 
@@ -186,12 +219,17 @@ class TestMalformedPayloads:
         assert [entry["hex"] for entry in result["ac"]] == ["ok"]
 
     def test_a_missing_timestamp_becomes_zero(self) -> None:
-        assert _readsb_to_airplanes({"aircraft": []}, CENTRE_LAT, CENTRE_LON, 50)["now"] == 0
+        assert (
+            _readsb_to_airplanes({"aircraft": []}, CENTRE_LAT, CENTRE_LON, 50)["now"]
+            == 0
+        )
 
 
 class TestTheDistanceCalculation:
     def test_zero_distance_to_itself(self) -> None:
-        assert _distance_nm(CENTRE_LAT, CENTRE_LON, CENTRE_LAT, CENTRE_LON) == pytest.approx(0.0)
+        assert _distance_nm(
+            CENTRE_LAT, CENTRE_LON, CENTRE_LAT, CENTRE_LON
+        ) == pytest.approx(0.0)
 
     def test_matches_the_known_distance_to_london(self) -> None:
         # Newcastle → London is ~213 nm; 1% tolerance covers the earth-radius
@@ -210,7 +248,11 @@ class TestTheDistanceCalculation:
         # The reason for haversine over a flat approximation: at 55°N a degree
         # of longitude is little over half a degree of latitude, and treating
         # them alike admits the wrong aircraft at the edge of a pane.
-        one_degree_north = _distance_nm(CENTRE_LAT, CENTRE_LON, CENTRE_LAT + 1, CENTRE_LON)
-        one_degree_east = _distance_nm(CENTRE_LAT, CENTRE_LON, CENTRE_LAT, CENTRE_LON + 1)
+        one_degree_north = _distance_nm(
+            CENTRE_LAT, CENTRE_LON, CENTRE_LAT + 1, CENTRE_LON
+        )
+        one_degree_east = _distance_nm(
+            CENTRE_LAT, CENTRE_LON, CENTRE_LAT, CENTRE_LON + 1
+        )
 
         assert one_degree_east < one_degree_north * 0.6

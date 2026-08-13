@@ -15,6 +15,7 @@ from backend.database import (
     seed_sdr_bandplan_from_file,
     seed_sdr_data_from_files,
 )
+from backend.routers import adsb_source as adsb_source_router
 from backend.routers import air, land, space
 from backend.routers import sdr as sdr_router
 from backend.routers import sentry as sentry_router
@@ -121,6 +122,7 @@ app.include_router(land.router)
 app.include_router(settings_router.router)
 app.include_router(sdr_router.router)
 app.include_router(sentry_router.router)
+app.include_router(adsb_source_router.router)
 
 
 # ── Health probe ───────────────────────────────────────────────────────────────
