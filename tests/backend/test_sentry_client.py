@@ -162,21 +162,93 @@ def test_client_falls_back_to_settings_timeouts_when_not_provided():
 # ── request headers ───────────────────────────────────────────────────────────
 
 
-async def test_request_includes_bearer_token_when_set(monkeypatch):
+async def test_request_never_sends_a_bearer_token(monkeypatch):
+    """Sentry has no token auth (its ADR-0010); it reads a session cookie only.
+
+    The header this used to send was accepted by nobody, so every management
+    call 401'd against a protected Sentry while looking correct here.
+    """
     handler, captured = _capturing_handler(200, {"ok": True})
     _install_mock_transport(monkeypatch, handler)
-    client = SentryClient("10.0.0.5", 8000, "s3cr3t-token")
+    client = SentryClient("10.0.0.5", 8000, "console-password")
     await client.get_health()
-    assert captured["request"].headers["Authorization"] == "Bearer s3cr3t-token"
+    assert "Authorization" not in captured["request"].headers
     assert captured["request"].headers["Accept"] == "application/json"
 
 
-async def test_request_omits_authorization_header_when_token_empty(monkeypatch):
+async def test_unauthenticated_request_carries_no_cookie(monkeypatch):
     handler, captured = _capturing_handler(200, {"ok": True})
     _install_mock_transport(monkeypatch, handler)
     client = SentryClient("10.0.0.5", 8000, "")
     await client.get_health()
-    assert "Authorization" not in captured["request"].headers
+    assert "Cookie" not in captured["request"].headers
+
+
+async def test_a_401_signs_in_and_retries_with_the_session_cookie(monkeypatch):
+    """The whole point of the mechanism: recover a session rather than give up."""
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path == "/api/auth/login":
+            return httpx.Response(
+                204, headers={"set-cookie": "sentry_session=granted-cookie; Path=/"}
+            )
+        if "Cookie" not in request.headers:
+            return httpx.Response(401, json={"detail": {"code": "unauthenticated"}})
+        return httpx.Response(200, json={"devices": []})
+
+    _install_mock_transport(monkeypatch, handler)
+    client = SentryClient("10.0.0.5", 8000, "console-password")
+
+    await client.get_devices()
+
+    paths = [request.url.path for request in seen]
+    assert paths == ["/api/devices", "/api/auth/login", "/api/devices"]
+    assert seen[-1].headers["Cookie"] == "sentry_session=granted-cookie"
+
+
+async def test_the_session_is_reused_rather_than_signing_in_each_call(monkeypatch):
+    """A login per request would be a login flood on the poll timer."""
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        if request.url.path == "/api/auth/login":
+            return httpx.Response(
+                204, headers={"set-cookie": "sentry_session=granted-cookie; Path=/"}
+            )
+        if "Cookie" not in request.headers:
+            return httpx.Response(401, json={"detail": {"code": "unauthenticated"}})
+        return httpx.Response(200, json={"ok": True})
+
+    _install_mock_transport(monkeypatch, handler)
+    client = SentryClient("10.0.0.5", 8000, "console-password")
+
+    await client.get_status()
+    await client.get_status()
+
+    assert seen.count("/api/auth/login") == 1
+
+
+async def test_a_wrong_password_is_not_retried_for_ever(monkeypatch):
+    """One retry only — looping would turn a typo into a login flood."""
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        if request.url.path == "/api/auth/login":
+            return httpx.Response(401, json={"detail": {"code": "unauthenticated"}})
+        return httpx.Response(401, json={"detail": {"code": "unauthenticated"}})
+
+    _install_mock_transport(monkeypatch, handler)
+    client = SentryClient("10.0.0.5", 8000, "wrong-password")
+
+    with pytest.raises(SentryApiError) as raised:
+        await client.get_devices()
+
+    assert raised.value.status_code == 401
+    assert seen.count("/api/auth/login") == 1
 
 
 # ── endpoint → HTTP method/path/body wiring ───────────────────────────────────

@@ -501,6 +501,34 @@ async def get_host_devices(host_id: int, db: AsyncSession = Depends(get_db)) -> 
     )
 
 
+@router.get("/{host_id}/devices/records")
+async def get_host_device_records(host_id: int, db: AsyncSession = Depends(get_db)) -> JSONResponse:
+    """Proxy `GET /api/devices` — Sentry's persisted device configuration.
+
+    Distinct from the cached snapshot above, and both are needed. `/api/status`
+    returns `DeviceStatus`, which describes what a device is *doing* — present,
+    state, live tuner readout — and deliberately carries none of the persisted
+    tuning intent. The stored `sample_rate`, `gain_db`, `gain_auto`,
+    `ppm_correction`, `bias_tee` and `direct_sampling` live only on
+    `DeviceRecord`, so an edit form driven off the snapshot alone would show
+    every tuning field blank and silently clear them on save.
+
+    Live rather than cached: it is fetched when a form opens, not on a timer,
+    and the operator is about to edit these values so they must be current. It
+    also carries Sentry's `port_suggestion` and `constraints`, which the port
+    field needs to suggest a free port rather than guess.
+    """
+    host = await _get_host_or_404(host_id, db)
+    client = _client_for(host)
+    try:
+        response = await client.get_devices()
+    except SentryApiError as exc:
+        _raise_for_sentry_error(exc)
+    except SentryUnreachableError as exc:
+        _raise_for_unreachable(exc)
+    return JSONResponse(response.data)
+
+
 # ── Device proxy — writes go straight to Sentry, never reimplemented here ──────
 
 

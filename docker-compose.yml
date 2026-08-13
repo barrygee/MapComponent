@@ -107,6 +107,44 @@ services:
     networks:
       - sentinel
 
+  # ADS-B decoder (readsb). OPT-IN: only builds/starts with `--profile adsb`.
+  # Decodes 1090 MHz from a *remote* Sentry dongle: it reads the raw I/Q stream
+  # from Sentry's rtl_tcp port and publishes `aircraft.json` for the air
+  # domain's Off Grid source. Point Settings > AIR > Off Grid Data Source at
+  # http://adsb-decoder:8080/data/aircraft.json (or the host's address and
+  # published port from outside the compose network).
+  #
+  # NOTE: this pulls raw samples across the LAN — roughly 38 Mbps sustained at
+  # 2.4 MSPS. Decoding on the Pi itself would cost a few KB/s instead; this
+  # arrangement is chosen to keep the decoders in one stack.
+  #
+  # The Sentry device MUST already be tuned to 1090 MHz at 2.4 MSPS. This
+  # container never retunes it — those are the operator's per-device settings
+  # and another consumer may be relying on them. See decoder/adsb/README.md.
+  adsb-decoder:
+    build:
+      context: ./decoder/adsb
+      dockerfile: Dockerfile
+    container_name: sentinel-adsb-decoder
+    profiles: ["adsb"]
+    depends_on:
+      - app
+    environment:
+      - RTL_TCP_HOST=${SENTINEL_ADSB_RTL_TCP_HOST:-192.168.5.67}
+      - RTL_TCP_PORT=${SENTINEL_ADSB_RTL_TCP_PORT:-2345}
+      # Polled once at startup to report what the source device is tuned to, so
+      # a mis-tuned dongle shows up in the logs rather than as an empty map.
+      - SENTRY_API_BASE=${SENTINEL_ADSB_SENTRY_API:-http://192.168.5.67:8000}
+      - JSON_DIR=/run/adsb/data
+      - HTTP_PORT=8080
+    # Published so the decoder can be checked from a browser and pointed at from
+    # outside the compose network; Sentinel itself reaches it as `adsb-decoder`.
+    ports:
+      - "8090:8080"
+    restart: unless-stopped
+    networks:
+      - sentinel
+
   # rtl-tcp:
   #   image: kosdk/rtl-tcp
   #   container_name: rtl-tcp

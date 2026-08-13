@@ -95,6 +95,7 @@
       v-else-if="item.type === 'air-replay-toggle'"
       @stage="emit('stage', item.id, $event)"
     />
+    <SentryHostsControl v-else-if="item.type === 'sdr-sentry-hosts'" />
     <SdrDevicesControl v-else-if="item.type === 'sdr-devices'" />
     <SdrAutoCenterControl
       v-else-if="item.type === 'sdr-autocenter'"
@@ -180,6 +181,7 @@ import AdsbLabelFieldsControl from './AdsbLabelFieldsControl.vue'
 import AdsbTagFieldsControl from './AdsbTagFieldsControl.vue'
 import AprsLabelFieldsControl from './AprsLabelFieldsControl.vue'
 import AirReplayToggleControl from './AirReplayToggleControl.vue'
+import SentryHostsControl from './SentryHostsControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import SdrAutoCenterControl from './SdrAutoCenterControl.vue'
 import SdrFullWaterfallUpdateControl from './SdrFullWaterfallUpdateControl.vue'
@@ -207,6 +209,7 @@ const WIDE_TYPES = new Set(['sdr-channelmaps-file'])
 // never gets squeezed into a single 300px column — two columns is the minimum
 // readable width for indented JSON.
 const HALF_TYPES = new Set([
+  'sdr-sentry-hosts',
   'sdr-devices',
   'space-tle-online',
   'space-tle-manual',

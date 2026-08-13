@@ -3,6 +3,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { nextTick } from 'vue'
 import { useAirStore } from '@/stores/air'
 import { useAirNotifStore } from '@/stores/airNotif'
+import { ADSB_POLL_INTERVAL_MS } from '@/constants/adsb'
 
 const { locationRef, overheadInstance, detectorInstance } = vi.hoisted(() => ({
   locationRef: { value: null as null | { lon: number; lat: number; accuracy: number } },
@@ -193,7 +194,7 @@ describe('useAirAlertsService', () => {
     clickRouter('abc')
     expect(handler).toHaveBeenCalledWith('abc')
 
-    await vi.advanceTimersByTimeAsync(2000) // fire the interval tick
+    await vi.advanceTimersByTimeAsync(ADSB_POLL_INTERVAL_MS) // fire the interval tick
     service.stop()
   })
 

@@ -12,6 +12,13 @@ class Settings(BaseSettings):
 
     # Base URL for the airplanes.live ADS-B API
     adsb_upstream_base: str = "https://api.airplanes.live/v2"
+    # Minimum gap between two outbound ADS-B requests to the same upstream host
+    # (5 seconds — airplanes.live bans clients that poll faster than this).
+    adsb_min_request_interval_ms: int = 5000
+    # Longest a request will wait for a free upstream slot before giving up and
+    # serving cached data instead. Capped at one interval so a burst of callers
+    # cannot pile into an ever-growing queue.
+    adsb_rate_limit_max_wait_ms: int = 5000
 
     # TLE data TTL — 6 hours (TLE changes slowly; Celestrak updates daily)
     tle_ttl_ms: int = 21_600_000

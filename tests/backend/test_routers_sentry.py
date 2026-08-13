@@ -316,7 +316,12 @@ class TestHealthProbe:
             "api_version": "1.0",
             "health": {"status": "ok"},
         }
-        assert captured["request"].headers["Authorization"] == "Bearer probe-token"
+        # No bearer header: Sentry reads a session cookie and nothing else
+        # (its ADR-0010), so a token here would only look like authentication.
+        # `/api/health` is unauthenticated anyway, which is what makes it a
+        # usable reachability probe against a Sentry whose password we may not
+        # hold.
+        assert "Authorization" not in captured["request"].headers
 
     def test_probe_unreachable_host_still_returns_200_with_reachable_false(
         self, client, monkeypatch
@@ -1071,3 +1076,67 @@ class TestHostCreateWithoutName:
         )
         assert resp.status_code == 201, resp.text
         assert resp.json()["name"] is None
+
+
+class TestDeviceRecordsProxy:
+    """`GET /{host_id}/devices/records` proxies Sentry's persisted configuration.
+
+    Distinct from the cached `/devices` snapshot: `DeviceStatus` carries no
+    tuning fields, so an edit form driven off the snapshot alone would show them
+    blank and write those blanks back on save.
+    """
+
+    def test_unknown_host_returns_404(self, client):
+        resp = client.get("/api/sdr/sentry-hosts/999/devices/records")
+        assert resp.status_code == 404
+
+    def test_returns_sentrys_body_verbatim_including_tuning_and_suggestion(
+        self, client, monkeypatch
+    ):
+        created = _create_host(client)
+        body = {
+            "devices": [
+                {
+                    "device_id": "serial:AIS-01",
+                    "name": "AIS SDR",
+                    "output_port": 1234,
+                    "sample_rate": 2048000,
+                    "gain_db": 28.0,
+                    "gain_auto": False,
+                    "ppm_correction": 3,
+                    "bias_tee": True,
+                    "direct_sampling": 0,
+                }
+            ],
+            "port_suggestion": 1242,
+            "constraints": {"min_port": 1024, "max_port": 65533},
+        }
+        handler, captured = _json_handler(200, body)
+        _install_mock_transport(monkeypatch, handler)
+
+        resp = client.get(f"/api/sdr/sentry-hosts/{created['id']}/devices/records")
+
+        assert resp.status_code == 200
+        assert resp.json() == body
+        # Sentry's own route, not the status one — the two carry different shapes.
+        assert captured["request"].url.path == "/api/devices"
+
+    def test_propagates_sentrys_error(self, client, monkeypatch):
+        created = _create_host(client)
+        handler, _ = _json_handler(
+            403, {"detail": {"code": "forbidden", "message": "Nope."}}
+        )
+        _install_mock_transport(monkeypatch, handler)
+
+        resp = client.get(f"/api/sdr/sentry-hosts/{created['id']}/devices/records")
+
+        assert resp.status_code == 403
+        assert resp.json()["detail"]["code"] == "forbidden"
+
+    def test_unreachable_returns_502(self, client, monkeypatch):
+        created = _create_host(client)
+        _install_mock_transport(monkeypatch, _unreachable_handler)
+
+        resp = client.get(f"/api/sdr/sentry-hosts/{created['id']}/devices/records")
+
+        assert resp.status_code == 502

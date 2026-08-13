@@ -1,91 +1,63 @@
 <template>
   <div class="sdr-devices-wrap">
     <div class="sdr-devices-list">
-      <div v-if="radios.length === 0" class="sdr-devices-empty">
-        No SDRs configured. Add one below.
+      <div v-if="sentryHosts.length === 0 && manualRadios.length === 0" class="sdr-devices-empty">
+        No SDRs configured. Add one below, or register a Sentry host in SENTRY HOSTS above.
       </div>
-      <div
-        v-for="r in radios"
-        :key="r.id"
-        class="sdr-device-item"
-        :class="{ 'sdr-device-item--open': openId === r.id }"
-      >
-        <div class="sdr-device-row">
-          <span class="sdr-device-info" :style="confirmId === r.id ? 'opacity:0.4' : ''">
-            <span
-              class="sdr-status-dot"
-              :class="{
-                'sdr-status-dot--connected': statusMap[r.id] === true,
-                'sdr-status-dot--disconnected': statusMap[r.id] === false,
-              }"
-              :title="
-                statusMap[r.id] === true
-                  ? 'Connected'
-                  : statusMap[r.id] === false
-                    ? 'Not connected'
-                    : 'Checking…'
-              "
-            ></span>
-            {{ r.name }}&nbsp;&nbsp;{{ r.host }}:{{ r.port }}
-          </span>
-          <button
-            v-if="confirmId !== r.id"
-            class="sdr-device-btn"
-            :class="{ 'sdr-device-btn--active': openId === r.id }"
-            title="Edit"
-            aria-label="Edit device"
-            @click="toggleEdit(r.id)"
-          >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path
-                d="M9.5 1.5L11.5 3.5L4.5 10.5H2.5V8.5L9.5 1.5Z"
-                stroke="currentColor"
-                stroke-width="1.3"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </button>
-          <button
-            v-if="confirmId !== r.id"
-            class="sdr-device-btn sdr-device-btn--danger"
-            title="Delete"
-            aria-label="Delete device"
-            @click="startDelete(r.id)"
-          >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <line
-                x1="2.5"
-                y1="2.5"
-                x2="10.5"
-                y2="10.5"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-              />
-              <line
-                x1="10.5"
-                y1="2.5"
-                x2="2.5"
-                y2="10.5"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-              />
-            </svg>
-          </button>
-          <div v-if="confirmId === r.id" class="sdr-device-confirm" style="display: flex">
-            <span class="sdr-device-confirm-label">DELETE?</span>
-            <button
-              class="sdr-device-confirm-btn sdr-device-confirm-btn--yes"
-              @click="confirmDelete(r.id)"
-            >
-              YES
-            </button>
-            <button class="sdr-device-confirm-btn" @click="confirmId = null">NO</button>
-          </div>
+
+      <template v-for="group in sentryGroups" :key="'host-' + group.host.id">
+        <SdrHostGroupHeader
+          :label="group.host.name || group.host.address"
+          :reachable="group.snapshot?.reachable ?? null"
+          :last-error="group.snapshot?.last_error ?? null"
+        />
+        <div v-if="group.devices.length === 0" class="sdr-devices-empty">
+          No devices detected on this host.
         </div>
-        <SdrDeviceForm v-if="openId === r.id" :radio="r" @save="onSave" @cancel="openId = null" />
-      </div>
+        <template
+          v-for="entry in group.devices"
+          :key="group.host.id + ':' + entry.device.device_id"
+        >
+          <SdrRadioRow
+            v-if="entry.radio"
+            :radio="entry.radio"
+            :connected="entry.device.present"
+            :open="openId === entry.radio.id"
+            :confirming="confirmId === entry.radio.id"
+            :sentry-device-status="entry.device"
+            @toggle-edit="toggleEdit(entry.radio.id)"
+            @start-delete="startDelete(entry.radio.id)"
+            @confirm-delete="confirmDelete(entry.radio.id)"
+            @cancel-delete="confirmId = null"
+            @save="onSave"
+            @cancel-edit="openId = null"
+          />
+          <SdrSentryDeviceRow
+            v-else
+            :device="entry.device"
+            :adding="addingDeviceKey === group.host.id + ':' + entry.device.device_id"
+            @add="addDeviceAsRadio(group.host, entry.device)"
+          />
+        </template>
+      </template>
+
+      <template v-if="manualRadios.length > 0">
+        <div v-if="sentryHosts.length > 0" class="sdr-host-group-header">MANUAL RADIOS</div>
+        <SdrRadioRow
+          v-for="radio in manualRadios"
+          :key="radio.id"
+          :radio="radio"
+          :connected="manualStatusMap[radio.id] ?? null"
+          :open="openId === radio.id"
+          :confirming="confirmId === radio.id"
+          @toggle-edit="toggleEdit(radio.id)"
+          @start-delete="startDelete(radio.id)"
+          @confirm-delete="confirmDelete(radio.id)"
+          @cancel-delete="confirmId = null"
+          @save="onSave"
+          @cancel-edit="openId = null"
+        />
+      </template>
 
       <div
         v-if="openId === 'new'"
@@ -101,64 +73,193 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+/**
+ * `SdrDevicesControl` — the Settings → SDR → DEVICES editor. Groups
+ * configured/available SDR devices by source (ADR-0009):
+ * - One group per registered Sentry host, listing every device Sentry
+ *   currently reports (`SdrSentryDeviceRow` for one not yet mirrored into
+ *   Sentinel's own radio list, `SdrRadioRow` once it has been).
+ * - A trailing "MANUAL RADIOS" group for radios entered directly in
+ *   Sentinel (`sentry_host_id === null`), unchanged from before this
+ *   feature existed.
+ *
+ * A single 3s poll tick (guarded by `pollInFlight` so a slow tick can never
+ * stack) refreshes both a manual radio's TCP reachability and every Sentry
+ * host's cached device snapshot, and diffs each host's device-id set against
+ * the previous tick to announce arrivals/departures through the
+ * notifications store — the live plug/unplug behaviour this component adds
+ * on top of the original per-radio-only poll. `sdr:radios-changed` keeps
+ * firing on every local mutation (add/edit/delete/mirror), matching the
+ * contract other components (e.g. `SdrDeviceSelector`, the SDR panel) already
+ * listen for.
+ */
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import SdrDeviceForm from './SdrDeviceForm.vue'
+import SdrRadioRow from './SdrRadioRow.vue'
+import SdrSentryDeviceRow from './SdrSentryDeviceRow.vue'
+import SdrHostGroupHeader from './SdrHostGroupHeader.vue'
+import { useNotificationsStore } from '@/stores/notifications'
+import {
+  listRadios,
+  createRadio,
+  deleteRadio,
+  getRadioStatus,
+  type SdrRadioRecord,
+  type SdrRadioInput,
+} from '@/services/sdrRadiosApi'
+import {
+  listSentryHosts,
+  getSentryHostDevices,
+  type SentryHost,
+  type SentryDeviceSnapshot,
+  type SentryDeviceStatus,
+} from '@/services/sentryApi'
+import { RADIOS_CHANGED_EVENT, SENTRY_HOSTS_CHANGED_EVENT } from '@/composables/sdrDeviceEvents'
 
-interface SdrRadioData {
-  id: number
-  name: string
-  host: string
-  port: number
-  bandwidth: number | null
-  rf_gain: number | null
-  agc: boolean | null
-  enabled: boolean
-  description: string
-}
+const notificationsStore = useNotificationsStore()
 
-const radios = ref<SdrRadioData[]>([])
+const radios = ref<SdrRadioRecord[]>([])
+const sentryHosts = ref<SentryHost[]>([])
+const deviceSnapshots = ref<Record<number, SentryDeviceSnapshot>>({})
 const openId = ref<number | 'new' | null>(null)
 const confirmId = ref<number | null>(null)
-const statusMap = ref<Record<number, boolean | null>>({})
+const manualStatusMap = ref<Record<number, boolean | null>>({})
+const addingDeviceKey = ref<string | null>(null)
 
-// Guards the 3s poll: each per-radio probe waits on a backend TCP connect (up to
-// ~1.5s × radios), so a slow network could let ticks pile up. Skip a tick while a
-// previous sweep is still in flight rather than stacking overlapping requests.
-let statusCheckInFlight = false
+// The present device-id set last seen per host, used only to diff against
+// the newest poll and detect arrivals/departures — not rendered. Paired with
+// the last-known name per device id so a departure notification can name the
+// device instead of showing its raw id.
+const previousDeviceIdsByHost = new Map<number, Set<string>>()
+const lastKnownDeviceNames = new Map<string, string>()
 
-async function checkStatuses(ids: number[]): Promise<void> {
-  if (statusCheckInFlight) return
-  statusCheckInFlight = true
+const manualRadios = computed(() => radios.value.filter((radio) => radio.sentry_host_id == null))
+
+/** One row model per device on a host: the live Sentry status, plus the
+ * mirrored Sentinel radio if one has already been created for it (null =
+ * not yet added — rendered as `SdrSentryDeviceRow`'s ADD row instead). */
+interface SentryDeviceRowModel {
+  device: SentryDeviceStatus
+  radio: SdrRadioRecord | null
+}
+
+interface SentryHostGroup {
+  host: SentryHost
+  snapshot: SentryDeviceSnapshot | undefined
+  devices: SentryDeviceRowModel[]
+}
+
+const sentryGroups = computed<SentryHostGroup[]>(() =>
+  sentryHosts.value.map((host) => {
+    const snapshot = deviceSnapshots.value[host.id]
+    const devices = snapshot?.status?.sdrs ?? []
+    return {
+      host,
+      snapshot,
+      devices: devices.map((device) => ({
+        device,
+        radio:
+          radios.value.find(
+            (radio) =>
+              radio.sentry_host_id === host.id && radio.sentry_device_id === device.device_id,
+          ) ?? null,
+      })),
+    }
+  }),
+)
+
+// Guards the 3s poll: a tick fans out one status probe per manual radio plus
+// one device-snapshot fetch per Sentry host, each of which waits on a
+// backend round trip. Skip a tick while a previous sweep is still in flight
+// rather than stacking overlapping requests (same guard as before this
+// feature existed, now covering the combined manual+Sentry sweep).
+let pollInFlight = false
+
+async function pollManualRadioStatuses(): Promise<void> {
+  await Promise.all(
+    manualRadios.value.map(async (radio) => {
+      const status = await getRadioStatus(radio.id)
+      manualStatusMap.value[radio.id] = status?.connected === true
+    }),
+  )
+}
+
+/**
+ * Announce devices that plugged in/unplugged on `host` since the previous
+ * tick. Tracks only the *present* device-id set — a serial-identified device
+ * Sentry keeps configured while unplugged still appears in every snapshot
+ * with `present: false`, so membership in the full device list is not itself
+ * a plug/unplug signal; only a `present` transition is.
+ */
+function announceDeviceChanges(host: SentryHost, currentDevices: SentryDeviceStatus[]): void {
+  const currentPresentIds = new Set(
+    currentDevices.filter((device) => device.present).map((device) => device.device_id),
+  )
+  const previousPresentIds = previousDeviceIdsByHost.get(host.id)
+  // Undefined only on the very first snapshot for this host — nothing to
+  // diff against yet, so every currently-present device would otherwise look
+  // like a fresh arrival.
+  if (previousPresentIds) {
+    for (const device of currentDevices) {
+      if (device.present && !previousPresentIds.has(device.device_id)) {
+        notificationsStore.add({
+          type: 'system',
+          title: 'SDR device connected',
+          detail: `${device.name || device.device_id} on ${host.name || host.address}`,
+        })
+      }
+    }
+    for (const previousId of previousPresentIds) {
+      if (!currentPresentIds.has(previousId)) {
+        const previousName = lastKnownDeviceNames.get(previousId) || previousId
+        notificationsStore.add({
+          type: 'system',
+          title: 'SDR device disconnected',
+          detail: `${previousName} on ${host.name || host.address}`,
+        })
+      }
+    }
+  }
+  for (const device of currentDevices) lastKnownDeviceNames.set(device.device_id, device.name)
+  previousDeviceIdsByHost.set(host.id, currentPresentIds)
+}
+
+async function pollSentryHostDevices(): Promise<void> {
+  await Promise.all(
+    sentryHosts.value.map(async (host) => {
+      const snapshot = await getSentryHostDevices(host.id)
+      deviceSnapshots.value = { ...deviceSnapshots.value, [host.id]: snapshot }
+      announceDeviceChanges(host, snapshot.status?.sdrs ?? [])
+    }),
+  )
+}
+
+async function pollAll(): Promise<void> {
+  if (pollInFlight) return
+  pollInFlight = true
   try {
-    await Promise.all(
-      ids.map(async (id) => {
-        try {
-          const res = await fetch(`/api/sdr/status/${id}`)
-          if (!res.ok) {
-            statusMap.value[id] = false
-            return
-          }
-          const data = await res.json()
-          statusMap.value[id] = data.connected === true
-        } catch {
-          statusMap.value[id] = false
-        }
-      }),
-    )
+    await Promise.all([pollManualRadioStatuses(), pollSentryHostDevices()])
   } finally {
-    statusCheckInFlight = false
+    pollInFlight = false
+  }
+}
+
+async function loadRadios(): Promise<void> {
+  radios.value = await listRadios()
+}
+
+async function loadSentryHosts(): Promise<void> {
+  try {
+    sentryHosts.value = await listSentryHosts()
+  } catch {
+    /* offline / transient — keep the previous list */
   }
 }
 
 async function load(): Promise<void> {
-  try {
-    const res = await fetch('/api/sdr/radios')
-    if (!res.ok) return
-    const raw = await res.json()
-    radios.value = (raw as SdrRadioData[]).map((r) => ({ ...r, id: Number(r.id) }))
-    await checkStatuses(radios.value.map((r) => r.id))
-  } catch {}
+  await Promise.all([loadRadios(), loadSentryHosts()])
+  await pollAll()
 }
 
 function toggleEdit(id: number): void {
@@ -177,33 +278,64 @@ function startDelete(id: number): void {
 }
 
 async function confirmDelete(id: number): Promise<void> {
-  try {
-    const res = await fetch('/api/sdr/radios/' + id, { method: 'DELETE' })
-    if (!res.ok) return
-    confirmId.value = null
-    await load()
-    document.dispatchEvent(new CustomEvent('sdr:radios-changed'))
-  } catch {}
+  const deleted = await deleteRadio(id)
+  if (!deleted) return
+  confirmId.value = null
+  await loadRadios()
+  document.dispatchEvent(new CustomEvent(RADIOS_CHANGED_EVENT))
 }
 
 async function onSave(): Promise<void> {
   openId.value = null
-  await load()
-  document.dispatchEvent(new CustomEvent('sdr:radios-changed'))
+  await loadRadios()
+  document.dispatchEvent(new CustomEvent(RADIOS_CHANGED_EVENT))
+}
+
+async function addDeviceAsRadio(host: SentryHost, device: SentryDeviceStatus): Promise<void> {
+  if (!device.output) return
+  const key = `${host.id}:${device.device_id}`
+  addingDeviceKey.value = key
+  try {
+    const body: SdrRadioInput = {
+      name: device.name || device.device_id,
+      host: host.address,
+      port: device.output.iq_port,
+      description: '',
+      enabled: device.enabled,
+      bandwidth: null,
+      rf_gain: null,
+      agc: null,
+      sentry_host_id: host.id,
+      sentry_device_id: device.device_id,
+      notes: device.notes,
+      antenna: device.antenna,
+      visibility: device.visibility,
+    }
+    const created = await createRadio(body)
+    if (created) {
+      await loadRadios()
+      document.dispatchEvent(new CustomEvent(RADIOS_CHANGED_EVENT))
+    }
+  } finally {
+    if (addingDeviceKey.value === key) addingDeviceKey.value = null
+  }
 }
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 function onRadiosChanged(): void {
-  void load()
+  void loadRadios()
+}
+
+function onSentryHostsChanged(): void {
+  void loadSentryHosts()
 }
 
 onMounted(() => {
   void load()
-  pollTimer = setInterval(() => {
-    if (radios.value.length > 0) void checkStatuses(radios.value.map((r) => r.id))
-  }, 3000)
-  document.addEventListener('sdr:radios-changed', onRadiosChanged)
+  pollTimer = setInterval(() => void pollAll(), 3000)
+  document.addEventListener(RADIOS_CHANGED_EVENT, onRadiosChanged)
+  document.addEventListener(SENTRY_HOSTS_CHANGED_EVENT, onSentryHostsChanged)
 })
 
 onBeforeUnmount(() => {
@@ -214,27 +346,19 @@ onBeforeUnmount(() => {
     pollTimer = null
   }
   /* v8 ignore stop */
-  document.removeEventListener('sdr:radios-changed', onRadiosChanged)
+  document.removeEventListener(RADIOS_CHANGED_EVENT, onRadiosChanged)
+  document.removeEventListener(SENTRY_HOSTS_CHANGED_EVENT, onSentryHostsChanged)
 })
 </script>
 
 <style scoped>
-.sdr-status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 8px;
-  background: #555;
-  flex-shrink: 0;
-  vertical-align: middle;
-  position: relative;
-  top: -1px;
-}
-.sdr-status-dot--connected {
-  background: var(--color-accent);
-}
-.sdr-status-dot--disconnected {
-  background: #ef4444;
+.sdr-host-group-header {
+  padding: 10px 14px 6px;
+  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(16, 19, 29, 0.55);
 }
 </style>

@@ -2,6 +2,7 @@ import maplibregl from 'maplibre-gl'
 import type { AirStore, AirNotifStore, NotificationsStore, TrackingStore } from '../types'
 import { createNotifEnabledAdapter, type NotifEnabledAdapter } from '@/stores/airNotif'
 import { parseAlt, isMilitary } from './adsbParse'
+import { ADSB_POLL_INTERVAL_MS, ADSB_REFETCH_GUARD_MS } from '@/constants/adsb'
 import type { TrackingField } from '@/stores/tracking'
 import {
   createRadarBlip,
@@ -2571,8 +2572,8 @@ export class AdsbLiveControl implements maplibregl.IControl {
 
   private _startPolling(): void {
     if (this._pollInterval) return
-    if (Date.now() - this._lastFetchTime > 4000) this._fetch()
-    this._pollInterval = setInterval(() => this._fetch(), 5000)
+    if (Date.now() - this._lastFetchTime > ADSB_REFETCH_GUARD_MS) this._fetch()
+    this._pollInterval = setInterval(() => this._fetch(), ADSB_POLL_INTERVAL_MS)
     if (!this._interpolateInterval) {
       this._interpolateInterval = setInterval(() => this._interpolate(), 100)
     }

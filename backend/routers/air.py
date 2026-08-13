@@ -22,6 +22,7 @@ from backend.db_helpers import get_setting
 from backend.models import AdsbCache, AirAircraft, AirFlight, AirMessage, AirSnapshot, AirTracking
 from backend.services import adsb as adsb_service
 from backend.services.flight_history import record_aircraft_batch
+from backend.services.upstream_rate_limit import UpstreamThrottledError
 from backend.utils import resolve_domain_urls
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import JSONResponse
@@ -78,6 +79,8 @@ async def get_aircraft_near_point(
       - HIT:    fresh row exists (within adsb_ttl_ms) → return immediately
       - MISS:   no row or expired → fetch upstream, upsert row, return fresh data
       - RATED:  upstream returned 429 → serve existing cache row regardless of age
+      - THROTTLED: our own limiter declined the call (see adsb_min_request_interval_ms)
+                → serve existing cache row regardless of age
       - STALE:  upstream failed (non-429) but row within adsb_stale_ms → serve old data
       - 503:    upstream failed and no usable cached entry
     """
@@ -107,11 +110,18 @@ async def get_aircraft_near_point(
 
     data: dict | None = None
     rate_limited = False
+    throttled = False
     for base_url in filter(None, [primary_url, fallback_url]):
         try:
             data = await adsb_service.fetch_aircraft(lat, lon, radius, base_url)
             rate_limited = False
             break
+        except UpstreamThrottledError:
+            # Our own limiter declined the call to stay inside the upstream's
+            # published rate limit. Try the other source (it has its own budget)
+            # before falling back to cached data.
+            throttled = True
+            continue
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:
                 rate_limited = True
@@ -160,6 +170,11 @@ async def get_aircraft_near_point(
     # Rate-limited: serve whatever we have cached, regardless of age
     if rate_limited and row:
         return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "RATED"})
+
+    # Locally throttled: a refresh is at most one rate-limit interval away, so
+    # serve the cached row rather than reporting an outage the upstream isn't having.
+    if throttled and row:
+        return JSONResponse(content=json.loads(row.payload), headers={"X-Cache": "THROTTLED"})
 
     # All upstreams failed — serve stale data if still within the stale window
     if row and is_within_stale(row.fetched_at, settings.adsb_stale_ms):

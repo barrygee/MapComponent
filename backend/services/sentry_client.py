@@ -29,6 +29,14 @@ import httpx
 from backend.config import settings
 
 # The header Sentry stamps on every /api response (including errors) per ADR-0009.
+SESSION_COOKIE_NAME = "sentry_session"
+"""Sentry's session cookie (its `services/console_auth.py`).
+
+Duplicated here rather than imported for the obvious reason — Sentry is a
+separate service — which makes it part of the wire contract between the two,
+alongside the paths and payload shapes this module already hard-codes.
+"""
+
 API_VERSION_HEADER = "X-Sentry-Api-Version"
 
 # RFC-1123-ish hostname: labels of 1-63 alphanumerics/hyphens/underscores (no
@@ -133,14 +141,24 @@ class SentryClient:
         self,
         address: str,
         port: int,
-        auth_token: str,
+        console_password: str,
         *,
         connect_timeout_s: float | None = None,
         read_timeout_s: float | None = None,
     ) -> None:
+        """`console_password` is Sentry's console password, not a bearer token.
+
+        Sentry has no token auth. It was removed by Sentry's ADR-0010 in favour
+        of one console password proved by a signed `sentry_session` cookie, and
+        `app/backend/security.py` there reads the cookie and nothing else — so
+        the `Authorization: Bearer` header this client used to send was accepted
+        by nobody and silently ignored, leaving every management call 401 against
+        a protected Sentry.
+        """
         self._address = validate_sentry_address(address)
         self._port = validate_sentry_port(port)
-        self._auth_token = auth_token
+        self._console_password = console_password
+        self._session_cookie: str | None = None
         connect = connect_timeout_s if connect_timeout_s is not None else settings.sentry_connect_timeout_s
         read = read_timeout_s if read_timeout_s is not None else settings.sentry_read_timeout_s
         self._timeout = httpx.Timeout(connect=connect, read=read, write=read, pool=read)
@@ -151,21 +169,53 @@ class SentryClient:
         return f"http://{self._address}:{self._port}"
 
     def _headers(self) -> dict[str, str]:
+        """Request headers, carrying the session cookie once one has been obtained.
+
+        The cookie is set by hand rather than by an `httpx` cookie jar: a client
+        is constructed per request here (see the class docstring), so a jar would
+        be discarded before it could ever be reused.
+        """
         headers = {"Accept": "application/json"}
-        if self._auth_token:
-            headers["Authorization"] = f"Bearer {self._auth_token}"
+        if self._session_cookie:
+            headers["Cookie"] = f"{SESSION_COOKIE_NAME}={self._session_cookie}"
         return headers
 
-    async def _request(self, method: str, path: str, *, json_body: dict[str, Any] | None = None) -> SentryResponse:
-        """Perform one request, translating transport/HTTP failures into the typed errors above."""
-        url = f"{self.base_url}{path}"
+    async def _sign_in(self) -> bool:
+        """Exchange the console password for a session cookie. False if it cannot.
+
+        Silent about *why* it failed, deliberately: Sentry answers every auth
+        failure identically on purpose, so there is nothing here to distinguish
+        a wrong password from a password that was since changed.
+        """
+        if not self._console_password:
+            return False
+        url = f"{self.base_url}/api/auth/login"
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
-                response = await client.request(method, url, headers=self._headers(), json=json_body)
-        except httpx.TimeoutException as exc:
-            raise SentryUnreachableError(f"Timed out reaching Sentry host {self._address}:{self._port}.") from exc
-        except httpx.HTTPError as exc:
-            raise SentryUnreachableError(f"Could not reach Sentry host {self._address}:{self._port}.") from exc
+                response = await client.post(url, json={"password": self._console_password})
+        except httpx.HTTPError:
+            return False
+        if response.status_code >= 400:
+            return False
+        cookie = response.cookies.get(SESSION_COOKIE_NAME)
+        if not cookie:
+            return False
+        self._session_cookie = cookie
+        return True
+
+    async def _request(self, method: str, path: str, *, json_body: dict[str, Any] | None = None) -> SentryResponse:
+        """Perform one request, translating transport/HTTP failures into the typed errors above.
+
+        Signs in and retries **once** on a 401. A session outlives many requests
+        but not for ever — it lapses, and it is invalidated outright whenever the
+        operator changes Sentry's password — so the first call after that would
+        otherwise fail for a reason the caller can do nothing about. Retried once
+        only: a second 401 means the password is wrong, and looping on it would
+        turn a typo into a login flood.
+        """
+        response = await self._send(method, path, json_body=json_body)
+        if response.status_code == 401 and await self._sign_in():
+            response = await self._send(method, path, json_body=json_body)
 
         api_version = response.headers.get(API_VERSION_HEADER)
         if response.status_code >= 400:
@@ -180,6 +230,17 @@ class SentryClient:
                 response.status_code, "invalid_response", "Sentry returned a non-JSON response."
             ) from exc
         return SentryResponse(data=payload, api_version=api_version)
+
+    async def _send(self, method: str, path: str, *, json_body: dict[str, Any] | None = None) -> httpx.Response:
+        """One HTTP round trip, with transport failures raised as `SentryUnreachableError`."""
+        url = f"{self.base_url}{path}"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                return await client.request(method, url, headers=self._headers(), json=json_body)
+        except httpx.TimeoutException as exc:
+            raise SentryUnreachableError(f"Timed out reaching Sentry host {self._address}:{self._port}.") from exc
+        except httpx.HTTPError as exc:
+            raise SentryUnreachableError(f"Could not reach Sentry host {self._address}:{self._port}.") from exc
 
     # ── health / status ──────────────────────────────────────────────────────
     async def get_health(self) -> SentryResponse:
