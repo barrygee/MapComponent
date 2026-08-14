@@ -156,6 +156,23 @@ class TestClaimingAndTuning:
         assert body["center_hz"] == 1_090_000_000
         assert body["sample_rate"] == 2_400_000
 
+    def test_uses_a_fixed_maximum_gain_rather_than_agc(
+        self, client: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # AGC cannot track a 0.5 microsecond pulse. It settles for the silence
+        # between messages — which is to say it settles low — and the pulses
+        # that matter arrive under the noise floor.
+        seen = _install_sentry(monkeypatch, sentry_ok)
+        set_source(client, register_host(client))
+
+        client.post("/api/sdr/adsb/claim", json={})
+
+        import json as json_module
+
+        body = json_module.loads(next(r for r in seen if r.method == "PATCH").content)
+        assert body["gain_auto"] is False
+        assert body["gain_db"] == adsb_source.ADSB_GAIN_DB
+
     def test_the_claim_precedes_the_tuning(
         self, client: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:

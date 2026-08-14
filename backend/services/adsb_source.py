@@ -39,6 +39,20 @@ ADSB_SAMPLE_RATE = 2_400_000
 """2.4 MSPS. ADS-B is a 2 MHz-wide pulse-position signal, so anything much below
 this cannot resolve the pulses; 2.4 is what the decoders assume."""
 
+ADSB_GAIN_DB = 49.6
+"""Maximum tuner gain, and deliberately **not** AGC.
+
+AGC is the obvious choice and the wrong one here. ADS-B is a burst mode: each
+message is a handful of 0.5 µs pulses with long silence between, and the tuner's
+automatic gain control cannot track anything that short — it settles for the
+*silence*, which is to say it settles low, and the pulses that matter arrive
+below the noise floor. Every ADS-B decoder's own guidance starts at maximum gain
+for this reason.
+
+49.6 dB is the R820T's top step. An aerial close to an airport can overload at
+this level, which shows up as the message rate *falling* as traffic gets
+nearer — the fix there is a lower fixed gain, not AGC."""
+
 RESERVATION_TTL_SECONDS = 120
 RENEWAL_INTERVAL_SECONDS = 30
 """Four missed renewals before the lease lapses — enough slack for a lost poll
@@ -182,9 +196,9 @@ async def claim_and_tune(db: AsyncSession, *, force: bool = False) -> dict[str, 
             {
                 "center_hz": ADSB_CENTRE_HZ,
                 "sample_rate": ADSB_SAMPLE_RATE,
-                # AGC: ADS-B is bursty and the useful dynamic range is wide, so a
-                # fixed gain that suits an aircraft overhead clips one at range.
-                "gain_auto": True,
+                # Fixed maximum gain, not AGC — see `ADSB_GAIN_DB`.
+                "gain_auto": False,
+                "gain_db": ADSB_GAIN_DB,
                 "enabled": True,
             },
             holder=holder,
