@@ -22,13 +22,15 @@ It is built **offline-first**: each domain has online and offline data sources w
 ### AIR
 ADS-B aircraft from the [airplanes.live](https://airplanes.live) API are proxied through the backend and cached in SQLite (10 s fresh TTL, 60 s stale window) to limit upstream load. Aircraft render as oriented icons; clicking one opens a detail panel and lets you track it. Map controls add airports (with frequencies), military bases, AWACS lobes, range rings, roads, an overhead-alert zone, and live labels.
 
+Optional **Off Grid** mode decodes 1090 MHz from one of your own SDRs instead, via a separate readsb `adsb-decoder` container — Sentinel claims the dongle and tunes it while AIR is open. See [Off Grid ADS-B](#off-grid-ads-b-optional).
+
 Optional **flight replay** (off by default, behind `air.replayEnabled`) records periodic snapshots into SQLite so past flights can be browsed by date and replayed on the map.
 
 ### SPACE
 Satellites are propagated from TLE data using **SGP4**. The default view tracks the ISS; any catalogued satellite can be selected by NORAD ID to show its current position, multi-orbit ground track, and visibility footprint. Pass prediction lists upcoming passes over your location, with heads-up notifications and optional **auto-tune** that drives the SDR to a satellite's downlink frequency during a pass. A day/night terminator overlay and full **TLE database management** (fetch from Celestrak, upload `.txt`, categorise, clear) are built in.
 
 ### SDR
-Each configured radio connects to a remote **`rtl_tcp`** daemon. The backend runs one IQ broadcaster per radio and fans computed FFT frames out to all subscribed WebSocket clients, which render a live **spectrum + waterfall**. You can tune, set bandwidth/gain, demodulate audio, organise frequencies into colour-coded groups, run a frequency **search** across ranges, overlay a band plan, and **record** audio (WAV) and raw IQ clips for later playback. An optional **digital decode** mode (P25/DMR/NXDN/D-STAR/YSF via a separate `dsd-fme` container) surfaces decoded call metadata and voice — see [Digital decoding](#digital-decoding-optional). An optional **APRS decode** mode (via a separate Direwolf `aprs-decoder` container) plots received stations on the Land map and lists packets below the waterfall — see [APRS decoding](#aprs-decoding-optional). The two decoders can run concurrently on separate dongles.
+Each configured radio connects to a remote **`rtl_tcp`** daemon. The backend runs one IQ broadcaster per radio and fans computed FFT frames out to all subscribed WebSocket clients, which render a live **spectrum + waterfall**. You can tune, set bandwidth/gain, demodulate audio, organise frequencies into colour-coded groups, run a frequency **search** across ranges, overlay a band plan, and **record** audio (WAV) and raw IQ clips for later playback. An optional **digital decode** mode (P25/DMR/NXDN/D-STAR/YSF via a separate `dsd-fme` container) surfaces decoded call metadata and voice — see [Digital decoding](#digital-decoding-optional). An optional **APRS decode** mode (via a separate Direwolf `aprs-decoder` container) plots received stations on the Land map and lists packets below the waterfall — see [APRS decoding](#aprs-decoding-optional). A third sidecar decodes **ADS-B** for the AIR map's Off Grid mode — see [Off Grid ADS-B](#off-grid-ads-b-optional). All three can run concurrently, but each needs **its own dongle**: a receiver serves one tuned purpose at a time, and Sentinel takes an enforced lease on the one it is using.
 
 ---
 
@@ -74,10 +76,12 @@ Sentinel/
 │   ├── config.py             Pydantic settings (TTLs, upstream URLs)
 │   ├── database.py           Engine, table creation, seeders, migrations
 │   ├── models.py             SQLAlchemy ORM models
-│   ├── routers/              air.py · space.py · sdr.py · settings.py
-│   ├── services/             adsb · satellite · tle · daynight · sdr · sdr_data
-│   │                         · sdr_decode · sdr_rigctl · sdr_channel_maps
+│   ├── routers/              air.py · space.py · land.py · sdr.py · sentry.py
+│   │                         · adsb_source.py · settings.py
+│   ├── services/             adsb · adsb_source · satellite · tle · daynight · sdr
+│   │                         · sdr_data · sdr_decode · sdr_rigctl · sdr_channel_maps
 │   │                         · sat_radio · flight_history · json_store
+│   │                         · sentry_client · sentry_fleet
 │   ├── cache.py              Fresh/stale SQLite write-through cache helpers
 │   └── data/                 Seed JSON (bandplan, frequencies, satellite/amateur radio)
 │
@@ -87,8 +91,14 @@ Sentinel/
 │   ├── assets/               Map tiles, PMTiles, sprites, fonts, logos
 │   └── spa-dist/             Built SPA bundle (served by the backend; committed)
 │
+├── decoder/                  Opt-in sidecars, each behind its own compose profile
+│   ├── entrypoint.py         Digital voice (dsd-fme)        — profile: decoder
+│   ├── aprs/                 APRS packet (Direwolf)         — profile: aprs
+│   └── adsb/                 1090 MHz ADS-B (readsb)        — profile: adsb
+│
 ├── tests/                    pytest (backend) + Playwright (full-stack e2e)
-├── docker-compose.yml        App service — FastAPI serving the SPA (host :8080)
+├── docs/adr/                 Architecture decision records
+├── docker-compose.yml        App service + the three decoder sidecars (host :8080)
 └── backend/Dockerfile        Multi-stage build (SPA + backend)
 ```
 
@@ -273,6 +283,80 @@ Notes when trying it:
 
 See [`decoder/aprs/README.md`](decoder/aprs/README.md) for the full data-flow and
 troubleshooting.
+
+### Off Grid ADS-B (optional)
+
+By default the AIR map gets aircraft from **airplanes.live** over the internet.
+**Off Grid** mode instead decodes 1090 MHz locally from one of your own SDRs, in
+its **own opt-in `adsb-decoder` container** built around **readsb**.
+
+The dongle stays on the Sentry Pi; the decoder runs beside Sentinel and reads the
+raw I/Q over the network from Sentry's `rtl_tcp` port. No mainstream 1090 MHz
+decoder reads `rtl_tcp` natively — they expect a local USB dongle or an
+already-demodulated feed — so the sidecar strips `rtl_tcp`'s 12-byte `RTL0`
+header and feeds readsb through its `ifile` input.
+
+> **Bandwidth.** This pulls raw samples across your LAN: roughly **38 Mbps
+> sustained** at 2.4 MSPS. Running a decoder *on the Pi* and sending decoded JSON
+> instead would cost a few KB/s. The arrangement here is deliberate — it keeps
+> every decoder in one stack — but it is the wrong trade on a constrained link.
+
+```bash
+# build + run the app WITH the ADS-B decoder (the --profile flag is the opt-in)
+docker compose --profile adsb up -d --build         # app on :8080 + adsb-decoder sidecar
+
+# rebuild only what changed, leaving the voice/APRS sidecars running
+docker compose --profile adsb up -d --build app adsb-decoder
+
+# follow the decoder as it resolves its source and starts readsb
+docker compose --profile adsb logs -f adsb-decoder
+
+# the decoded aircraft file it serves, for checking by hand
+curl -s localhost:8090/data/aircraft.json | head
+
+# revert to app-only (the sidecar never starts without the profile):
+docker compose --profile adsb down && docker compose up -d
+```
+
+Then, in the UI:
+
+1. **Settings → SDR** — add the Sentry host, entering its **console password**
+   (Sentry has no API tokens; Sentinel signs in and holds a session cookie).
+2. **Settings → AIR → Off Grid SDR** — pick which of that Sentry's dongles
+   receives ADS-B.
+3. **Settings → AIR → Off Grid Data Source** — set
+   `http://adsb-decoder:8080/data/aircraft.json` (or the host's address and
+   published port `8090` from outside the compose network).
+4. Switch to **Off Grid** and open **AIR**.
+
+Opening AIR off grid **claims that dongle and tunes it to 1090 MHz at 2.4 MSPS**,
+renews the claim while the view is open, and releases it on the way out. The
+claim is a *lease* with a TTL, so a closed tab or a crashed browser releases the
+device by itself. Tuning is re-applied on every renewal, which makes it
+self-healing: a replugged dongle or a Sentry restart comes back to 1090 MHz
+within about thirty seconds.
+
+While AIR holds the dongle, Sentry refuses tuning changes to it from anything
+else — its own console included, which shows who has it and offers an explicit
+override. Nothing else can retune the receiver out from under the map.
+
+Notes when trying it:
+
+- **A dongle serves one purpose at a time.** AIR and the voice/APRS decoders
+  cannot share one — give each its own, or expect them to take it in turns.
+- **Until you pick a source**, the decoder retries every few seconds and logs
+  that none is configured. That is the correct state, not a fault.
+- **If the map stays empty, the notice at the top of AIR says why** — no source
+  picked, another consumer holding the device, a wrong console password, or an
+  unreachable Pi. Only the second offers a *Take control* button, because it is
+  the only one taking the device would fix.
+- The device must be **enabled and published** on the Sentry side to appear in
+  the picker.
+
+See [`decoder/adsb/README.md`](decoder/adsb/README.md) for the data flow and
+troubleshooting, and
+[`docs/adr/0003-sentry-sdr-lock-and-tune.md`](docs/adr/0003-sentry-sdr-lock-and-tune.md)
+for the lease design and why the source is named rather than merely pointed at.
 
 ---
 
