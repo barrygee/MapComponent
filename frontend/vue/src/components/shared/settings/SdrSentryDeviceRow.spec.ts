@@ -87,6 +87,48 @@ describe('SdrSentryDeviceRow', () => {
     expect(button.attributes('title')).toBeUndefined()
   })
 
+  it('refuses to mirror a private device, and says why', () => {
+    // Private is the operator saying on the Sentry side that this dongle is not
+    // for sharing. Mirroring it would contradict that, and the resulting radio
+    // would fail to connect for a reason nothing in Sentinel explains.
+    const wrapper = mount(SdrSentryDeviceRow, {
+      props: {
+        device: buildDevice({
+          output: { iq_port: 1, control_port: 2, host: '10.0.0.1' },
+          visibility: 'private',
+        }),
+        adding: false,
+      },
+    })
+    const button = wrapper.find('.sdr-devices-btn')
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(button.attributes('title')).toContain('private on its Sentry')
+  })
+
+  it('refuses to mirror a disabled device, and says why', () => {
+    const wrapper = mount(SdrSentryDeviceRow, {
+      props: {
+        device: buildDevice({
+          output: { iq_port: 1, control_port: 2, host: '10.0.0.1' },
+          enabled: false,
+        }),
+        adding: false,
+      },
+    })
+    const button = wrapper.find('.sdr-devices-btn')
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(button.attributes('title')).toContain('disabled on its Sentry')
+  })
+
+  it('still shows the row for a private device', () => {
+    // The row stays: this is the management view, and hiding it is what would
+    // make the very toggle that flips the state unreachable.
+    const wrapper = mount(SdrSentryDeviceRow, {
+      props: { device: buildDevice({ visibility: 'private' }), adding: false },
+    })
+    expect(wrapper.text()).toContain(buildDevice().name)
+  })
+
   it('disables the ADD button and shows a busy label while an add request is in flight', () => {
     const wrapper = mount(SdrSentryDeviceRow, {
       props: {
