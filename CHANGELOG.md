@@ -324,6 +324,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Correct the row tints and chevron anchoring on the shared shell
 - Widen the JSON config editors to two grid columns
 - Close the gap above an expanded first filter row
+- Tune ADS-B to fixed maximum gain instead of AGC (#273)
 
 ### Chores
 
