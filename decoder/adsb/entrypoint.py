@@ -27,7 +27,9 @@ rather than left to be discovered from an empty map.
 Uses only the Python standard library so the runtime image stays minimal.
 
 Environment:
-    RTL_TCP_HOST / RTL_TCP_PORT   the Sentry rtl_tcp endpoint to read
+    CONFIG_URL                    Sentinel's `/api/sdr/adsb/config`, polled for the
+                                  rtl_tcp endpoint. Preferred over RTL_TCP_HOST/PORT
+    RTL_TCP_HOST / RTL_TCP_PORT   static fallback when CONFIG_URL is unset or silent
     JSON_DIR                      where readsb writes aircraft.json
     HTTP_PORT                     port this process serves JSON_DIR on
     SENTRY_API_BASE               optional; polled once at startup to report
@@ -71,6 +73,38 @@ def _environment_int(name: str, default: int) -> int:
     except ValueError:
         log(f"{name} is not a number; using {default}")
         return default
+
+
+def resolve_source(config_url: str, fallback: tuple[str, int]) -> tuple[str, int] | None:
+    """Ask Sentinel where this decoder's I/Q lives, falling back to the environment.
+
+    The source belongs to the operator's choice in Sentinel, not to this
+    container's environment: pointing AIR at a different dongle should not mean
+    editing compose and recreating a container. Polling for it keeps the fact in
+    one place and lets the change take effect on the next reconnect.
+
+    Falls back rather than failing when Sentinel cannot be reached or has no
+    source configured. A decoder that refused to start until a settings page had
+    been visited would be hard to diagnose from the outside — and a static
+    `RTL_TCP_HOST` remains a perfectly good way to run this thing standalone.
+    """
+    if not config_url:
+        return fallback if fallback[0] else None
+    try:
+        with urllib.request.urlopen(config_url, timeout=5) as response:
+            payload = json.load(response)
+    except (urllib.error.URLError, OSError, ValueError) as error:
+        log(f"could not read {config_url} ({error})")
+        return fallback if fallback[0] else None
+
+    endpoint = payload.get("rtl_tcp") or {}
+    host = endpoint.get("host")
+    port = endpoint.get("port")
+    if payload.get("configured") and isinstance(host, str) and isinstance(port, int):
+        return host, port
+
+    log("Sentinel has no ADS-B source configured yet (Settings → AIR)")
+    return fallback if fallback[0] else None
 
 
 def report_source_tuning(api_base: str, rtl_tcp_port: int) -> None:
@@ -175,14 +209,14 @@ def serve_json(json_dir: str, http_port: int) -> ThreadingHTTPServer:
 
 
 def main() -> int:
-    host = os.environ.get("RTL_TCP_HOST", "")
-    port = _environment_int("RTL_TCP_PORT", 2345)
+    fallback = (os.environ.get("RTL_TCP_HOST", ""), _environment_int("RTL_TCP_PORT", 2345))
+    config_url = os.environ.get("CONFIG_URL", "")
     json_dir = os.environ.get("JSON_DIR", "/run/adsb/data")
     http_port = _environment_int("HTTP_PORT", 8080)
     api_base = os.environ.get("SENTRY_API_BASE", "")
 
-    if not host:
-        log("RTL_TCP_HOST is not set; nothing to decode")
+    if not config_url and not fallback[0]:
+        log("neither CONFIG_URL nor RTL_TCP_HOST is set; nothing to decode")
         return 1
 
     os.makedirs(json_dir, exist_ok=True)
@@ -190,9 +224,6 @@ def main() -> int:
     # path every readsb/tar1090 deployment uses — an operator pointing Sentinel
     # at this decoder types the same URL they would for any other receiver.
     serve_json(os.path.dirname(json_dir.rstrip("/")) or "/", http_port)
-
-    if api_base:
-        report_source_tuning(api_base, port)
 
     stopping = threading.Event()
 
@@ -206,7 +237,23 @@ def main() -> int:
     # Relaunched rather than exited-on, because the far end is a Raspberry Pi
     # across a network: a reboot, a replugged dongle or a brief drop should
     # heal by itself instead of needing the container restarted.
+    reported_for_port: int | None = None
     while not stopping.is_set():
+        # Re-resolved on every attempt, so changing the source in Sentinel takes
+        # effect at the next reconnect instead of needing the container restarted.
+        resolved = resolve_source(config_url, fallback)
+        if resolved is None:
+            log(f"no source to read; retrying in {RESTART_DELAY_SECONDS}s")
+            stopping.wait(RESTART_DELAY_SECONDS)
+            continue
+        host, port = resolved
+
+        # Once per source, not per reconnect: a mis-tuned dongle is worth saying
+        # loudly, and worth saying only once rather than every five seconds.
+        if api_base and reported_for_port != port:
+            report_source_tuning(api_base, port)
+            reported_for_port = port
+
         process = build_pipeline(host, port, json_dir)
         while not stopping.is_set() and process.poll() is None:
             time.sleep(0.5)

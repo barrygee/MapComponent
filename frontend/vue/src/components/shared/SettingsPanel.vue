@@ -456,6 +456,14 @@ const ALL_SETTINGS: SettingItem[] = [
     defaultUrl: '',
   },
   {
+    section: 'air',
+    sectionLabel: 'AIR',
+    id: 'air-offgrid-sdr-source',
+    label: 'Off Grid SDR',
+    desc: 'Which Sentry SDR receives ADS-B. Held and tuned to 1090 MHz while AIR is open off grid',
+    type: 'adsb-sdr-source',
+  },
+  {
     section: 'space',
     sectionLabel: 'SPACE',
     id: 'space-online-source',

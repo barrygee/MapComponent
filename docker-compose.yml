@@ -130,7 +130,13 @@ services:
     depends_on:
       - app
     environment:
-      - RTL_TCP_HOST=${SENTINEL_ADSB_RTL_TCP_HOST:-192.168.5.67}
+      # Where the I/Q comes from is the operator's choice in Settings → AIR, not
+      # a compose value: this is polled so changing the source device takes
+      # effect at the next reconnect rather than needing the container recreated.
+      - CONFIG_URL=http://app:8000/api/sdr/adsb/config
+      # Static fallback, for running this decoder standalone or before a source
+      # has been picked. Leave unset to require the configured source.
+      - RTL_TCP_HOST=${SENTINEL_ADSB_RTL_TCP_HOST:-}
       - RTL_TCP_PORT=${SENTINEL_ADSB_RTL_TCP_PORT:-2345}
       # Polled once at startup to report what the source device is tuned to, so
       # a mis-tuned dongle shows up in the logs rather than as an empty map.

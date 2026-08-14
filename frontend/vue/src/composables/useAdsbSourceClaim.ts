@@ -85,9 +85,9 @@ export function useAdsbSourceClaim() {
       // The timer is (re)started here rather than only on success, because a
       // *first* attempt that fails would otherwise leave no timer at all — the
       // one case where retrying matters most is the one that would never retry.
-      // The server's cadence is unknown until a claim succeeds, so this falls
-      // back to the same interval the server asks for in practice.
-      scheduleRenewals(claim.value?.renew_within_seconds ?? RETRY_INTERVAL_SECONDS)
+      // The server has stated no cadence (there is no claim), so this is the
+      // local default; a later success replaces it with the server's own.
+      scheduleRenewals(RETRY_INTERVAL_SECONDS)
       return
     }
 
