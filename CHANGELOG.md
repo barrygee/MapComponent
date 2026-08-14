@@ -127,6 +127,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Trim the layer menus, unify the location-names tooltip (#268)
 - Thicken the APRS count ring and let the map through it
 - Sentry device management, and Off Grid ADS-B end to end (#271)
+- Stop offering private and disabled SDRs as sources (#274)
 
 ### Bug Fixes
 
