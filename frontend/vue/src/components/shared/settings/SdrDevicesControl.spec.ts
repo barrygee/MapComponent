@@ -435,6 +435,78 @@ describe('SdrDevicesControl', () => {
     expect(mockCreateRadio).not.toHaveBeenCalled()
   })
 
+  it('names a radio after the device id when the device has no name', async () => {
+    // A Sentry device need not be named; the created radio still needs a label
+    // that identifies it rather than an empty string.
+    mockListSentryHosts.mockResolvedValue([HOST])
+    const unnamed = { ...DEVICE, name: '' }
+    mockGetSentryHostDevices.mockResolvedValue(snapshot([unnamed]))
+    mockCreateRadio.mockResolvedValue({ id: 9 } as never)
+    const wrapper = mountControl()
+    await flushPromises()
+
+    await (
+      wrapper.vm as unknown as {
+        addDeviceAsRadio: (host: SentryHost, device: SentryDeviceStatus) => Promise<void>
+      }
+    ).addDeviceAsRadio(HOST, unnamed)
+
+    expect(mockCreateRadio).toHaveBeenCalledWith(
+      expect.objectContaining({ name: unnamed.device_id }),
+    )
+  })
+
+  it('keeps announcing nothing while a device simply stays plugged in', async () => {
+    // Only transitions are worth a notification; a device present on every tick
+    // must not announce itself once per poll.
+    vi.useFakeTimers()
+    const notificationsStore = useNotificationsStore()
+    const addSpy = vi.spyOn(notificationsStore, 'add')
+    mockListSentryHosts.mockResolvedValue([HOST])
+    mockGetSentryHostDevices.mockResolvedValue(snapshot([{ ...DEVICE, present: true }]))
+    mountControl()
+    await vi.runOnlyPendingTimersAsync()
+    addSpy.mockClear()
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(addSpy).not.toHaveBeenCalled()
+  })
+
+  it("leaves the newer add's spinner alone when an older one finishes late", async () => {
+    // Two adds can overlap — the operator clicks a second ADD before the first
+    // request returns. The slower one must not clear the pending marker that
+    // now belongs to the faster one, or the second row would lose its spinner
+    // while it is still working.
+    const second = { ...DEVICE, device_id: 'rtl-2', name: 'RTL 2' }
+    mockListSentryHosts.mockResolvedValue([HOST])
+    mockGetSentryHostDevices.mockResolvedValue(snapshot([DEVICE, second]))
+
+    let finishFirst: (value: unknown) => void = () => {}
+    mockCreateRadio
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)) as never)
+      .mockResolvedValue({ id: 2 } as never)
+
+    const wrapper = mountControl()
+    await flushPromises()
+    const control = wrapper.vm as unknown as {
+      addDeviceAsRadio: (host: SentryHost, device: SentryDeviceStatus) => Promise<void>
+      addingDeviceKey: string | null
+    }
+
+    const firstAdd = control.addDeviceAsRadio(HOST, DEVICE)
+    await control.addDeviceAsRadio(HOST, second)
+    finishFirst({ id: 1 })
+    await firstAdd
+    await flushPromises()
+
+    // The second add owns the marker and has already cleared its own; the first
+    // finishing afterwards must not touch it.
+    expect(control.addingDeviceKey).toBeNull()
+    expect(mockCreateRadio).toHaveBeenCalledTimes(2)
+  })
+
   it('reloads the radio list on an external sdr:radios-changed event', async () => {
     mountControl()
     await flushPromises()
@@ -496,6 +568,47 @@ describe('SdrDevicesControl', () => {
     expect(statusCalls).toBe(1)
     await vi.advanceTimersByTimeAsync(3000)
     expect(statusCalls).toBe(1) // the guard skipped the overlapping tick
+  })
+
+  it('falls back to ids when a device and host have no names', async () => {
+    // A Sentry device need not be named, and a host row's name is optional, so
+    // both notification halves have a fallback. Without this the arrival of an
+    // unnamed dongle would announce "undefined on undefined".
+    vi.useFakeTimers()
+    const notificationsStore = useNotificationsStore()
+    const addSpy = vi.spyOn(notificationsStore, 'add')
+    mockListSentryHosts.mockResolvedValue([{ ...HOST, name: null }])
+    mockGetSentryHostDevices.mockResolvedValueOnce(
+      snapshot([{ ...DEVICE, name: '', present: false }]),
+    )
+    mountControl()
+    await vi.runOnlyPendingTimersAsync()
+
+    mockGetSentryHostDevices.mockResolvedValueOnce(
+      snapshot([{ ...DEVICE, name: '', present: true }]),
+    )
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(addSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'SDR device connected',
+        detail: `${DEVICE.device_id} on ${HOST.address}`,
+      }),
+    )
+
+    // And the same fallbacks on the way out, where the remembered name is used.
+    addSpy.mockClear()
+    mockGetSentryHostDevices.mockResolvedValueOnce(
+      snapshot([{ ...DEVICE, name: '', present: false }]),
+    )
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(addSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'SDR device disconnected',
+        detail: `${DEVICE.device_id} on ${HOST.address}`,
+      }),
+    )
   })
 
   it('announces a device arriving and departing across poll ticks without a reload, via the notifications store', async () => {

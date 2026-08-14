@@ -126,8 +126,9 @@ export function useAdsbSourceClaim() {
 
   watch(
     shouldHold,
-    (holding, wasHolding) => {
-      if (holding === wasHolding) return
+    (holding) => {
+      // No same-value guard: `shouldHold` is a computed, so the watcher only
+      // fires when it genuinely changes.
       if (holding) {
         void acquire()
       } else {

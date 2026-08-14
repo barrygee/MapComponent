@@ -126,6 +126,20 @@ describe('useAdsbSourceClaim', () => {
       expect(releaseSpy).toHaveBeenCalled()
     })
 
+    it('does not re-claim when an unrelated setting changes', async () => {
+      // Redundant claims would hammer Sentry on every settings write; nothing
+      // happens because `shouldHold` did not change.
+      goOffGrid()
+      mountClaim()
+      await nextTick()
+      claimSpy.mockClear()
+
+      useSettingsStore().setSetting('air', 'somethingElse', true)
+      await nextTick()
+
+      expect(claimSpy).not.toHaveBeenCalled()
+    })
+
     it('releases on unmount', async () => {
       goOffGrid()
       const wrapper = mountClaim()

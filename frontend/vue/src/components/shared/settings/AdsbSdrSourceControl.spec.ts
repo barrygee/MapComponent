@@ -127,6 +127,67 @@ describe('AdsbSdrSourceControl', () => {
     expect(wrapper.findAll('option').map((o) => o.text())).toContain('Live Pi — ADSB')
   })
 
+  it('degrades to an empty list when Sentinel itself cannot be reached', async () => {
+    vi.spyOn(sentryApi, 'listSentryHosts').mockRejectedValue(new Error('offline'))
+
+    const wrapper = mount(AdsbSdrSourceControl)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Add a Sentry host')
+  })
+
+  it('falls back to ids when a host and device have no names', async () => {
+    // Neither name is guaranteed: a Sentry device need not be named, and a host
+    // row's name is optional. Without the fallbacks the list would offer
+    // "undefined — undefined".
+    vi.spyOn(sentryApi, 'listSentryHosts').mockResolvedValue([host({ name: null })])
+    vi.spyOn(sentryApi, 'getSentryHostDevices').mockResolvedValue(
+      snapshotWith({ device_id: 'serial:AAA', name: '' }),
+    )
+
+    const wrapper = mount(AdsbSdrSourceControl)
+    await flushPromises()
+
+    expect(wrapper.findAll('option').map((o) => o.text())).toContain('192.168.5.67 — serial:AAA')
+  })
+
+  it('tolerates a host that reports no status payload', async () => {
+    // The poller reports `status: null` for a host it has not reached yet.
+    vi.spyOn(sentryApi, 'listSentryHosts').mockResolvedValue([host()])
+    vi.spyOn(sentryApi, 'getSentryHostDevices').mockResolvedValue({
+      reachable: false,
+      last_error: null,
+      last_polled_at: 0,
+      last_success_at: null,
+      api_version: null,
+      status: null,
+    } as sentryApi.SentryDeviceSnapshot)
+
+    const wrapper = mount(AdsbSdrSourceControl)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('publish no SDRs')
+  })
+
+  it('saves nothing for a malformed selection', async () => {
+    // Defensive: every value comes from an option built above, but a saved
+    // setting written by hand should not be turned into a nonsense request.
+    vi.spyOn(sentryApi, 'listSentryHosts').mockResolvedValue([host()])
+    vi.spyOn(sentryApi, 'getSentryHostDevices').mockResolvedValue(
+      snapshotWith({ device_id: 'serial:AAA', name: 'ADSB' }),
+    )
+    const wrapper = mount(AdsbSdrSourceControl)
+    await flushPromises()
+
+    const select = wrapper.find('select').element as HTMLSelectElement
+    const option = document.createElement('option')
+    option.value = 'not-a-number:'
+    select.appendChild(option)
+    await wrapper.find('select').setValue('not-a-number:')
+
+    expect(setSourceSpy).not.toHaveBeenCalled()
+  })
+
   it('saves the host id and device id split correctly', async () => {
     // `serial:97710286` contains a colon, so a naive split would save
     // "serial" as the device and drop the rest.
