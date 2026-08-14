@@ -254,7 +254,9 @@ class TestAprsDecodeWebsocket:
         # rather than error when the radio is running APRS.
         radio = {"id": 1, "name": "Test", "host": "h1", "port": 1234}
         _patch_resolve(monkeypatch, _FakeBroadcaster(), radio)
-        sdr_decode._aprs_bridges["h1:1234"] = sdr_decode.AprsDecodeBridge(_FakeBroadcaster(), pcm_port=0)
+        sdr_decode._aprs_bridges["h1:1234"] = sdr_decode.AprsDecodeBridge(
+            _FakeBroadcaster(), pcm_port=0
+        )
         from starlette.websockets import WebSocketDisconnect as StarletteWSDisconnect
 
         with pytest.raises(StarletteWSDisconnect):

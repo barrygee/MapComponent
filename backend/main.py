@@ -15,13 +15,16 @@ from backend.database import (
     seed_sdr_bandplan_from_file,
     seed_sdr_data_from_files,
 )
+from backend.routers import adsb_source as adsb_source_router
 from backend.routers import air, land, space
 from backend.routers import sdr as sdr_router
+from backend.routers import sentry as sentry_router
 from backend.routers import settings as settings_router
 from backend.services import aprs_store
 from backend.services import sdr as sdr_service
 from backend.services import sdr_decode as sdr_decode_service
 from backend.services.flight_history import cleanup_old_snapshots
+from backend.services.sentry_fleet import fleet_poller
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -60,6 +63,8 @@ async def lifespan(app: FastAPI):
     # radio or unreachable dongle is logged and skipped, never blocking startup).
     await sdr_router.resume_persisted_aprs()
     cleanup_task = asyncio.create_task(_daily_cleanup_loop())
+    # Start one poller task per enabled Sentry host (ADR-0009).
+    await fleet_poller.start_all()
 
     # Chain SIGTERM/SIGINT: wake all SDR subscriber queues the instant the
     # signal arrives so blocked WS stream loops exit immediately, THEN run
@@ -95,6 +100,7 @@ async def lifespan(app: FastAPI):
         await cleanup_task
     except asyncio.CancelledError:
         pass
+    await fleet_poller.stop_all()
     await sdr_decode_service.shutdown_all_decoders()
     await sdr_service.shutdown_all()
 
@@ -115,6 +121,8 @@ app.include_router(space.router)
 app.include_router(land.router)
 app.include_router(settings_router.router)
 app.include_router(sdr_router.router)
+app.include_router(sentry_router.router)
+app.include_router(adsb_source_router.router)
 
 
 # ── Health probe ───────────────────────────────────────────────────────────────

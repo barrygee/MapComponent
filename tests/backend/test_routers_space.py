@@ -4,10 +4,12 @@ Focused on the DB-only endpoints (TLE management, daynight, /tle/list, etc.).
 The /iss, /satellite/{n}, and /passes endpoints require real TLE data and
 SGP4 propagation; their error paths are still exercised here.
 """
+
 from __future__ import annotations
 
 
 # ── /api/space/daynight ──────────────────────────────────────────────────────
+
 
 class TestDaynight:
     def test_returns_geojson_feature(self, client):
@@ -21,12 +23,18 @@ class TestDaynight:
 
 # ── /api/space/tle/status ────────────────────────────────────────────────────
 
+
 class TestTleStatus:
     def test_empty_database_shape(self, client):
         resp = client.get("/api/space/tle/status")
         assert resp.status_code == 200
         body = resp.json()
-        assert set(body.keys()) == {"total", "uncategorised", "by_source", "by_category"}
+        assert set(body.keys()) == {
+            "total",
+            "uncategorised",
+            "by_source",
+            "by_category",
+        }
         assert body["total"] == 0
         assert body["uncategorised"] == 0
         assert body["by_source"] == {}
@@ -34,6 +42,7 @@ class TestTleStatus:
 
 
 # ── /api/space/tle/list ──────────────────────────────────────────────────────
+
 
 class TestTleList:
     def test_empty_returns_empty_satellites(self, client):
@@ -44,6 +53,7 @@ class TestTleList:
 
 # ── /api/space/tle/uncategorised ─────────────────────────────────────────────
 
+
 class TestTleUncategorised:
     def test_empty_returns_empty_satellites(self, client):
         resp = client.get("/api/space/tle/uncategorised")
@@ -52,6 +62,7 @@ class TestTleUncategorised:
 
 
 # ── /api/space/iss (without TLE data) ────────────────────────────────────────
+
 
 class TestIssNoTle:
     def test_returns_error_when_no_tle(self, client):
@@ -63,6 +74,7 @@ class TestIssNoTle:
 
 # ── /api/space/satellite/{n} (without TLE data) ──────────────────────────────
 
+
 class TestSatelliteByIdNoTle:
     def test_unknown_norad_id_returns_error(self, client):
         resp = client.get("/api/space/satellite/99999")
@@ -70,6 +82,7 @@ class TestSatelliteByIdNoTle:
 
 
 # ── /api/space/passes (without location or TLE) ──────────────────────────────
+
 
 class TestPasses:
     def test_missing_required_query_returns_422(self, client):
@@ -81,7 +94,13 @@ class TestPasses:
     def test_no_tle_seeded_returns_error_not_500_explosion(self, client):
         resp = client.get(
             "/api/space/passes",
-            params={"lat": 51.5, "lon": 0.0, "hours": 24, "min_el": 30, "categories": "weather"},
+            params={
+                "lat": 51.5,
+                "lon": 0.0,
+                "hours": 24,
+                "min_el": 30,
+                "categories": "weather",
+            },
         )
         # Pin: the no-TLE path must return a JSON response (not raise) at 200/500/503.
         assert resp.status_code in (200, 500, 503)
@@ -89,6 +108,7 @@ class TestPasses:
 
 
 # ── /api/space/tle (DELETE — wipe all) ───────────────────────────────────────
+
 
 class TestTleDelete:
     def test_without_confirm_returns_400(self, client):
@@ -104,6 +124,7 @@ class TestTleDelete:
 
 
 # ── Domain URL resolution → fetch_tle (offgrid fallback pass-through) ────────
+
 
 class TestDomainUrlsReachFetchTle:
     """The space domain's offgrid fallback URL must reach fetch_tle.
@@ -153,12 +174,16 @@ class TestDomainUrlsReachFetchTle:
     def test_satellite_passes_endpoint_passes_both_urls(self, client, monkeypatch):
         captured = self._capture_fetch_tle_urls(monkeypatch)
 
-        resp = client.get("/api/space/satellite/43013/passes", params={"lat": 51.5, "lon": 0.0})
+        resp = client.get(
+            "/api/space/satellite/43013/passes", params={"lat": 51.5, "lon": 0.0}
+        )
 
         assert resp.status_code == 200
         assert captured == [(self.PRIMARY_URL, self.FALLBACK_URL)]
 
-    def test_multi_satellite_passes_endpoint_passes_both_urls(self, client, monkeypatch):
+    def test_multi_satellite_passes_endpoint_passes_both_urls(
+        self, client, monkeypatch
+    ):
         from backend.models import SatelliteCatalogue
         from backend.database import get_db
 
@@ -169,7 +194,10 @@ class TestDomainUrlsReachFetchTle:
             async for session in client.app.dependency_overrides[get_db]():
                 session.add(
                     SatelliteCatalogue(
-                        norad_id="43013", name="NOAA 20", category="weather", updated_at=0
+                        norad_id="43013",
+                        name="NOAA 20",
+                        category="weather",
+                        updated_at=0,
                     )
                 )
                 await session.commit()

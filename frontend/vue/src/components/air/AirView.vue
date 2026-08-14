@@ -4,6 +4,11 @@
     <AirMap ref="airMapRef" />
     <AirSideMenu :map-ref="airMapProxy" />
     <NoUrlOverlay domain="air" />
+    <AdsbSourceNotice
+      :error="adsbSourceClaim.error.value"
+      :is-claiming="adsbSourceClaim.isClaiming.value"
+      @take-control="adsbSourceClaim.takeControl"
+    />
     <Teleport v-if="searchPaneReady" :to="sidebarPaneSelector('search')">
       <AirFilter
         ref="airFilterRef"
@@ -27,11 +32,18 @@ import AirSideMenu from './AirSideMenu.vue'
 import AirFilter from './AirFilter.vue'
 import AirReplayPanel from './AirReplayPanel.vue'
 import NoUrlOverlay from '@/components/shared/NoUrlOverlay.vue'
+import AdsbSourceNotice from './AdsbSourceNotice.vue'
 import { sidebarPaneSelector } from '@/constants/sidebarPanes'
 import { useSidebarPaneTarget } from '@/composables/useSidebarPaneTarget'
+import { useAdsbSourceClaim } from '@/composables/useAdsbSourceClaim'
 import type { AdsbLiveControl } from './controls/adsb/AdsbLiveControl'
 import type { AirportsToggleControl } from './controls/airports/AirportsControl'
 import type { MilitaryBasesToggleControl } from './controls/military-bases/MilitaryBasesControl'
+
+// Holds the Sentry dongle at 1090 MHz for as long as AIR is showing off-grid
+// aircraft, and gives it back on the way out. No-op online, where the data comes
+// from airplanes.live and no local dongle is involved. See ADR-0003.
+const adsbSourceClaim = useAdsbSourceClaim()
 
 const airMapRef = ref<InstanceType<typeof AirMap> | null>(null)
 const airFilterRef = ref<InstanceType<typeof AirFilter> | null>(null)

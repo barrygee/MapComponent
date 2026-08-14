@@ -25,6 +25,7 @@ from backend.services.sdr import (
 
 # ── _iq_bytes_to_complex ──────────────────────────────────────────────────────
 
+
 class TestIqBytesToComplex:
     def _make_iq_bytes(self, i_val: int, q_val: int, n_pairs: int = 1) -> bytes:
         """Build raw IQ bytes with constant I and Q values."""
@@ -75,6 +76,7 @@ class TestIqBytesToComplex:
 
 # ── _hann_window ─────────────────────────────────────────────────────────────
 
+
 class TestHannWindow:
     def test_returns_float32_array(self):
         window = _hann_window(64)
@@ -87,7 +89,7 @@ class TestHannWindow:
     def test_endpoints_are_near_zero(self):
         # Hann window is 0 at both endpoints
         window = _hann_window(64)
-        assert abs(float(window[0]))  < 0.01
+        assert abs(float(window[0])) < 0.01
         assert abs(float(window[-1])) < 0.01
 
     def test_peak_is_at_centre(self):
@@ -108,6 +110,7 @@ class TestHannWindow:
 
 
 # ── compute_fft_frame ─────────────────────────────────────────────────────────
+
 
 def _make_silence(n_samples: int = DEFAULT_FFT_SIZE) -> bytes:
     """Generate IQ bytes representing a DC-biased near-silence signal (all 128)."""
@@ -132,43 +135,59 @@ def _make_tone(
 
 
 class TestComputeFftFrame:
-    CENTER_HZ    = 100_000_000  # 100 MHz
-    SAMPLE_RATE  = 2_048_000    # 2.048 MHz
+    CENTER_HZ = 100_000_000  # 100 MHz
+    SAMPLE_RATE = 2_048_000  # 2.048 MHz
 
     def test_returns_dict_with_required_keys(self):
-        frame = compute_fft_frame(_make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ)
+        frame = compute_fft_frame(
+            _make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ
+        )
         for key in ("type", "center_hz", "sample_rate", "bins", "timestamp_ms"):
             assert key in frame
 
     def test_type_field_is_spectrum(self):
-        frame = compute_fft_frame(_make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ)
+        frame = compute_fft_frame(
+            _make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ
+        )
         assert frame["type"] == "spectrum"
 
     def test_center_hz_is_passed_through(self):
-        frame = compute_fft_frame(_make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ)
+        frame = compute_fft_frame(
+            _make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ
+        )
         assert frame["center_hz"] == self.CENTER_HZ
 
     def test_sample_rate_is_passed_through(self):
-        frame = compute_fft_frame(_make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ)
+        frame = compute_fft_frame(
+            _make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ
+        )
         assert frame["sample_rate"] == self.SAMPLE_RATE
 
     def test_bins_length_equals_fft_size(self):
-        frame = compute_fft_frame(_make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ)
+        frame = compute_fft_frame(
+            _make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ
+        )
         assert len(frame["bins"]) == DEFAULT_FFT_SIZE
 
     def test_bins_are_floats(self):
-        frame = compute_fft_frame(_make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ)
+        frame = compute_fft_frame(
+            _make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ
+        )
         assert all(isinstance(b, float) for b in frame["bins"])
 
     def test_bins_are_in_dbfs_range(self):
         # Power values should be in a plausible dBFS range (e.g. -200 to +10)
-        frame = compute_fft_frame(_make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ)
+        frame = compute_fft_frame(
+            _make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ
+        )
         for b in frame["bins"]:
             assert -200 <= b <= 10, f"Bin value {b} is outside plausible dBFS range"
 
     def test_timestamp_ms_is_close_to_now(self):
         before = int(time.time() * 1000)
-        frame = compute_fft_frame(_make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ)
+        frame = compute_fft_frame(
+            _make_silence(), DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ
+        )
         after = int(time.time() * 1000)
         assert before <= frame["timestamp_ms"] <= after + 100
 
@@ -176,14 +195,18 @@ class TestComputeFftFrame:
         # Place a tone at +100 kHz offset from centre
         offset_hz = 100_000
         raw = _make_tone(offset_hz, self.SAMPLE_RATE, DEFAULT_FFT_SIZE)
-        frame = compute_fft_frame(raw, DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ)
+        frame = compute_fft_frame(
+            raw, DEFAULT_FFT_SIZE, self.SAMPLE_RATE, self.CENTER_HZ
+        )
 
         bins = frame["bins"]
         peak_bin = bins.index(max(bins))
 
         # Expected bin: offset maps to (offset / sample_rate) * n_fft bins from centre,
         # shifted by n_fft//2 because of fftshift.
-        expected_bin = DEFAULT_FFT_SIZE // 2 + round(offset_hz / self.SAMPLE_RATE * DEFAULT_FFT_SIZE)
+        expected_bin = DEFAULT_FFT_SIZE // 2 + round(
+            offset_hz / self.SAMPLE_RATE * DEFAULT_FFT_SIZE
+        )
         # Allow ±2 bins of tolerance for windowing spread
         assert abs(peak_bin - expected_bin) <= 2, (
             f"Peak at bin {peak_bin}, expected near {expected_bin}"

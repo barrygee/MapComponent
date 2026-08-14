@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import type maplibregl from 'maplibre-gl'
+import { ADSB_POLL_INTERVAL_MS } from '@/constants/adsb'
 
 // ---- Marker mock registry ----
 interface FakeMarker {
@@ -2781,7 +2782,7 @@ describe('AdsbLiveControl residual gaps', () => {
     const interpSpy = vi.spyOn(priv(control), '_interpolate')
     priv(control)._startPolling()
     expect(fetchSpy).toHaveBeenCalledTimes(1) // immediate
-    vi.advanceTimersByTime(5000) // poll interval callback fires
+    vi.advanceTimersByTime(ADSB_POLL_INTERVAL_MS) // poll interval callback fires
     expect(fetchSpy).toHaveBeenCalledTimes(2)
     expect(interpSpy).toHaveBeenCalled() // 100ms interpolate callback fires
   })

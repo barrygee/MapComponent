@@ -183,14 +183,19 @@ const activeDescId = computed(() =>
   menuOpen.value ? optionId(Math.min(highlight.value, optionCount.value - 1)) : undefined,
 )
 
-// List every enabled radio. We deliberately do NOT probe reachability here:
-// rtl_tcp is single-client, so opening a throwaway probe socket to a radio (then
-// closing it) disturbs the dongle and made the immediately-following control
-// connect fail — the user had to select the radio twice before it connected.
-// Reachability is shown by the device dot once a radio is selected and the real
-// control connection is established; the menu just lists what's configured.
+// List every enabled, non-private radio. We deliberately do NOT probe
+// reachability here: rtl_tcp is single-client, so opening a throwaway probe
+// socket to a radio (then closing it) disturbs the dongle and made the
+// immediately-following control connect fail — the user had to select the
+// radio twice before it connected. Reachability is shown by the device dot
+// once a radio is selected and the real control connection is established;
+// the menu just lists what's configured. A `visibility: 'private'` device
+// (ADR-0009) still runs and holds its port but is deliberately excluded from
+// this operational list — it exists for another consumer, not this operator.
 function populateMenuRadios() {
-  menuRadios.value = sdrStore.radios.filter((radio) => radio.enabled)
+  menuRadios.value = sdrStore.radios.filter(
+    (radio) => radio.enabled && radio.visibility !== 'private',
+  )
 }
 
 // Runs on every open path (trigger click or keyboard) via the base's `open`

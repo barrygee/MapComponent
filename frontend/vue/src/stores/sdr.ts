@@ -8,6 +8,19 @@ export interface SdrRadio {
   port: number
   enabled: boolean
   description?: string
+  bandwidth?: number | null
+  rf_gain?: number | null
+  agc?: boolean | null
+  // Sentry mirror fields (ADR-0009). `sentry_host_id` is null for a radio the
+  // operator typed in by hand; when set, this radio mirrors one device on
+  // that Sentry host (`sentry_device_id`, e.g. "usb:1-1.4.2" or "serial:AIS-01").
+  sentry_host_id?: number | null
+  sentry_device_id?: string | null
+  notes?: string
+  antenna?: string
+  // A 'private' device still runs and holds its port but is hidden from the
+  // operational radio list (SdrDeviceSelector filters it out) — see ADR-0009.
+  visibility?: 'public' | 'private'
 }
 
 export interface SdrFrequencyGroup {

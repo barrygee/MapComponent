@@ -12,6 +12,13 @@ class Settings(BaseSettings):
 
     # Base URL for the airplanes.live ADS-B API
     adsb_upstream_base: str = "https://api.airplanes.live/v2"
+    # Minimum gap between two outbound ADS-B requests to the same upstream host
+    # (5 seconds — airplanes.live bans clients that poll faster than this).
+    adsb_min_request_interval_ms: int = 5000
+    # Longest a request will wait for a free upstream slot before giving up and
+    # serving cached data instead. Capped at one interval so a burst of callers
+    # cannot pile into an ever-growing queue.
+    adsb_rate_limit_max_wait_ms: int = 5000
 
     # TLE data TTL — 6 hours (TLE changes slowly; Celestrak updates daily)
     tle_ttl_ms: int = 21_600_000
@@ -81,6 +88,21 @@ class Settings(BaseSettings):
     # (seeded from default_config.json); aprs_store reads that and falls back to
     # this value.
     aprs_station_ttl_ms: int = 300_000
+
+    # ── Sentry integration (ADR-0009: Sentry owns SDR device state, Sentinel is a client) ──
+    # How often each enabled Sentry host is polled for GET /api/status, in seconds.
+    sentry_poll_interval_s: float = 2.0
+    # Starting backoff (seconds) applied after a failed poll; doubles on each
+    # further consecutive failure up to sentry_poll_backoff_max_s.
+    sentry_poll_backoff_start_s: float = 2.0
+    # Cap on the exponential poll-retry backoff, so a long-dead host is still
+    # retried periodically rather than abandoned.
+    sentry_poll_backoff_max_s: float = 30.0
+    # TCP connect timeout (seconds) for calls to a Sentry host — the Pi may be
+    # slow to respond or simply off the network.
+    sentry_connect_timeout_s: float = 3.0
+    # Read timeout (seconds) for calls to a Sentry host, once connected.
+    sentry_read_timeout_s: float = 5.0
 
     class Config:
         env_file = ".env"

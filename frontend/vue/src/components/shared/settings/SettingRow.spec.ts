@@ -21,6 +21,8 @@ import NotificationSoundControl from './NotificationSoundControl.vue'
 import SourceOverrideControl from './SourceOverrideControl.vue'
 import OnlineSourceControl from './OnlineSourceControl.vue'
 import OfflineSourceControl from './OfflineSourceControl.vue'
+import AdsbSdrSourceControl from './AdsbSdrSourceControl.vue'
+import SentryHostsControl from './SentryHostsControl.vue'
 import SpaceTleOnlineControl from './SpaceTleOnlineControl.vue'
 import SpaceTleManualControl from './SpaceTleManualControl.vue'
 import SpaceTleDatabaseControl from './SpaceTleDatabaseControl.vue'
@@ -70,6 +72,8 @@ const TYPE_TO_COMPONENT: Array<[string, Component, Partial<SettingItem>?]> = [
   ['source-override', SourceOverrideControl, { ns: 'air' }],
   ['online-source', OnlineSourceControl, { ns: 'air', defaultUrl: '' }],
   ['offline-source', OfflineSourceControl, { ns: 'air', defaultUrl: '' }],
+  ['adsb-sdr-source', AdsbSdrSourceControl],
+  ['sdr-sentry-hosts', SentryHostsControl],
   ['space-tle-online', SpaceTleOnlineControl],
   ['space-tle-manual', SpaceTleManualControl],
   ['space-tle-db', SpaceTleDatabaseControl],

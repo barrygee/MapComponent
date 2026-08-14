@@ -605,21 +605,29 @@ class TestBridgeTrunkAccessors:
         assert bridge.connection is broadcaster.connection
 
     def test_current_offset_reflects_set_channel(self):
-        bridge = DigitalDecodeBridge(_BroadcasterWithConn(), pcm_port=0, audio_udp_port=0)
+        bridge = DigitalDecodeBridge(
+            _BroadcasterWithConn(), pcm_port=0, audio_udp_port=0
+        )
         assert bridge.current_offset_hz == 0
         bridge.set_channel(offset_hz=12_345)
         assert bridge.current_offset_hz == 12_345
 
     def test_running_false_before_start(self):
-        bridge = DigitalDecodeBridge(_BroadcasterWithConn(), pcm_port=0, audio_udp_port=0)
+        bridge = DigitalDecodeBridge(
+            _BroadcasterWithConn(), pcm_port=0, audio_udp_port=0
+        )
         assert bridge.running is False
 
     def test_bounce_decoder_without_writer_returns_false(self):
-        bridge = DigitalDecodeBridge(_BroadcasterWithConn(), pcm_port=0, audio_udp_port=0)
+        bridge = DigitalDecodeBridge(
+            _BroadcasterWithConn(), pcm_port=0, audio_udp_port=0
+        )
         assert bridge.bounce_decoder() is False
 
     def test_bounce_decoder_closes_writer_and_clears_state(self):
-        bridge = DigitalDecodeBridge(_BroadcasterWithConn(), pcm_port=0, audio_udp_port=0)
+        bridge = DigitalDecodeBridge(
+            _BroadcasterWithConn(), pcm_port=0, audio_udp_port=0
+        )
         writer = MagicMock()
         bridge._pcm_writer = writer
         bridge._decoder_connected = True

@@ -3,6 +3,7 @@ import { useAirStore } from '@/stores/air'
 import { useNotificationsStore, getAircraftClickHandler } from '@/stores/notifications'
 import { useAirNotifStore } from '@/stores/airNotif'
 import { useUserLocation } from '@/composables/useUserLocation'
+import { ADSB_POLL_INTERVAL_MS } from '@/constants/adsb'
 import { OverheadAlertsTracker } from '@/components/air/controls/overhead-zone/OverheadAlertsTracker'
 import { AircraftEventDetector } from '@/components/air/controls/adsb/AircraftEventDetector'
 import {
@@ -24,7 +25,11 @@ import {
 // Module-singleton (mirrors useUserLocation / useConnectivity). Instantiated and
 // started once from App.vue.
 
-const POLL_MS = 2000
+// Matches the backend's ADS-B cache TTL — see `@/constants/adsb`. This service
+// polls a different cache key than the map control (user location vs map
+// centre), so both pollers share the upstream's single call budget; keeping
+// this at the TTL stops the two starving each other of call slots.
+const POLL_MS = ADSB_POLL_INTERVAL_MS
 
 let _started = false
 let _timer: ReturnType<typeof setInterval> | null = null

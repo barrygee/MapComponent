@@ -63,6 +63,7 @@
       @stage="emit('stage', item.id, $event)"
       @commit="emit('commit')"
     />
+    <AdsbSdrSourceControl v-else-if="item.type === 'adsb-sdr-source'" />
     <SpaceTleOnlineControl v-else-if="item.type === 'space-tle-online'" />
     <SpaceTleManualControl v-else-if="item.type === 'space-tle-manual'" />
     <SpaceTleDatabaseControl v-else-if="item.type === 'space-tle-db'" />
@@ -95,6 +96,7 @@
       v-else-if="item.type === 'air-replay-toggle'"
       @stage="emit('stage', item.id, $event)"
     />
+    <SentryHostsControl v-else-if="item.type === 'sdr-sentry-hosts'" />
     <SdrDevicesControl v-else-if="item.type === 'sdr-devices'" />
     <SdrAutoCenterControl
       v-else-if="item.type === 'sdr-autocenter'"
@@ -170,6 +172,7 @@ import NotificationSoundControl from './NotificationSoundControl.vue'
 import SourceOverrideControl from './SourceOverrideControl.vue'
 import OnlineSourceControl from './OnlineSourceControl.vue'
 import OfflineSourceControl from './OfflineSourceControl.vue'
+import AdsbSdrSourceControl from './AdsbSdrSourceControl.vue'
 import SpaceTleOnlineControl from './SpaceTleOnlineControl.vue'
 import SpaceTleManualControl from './SpaceTleManualControl.vue'
 import SpaceTleDatabaseControl from './SpaceTleDatabaseControl.vue'
@@ -180,6 +183,7 @@ import AdsbLabelFieldsControl from './AdsbLabelFieldsControl.vue'
 import AdsbTagFieldsControl from './AdsbTagFieldsControl.vue'
 import AprsLabelFieldsControl from './AprsLabelFieldsControl.vue'
 import AirReplayToggleControl from './AirReplayToggleControl.vue'
+import SentryHostsControl from './SentryHostsControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import SdrAutoCenterControl from './SdrAutoCenterControl.vue'
 import SdrFullWaterfallUpdateControl from './SdrFullWaterfallUpdateControl.vue'
@@ -207,6 +211,7 @@ const WIDE_TYPES = new Set(['sdr-channelmaps-file'])
 // never gets squeezed into a single 300px column — two columns is the minimum
 // readable width for indented JSON.
 const HALF_TYPES = new Set([
+  'sdr-sentry-hosts',
   'sdr-devices',
   'space-tle-online',
   'space-tle-manual',
