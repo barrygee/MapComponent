@@ -1208,6 +1208,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Require a feature branch for every change (#123)
 - Sync services, SDR API, and config with current codebase (#233)
 - Document the Playwright e2e gate and the two e2e suites
+- Document Off Grid ADS-B setup and the decoder sidecar (#272)
 
 ### Tests
 
