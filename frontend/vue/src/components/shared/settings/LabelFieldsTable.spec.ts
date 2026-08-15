@@ -123,6 +123,53 @@ describe('LabelFieldsTable', () => {
     expect(wrapper.findAll('.preview')).toHaveLength(2)
   })
 
+  it('renders the header row by default and drops it on request', () => {
+    expect(mountTable().find('.lft-header').exists()).toBe(true)
+    expect(mountTable({ showHeader: false }).find('.lft-header').exists()).toBe(false)
+    // The rows themselves are unaffected by the missing caption row.
+    expect(mountTable({ showHeader: false }).findAll('.lft-row')).toHaveLength(2)
+  })
+
+  it('draws tick boxes by default, not switches', () => {
+    const wrapper = mountTable({ isChecked: () => true })
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(4)
+    expect(wrapper.findAll('[role="switch"]')).toHaveLength(0)
+    expect(wrapper.findAll('svg').length).toBeGreaterThan(0)
+  })
+
+  it('draws toggle switches when asked, reflecting each cell’s state', () => {
+    const wrapper = mountTable({
+      columns: ONE_COLUMN,
+      isChecked: (_column: string, row: string) => row === 'callsign',
+    })
+    const switched = mountTable({
+      columns: ONE_COLUMN,
+      control: 'switch',
+      isChecked: (_column: string, row: string) => row === 'callsign',
+    })
+    expect(wrapper.findAll('[role="switch"]')).toHaveLength(0)
+
+    const switches = switched.findAll('[role="switch"]')
+    expect(switches).toHaveLength(2)
+    expect(switched.findAll('input[type="checkbox"]')).toHaveLength(0)
+    expect(switches[0]!.attributes('aria-checked')).toBe('true')
+    expect(switches[1]!.attributes('aria-checked')).toBe('false')
+    expect(switches[0]!.attributes('aria-label')).toBe('Callsign')
+  })
+
+  it('emits toggle from a switch, naming the same column and row', async () => {
+    const wrapper = mountTable({ columns: ONE_COLUMN, control: 'switch' })
+    await wrapper.findAll('[role="switch"]')[1]!.trigger('click')
+    expect(wrapper.emitted('toggle')![0]).toEqual(['show', 'altitude'])
+  })
+
+  it('has no accessibility violations as a header-less switch list', async () => {
+    const wrapper = mountTable({ columns: ONE_COLUMN, control: 'switch', showHeader: false })
+    expect(
+      await axe(wrapper.html(), { rules: { region: { enabled: false } } }),
+    ).toHaveNoViolations()
+  })
+
   it('renders no rows for an empty field list', () => {
     const wrapper = mountTable({ rows: [] })
     expect(wrapper.findAll('.lft-row')).toHaveLength(0)

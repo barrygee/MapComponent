@@ -13,7 +13,7 @@ vi.mock('@/services/settingsApi', () => ({
 }))
 import * as settingsApi from '@/services/settingsApi'
 
-/** Index of an option's checkbox, matching the control's row order. */
+/** Index of an option's switch, matching the control's row order. */
 const ROW = {
   autoCenter: 0,
   snapToKnown: 1,
@@ -22,12 +22,12 @@ const ROW = {
   muteWhileDecoding: 4,
 } as const
 
-function checkboxes(wrapper: ReturnType<typeof mount>) {
-  return wrapper.findAll('input[type="checkbox"]')
+function switches(wrapper: ReturnType<typeof mount>) {
+  return wrapper.findAll('[role="switch"]')
 }
 
-function isChecked(wrapper: ReturnType<typeof mount>, row: number): boolean {
-  return (checkboxes(wrapper)[row]!.element as HTMLInputElement).checked
+function isOn(wrapper: ReturnType<typeof mount>, row: number): boolean {
+  return switches(wrapper)[row]!.attributes('aria-checked') === 'true'
 }
 
 /** Runs the staged writer the control emitted for its `index`-th change. */
@@ -48,16 +48,16 @@ describe('SdrOptionsControl', () => {
     vi.mocked(settingsApi.put).mockResolvedValue(undefined)
   })
 
-  it('renders one checkbox for each of the five SDR options', async () => {
+  it('renders one toggle switch for each of the five SDR options', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    expect(checkboxes(wrapper)).toHaveLength(5)
+    expect(switches(wrapper)).toHaveLength(5)
   })
 
-  it('names each checkbox after its option, with no per-option description', async () => {
+  it('names each switch after its option, with no per-option description', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    const names = checkboxes(wrapper).map((box) => box.attributes('aria-label'))
+    const names = switches(wrapper).map((toggle) => toggle.attributes('aria-label'))
     expect(names).toEqual([
       'Auto-center on Tune',
       'Snap to Known Frequencies',
@@ -70,6 +70,24 @@ describe('SdrOptionsControl', () => {
     expect(wrapper.text()).not.toContain('Frequency Manager')
   })
 
+  it('shows no column headings above the options', async () => {
+    const wrapper = mount(SdrOptionsControl)
+    await flushPromises()
+    expect(wrapper.find('.lft-header').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('OPTION')
+    expect(wrapper.text()).not.toContain('ON')
+  })
+
+  it('drives each option with the Settings panel’s toggle switch', async () => {
+    const wrapper = mount(SdrOptionsControl)
+    await flushPromises()
+    expect(wrapper.findAll('.toggle-track')).toHaveLength(5)
+    // Every option is independently on or off — no tick boxes, no radio group.
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(0)
+    expect(wrapper.findAll('input[type="radio"]')).toHaveLength(0)
+    expect(wrapper.findAll('.toggle-track.is-on')).toHaveLength(5)
+  })
+
   it('uses the app accent, matching the domains’ label-field tables', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
@@ -79,7 +97,7 @@ describe('SdrOptionsControl', () => {
   it('shows every option on by default', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    expect(checkboxes(wrapper).map((_box, index) => isChecked(wrapper, index))).toEqual([
+    expect(switches(wrapper).map((_box, index) => isOn(wrapper, index))).toEqual([
       true,
       true,
       true,
@@ -93,18 +111,18 @@ describe('SdrOptionsControl', () => {
     sdr.setShowBandPlan(false)
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    expect(isChecked(wrapper, ROW.showBandPlan)).toBe(false)
-    expect(isChecked(wrapper, ROW.showKnownFreqs)).toBe(true)
+    expect(isOn(wrapper, ROW.showBandPlan)).toBe(false)
+    expect(isOn(wrapper, ROW.showKnownFreqs)).toBe(true)
   })
 
   it('switching an option off mirrors into the store immediately', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
     const sdr = useSdrStore()
-    await checkboxes(wrapper)[ROW.snapToKnown]!.trigger('change')
+    await switches(wrapper)[ROW.snapToKnown]!.trigger('click')
 
     expect(sdr.snapToKnown).toBe(false)
-    expect(isChecked(wrapper, ROW.snapToKnown)).toBe(false)
+    expect(isOn(wrapper, ROW.snapToKnown)).toBe(false)
     // Nothing is persisted until the Settings panel applies the staged write.
     expect(settingsApi.put).not.toHaveBeenCalled()
   })
@@ -114,16 +132,16 @@ describe('SdrOptionsControl', () => {
     sdr.setShowKnownFreqs(false)
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    await checkboxes(wrapper)[ROW.showKnownFreqs]!.trigger('change')
+    await switches(wrapper)[ROW.showKnownFreqs]!.trigger('click')
 
     expect(sdr.showKnownFreqs).toBe(true)
-    expect(isChecked(wrapper, ROW.showKnownFreqs)).toBe(true)
+    expect(isOn(wrapper, ROW.showKnownFreqs)).toBe(true)
   })
 
   it('stages the write under the option’s own settings key', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    await checkboxes(wrapper)[ROW.showBandPlan]!.trigger('change')
+    await switches(wrapper)[ROW.showBandPlan]!.trigger('click')
     await runStagedWrite(wrapper)
     expect(settingsApi.put).toHaveBeenCalledWith('sdr', 'showBandPlan', false)
   })
@@ -137,7 +155,7 @@ describe('SdrOptionsControl', () => {
   ])('persists row %i as the %s setting', async (row, settingKey) => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    await checkboxes(wrapper)[row]!.trigger('change')
+    await switches(wrapper)[row]!.trigger('click')
     await runStagedWrite(wrapper)
     expect(settingsApi.put).toHaveBeenCalledWith('sdr', settingKey, false)
   })
@@ -146,7 +164,7 @@ describe('SdrOptionsControl', () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
     const sdr = useSdrStore()
-    await checkboxes(wrapper)[ROW.muteWhileDecoding]!.trigger('change')
+    await switches(wrapper)[ROW.muteWhileDecoding]!.trigger('click')
 
     expect(sdr.muteAudioWhileDecoding).toBe(false)
     expect(sdr.autoCenterWaterfallOnTune).toBe(true)
@@ -158,8 +176,8 @@ describe('SdrOptionsControl', () => {
   it('stages one write per option when several are toggled', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    await checkboxes(wrapper)[ROW.autoCenter]!.trigger('change')
-    await checkboxes(wrapper)[ROW.showBandPlan]!.trigger('change')
+    await switches(wrapper)[ROW.autoCenter]!.trigger('click')
+    await switches(wrapper)[ROW.showBandPlan]!.trigger('click')
 
     expect(wrapper.emitted('stage')).toHaveLength(2)
     await runStagedWrite(wrapper, 0)
@@ -181,8 +199,8 @@ describe('SdrOptionsControl', () => {
     expect(settingsApi.getNamespace).toHaveBeenCalledWith('sdr')
     expect(sdr.snapToKnown).toBe(false)
     expect(sdr.muteAudioWhileDecoding).toBe(false)
-    expect(isChecked(wrapper, ROW.snapToKnown)).toBe(false)
-    expect(isChecked(wrapper, ROW.muteWhileDecoding)).toBe(false)
+    expect(isOn(wrapper, ROW.snapToKnown)).toBe(false)
+    expect(isOn(wrapper, ROW.muteWhileDecoding)).toBe(false)
     // Keys the backend didn't send keep their local value.
     expect(sdr.showBandPlan).toBe(true)
   })
@@ -209,14 +227,14 @@ describe('SdrOptionsControl', () => {
   it('re-syncs when the config JSON editor uploads a new config', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    expect(isChecked(wrapper, ROW.showKnownFreqs)).toBe(true)
+    expect(isOn(wrapper, ROW.showKnownFreqs)).toBe(true)
 
     vi.mocked(settingsApi.getNamespace).mockResolvedValue({ showKnownFreqs: false } as never)
     document.dispatchEvent(new Event('sentinel:config-uploaded'))
     await flushPromises()
 
     expect(useSdrStore().showKnownFreqs).toBe(false)
-    expect(isChecked(wrapper, ROW.showKnownFreqs)).toBe(false)
+    expect(isOn(wrapper, ROW.showKnownFreqs)).toBe(false)
   })
 
   it('stops re-syncing once unmounted', async () => {
