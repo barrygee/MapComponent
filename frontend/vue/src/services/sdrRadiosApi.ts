@@ -27,6 +27,18 @@ export interface SdrRadioRecord {
   antenna: string
   visibility: 'public' | 'private'
   created_at?: number
+  /**
+   * Whether the Sentry device this radio mirrors is currently usable.
+   *
+   * Computed by the backend against the live fleet snapshot, not stored: a
+   * dongle can be unplugged, disabled or replugged elsewhere at any moment, and
+   * the point of reporting it is to grey the radio out rather than let the
+   * operator discover it by a connection that can only fail. Always true for a
+   * manually-entered radio, which has no Sentry device behind it.
+   */
+  device_available?: boolean
+  /** Why it is unavailable, in the operator's terms. Empty when it is available. */
+  unavailable_reason?: string
 }
 
 export type SdrRadioInput = Omit<SdrRadioRecord, 'id' | 'created_at'>

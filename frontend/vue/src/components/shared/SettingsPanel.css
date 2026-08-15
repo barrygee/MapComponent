@@ -1258,6 +1258,32 @@
   text-overflow: ellipsis;
 }
 
+/* A radio whose Sentry device is unplugged, disabled or gone. Dimmed rather
+   than hidden: the radio still exists and is still the operator's to keep,
+   rename or delete — it simply cannot be connected to right now. */
+.sdr-device-info--unavailable {
+  opacity: 0.45;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* The reason, beside the row. Kept to one short sentence from the backend so it
+   fits without wrapping the row; it is the difference between "this is broken"
+   and "your dongle is unplugged". */
+.sdr-device-unavailable {
+  flex-shrink: 1;
+  min-width: 0;
+  margin-right: 8px;
+  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: rgba(180, 60, 60, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .sdr-device-btn {
   flex-shrink: 0;
   background: none;

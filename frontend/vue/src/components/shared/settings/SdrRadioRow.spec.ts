@@ -174,3 +174,86 @@ describe('SdrRadioRow', () => {
     })
   })
 })
+
+describe('a radio whose Sentry device is unavailable', () => {
+  /**
+   * The state that used to be invisible: the dongle is unplugged, disabled or
+   * replugged elsewhere, and the only way to find out was to connect and get a
+   * bare failure. The row now says so before the operator tries.
+   */
+  const unavailable = (reason: string): SdrRadioRecord => ({
+    ...MANUAL_RADIO,
+    sentry_host_id: 1,
+    sentry_device_id: 'serial:AAA',
+    device_available: false,
+    unavailable_reason: reason,
+  })
+
+  const mountRow = (radio: SdrRadioRecord) =>
+    mount(SdrRadioRow, {
+      props: { radio, connected: false, open: false, confirming: false },
+    })
+
+  it('shows the reason it cannot be used', () => {
+    const wrapper = mountRow(unavailable('The dongle is unplugged.'))
+
+    expect(wrapper.find('.sdr-device-unavailable').text()).toBe('The dongle is unplugged.')
+  })
+
+  it('dims the row so it reads as out of service', () => {
+    const wrapper = mountRow(unavailable('The dongle is unplugged.'))
+
+    expect(wrapper.find('.sdr-device-info--unavailable').exists()).toBe(true)
+  })
+
+  it('still shows the radio rather than hiding it', () => {
+    // It is still the operator's radio to keep, rename or delete — a loose USB
+    // plug must not make their configuration disappear.
+    const wrapper = mountRow(unavailable('Its Sentry no longer has this device.'))
+
+    expect(wrapper.text()).toContain('Roof')
+    expect(wrapper.find('[aria-label="Edit device"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Delete device"]').exists()).toBe(true)
+  })
+
+  it('says nothing for an available radio', () => {
+    const wrapper = mountRow({ ...MANUAL_RADIO, device_available: true })
+
+    expect(wrapper.find('.sdr-device-unavailable').exists()).toBe(false)
+    expect(wrapper.find('.sdr-device-info--unavailable').exists()).toBe(false)
+  })
+
+  it('treats an absent flag as available', () => {
+    // An older backend, or a manual radio with no Sentry device behind it —
+    // greying either out would be a lie.
+    const wrapper = mountRow(MANUAL_RADIO)
+
+    expect(wrapper.find('.sdr-device-info--unavailable').exists()).toBe(false)
+  })
+
+  it('hides the reason while a delete confirmation is showing', () => {
+    // The confirm/cancel controls take the row; two competing messages there
+    // would be noise at the moment the operator is answering a question.
+    const wrapper = mount(SdrRadioRow, {
+      props: {
+        radio: unavailable('The dongle is unplugged.'),
+        connected: false,
+        open: false,
+        confirming: true,
+      },
+    })
+
+    expect(wrapper.find('.sdr-device-unavailable').exists()).toBe(false)
+  })
+
+  it('has no accessibility violations', async () => {
+    // `region` disabled as elsewhere in this file: a row mounted on its own is
+    // not inside the settings panel's landmarks, which is a fact about the test
+    // harness rather than the component.
+    const wrapper = mountRow(unavailable('The dongle is unplugged.'))
+
+    expect(
+      await axe(wrapper.html(), { rules: { region: { enabled: false } } }),
+    ).toHaveNoViolations()
+  })
+})
