@@ -555,21 +555,6 @@
             </div>
           </BaseAccordionSection>
         </div>
-
-        <!-- Trunk-system channel-map picker + FOLLOW button. Lives in its own
-             accordion below SEARCH; only shown when trunk tracking is enabled
-             in Settings and while digital decode is running (the trunk control
-             rides on the decode session). -->
-        <SdrTrunkSection
-          v-if="trunkTrackingEnabled && digitalEnabled"
-          v-model:expanded="trunkSectionExpanded"
-          v-model:channel-map="trunkChannelMap"
-          :trunk-enabled="trunkEnabled"
-          :channel-maps="trunkChannelMaps"
-          :can-follow="canEnableTrunk"
-          :trunk-error="trunkError"
-          @toggle-follow="toggleTrunk"
-        />
       </div>
 
       <!-- ───────────── FREQUENCY MANAGER TAB (saved frequencies) ───────────── -->
@@ -635,7 +620,6 @@ import SdrFrequencyManagerTab from './SdrFrequencyManagerTab.vue'
 import SdrFavouritesSection from './SdrFavouritesSection.vue'
 import SdrDeviceSelector from './SdrDeviceSelector.vue'
 import SdrSettingsAccordion from './SdrSettingsAccordion.vue'
-import SdrTrunkSection from './SdrTrunkSection.vue'
 import type { SdrLiveTuneSeed } from './SdrFrequencyManagerTab.vue'
 import BaseAccordionSection from '@/components/base/BaseAccordionSection.vue'
 import BaseIconButton from '@/components/base/BaseIconButton.vue'
@@ -854,7 +838,6 @@ watch(
       scannerSectionExpanded.value = false
       searchSectionExpanded.value = false
       savedRangesExpanded.value = false
-      trunkSectionExpanded.value = false
     }
   },
 )
@@ -1139,25 +1122,12 @@ const {
   isAlreadyConnected: () => connected.value,
 })
 
-// ── Digital decode (dsd-fme sidecar) + trunk tracking ─────────────────────────
-// The decode/trunk engine (backend digital_decode / trunk_decode /
-// digital_channel commands, decode-socket + analog-mute choreography, the
-// channel-map fetch and the digital↔trunk reconciliation watchers) lives in
-// useSdrDigitalDecode; the panel injects sendCmd and its tuner refs so the
-// command cadence is unchanged.
-const {
-  digitalEnabled,
-  setDigital,
-  toggleDigital,
-  trunkTrackingEnabled,
-  trunkEnabled,
-  trunkChannelMap,
-  trunkChannelMaps,
-  trunkError,
-  canEnableTrunk,
-  loadChannelMaps,
-  toggleTrunk,
-} = useSdrDigitalDecode({
+// ── Digital decode (dsd-fme sidecar) ──────────────────────────────────────────
+// The decode engine (backend digital_decode / digital_channel commands, the
+// decode-socket + analog-mute choreography and the channel-state watchers)
+// lives in useSdrDigitalDecode; the panel injects sendCmd and its tuner refs
+// so the command cadence is unchanged.
+const { digitalEnabled, setDigital, toggleDigital } = useSdrDigitalDecode({
   sdrStore: _sdrStore,
   sendCmd,
   selectedRadioId,
@@ -1247,12 +1217,6 @@ async function toggleAprs() {
     _sdrStore().clearDecode()
   }
 }
-
-// Trunk-system accordion (sits below SEARCH). The accordion body, its
-// flat-dark channel-map dropdown (with its own teleported menu + dismissal)
-// and the FOLLOW button live in SdrTrunkSection.vue; only the expanded flag
-// stays here so the panel-open watch above can collapse it with its siblings.
-const trunkSectionExpanded = ref(false)
 
 // ── Radio selection ───────────────────────────────────────────────────────────
 // Manual select/deselect, the radio-list load (with its sessionStorage cache)
@@ -1394,17 +1358,6 @@ function onCtrlSocketMessage(msg: any) {
       setStatus(false)
       break
     case 'pong':
-      break
-    case 'trunk_status':
-      // Backend confirms (or rejects) a trunk_decode request. On rejection
-      // (e.g. missing channel map) it reports enabled:false + an error, so
-      // reconcile the toggle and surface the message.
-      if (msg.enabled === false) {
-        _sdrStore().setTrunkEnabled(false)
-        if (typeof msg.error === 'string') _sdrStore().setTrunkError(msg.error)
-      } else if (msg.enabled === true) {
-        _sdrStore().setTrunkEnabled(true)
-      }
       break
   }
 }
@@ -2018,7 +1971,6 @@ onMounted(() => {
 
   loadRadios()
   reloadData()
-  void loadChannelMaps()
 })
 
 onUnmounted(() => {
@@ -2029,7 +1981,7 @@ onUnmounted(() => {
 })
 
 // Every dropdown now lives in its own extracted component (device selector,
-// step/sample-rate pickers, settings accordion, trunk section) with its own
+// step/sample-rate pickers, settings accordion) with its own
 // teleported menu, settle window and dismiss listeners — the panel no longer
 // registers document-level click/scroll/resize handlers for menus.
 useDocumentEvent('sdr:radios-changed', onRadiosChanged)

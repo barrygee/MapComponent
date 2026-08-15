@@ -47,21 +47,6 @@ class Settings(BaseSettings):
     decoder_secret_file: str = "/run/decoder/secret"
     # Default channel bandwidth (Hz) used when digital decode is enabled.
     decoder_default_bw_hz: int = 12_500
-    # TCP port the backend's rigctld-compatible server listens on for trunk
-    # tracking. dsd-fme (run with `-U <port>`) connects here as a rigctl CLIENT
-    # and drives retunes; the backend translates each requested frequency into a
-    # demod offset shift or a hardware retune. 4532 is dsd-fme's SDR++ default.
-    decoder_rigctl_port: int = 4532
-    # Guard band (Hz) kept clear at each edge of the captured span when deciding
-    # whether a requested trunk frequency can be reached by an in-span demod
-    # offset shift (preferred) rather than a hardware retune (fallback). Sized so
-    # a full channel stays inside the span rather than clipping the edge.
-    decoder_rigctl_guard_hz: int = 25_000
-    # Directory holding trunking channel-map / group-list CSVs. Mounted into both
-    # the app (to list them for the UI) and decoder (dsd-fme reads them) containers
-    # from ./decoder/channel-maps. The relative default works for a local dev run
-    # from the repo root; compose overrides it to the in-container path.
-    channel_maps_dir: str = "decoder/channel-maps"
     # Offset added to a radio's rtl_tcp port to reach the fan-out relay's NDJSON
     # tuning-ownership control channel (e.g. IQ 1234 → control 1236). Must match the
     # relay's RELAY_CONTROL_PORT (which itself defaults to LISTEN_PORT + 2). When the

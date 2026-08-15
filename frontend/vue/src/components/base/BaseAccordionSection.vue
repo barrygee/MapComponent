@@ -38,8 +38,8 @@
  * `BaseAccordionSection` — the disclosure header-row + collapsible body used
  * across the SDR panel. Extracted from (not a rewrite of) the byte-identical
  * header buttons copy-pasted across `SdrPanel.vue` (SCANNER / SEARCH / SAVED
- * RANGES), `SdrSettingsAccordion.vue` (SETTINGS) and `SdrTrunkSection.vue`
- * (TRUNK SYSTEM), plus the two near-copies in `SdrFrequencyManagerTab.vue`
+ * RANGES) and `SdrSettingsAccordion.vue` (SETTINGS), plus the two near-copies
+ * in `SdrFrequencyManagerTab.vue`
  * (the add/edit forms' RADIO SETTINGS toggle).
  *
  * Two real, spec-pinned looks — variants, not free-form class props:
@@ -52,9 +52,8 @@
  *   by its `open` prop, no expanded class).
  *
  * The expanded state stays caller-owned (`v-model:expanded`) — `SdrPanel`
- * collapses its sections whenever the side panel opens, and
- * `SdrTrunkSection` forwards a panel-owned model for the same reason. The
- * header button and body `<div v-show>` render as adjacent siblings, which
+ * collapses its sections whenever the side panel opens. The header button and
+ * body `<div v-show>` render as adjacent siblings, which
  * DOM-dependent selectors (and the existing specs) rely on.
  *
  * Slots:

@@ -36,7 +36,6 @@ import AirReplayToggleControl from './AirReplayToggleControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import SdrOptionsControl from './SdrOptionsControl.vue'
 import SdrResumeDelayControl from './SdrResumeDelayControl.vue'
-import SdrTrunkTrackingToggleControl from './SdrTrunkTrackingToggleControl.vue'
 import ConfigCurrentControl from './ConfigCurrentControl.vue'
 import ExportAllControl from './ExportAllControl.vue'
 import JsonDataControl from './JsonDataControl.vue'
@@ -83,10 +82,8 @@ const TYPE_TO_COMPONENT: Array<[string, Component, Partial<SettingItem>?]> = [
   ['sdr-devices', SdrDevicesControl],
   ['sdr-options', SdrOptionsControl],
   ['sdr-resume-delay', SdrResumeDelayControl],
-  ['sdr-trunk-tracking-toggle', SdrTrunkTrackingToggleControl],
   ['sdr-frequencies-file', JsonDataControl],
   ['sdr-bandplan-file', JsonDataControl],
-  ['sdr-channelmaps-file', JsonDataControl],
   ['config-current', ConfigCurrentControl],
   ['export-all', ExportAllControl],
 ]
@@ -123,15 +120,6 @@ describe('SettingRow', () => {
 
     const withoutDesc = mountRow({ id: 'x', type: 'probe-url', label: 'Probe' })
     expect(withoutDesc.find('.settings-item-desc').exists()).toBe(false)
-  })
-
-  it('applies the wide modifier only to wide types', () => {
-    expect(mountRow({ id: 'a', type: 'sdr-channelmaps-file', label: 'Maps' }).classes()).toContain(
-      'settings-item--wide',
-    )
-    expect(mountRow({ id: 'b', type: 'probe-url', label: 'Probe' }).classes()).not.toContain(
-      'settings-item--wide',
-    )
   })
 
   it('forwards a child stage event with the item id', () => {

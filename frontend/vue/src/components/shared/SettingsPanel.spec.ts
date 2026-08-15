@@ -12,7 +12,6 @@ import SettingsPanel from './SettingsPanel.vue'
 import SettingRow from './settings/SettingRow.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAppStore } from '@/stores/app'
-import { useSdrStore } from '@/stores/sdr'
 
 // SettingRow and its many control children are covered by their own specs; stub
 // it so this spec exercises only SettingsPanel's own section/search/commit logic.
@@ -210,9 +209,7 @@ describe('SettingsPanel', () => {
     })
   })
 
-  describe('trunk channel-maps visibility gating', () => {
-    // The Trunk Channel Maps (JSON) editor row is gated behind the SDR store's
-    // trunkTrackingEnabled flag; the always-present Trunk Tracking toggle is not.
+  describe('SDR section rows', () => {
     function renderedItemIds(wrapper: ReturnType<typeof mountPanel>): string[] {
       return wrapper
         .findAllComponents(SettingRow)
@@ -236,42 +233,6 @@ describe('SettingsPanel', () => {
 
       await wrapper.find('#settings-search-input').setValue('Mute Audio While Decoding')
       expect(renderedItemIds(wrapper)).toContain('sdr-options')
-    })
-
-    it('hides the channel-maps editor when trunk tracking is off', async () => {
-      localStorage.clear()
-      const wrapper = mountPanel()
-      await openSdrSection(wrapper)
-      const ids = renderedItemIds(wrapper)
-      expect(ids).toContain('sdr-trunk-tracking-toggle')
-      expect(ids).not.toContain('sdr-channelmaps-file')
-    })
-
-    it('shows the channel-maps editor when trunk tracking is on', async () => {
-      localStorage.clear()
-      useSdrStore().setTrunkTrackingEnabled(true)
-      const wrapper = mountPanel()
-      await openSdrSection(wrapper)
-      const ids = renderedItemIds(wrapper)
-      expect(ids).toContain('sdr-trunk-tracking-toggle')
-      expect(ids).toContain('sdr-channelmaps-file')
-    })
-
-    it('excludes the channel-maps editor from search results when trunk tracking is off', async () => {
-      localStorage.clear()
-      const wrapper = mountPanel()
-      await wrapper.find('#settings-search-input').setValue('Trunk Channel Maps')
-      const ids = renderedItemIds(wrapper)
-      expect(ids).not.toContain('sdr-channelmaps-file')
-    })
-
-    it('includes the channel-maps editor in search results when trunk tracking is on', async () => {
-      localStorage.clear()
-      useSdrStore().setTrunkTrackingEnabled(true)
-      const wrapper = mountPanel()
-      await wrapper.find('#settings-search-input').setValue('Trunk Channel Maps')
-      const ids = renderedItemIds(wrapper)
-      expect(ids).toContain('sdr-channelmaps-file')
     })
   })
 

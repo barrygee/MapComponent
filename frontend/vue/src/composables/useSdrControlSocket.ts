@@ -25,7 +25,7 @@ export interface UseSdrControlSocketOptions {
   onSocketOpen: (radioId: number) => void
   /**
    * Receives every JSON-parsed control-socket frame; the panel discriminates
-   * on msg.type (status/spectrum/control/error/pong/trunk_status).
+   * on msg.type (status/spectrum/control/error/pong).
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic WS JSON payload; the consumer discriminates on msg.type and field-casts at use sites
   onSocketMessage: (msg: any) => void

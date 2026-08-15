@@ -593,48 +593,17 @@ class _ConnStub:
 
 
 class _BroadcasterWithConn(_FakeBroadcaster):
-    """IQ fan-out stub that also exposes a connection (for rigctl accessors)."""
+    """IQ fan-out stub that also exposes a connection."""
 
     connection = _ConnStub()
 
 
-class TestBridgeTrunkAccessors:
-    def test_connection_proxies_broadcaster(self):
-        broadcaster = _BroadcasterWithConn()
-        bridge = DigitalDecodeBridge(broadcaster, pcm_port=0, audio_udp_port=0)
-        assert bridge.connection is broadcaster.connection
-
-    def test_current_offset_reflects_set_channel(self):
-        bridge = DigitalDecodeBridge(
-            _BroadcasterWithConn(), pcm_port=0, audio_udp_port=0
-        )
-        assert bridge.current_offset_hz == 0
-        bridge.set_channel(offset_hz=12_345)
-        assert bridge.current_offset_hz == 12_345
-
+class TestBridgeState:
     def test_running_false_before_start(self):
         bridge = DigitalDecodeBridge(
             _BroadcasterWithConn(), pcm_port=0, audio_udp_port=0
         )
         assert bridge.running is False
-
-    def test_bounce_decoder_without_writer_returns_false(self):
-        bridge = DigitalDecodeBridge(
-            _BroadcasterWithConn(), pcm_port=0, audio_udp_port=0
-        )
-        assert bridge.bounce_decoder() is False
-
-    def test_bounce_decoder_closes_writer_and_clears_state(self):
-        bridge = DigitalDecodeBridge(
-            _BroadcasterWithConn(), pcm_port=0, audio_udp_port=0
-        )
-        writer = MagicMock()
-        bridge._pcm_writer = writer
-        bridge._decoder_connected = True
-        assert bridge.bounce_decoder() is True
-        writer.close.assert_called_once()
-        assert bridge._pcm_writer is None
-        assert bridge.decoder_reachable is False
 
 
 # ── AprsDecodeBridge ──────────────────────────────────────────────────────────
@@ -680,7 +649,6 @@ class TestAprsDecodeBridge:
         # APRS must not expose the voice bridge's audio API.
         bridge = AprsDecodeBridge(_FakeBroadcaster(), pcm_port=0)
         assert not hasattr(bridge, "subscribe_audio")
-        assert not hasattr(bridge, "bounce_decoder")
 
     async def test_stop_drains_event_subscribers(self):
         bridge = AprsDecodeBridge(_FakeBroadcaster(), pcm_port=0)

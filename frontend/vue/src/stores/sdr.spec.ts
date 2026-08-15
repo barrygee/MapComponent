@@ -494,26 +494,6 @@ describe('sdr store', () => {
       expect(store.decodeSync).toBe(false)
     })
 
-    it('a trunk_event updates the follow indicators without adding a call row', () => {
-      const store = useSdrStore()
-      store.pushDecodeEvent({
-        type: 'trunk_event',
-        tuned_hz: 451_500_000,
-        is_control_channel: false,
-        ts: 1,
-      } as never)
-      expect(store.trunkFollowedHz).toBe(451_500_000)
-      expect(store.trunkOnControlChannel).toBe(false)
-      // It is a state change, not a decoded call — no table row.
-      expect(store.decodeEvents).toHaveLength(0)
-
-      // A control-channel return with no tuned_hz keeps the last frequency but
-      // flips the on-control flag (covers the non-number tuned_hz branch).
-      store.pushDecodeEvent({ type: 'trunk_event', is_control_channel: true, ts: 2 } as never)
-      expect(store.trunkFollowedHz).toBe(451_500_000)
-      expect(store.trunkOnControlChannel).toBe(true)
-    })
-
     it('pushDecodeEvent stamps ts when missing', () => {
       const store = useSdrStore()
       vi.spyOn(Date, 'now').mockReturnValue(12345)
@@ -646,55 +626,6 @@ describe('sdr store', () => {
       store.clearDecodeEvents()
       expect(store.decodeEvents).toEqual([])
       expect(store.decoderReachable).toBe(true)
-    })
-  })
-
-  describe('trunk tracking feature flag', () => {
-    it('defaults trunkTrackingEnabled to false', () => {
-      expect(useSdrStore().trunkTrackingEnabled).toBe(false)
-    })
-
-    it('reads trunkTrackingEnabled=true from localStorage on init', () => {
-      localStorage.setItem('sdrTrunkTrackingEnabled', '1')
-      expect(useSdrStore().trunkTrackingEnabled).toBe(true)
-    })
-
-    it('falls back to false when localStorage throws on read', () => {
-      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-        throw new Error('blocked')
-      })
-      expect(useSdrStore().trunkTrackingEnabled).toBe(false)
-      spy.mockRestore()
-    })
-
-    it('setTrunkTrackingEnabled updates state and persists both positions', () => {
-      const store = useSdrStore()
-      store.setTrunkTrackingEnabled(true)
-      expect(store.trunkTrackingEnabled).toBe(true)
-      expect(localStorage.getItem('sdrTrunkTrackingEnabled')).toBe('1')
-      store.setTrunkTrackingEnabled(false)
-      expect(store.trunkTrackingEnabled).toBe(false)
-      expect(localStorage.getItem('sdrTrunkTrackingEnabled')).toBe('0')
-    })
-
-    it('setTrunkTrackingEnabled swallows a localStorage write error', () => {
-      const store = useSdrStore()
-      const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-        throw new Error('full')
-      })
-      expect(() => store.setTrunkTrackingEnabled(true)).not.toThrow()
-      expect(store.trunkTrackingEnabled).toBe(true)
-      spy.mockRestore()
-    })
-
-    it('disabling the feature does not itself clear an active follow (panel owns the stop)', () => {
-      const store = useSdrStore()
-      store.setTrunkTrackingEnabled(true)
-      store.setTrunkEnabled(true)
-      store.setTrunkTrackingEnabled(false)
-      // The store leaves trunkEnabled alone so the SDR panel's watcher can send
-      // the WS stop; clearing it here would skip that command.
-      expect(store.trunkEnabled).toBe(true)
     })
   })
 

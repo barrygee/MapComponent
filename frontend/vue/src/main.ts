@@ -18,7 +18,6 @@ import { useAirStore } from './stores/air'
 import type { AdsbLabelFields, AdsbTagFields } from './stores/air'
 import { useLandStore } from './stores/land'
 import type { AprsLabelFieldMap } from './stores/land'
-import { useSdrStore } from './stores/sdr'
 import { useSettingsStore } from './stores/settings'
 
 // Register PMTiles protocol once at app startup — never inside a component.
@@ -48,7 +47,6 @@ const ALL_DOMAINS = ['air', 'space', 'sea', 'land', 'sdr'] as const
 const DOMAINS_ON_BY_DEFAULT = new Set(['air', 'space', 'sdr'])
 const airStore = useAirStore()
 const landStore = useLandStore()
-const sdrStore = useSdrStore()
 const settingsStore = useSettingsStore()
 
 const DEFAULT_LABEL_DATA_POINTS = {
@@ -109,10 +107,6 @@ const DEFAULT_LABEL_DATA_POINTS = {
       // Replay recording toggle — default OFF when absent from the DB.
       const replayOn = data.air?.replayEnabled
       airStore.setReplayEnabled(typeof replayOn === 'boolean' ? replayOn : false)
-
-      // Trunk-tracking feature flag — default OFF when absent from the DB.
-      const trunkOn = data.sdr?.trunkTrackingEnabled
-      sdrStore.setTrunkTrackingEnabled(typeof trunkOn === 'boolean' ? trunkOn : false)
 
       // Hydrate labelDataPoints from API into store before first render.
       const remote = data.air?.labelDataPoints as AdsbTagFields | undefined

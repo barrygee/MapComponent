@@ -37,7 +37,7 @@
 /**
  * `BaseSelectMenu` — the flat-dark custom dropdown primitive underlying the
  * SDR pickers (`SdrStepPicker`, `SdrSampleRatePicker`, `SdrDeviceSelector`,
- * `SdrSettingsAccordion`'s SAMPLE RATE, `SdrTrunkSection`'s channel map):
+ * `SdrSettingsAccordion`'s SAMPLE RATE):
  * a `tabindex` trigger plus a body-teleported, fixed-position menu anchored
  * from the trigger's rect at open time. Extracted from (not a rewrite of)
  * the trigger/Teleport template those pickers each carried on top of
@@ -66,7 +66,7 @@
  * co-location sweep — the item rules are rendered by the pickers' `#options`
  * slots, but splitting the family across files would risk its internal
  * cascade order (`--active` before `--selected`). The per-picker menu-class
- * hooks (`.sdr-step-menu`, `.sdr-trunk-menu`) carry no CSS rules today, and
+ * hooks (e.g. `.sdr-step-menu`) carry no CSS rules today, and
  * the contextual overrides in feature sheets (`.sdr-search-adhoc-col …`,
  * `.sdr-ef-setting …`) are higher-specificity and order-immune.
  */
