@@ -28,7 +28,6 @@ describe('sdr store', () => {
     expect(store.currentMode).toBe('WFM')
     expect(store.sampleRate).toBe(2_048_000)
     expect(store.autoCenterWaterfallOnTune).toBe(true)
-    expect(store.fullWaterfallUpdate).toBe(true)
     expect(store.snapToKnown).toBe(true)
     expect(store.showBandPlan).toBe(true)
     expect(store.showKnownFreqs).toBe(true)
@@ -44,7 +43,6 @@ describe('sdr store', () => {
       lsKey: 'sdrAutoCenterWaterfallOnTune',
       read: (s) => s.autoCenterWaterfallOnTune,
     },
-    { name: 'fullWaterfall', lsKey: 'sdrFullWaterfallUpdate', read: (s) => s.fullWaterfallUpdate },
     { name: 'snapToKnown', lsKey: 'sdrSnapToKnown', read: (s) => s.snapToKnown },
     { name: 'showBandPlan', lsKey: 'sdrShowBandPlan', read: (s) => s.showBandPlan },
     { name: 'showKnownFreqs', lsKey: 'sdrShowKnownFreqs', read: (s) => s.showKnownFreqs },
@@ -61,7 +59,6 @@ describe('sdr store', () => {
     })
     const store = useSdrStore()
     expect(store.autoCenterWaterfallOnTune).toBe(true)
-    expect(store.fullWaterfallUpdate).toBe(true)
     expect(store.snapToKnown).toBe(true)
     expect(store.showBandPlan).toBe(true)
     expect(store.showKnownFreqs).toBe(true)
@@ -76,12 +73,6 @@ describe('sdr store', () => {
     apply: (s: SdrStore, on: boolean) => void
     read: (s: SdrStore) => boolean
   }> = [
-    {
-      name: 'setFullWaterfallUpdate',
-      lsKey: 'sdrFullWaterfallUpdate',
-      apply: (s, on) => s.setFullWaterfallUpdate(on),
-      read: (s) => s.fullWaterfallUpdate,
-    },
     {
       name: 'setSnapToKnown',
       lsKey: 'sdrSnapToKnown',
@@ -161,12 +152,6 @@ describe('sdr store', () => {
       dbKey: 'autoCenterWaterfallOnTune',
       hydrate: (s) => s.hydrateAutoCenterFromDb(),
       read: (s) => s.autoCenterWaterfallOnTune,
-    },
-    {
-      name: 'fullWaterfall',
-      dbKey: 'fullWaterfallUpdate',
-      hydrate: (s) => s.hydrateFullWaterfallUpdateFromDb(),
-      read: (s) => s.fullWaterfallUpdate,
     },
     {
       name: 'snapToKnown',

@@ -1942,6 +1942,27 @@ describe('SdrWaterfall — mouse-wheel pan', () => {
 
 // =============================================================================
 describe('SdrWaterfall — FFT bin sizing & resize', () => {
+  it('clamps the bin request to MAX_BINS when mounting at a restored extreme zoom', () => {
+    // zoom 50 × 1000px = 50000 → clamped to MAX_BINS at mount.
+    localStorage.setItem('sdrViewZoom', '50')
+    const store = useSdrStore()
+    const fftSpy = vi.spyOn(store, 'requestFftSize')
+    const wrapper = mount(SdrWaterfall, { attachTo: document.body })
+    flushRaf()
+    expect(fftSpy).toHaveBeenCalledWith(32768)
+    void wrapper
+  })
+
+  it('pins the bin target across a resize', () => {
+    const { store } = mountWaterfall()
+    // A dpr change would move the computed target, but resize no longer
+    // re-requests bins — the waterfall history must survive the resize.
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 })
+    const fftSpy = vi.spyOn(store, 'requestFftSize')
+    triggerResize()
+    expect(fftSpy).not.toHaveBeenCalled()
+  })
+
   it('requests a larger power-of-two bin count on a wide/HiDPI canvas at init', () => {
     Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 })
     const store = useSdrStore()
@@ -1950,45 +1971,6 @@ describe('SdrWaterfall — FFT bin sizing & resize', () => {
     flushRaf() // init publishes the bin target directly (1000px * 2 dpr → 2048)
     expect(fftSpy).toHaveBeenCalledWith(2048)
     void wrapper
-  })
-
-  it('clamps the bin request to MAX_BINS at extreme zoom', async () => {
-    const { wrapper, store } = mountWaterfall()
-    await playWithFrame(store)
-    store.setFullWaterfallUpdate(true)
-    const fftSpy = vi.spyOn(store, 'requestFftSize')
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    // zoom 50 × 1000px = 50000 → clamp to 32768 (scheduled, debounced 250 ms).
-    await wrapper.findAll('input[type="range"]')[0].setValue(50)
-    vi.advanceTimersByTime(300)
-    vi.useRealTimers()
-    expect(fftSpy).toHaveBeenCalledWith(32768)
-  })
-
-  it('refreshes the bin target on resize only when Full Waterfall Update is on', async () => {
-    const { store } = mountWaterfall()
-    store.setFullWaterfallUpdate(true)
-    // Bump dpr so the recomputed target differs from the init value and a new
-    // request is observable.
-    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 })
-    const fftSpy = vi.spyOn(store, 'requestFftSize')
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    triggerResize()
-    vi.advanceTimersByTime(300)
-    vi.useRealTimers()
-    expect(fftSpy).toHaveBeenCalledWith(2048)
-  })
-
-  it('pins the bin target across a resize when Full Waterfall Update is off', async () => {
-    const { store } = mountWaterfall()
-    store.setFullWaterfallUpdate(false)
-    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 })
-    const fftSpy = vi.spyOn(store, 'requestFftSize')
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    triggerResize()
-    vi.advanceTimersByTime(300)
-    vi.useRealTimers()
-    expect(fftSpy).not.toHaveBeenCalled()
   })
 })
 
@@ -2104,20 +2086,6 @@ describe('SdrWaterfall — zoom / frequency / full-update watchers', () => {
     store.setFrequency(100_200_000)
     await flushPromises()
     expect(specPlot().calls.zoom?.length ?? 0).toBe(zoomCallsBefore)
-  })
-
-  it('refreshes bins when Full Waterfall Update is toggled on', async () => {
-    const { wrapper, store } = mountWaterfall()
-    store.setFullWaterfallUpdate(false) // default is on — toggle off first
-    await wrapper.vm.$nextTick()
-    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 })
-    const fftSpy = vi.spyOn(store, 'requestFftSize')
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    store.setFullWaterfallUpdate(true)
-    await wrapper.vm.$nextTick() // flush the watcher → scheduleDesiredBins
-    vi.advanceTimersByTime(300)
-    vi.useRealTimers()
-    expect(fftSpy).toHaveBeenCalledWith(2048)
   })
 
   it('covers the nice-number tick step bands across zoom levels', async () => {
@@ -2562,22 +2530,6 @@ describe('SdrWaterfall — installMarginTweaks Mx accessor setters', () => {
 })
 
 // =============================================================================
-describe('SdrWaterfall — debounced bin scheduling', () => {
-  it('skips a redundant request when the bin count is unchanged', async () => {
-    const { store } = mountWaterfall()
-    store.setFullWaterfallUpdate(true)
-    const fftSpy = vi.spyOn(store, 'requestFftSize')
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    // dpr/zoom unchanged → computeDesiredBins === lastRequestedBins → no call.
-    triggerResize()
-    triggerResize() // second schedule clears the first pending debounce
-    vi.advanceTimersByTime(300)
-    vi.useRealTimers()
-    expect(fftSpy).not.toHaveBeenCalled()
-  })
-})
-
-// =============================================================================
 describe('SdrWaterfall — live pan offset reset on retune frame', () => {
   it('clears a held wheel pan offset when a re-centred frame arrives', async () => {
     const { wrapper, store } = mountWaterfall()
@@ -2709,18 +2661,15 @@ describe('SdrWaterfall — remaining branch coverage', () => {
     expect(wrapper.find('#sdr-waterfall').classes()).not.toContain('edge-resize')
   })
 
-  it('defaults the device-pixel-ratio to 1 when the browser reports 0', async () => {
-    const { store } = mountWaterfall()
-    store.setFullWaterfallUpdate(true)
+  it('defaults the device-pixel-ratio to 1 when the browser reports 0', () => {
     Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 0 })
+    const store = useSdrStore()
     const fftSpy = vi.spyOn(store, 'requestFftSize')
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    triggerResize() // computeDesiredBins runs with dpr → 1 fallback
-    vi.advanceTimersByTime(300)
-    vi.useRealTimers()
-    // px*1 = 1000 → 1024 bins, same as the init value, so no new request — the
-    // dpr fallback path still executed.
-    expect(fftSpy).not.toHaveBeenCalled()
+    const wrapper = mount(SdrWaterfall, { attachTo: document.body })
+    flushRaf() // computeDesiredBins runs at mount with the dpr → 1 fallback
+    // px*1 = 1000 → rounded up to 1024 bins.
+    expect(fftSpy).toHaveBeenCalledWith(1024)
+    void wrapper
   })
 
   it('suppresses the native context menu on both plots', async () => {
@@ -2815,16 +2764,12 @@ describe('SdrWaterfall — final branch fall-throughs', () => {
     expect(tuneSpy).toHaveBeenCalledWith(expect.any(Number), true)
   })
 
-  it('does not refresh bins on zoom when Full Waterfall Update is off', async () => {
+  it('does not refresh bins on zoom', async () => {
     const { wrapper, store } = mountWaterfall()
     await playWithFrame(store)
-    store.setFullWaterfallUpdate(false)
-    await wrapper.vm.$nextTick()
     const fftSpy = vi.spyOn(store, 'requestFftSize')
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     await wrapper.findAll('input[type="range"]')[0].setValue(8)
-    vi.advanceTimersByTime(300)
-    vi.useRealTimers()
+    await wrapper.vm.$nextTick()
     expect(fftSpy).not.toHaveBeenCalled()
   })
 })

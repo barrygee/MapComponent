@@ -35,7 +35,6 @@ import AprsLabelFieldsControl from './AprsLabelFieldsControl.vue'
 import AirReplayToggleControl from './AirReplayToggleControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import SdrAutoCenterControl from './SdrAutoCenterControl.vue'
-import SdrFullWaterfallUpdateControl from './SdrFullWaterfallUpdateControl.vue'
 import SdrSnapToKnownControl from './SdrSnapToKnownControl.vue'
 import SdrShowBandPlanControl from './SdrShowBandPlanControl.vue'
 import SdrShowKnownFreqsControl from './SdrShowKnownFreqsControl.vue'
@@ -87,7 +86,6 @@ const TYPE_TO_COMPONENT: Array<[string, Component, Partial<SettingItem>?]> = [
   ['air-replay-toggle', AirReplayToggleControl],
   ['sdr-devices', SdrDevicesControl],
   ['sdr-autocenter', SdrAutoCenterControl],
-  ['sdr-full-waterfall-update', SdrFullWaterfallUpdateControl],
   ['sdr-snap-to-known', SdrSnapToKnownControl],
   ['sdr-show-bandplan', SdrShowBandPlanControl],
   ['sdr-show-known-freqs', SdrShowKnownFreqsControl],

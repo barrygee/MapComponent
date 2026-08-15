@@ -4,7 +4,7 @@ import { useSdrStore } from '@/stores/sdr'
 
 // "Snap to known frequencies" toggle. ON: clicking a known-frequency marker in
 // the spectrum jumps to it, and dragging the tuner bar snaps to a nearby known
-// frequency. Persistence and DB hydration mirror SdrFullWaterfallUpdateControl.
+// frequency. Persistence and DB hydration mirror SdrAutoCenterControl.
 const sdr = useSdrStore()
 const emit = defineEmits<{ stage: [fn: () => Promise<unknown> | void] }>()
 </script>

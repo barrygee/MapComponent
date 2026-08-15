@@ -102,10 +102,6 @@
       v-else-if="item.type === 'sdr-autocenter'"
       @stage="emit('stage', item.id, $event)"
     />
-    <SdrFullWaterfallUpdateControl
-      v-else-if="item.type === 'sdr-full-waterfall-update'"
-      @stage="emit('stage', item.id, $event)"
-    />
     <SdrSnapToKnownControl
       v-else-if="item.type === 'sdr-snap-to-known'"
       @stage="emit('stage', item.id, $event)"
@@ -186,7 +182,6 @@ import AirReplayToggleControl from './AirReplayToggleControl.vue'
 import SentryHostsControl from './SentryHostsControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import SdrAutoCenterControl from './SdrAutoCenterControl.vue'
-import SdrFullWaterfallUpdateControl from './SdrFullWaterfallUpdateControl.vue'
 import SdrSnapToKnownControl from './SdrSnapToKnownControl.vue'
 import SdrShowBandPlanControl from './SdrShowBandPlanControl.vue'
 import SdrShowKnownFreqsControl from './SdrShowKnownFreqsControl.vue'

@@ -97,7 +97,6 @@
     "defaultGain": 30,
     "defaultSquelch": -60,
     "autoCenterWaterfallOnTune": true,
-    "fullWaterfallUpdate": true,
     "showBandPlan": true,
     "showKnownFreqs": true,
     "digitalDecodeDefault": false,
