@@ -128,6 +128,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Thicken the APRS count ring and let the map through it
 - Sentry device management, and Off Grid ADS-B end to end (#271)
 - Stop offering private and disabled SDRs as sources (#274)
+- Let mirrored radios follow their device, and report availability (#275)
 
 ### Bug Fixes
 
