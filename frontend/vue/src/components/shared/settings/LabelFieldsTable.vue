@@ -1,7 +1,7 @@
 <template>
   <div class="lft-wrap" :style="{ '--lft-accent': accentColor }">
     <div class="lft-table">
-      <div class="lft-header" :style="gridStyle">
+      <div v-if="showHeader" class="lft-header" :style="gridStyle">
         <div class="lft-header-field">{{ fieldHeader }}</div>
         <div v-for="column in columns" :key="column.key" class="lft-header-col">
           {{ column.label }}
@@ -14,7 +14,14 @@
           <slot name="row-extra" :row="row" />
         </div>
         <div v-for="column in columns" :key="column.key" class="lft-cell">
+          <BaseToggleSwitch
+            v-if="control === 'switch'"
+            :model-value="isChecked(column.key, row.key)"
+            :accessible-name="accessibleName(row, column)"
+            @update:model-value="emit('toggle', column.key, row.key)"
+          />
           <BaseCheckbox
+            v-else
             class="lft-check"
             input-class="lft-input"
             box-class="lft-box"
@@ -58,6 +65,7 @@
  */
 import { computed } from 'vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
+import BaseToggleSwitch from '@/components/base/BaseToggleSwitch.vue'
 
 /** One checkbox column — a group the field set can differ between. */
 export interface LabelFieldColumn {
@@ -83,11 +91,25 @@ const props = withDefaults(
     /** Tick colour, dark by default so it reads on a bright accent fill. */
     checkmarkColor?: string
     fieldHeader?: string
+    /**
+     * Whether to render the column-heading row. Tables whose columns need no
+     * explanation (a single unlabelled on/off column) pass `false`.
+     */
+    showHeader?: boolean
+    /**
+     * Which on/off control each cell renders: the compact tick box
+     * (`'checkbox'`, the default — right for a dense grid of label fields) or
+     * the Settings panel's standard toggle switch (`'switch'`, for a short
+     * list of independent options).
+     */
+    control?: 'checkbox' | 'switch'
   }>(),
   {
     accentColor: '#c8ff00',
     checkmarkColor: '#0a0c10',
     fieldHeader: 'Field',
+    showHeader: true,
+    control: 'checkbox',
   },
 )
 

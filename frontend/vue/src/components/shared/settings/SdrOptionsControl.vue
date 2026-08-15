@@ -3,7 +3,8 @@
     :columns="OPTION_COLUMNS"
     :rows="OPTION_ROWS"
     :is-checked="isOptionEnabled"
-    field-header="Option"
+    :show-header="false"
+    control="switch"
     @toggle="onToggleOption"
   />
 </template>
@@ -13,9 +14,9 @@
  * Settings control for the SDR panel's on/off options, gathered into one box.
  *
  * Replaces five separate toggle rows (auto-center, snap to known frequencies,
- * band plan, known-frequency labels, decode mute) with a single checkbox list
- * in the same style as the domains' "Label Data Points" tables — name plus
- * checkbox, no per-option prose.
+ * band plan, known-frequency labels, decode mute) with a single list built on
+ * the domains' "Label Data Points" table — name plus the Settings panel's
+ * standard toggle switch, with no column headings and no per-option prose.
  *
  * Each option keeps the lifecycle the individual toggles had: hydrate from the
  * DB on open, mirror into the sdr store immediately so the waterfall/audio

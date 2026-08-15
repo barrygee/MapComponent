@@ -184,10 +184,13 @@ const emit = defineEmits<{
 const WIDE_TYPES = new Set(['sdr-channelmaps-file'])
 // Every JSON-textarea editor sits here (or in WIDE_TYPES) so a config document
 // never gets squeezed into a single 300px column — two columns is the minimum
-// readable width for indented JSON.
+// readable width for indented JSON. The SDR options box joins them so its
+// option names ("Snap to Known Frequencies") stay on one line beside their
+// checkbox column.
 const HALF_TYPES = new Set([
   'sdr-sentry-hosts',
   'sdr-devices',
+  'sdr-options',
   'space-tle-online',
   'space-tle-manual',
   'space-tle-db',
