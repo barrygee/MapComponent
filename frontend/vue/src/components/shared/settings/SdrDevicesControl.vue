@@ -39,6 +39,24 @@
             @add="addDeviceAsRadio(group.host, entry.device)"
           />
         </template>
+        <!-- Radios whose device this host no longer lists — usually a dongle
+             replugged into another socket, which changes its identity. Rendered
+             so they can be seen and removed; without this they are invisible
+             here yet still fail whenever something connects to them. -->
+        <SdrRadioRow
+          v-for="radio in group.orphanedRadios"
+          :key="'orphan-' + radio.id"
+          :radio="radio"
+          :connected="false"
+          :open="openId === radio.id"
+          :confirming="confirmId === radio.id"
+          @toggle-edit="toggleEdit(radio.id)"
+          @start-delete="startDelete(radio.id)"
+          @confirm-delete="confirmDelete(radio.id)"
+          @cancel-delete="confirmId = null"
+          @save="onSave"
+          @cancel-edit="openId = null"
+        />
       </template>
 
       <template v-if="manualRadios.length > 0">
@@ -148,6 +166,18 @@ interface SentryHostGroup {
   host: SentryHost
   snapshot: SentryDeviceSnapshot | undefined
   devices: SentryDeviceRowModel[]
+  /**
+   * Radios belonging to this host whose device is no longer in its device list.
+   *
+   * The list above is built by walking the host's *devices* and finding each
+   * one's radio, so a radio whose device has gone has nothing to hang off and
+   * would never be rendered at all. That is not a cosmetic gap: it happens
+   * whenever a topology-keyed dongle is replugged into a different USB socket —
+   * the identity changes, the old one vanishes, and the operator is left with a
+   * radio they cannot see, cannot fix and cannot delete, which still fails when
+   * something tries to connect to it.
+   */
+  orphanedRadios: SdrRadioRecord[]
 }
 
 const sentryGroups = computed<SentryHostGroup[]>(() =>
@@ -165,6 +195,16 @@ const sentryGroups = computed<SentryHostGroup[]>(() =>
               radio.sentry_host_id === host.id && radio.sentry_device_id === device.device_id,
           ) ?? null,
       })),
+      // Only meaningful once the host has actually answered: with no snapshot
+      // every radio would look orphaned, which is the opposite of the truth
+      // while a Pi is simply still booting.
+      orphanedRadios: snapshot?.status
+        ? radios.value.filter(
+            (radio) =>
+              radio.sentry_host_id === host.id &&
+              !devices.some((device) => device.device_id === radio.sentry_device_id),
+          )
+        : [],
     }
   }),
 )

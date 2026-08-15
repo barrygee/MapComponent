@@ -507,6 +507,135 @@ describe('SdrDevicesControl', () => {
     expect(mockCreateRadio).toHaveBeenCalledTimes(2)
   })
 
+  it('still lists a radio whose device the Sentry no longer has', async () => {
+    // The replug case. The list is built by walking the host's devices, so a
+    // radio whose device identity has gone has nothing to hang off — it would
+    // be invisible here, yet still fail whenever something connects to it, and
+    // the operator would have no way to delete it.
+    mockListSentryHosts.mockResolvedValue([HOST])
+    mockGetSentryHostDevices.mockResolvedValue(snapshot([DEVICE]))
+    mockListRadios.mockResolvedValue([
+      {
+        id: 9,
+        name: 'Moved dongle',
+        host: '192.168.1.50',
+        port: 4444,
+        description: '',
+        enabled: true,
+        bandwidth: null,
+        rf_gain: null,
+        agc: null,
+        sentry_host_id: HOST.id,
+        sentry_device_id: 'usb:1-1.2',
+        notes: '',
+        antenna: '',
+        visibility: 'public',
+        device_available: false,
+        unavailable_reason: 'Its Sentry no longer has this device.',
+      },
+    ] as never)
+
+    const wrapper = mountControl()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Moved dongle')
+  })
+
+  it('lets an orphaned radio be edited and deleted like any other', async () => {
+    // The whole point of rendering it: the operator can get rid of a radio
+    // whose dongle has moved. Without these wired up it would be visible but
+    // inert.
+    mockListSentryHosts.mockResolvedValue([HOST])
+    mockGetSentryHostDevices.mockResolvedValue(snapshot([DEVICE]))
+    mockListRadios.mockResolvedValue([
+      {
+        id: 9,
+        name: 'Moved dongle',
+        host: '192.168.1.50',
+        port: 4444,
+        description: '',
+        enabled: true,
+        bandwidth: null,
+        rf_gain: null,
+        agc: null,
+        sentry_host_id: HOST.id,
+        sentry_device_id: 'usb:1-1.2',
+        notes: '',
+        antenna: '',
+        visibility: 'public',
+        device_available: false,
+        unavailable_reason: 'Its Sentry no longer has this device.',
+      },
+    ] as never)
+    mockDeleteRadio.mockResolvedValue(true as never)
+
+    const wrapper = mountControl()
+    await flushPromises()
+    const orphan = wrapper
+      .findAllComponents(SdrRadioRow)
+      .find((row) => row.props('radio').id === 9)!
+
+    orphan.vm.$emit('toggle-edit')
+    await flushPromises()
+    expect(orphan.props('open')).toBe(true)
+
+    orphan.vm.$emit('cancel-edit')
+    await flushPromises()
+    expect(orphan.props('open')).toBe(false)
+
+    orphan.vm.$emit('start-delete')
+    await flushPromises()
+    expect(orphan.props('confirming')).toBe(true)
+
+    orphan.vm.$emit('cancel-delete')
+    await flushPromises()
+    expect(orphan.props('confirming')).toBe(false)
+
+    orphan.vm.$emit('confirm-delete')
+    await flushPromises()
+    expect(mockDeleteRadio).toHaveBeenCalledWith(9)
+
+    orphan.vm.$emit('save')
+    await flushPromises()
+  })
+
+  it('does not treat every radio as orphaned while a host is still unreachable', async () => {
+    // With no snapshot yet, a booting Pi would otherwise make every one of its
+    // radios look like its device had vanished.
+    mockListSentryHosts.mockResolvedValue([HOST])
+    mockGetSentryHostDevices.mockResolvedValue({
+      reachable: false,
+      last_error: 'Timed out',
+      last_polled_at: 0,
+      last_success_at: null,
+      api_version: null,
+      status: null,
+    } as never)
+    mockListRadios.mockResolvedValue([
+      {
+        id: 9,
+        name: 'Moved dongle',
+        host: '192.168.1.50',
+        port: 4444,
+        description: '',
+        enabled: true,
+        bandwidth: null,
+        rf_gain: null,
+        agc: null,
+        sentry_host_id: HOST.id,
+        sentry_device_id: 'usb:1-1.2',
+        notes: '',
+        antenna: '',
+        visibility: 'public',
+      },
+    ] as never)
+
+    const wrapper = mountControl()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Moved dongle')
+  })
+
   it('reloads the radio list on an external sdr:radios-changed event', async () => {
     mountControl()
     await flushPromises()
