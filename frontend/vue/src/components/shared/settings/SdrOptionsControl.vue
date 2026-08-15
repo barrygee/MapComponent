@@ -1,5 +1,6 @@
 <template>
   <LabelFieldsTable
+    class="sdr-options-table"
     :columns="OPTION_COLUMNS"
     :rows="OPTION_ROWS"
     :is-checked="isOptionEnabled"
@@ -124,3 +125,21 @@ function onToggleOption(_column: string, settingKey: string): void {
   emit('stage', () => settingsApi.put('sdr', option.settingKey, nextValue))
 }
 </script>
+
+<style scoped>
+/* Match the SDR Devices rows (`.sdr-device-info` in SettingsPanel.css) so the
+   two SDR cards read as one family. The size was already the same 12px Barlow
+   500 — what set the option names apart was the label-grid's wider 0.08em
+   tracking and slightly lighter ink, both of which are dialled back here. The
+   size is restated so this row stays matched if the shared grid's own type
+   ever changes for the domains' label tables. The rule lives here rather than
+   in LabelFieldsTable because only this card follows the device rows.
+   `:deep()` is required: the table renders inside a child component. */
+.sdr-options-table :deep(.lft-row-name) {
+  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: rgba(16, 19, 29, 0.85);
+}
+</style>

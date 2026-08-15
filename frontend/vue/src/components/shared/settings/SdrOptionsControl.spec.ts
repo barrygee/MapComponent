@@ -88,6 +88,14 @@ describe('SdrOptionsControl', () => {
     expect(wrapper.findAll('.toggle-track.is-on')).toHaveLength(5)
   })
 
+  it('carries the class its type overrides hang off, matching the device rows', async () => {
+    // The scoped rule that aligns the option names with `.sdr-device-info`
+    // keys off this class, so losing it silently restores the label-grid type.
+    const wrapper = mount(SdrOptionsControl)
+    await flushPromises()
+    expect(wrapper.find('.lft-wrap').classes()).toContain('sdr-options-table')
+  })
+
   it('uses the app accent, matching the domains’ label-field tables', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
