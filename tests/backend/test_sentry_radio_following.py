@@ -110,7 +110,7 @@ class TestReportingAvailability:
         available, reason = _device_availability(mirrored_radio())
 
         assert available is False
-        assert "no longer has this device" in reason
+        assert "Device not found" in reason
 
     def test_an_unreachable_host_is_not_mistaken_for_a_missing_device(
         self, snapshot_with: Any

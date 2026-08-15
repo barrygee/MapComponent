@@ -43,11 +43,13 @@ class FakeWebSocket {
 }
 
 let connectStatus = 200
+let connectBody: Record<string, unknown> = {}
 let statusBody: Record<string, unknown> = { connected: false }
 let statusOk = true
 let statusRejects = false
 const fetchMock = vi.fn(async (url: string) => {
-  if (String(url).startsWith('/api/sdr/connect')) return { status: connectStatus }
+  if (String(url).startsWith('/api/sdr/connect'))
+    return { status: connectStatus, json: async () => connectBody }
   if (String(url).startsWith('/api/sdr/status/')) {
     if (statusRejects) throw new TypeError('offline')
     return { ok: statusOk, json: async () => statusBody }
@@ -60,6 +62,7 @@ function createHarness(overrides: Partial<UseSdrControlSocketOptions> = {}) {
   const onSocketMessage = vi.fn()
   const onSocketDown = vi.fn()
   const onRadioMissing = vi.fn()
+  const onDeviceUnavailable = vi.fn()
   const onReachable = vi.fn()
   const options: UseSdrControlSocketOptions = {
     sdrStore: () => useSdrStore(),
@@ -67,13 +70,22 @@ function createHarness(overrides: Partial<UseSdrControlSocketOptions> = {}) {
     onSocketMessage,
     onSocketDown,
     onRadioMissing,
+    onDeviceUnavailable,
     onReachable,
     isRadioStillSelected: () => true,
     isAlreadyConnected: () => false,
     ...overrides,
   }
   const socket = useSdrControlSocket(options)
-  return { socket, onSocketOpen, onSocketMessage, onSocketDown, onRadioMissing, onReachable }
+  return {
+    socket,
+    onSocketOpen,
+    onSocketMessage,
+    onSocketDown,
+    onRadioMissing,
+    onDeviceUnavailable,
+    onReachable,
+  }
 }
 
 /** Opens the control socket for the given radio and fires its 'open' event. */
@@ -398,5 +410,75 @@ describe('useSdrControlSocket — data-confirmed flag and init markers', () => {
     socket.markInitialised(3)
     expect(socket.isInitialised(3)).toBe(true)
     expect(sessionStorage.getItem('sdrInit_3')).toBe('1')
+  })
+})
+
+describe('a radio whose device is unavailable', () => {
+  /**
+   * The refusal that used to retry for ever. `POST /api/sdr/connect` answers
+   * 503 when the backend knows the device is unusable — unplugged, disabled, or
+   * replugged into another socket — and retrying refuses identically every few
+   * seconds, filling the console and never succeeding.
+   */
+  beforeEach(() => {
+    connectStatus = 503
+    connectBody = { detail: 'RTL-SDR V4 is unavailable. Device not found.' }
+  })
+
+  it('reports the reason instead of opening a socket', async () => {
+    const { socket, onDeviceUnavailable } = createHarness()
+
+    await socket.openControlSocket(1)
+    await flushPromises()
+
+    expect(onDeviceUnavailable).toHaveBeenCalledWith('RTL-SDR V4 is unavailable. Device not found.')
+  })
+
+  it('keeps the stored radio id, unlike a 404', async () => {
+    // The radio still exists and its dongle may come back, so the operator's
+    // selection is still meaningful — clearing it would lose their choice.
+    const { socket } = createHarness()
+
+    await socket.openControlSocket(7)
+    await flushPromises()
+
+    expect(sessionStorage.getItem('sdrLastRadioId')).toBe('7')
+  })
+
+  it('does not report the radio as missing', async () => {
+    const { socket, onRadioMissing } = createHarness()
+
+    await socket.openControlSocket(1)
+    await flushPromises()
+
+    expect(onRadioMissing).not.toHaveBeenCalled()
+  })
+
+  it('falls back when the error body is not JSON at all', async () => {
+    // A proxy or gateway can answer 503 with HTML; the message still has to be
+    // something, and it must not throw on the way.
+    connectBody = {}
+    fetchMock.mockImplementationOnce(async () => ({
+      status: 503,
+      json: async () => {
+        throw new SyntaxError('Unexpected token <')
+      },
+    }))
+    const { socket, onDeviceUnavailable } = createHarness()
+
+    await socket.openControlSocket(1)
+    await flushPromises()
+
+    expect(onDeviceUnavailable).toHaveBeenCalledWith('That radio is currently unavailable.')
+  })
+
+  it('falls back to a general message when the body carries no detail', async () => {
+    connectBody = {}
+    const { socket, onDeviceUnavailable } = createHarness()
+
+    await socket.openControlSocket(1)
+    await flushPromises()
+
+    expect(onDeviceUnavailable).toHaveBeenCalledWith('That radio is currently unavailable.')
   })
 })

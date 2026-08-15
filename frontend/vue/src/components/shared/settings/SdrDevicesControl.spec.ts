@@ -531,7 +531,7 @@ describe('SdrDevicesControl', () => {
         antenna: '',
         visibility: 'public',
         device_available: false,
-        unavailable_reason: 'Its Sentry no longer has this device.',
+        unavailable_reason: 'Device not found.',
       },
     ] as never)
 
@@ -564,7 +564,7 @@ describe('SdrDevicesControl', () => {
         antenna: '',
         visibility: 'public',
         device_available: false,
-        unavailable_reason: 'Its Sentry no longer has this device.',
+        unavailable_reason: 'Device not found.',
       },
     ] as never)
     mockDeleteRadio.mockResolvedValue(true as never)

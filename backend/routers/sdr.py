@@ -429,7 +429,7 @@ def _device_availability(radio: dict) -> tuple[bool, str]:
 
     # Known host, live snapshot, no such device: the dongle it mirrors is gone —
     # most often replugged into another socket, which changes its identity.
-    return False, "Its Sentry no longer has this device."
+    return False, "Device not found."
 
 
 @router.get("/api/sdr/radios")
