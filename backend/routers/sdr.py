@@ -39,7 +39,7 @@ from backend.config import settings
 from backend.database import get_db, sync_sdr_groups_to_config, sync_sdr_search_ranges_to_config
 from backend.db_helpers import get_setting, upsert_setting
 from backend.models import SdrFrequencyGroup, SdrFrequencyGroupLink, SdrRecording, SdrSearchRange, SdrStoredFrequency
-from backend.services import aprs_store, sdr_channel_maps, sdr_decode, sdr_rigctl
+from backend.services import aprs_store, sdr_decode
 from backend.services import sdr as sdr_svc
 from backend.services.sdr_data import write_sdr_frequencies_file
 from backend.services.sentry_fleet import fleet_poller
@@ -775,45 +775,6 @@ async def set_sdr_data_bandplan(body: dict, db: AsyncSession = Depends(get_db)):
     return JSONResponse({"status": "ok"})
 
 
-@router.get("/api/sdr/data/channel-maps")
-async def get_sdr_data_channel_maps(db: AsyncSession = Depends(get_db)):
-    """Return {channel_maps} as the editor source — trunk channel maps as JSON.
-
-    The DB is the source of truth once anything has been saved. Before that (no
-    DB value yet) we seed from any channel-map CSVs already present in the maps
-    directory, so hand-made maps appear in the editor and aren't lost on first
-    save.
-    """
-    stored = await get_setting(db, "sdr", "channel_maps", default=None)
-    if isinstance(stored, list):
-        return JSONResponse({"channel_maps": stored})
-    seeded = sdr_channel_maps.read_channel_maps_from_dir(Path(settings.channel_maps_dir))
-    return JSONResponse({"channel_maps": seeded})
-
-
-@router.post("/api/sdr/data/channel-maps")
-async def set_sdr_data_channel_maps(body: dict, db: AsyncSession = Depends(get_db)):
-    """Replace trunk channel maps from an edited JSON object {channel_maps: [...]}.
-
-    Validates the shape, stores it in the DB, then renders each map to the
-    ``<name>.csv`` file dsd-fme loads (pruning maps that were removed). The
-    rendered CSVs are what the TRUNK control lists and what trunk tracking uses.
-    """
-    try:
-        maps = sdr_channel_maps.validate_channel_maps_payload(body)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-    await upsert_setting(db, "sdr", "channel_maps", maps)
-    try:
-        sdr_channel_maps.write_channel_maps_to_dir(Path(settings.channel_maps_dir), maps)
-    except OSError as exc:
-        raise HTTPException(500, f"could not write channel-map files: {exc}") from exc
-    return JSONResponse({"status": "ok"})
-
-
-# ── Recording CRUD + file serving ────────────────────────────────────────────
-
-
 @router.get("/api/sdr/recordings")
 async def list_recordings(db: AsyncSession = Depends(get_db)):
     rows = (
@@ -1116,57 +1077,6 @@ async def _resolve_broadcaster(
     return broadcaster, radio
 
 
-async def _handle_trunk_command(
-    websocket: WebSocket,
-    radio: dict,
-    broadcaster: sdr_svc.RadioBroadcaster,
-    msg: dict,
-) -> None:
-    """Apply a ``trunk_decode`` control-socket command.
-
-    Enabling sets the desired trunk config (validated channel-map CSV), ensures
-    the decode bridge + rigctld server are running, and — if the decoder was
-    already decoding without trunk flags — bounces it so the sidecar relaunches
-    dsd-fme in trunk mode. Disabling clears the config, stops the rigctld server,
-    and bounces the decoder back to plain decode. A ``trunk_status`` frame is
-    sent back to the browser either way.
-    """
-    enabled = bool(msg.get("enabled"))
-    if enabled:
-        try:
-            sdr_rigctl.set_trunk_config(
-                enabled=True,
-                channel_map=msg.get("channel_map"),
-                group_list=msg.get("group_list"),
-            )
-        except ValueError as exc:
-            await websocket.send_text(json.dumps({"type": "trunk_status", "enabled": False, "error": str(exc)}))
-            return
-        bridge = await sdr_decode.get_or_create_bridge(radio["host"], radio["port"], broadcaster)
-        was_running = bridge.running
-        await bridge.start(
-            offset_hz=int(msg.get("offset_hz", 0) or 0),
-            bw_hz=int(msg.get("bw_hz", 0) or 0) or None,
-        )
-        # The channel tuned at enable time is the control channel; record it so
-        # retune events can be labelled control-channel vs voice.
-        sdr_rigctl.set_control_channel(bridge.connection.center_hz + bridge.current_offset_hz)
-        await sdr_rigctl.start_rigctl_server()
-        # If decode was already live, dsd-fme is connected without trunk flags;
-        # force it to relaunch so it picks up the new config. A fresh start needs
-        # no bounce — the sidecar connects with trunk flags on its next cycle.
-        if was_running:
-            bridge.bounce_decoder()
-        await websocket.send_text(json.dumps({"type": "trunk_status", "enabled": True}))
-    else:
-        sdr_rigctl.reset_trunk_config()
-        await sdr_rigctl.stop_rigctl_server()
-        bridge = sdr_decode.get_bridge(radio["host"], radio["port"])
-        if bridge is not None and bridge.running:
-            bridge.bounce_decoder()
-        await websocket.send_text(json.dumps({"type": "trunk_status", "enabled": False}))
-
-
 @router.websocket("/ws/sdr/{radio_id}/iq")
 async def sdr_iq_websocket(radio_id: int, websocket: WebSocket):
     """Stream raw IQ binary frames to a single client.
@@ -1374,8 +1284,6 @@ async def sdr_websocket(radio_id: int, websocket: WebSocket):
                                 offset_hz=int(msg.get("offset_hz", 0) or 0),
                                 bw_hz=int(msg.get("bw_hz", 0) or 0) or None,
                             )
-                    elif cmd == "trunk_decode":
-                        await _handle_trunk_command(websocket, radio, broadcaster, msg)
                     elif cmd == "ping":
                         await websocket.send_text(json.dumps({"type": "pong"}))
                 except sdr_svc.ReadOnlyTuningError:
@@ -1431,11 +1339,8 @@ async def sdr_websocket(radio_id: int, websocket: WebSocket):
             await cmd_task
         except asyncio.CancelledError:
             pass
-        # A decode session must never outlive its control socket — and neither
-        # should trunk tracking, so tear down the rigctld server with it.
+        # A decode session must never outlive its control socket.
         await sdr_decode.stop_bridge(radio["host"], radio["port"])
-        sdr_rigctl.reset_trunk_config()
-        await sdr_rigctl.stop_rigctl_server()
 
 
 # ── Digital decode (dsd-fme sidecar) ────────────────────────────────────────────
@@ -1470,13 +1375,10 @@ async def ingest_decode_event(
 
 @router.get("/api/sdr/decode/config")
 async def decode_config(x_decode_secret: str = Header(default="")):
-    """Report the decoder's desired trunk config to the dsd-fme sidecar supervisor.
+    """Report decode-session state to the dsd-fme sidecar supervisor.
 
     Authenticated with the same shared secret as ingest (fails closed). The
-    supervisor polls this before each dsd-fme launch to decide whether to add the
-    trunking + rigctl flags and which channel-map CSV to load. ``rigctl_port`` is
-    the port the backend's rigctld server listens on (and that dsd-fme connects to
-    via the sidecar's localhost forwarder).
+    supervisor polls this before each dsd-fme launch.
 
     ``active`` reports whether a decode session is actually serving PCM. The
     supervisor gates on it: with no active session the PCM feed isn't listening, so
@@ -1490,13 +1392,7 @@ async def decode_config(x_decode_secret: str = Header(default="")):
     if not secrets.compare_digest(x_decode_secret, secret):
         raise HTTPException(401, "invalid decode secret")
     bridge = sdr_decode.get_active_bridge()
-    return JSONResponse(
-        {
-            "trunk": sdr_rigctl.get_trunk_config().as_dict(),
-            "rigctl_port": settings.decoder_rigctl_port,
-            "active": bool(bridge and bridge.running),
-        }
-    )
+    return JSONResponse({"active": bool(bridge and bridge.running)})
 
 
 # ── APRS decode (Direwolf sidecar) ──────────────────────────────────────────────
@@ -1633,32 +1529,6 @@ async def resume_persisted_aprs() -> None:
         await bridge.start()
     except (ConnectionError, OSError):
         logging.getLogger(__name__).exception("Failed to resume APRS decode on radio %s", radio_id)
-
-
-@router.get("/api/sdr/trunk/channel-maps")
-async def list_channel_maps():
-    """List the trunking channel-map / group-list CSV filenames available to select.
-
-    Reads the mounted channel-maps directory and returns the plain ``*.csv``
-    filenames (sorted), each re-validated as a safe name. Returns an empty list
-    if the directory is absent (e.g. a dev run without any maps), so the UI
-    simply shows no options rather than erroring.
-    """
-    maps_dir = Path(settings.channel_maps_dir)
-    names: list[str] = []
-    try:
-        for entry in sorted(maps_dir.iterdir()):
-            if not entry.is_file():
-                continue
-            try:
-                safe = sdr_rigctl.validate_csv_name(entry.name)
-            except ValueError:
-                continue
-            if safe:
-                names.append(safe)
-    except OSError:
-        pass
-    return JSONResponse({"channel_maps": names})
 
 
 @router.get("/api/sdr/decode/status/{radio_id}")

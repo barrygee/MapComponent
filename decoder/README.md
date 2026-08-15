@@ -1,6 +1,6 @@
 # Digital-voice decoder sidecar (dsd-fme)
 
-This optional container decodes **digital voice / trunked** protocols — P25, DMR,
+This optional container decodes **digital voice** protocols — P25, DMR,
 NXDN, D-STAR, YSF, M17, EDACS — from the SDR stream and surfaces decoded **call
 metadata** (mode, talkgroup, source ID, colour code, sync) plus **decoded voice
 audio** in the Sentinel SDR UI.
@@ -95,36 +95,6 @@ the chip, so no patented software is relied on at runtime.
 (Note: mbelib is still compiled because dsd-fme requires it to build; the dongle
 simply takes over the actual vocoding at runtime.)
 
-## Trunk tracking (following trunked systems)
-
-Trunked systems (P25, DMR Tier III / Capacity-Plus / Connect-Plus, NXDN, EDACS)
-assign voice to a channel announced on a **control channel** at call time. With
-trunk tracking on, dsd-fme decodes the control channel and, on each call grant,
-retunes to the voice channel and back — so you hear the calls, not just the
-control data.
-
-**How it works here.** dsd-fme drives retunes over the Hamlib **rigctl**
-protocol (it is the client). The backend runs a small **rigctld server** that
-translates each requested frequency into either an in-span demod offset shift
-(gapless, preferred) or a hardware retune (fallback, when the channel is outside
-the captured span). dsd-fme's rigctl client only dials `localhost`, so this
-container runs a tiny **forwarder** that proxies `localhost:4532` to the backend.
-
-**Enabling it:**
-
-1. Put a channel-map CSV for your system in `decoder/channel-maps/` — see
-   [`channel-maps/README.md`](channel-maps/README.md) for the format. This is
-   **required** and system-specific; trunk tracking can't work without it.
-2. Start with the decoder profile as usual
-   (`docker compose --profile decoder up --build -d`).
-3. In the SDR UI, tune to the system's **control channel**, enable **DIGITAL**,
-   then enable **TRUNK** and pick your channel-map file. The decoder relaunches
-   in trunk mode and begins following grants.
-
-The control + voice channels are followed by re-slicing the captured SDR span
-when they fall within it (no hardware retune); a wider system falls back to
-retuning the dongle, which briefly interrupts the stream.
-
 ## Security
 
 The decoder authenticates its event POSTs to the backend with a shared secret,
@@ -140,14 +110,11 @@ To pin an explicit value instead, set `SENTINEL_DECODER_SECRET` in `.env`
 |---|---|---|
 | `SENTINEL_DECODER_SECRET` | `.env` (optional) | Pin the ingest secret instead of auto-generating it |
 | `DSD_EXTRA_ARGS` | `decoder` env | Extra `dsd-fme` flags (e.g. dongle) |
-| `RIGCTL_HOST` / `RIGCTL_PORT` | `decoder` env | Backend rigctld server the trunk forwarder targets (default `app:4532`) |
-| `CONFIG_URL` | `decoder` env | Backend decode-config endpoint polled for trunk state |
-| `CHANNEL_MAPS_DIR` | `decoder` env | Where trunking CSVs are mounted (`/app/channel-maps`) |
+| `CONFIG_URL` | `decoder` env | Backend decode-config endpoint polled for the active-session flag |
 | `MBELIB_REF` / `DSDFME_REF` | build args | Pin the upstream git refs for reproducibility |
 
-The backend ports (`DECODER_PCM_PORT` 7355, `DECODER_AUDIO_UDP_PORT` 7356,
-`DECODER_RIGCTL_PORT` 4532) are set in `docker-compose.yml` and only need
-changing if they clash on your host.
+The backend ports (`DECODER_PCM_PORT` 7355, `DECODER_AUDIO_UDP_PORT` 7356) are
+set in `docker-compose.yml` and only need changing if they clash on your host.
 
 ## Troubleshooting
 

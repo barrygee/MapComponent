@@ -89,11 +89,6 @@ export interface DecodeEvent {
   audio_sample_rate?: number
   // Present only on `type: "log"` frames — one raw dsd-fme output line.
   line?: string
-  // Present only on `type: "trunk_event"` frames (trunk tracking): the absolute
-  // frequency the decoder just retuned to, and whether that is the control
-  // channel (a return) rather than a call's voice channel.
-  tuned_hz?: number
-  is_control_channel?: boolean
   // Present only on `type: "aprs"` frames (APRS packet decode). The source
   // callsign, decoded position, and optional movement/status fields; the same
   // shape the Land map plots. `raw` is the TNC2 packet the fix was parsed from.
@@ -596,80 +591,6 @@ export const useSdrStore = defineStore('sdr', () => {
     }
   }
 
-  // ── Trunk tracking (dsd-fme follows control-channel grants) ────────────────
-  // Master feature flag for the whole trunk-tracking surface (opt-in, default
-  // OFF — same shape as air.replayEnabled). When OFF the TRUNK button and the
-  // TRUNK SYSTEM channel-map picker are hidden in the SDR panel and the "Trunk
-  // Channel Maps (JSON)" config row is hidden in Settings. Lives in the `sdr`
-  // settings namespace; localStorage is a fast-path cache so the first render
-  // after load is correct before the async settings fetch resolves
-  // (SdrTrunkTrackingToggleControl reconciles it with the DB).
-  function _readTrunkTrackingEnabled(): boolean {
-    try {
-      return localStorage.getItem('sdrTrunkTrackingEnabled') === '1'
-    } catch {
-      return false
-    }
-  }
-  const trunkTrackingEnabled = ref<boolean>(_readTrunkTrackingEnabled())
-  function setTrunkTrackingEnabled(on: boolean) {
-    trunkTrackingEnabled.value = on
-    try {
-      localStorage.setItem('sdrTrunkTrackingEnabled', on ? '1' : '0')
-    } catch {}
-    // Stopping an active follow when the feature is switched off is left to the
-    // SDR panel (it watches this flag and owns the WS connection that tells
-    // dsd-fme to drop trunk mode) — same split as the digital-decode toggle.
-    // Clearing trunkEnabled here would pre-empt that watcher and skip the WS
-    // command, leaving the backend following with no UI.
-  }
-
-  // Whether trunk tracking is active. Not auto-persisted: trunking rides on an
-  // active decode session and a chosen channel map, so it is always started
-  // explicitly rather than restored on load.
-  const trunkEnabled = ref(false)
-  function setTrunkEnabled(on: boolean) {
-    trunkEnabled.value = on
-    if (!on) {
-      trunkFollowedHz.value = null
-      trunkOnControlChannel.value = false
-      trunkError.value = ''
-    }
-  }
-
-  // The selected channel-map CSV filename. Persisted as a convenience so the last
-  // system is preselected next time (it does not enable trunking on its own).
-  function _readTrunkChannelMap(): string {
-    try {
-      return localStorage.getItem('sdrTrunkChannelMap') ?? ''
-    } catch {
-      return ''
-    }
-  }
-  const trunkChannelMap = ref<string>(_readTrunkChannelMap())
-  function setTrunkChannelMap(name: string) {
-    trunkChannelMap.value = name
-    try {
-      localStorage.setItem('sdrTrunkChannelMap', name)
-    } catch {}
-  }
-
-  // CSV filenames offered in the channel-map picker, fetched from the backend.
-  const trunkChannelMaps = ref<string[]>([])
-  function setTrunkChannelMaps(names: string[]) {
-    trunkChannelMaps.value = names
-  }
-
-  // Live trunk indicators: the frequency currently followed and whether it is the
-  // control channel (vs an active call's voice channel). Reset per session.
-  const trunkFollowedHz = ref<number | null>(null)
-  const trunkOnControlChannel = ref(false)
-  // Last trunk error surfaced by the backend (e.g. missing channel map).
-  const trunkError = ref('')
-  function setTrunkError(message: string) {
-    trunkError.value = message
-  }
-
   // Live decoded-event log (newest first), plus the latest sync / decoder
   // reachability state. Non-persisted — this is live session data.
   const decodeEvents = ref<DecodeEvent[]>([])
@@ -721,13 +642,6 @@ export const useSdrStore = defineStore('sdr', () => {
         continue
       }
       if (event.type === 'decode_status') continue
-      if (event.type === 'trunk_event') {
-        // Trunk retune: update the "currently following" indicators only — it is
-        // a state change (which channel we are on), not a decoded call row.
-        if (typeof event.tuned_hz === 'number') trunkFollowedHz.value = event.tuned_hz
-        trunkOnControlChannel.value = event.is_control_channel === true
-        continue
-      }
       freshRows.push({ ...event, ts: event.ts || Date.now() })
     }
     // Reverse so the batch's newest frame lands at the front, then prepend the
@@ -763,8 +677,6 @@ export const useSdrStore = defineStore('sdr', () => {
     decoderReachable.value = false
     decodedMode.value = ''
     decodedAudioRate.value = null
-    trunkFollowedHz.value = null
-    trunkOnControlChannel.value = false
   }
 
   // Clear only the event log (the user's "clear" button), leaving the live
@@ -1085,18 +997,6 @@ export const useSdrStore = defineStore('sdr', () => {
     clearDecode,
     clearDecodeEvents,
     clearDecodeLogs,
-    trunkTrackingEnabled,
-    setTrunkTrackingEnabled,
-    trunkEnabled,
-    setTrunkEnabled,
-    trunkChannelMap,
-    setTrunkChannelMap,
-    trunkChannelMaps,
-    setTrunkChannelMaps,
-    trunkFollowedHz,
-    trunkOnControlChannel,
-    trunkError,
-    setTrunkError,
     setRadio,
     setFrequency,
     setMode,

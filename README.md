@@ -79,8 +79,8 @@ Sentinel/
 │   ├── routers/              air.py · space.py · land.py · sdr.py · sentry.py
 │   │                         · adsb_source.py · settings.py
 │   ├── services/             adsb · adsb_source · satellite · tle · daynight · sdr
-│   │                         · sdr_data · sdr_decode · sdr_rigctl · sdr_channel_maps
-│   │                         · sat_radio · flight_history · json_store
+│   │                         · sdr_data · sdr_decode · sat_radio · flight_history
+│   │                         · json_store
 │   │                         · sentry_client · sentry_fleet
 │   ├── cache.py              Fresh/stale SQLite write-through cache helpers
 │   └── data/                 Seed JSON (bandplan, frequencies, satellite/amateur radio)
@@ -146,7 +146,7 @@ Once running, open **Settings** (gear icon, bottom-right) and set *My Location* 
 
 ### Digital decoding (optional)
 
-Decoding digital voice/trunked modes (P25, DMR, NXDN, D-STAR, YSF, M17, …) runs
+Decoding digital voice modes (P25, DMR, NXDN, D-STAR, YSF, M17, …) runs
 in a **separate, opt-in `dsd-fme` container**. It is **never built by default or
 in CI** because `dsd-fme` requires the patent-encumbered **`mbelib`** vocoder to
 compile — building the decoder is a deliberate local action that compiles
@@ -184,55 +184,6 @@ Notes when trying it:
 
 See [`decoder/README.md`](decoder/README.md) for the full rationale, the
 hardware-AMBE-dongle alternative, and more troubleshooting.
-
-#### Trunk tracking & channel maps (DMR)
-
-On a **trunked** system, voice is not on a fixed frequency: a **control channel**
-announces which logical channel a call has been assigned to, and the receiver
-must retune to follow it. Sentinel does this with `dsd-fme` over the rigctl
-protocol — turn it on with the **TRUNK** control in the SDR panel (it rides on an
-active digital-decode session). See the SDR panel's TRUNK control once digital
-decode is running.
-
-**P25** can derive its channels from the control channel, so it needs no extra
-data. **DMR** (Tier III / Capacity-Plus / Connect-Plus) and **EDACS** cannot —
-the logical-channel-number → frequency mapping exists only in the operator's
-config and is never transmitted, so you must supply it as a **channel map**.
-
-**Adding a DMR channel map** — do it in the app, as JSON:
-
-1. Open **Settings → SDR → Trunk Channel Maps (JSON)** and click **EDIT**.
-2. Add one entry per system: a `name` plus the `lsn` (logical/slot channel
-   number) → `frequency_hz` pairs for that system:
-
-   ```json
-   {
-     "channel_maps": [
-       {
-         "name": "my-dmr-system",
-         "channels": [
-           { "lsn": 1, "frequency_hz": 858606250 },
-           { "lsn": 2, "frequency_hz": 858606250 },
-           { "lsn": 3, "frequency_hz": 859606250 }
-         ]
-       }
-     ]
-   }
-   ```
-
-3. **APPLY CHANGES.** The map is stored in the database and written out as the
-   CSV file `dsd-fme` actually loads (`decoder/channel-maps/<name>.csv`) — you
-   never edit CSV by hand. The new map then appears in the SDR panel's **TRUNK**
-   control; select it and enable trunk tracking.
-
-`name` must be a plain filename component (letters, digits, dot, dash,
-underscore); each `frequency_hz` is in Hz. Editing or removing a map and
-re-applying re-renders the CSVs to match.
-
-Where the LSN→frequency numbers come from: there is no universal feed, so you
-build the table from a system's known carriers — e.g. a community database such
-as RadioReference where coverage exists, or by observing which logical channel
-number `dsd-fme` reports on each carrier as you tune across the system.
 
 ### APRS decoding (optional)
 
@@ -446,7 +397,7 @@ Backend settings live in `backend/config.py` (Pydantic Settings) and can be over
 | `TLE_MANUAL_TTL_MS` | `2592000000` (30 d) | TTL for manually-uploaded TLE data |
 | `CELESTRAK_ISS_URL` | Celestrak active-satellites TLE feed | Default TLE feed URL |
 
-`config.py` also defines the optional **digital-decode / trunk-tracking** settings (`DECODER_*`, `CHANNEL_MAPS_DIR`, `SDR_RELAY_CONTROL_*`) used by the `dsd-fme` sidecar and rigctl trunk server, and the **APRS-decode** settings (`APRS_DECODER_*`, `APRS_STATION_TTL_MS`) used by the Direwolf sidecar. These are auto-wired by `docker-compose.yml` — see [Digital decoding](#digital-decoding-optional) and [APRS decoding](#aprs-decoding-optional) — and normally need no manual configuration.
+`config.py` also defines the optional **digital-decode** settings (`DECODER_*`, `SDR_RELAY_CONTROL_*`) used by the `dsd-fme` sidecar, and the **APRS-decode** settings (`APRS_DECODER_*`, `APRS_STATION_TTL_MS`) used by the Direwolf sidecar. These are auto-wired by `docker-compose.yml` — see [Digital decoding](#digital-decoding-optional) and [APRS decoding](#aprs-decoding-optional) — and normally need no manual configuration.
 
 In Docker, set these under `environment:` in `docker-compose.yml`.
 
@@ -484,12 +435,11 @@ Interactive docs are available at `/api/docs` (Swagger) and `/api/redoc` when th
 |---|---|---|
 | GET · POST · PUT · DELETE | `/radios[/{id}]` | Manage configured radios |
 | GET · POST · PUT · DELETE | `/groups[/{id}]` · `/frequencies[/{id}]` · `/search-ranges[/{id}]` | Manage frequency groups, stored frequencies, search ranges |
-| GET · POST | `/data/frequencies` · `/data/bandplan` · `/data/channel-maps` | Bulk import/export of SDR data and trunk channel maps |
+| GET · POST | `/data/frequencies` · `/data/bandplan` | Bulk import/export of SDR data |
 | GET · POST · PATCH · DELETE | `/recordings[...]` | List recordings; `/recordings/start` · `/recordings/stop`; rename/delete; `/recordings/{id}/file` (WAV) and `/{id}/iq` (raw IQ) download |
 | POST | `/connect` · `/disconnect` | Open/close a radio's `rtl_tcp` connection |
 | GET | `/status/{radio_id}` | Connection state |
 | POST · GET | `/decode/ingest` · `/decode/config` · `/decode/status/{radio_id}` | `dsd-fme` decode ingest, config, and per-radio decode state |
-| GET | `/trunk/channel-maps` | Available trunk channel maps for TRUNK tracking |
 | WS | `/ws/sdr/{radio_id}` · `/ws/sdr/{radio_id}/iq` | Spectrum frames / raw IQ stream |
 | WS | `/ws/sdr/{radio_id}/decode` · `/decode/audio` | Decoded call metadata / decoded voice audio |
 

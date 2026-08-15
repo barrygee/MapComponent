@@ -16,13 +16,6 @@
       <!-- ── Column: raw decoder logs (verbatim dsd-fme output) — voice only ──── -->
       <section v-if="!isAprs" class="sdr-decode-dock-column" aria-label="Decoder logs">
         <div class="sdr-decode-dock-column-header">
-          <!-- Trunk-tracking indicator: which channel the decoder is currently
-               following. aria-live announces grant/return transitions. -->
-          <p v-if="trunkEnabled" class="sdr-decode-trunk" aria-live="polite">
-            <span class="sdr-decode-dot" :class="trunkDotClass" aria-hidden="true"></span>
-            {{ trunkText }}
-          </p>
-
           <!-- aria-live announces sync / decoder-reachability changes without
                re-reading the whole log on every new line. -->
           <p class="sdr-decode-status" aria-live="polite">
@@ -250,24 +243,6 @@ const statusClass = computed(() => {
   return store.decodeSync ? 'sdr-decode-dot--synced' : 'sdr-decode-dot--idle'
 })
 
-// Trunk-tracking indicator. While following a system, show whether the decoder
-// is parked on the control channel or has followed a grant to a voice channel,
-// and the frequency in MHz.
-const trunkEnabled = computed(() => store.trunkEnabled)
-function formatMhz(frequencyHz: number): string {
-  return `${(frequencyHz / 1e6).toFixed(4)} MHz`
-}
-const trunkText = computed(() => {
-  if (store.trunkFollowedHz === null) return 'Trunking — waiting for control channel'
-  if (store.trunkOnControlChannel) return `Control channel — ${formatMhz(store.trunkFollowedHz)}`
-  return `Following call — ${formatMhz(store.trunkFollowedHz)}`
-})
-const trunkDotClass = computed(() =>
-  store.trunkFollowedHz !== null && !store.trunkOnControlChannel
-    ? 'sdr-decode-dot--synced'
-    : 'sdr-decode-dot--idle',
-)
-
 // Whether the structured column is showing APRS packets (vs voice calls).
 const isAprs = computed(() => store.decodeStreamKind === 'aprs')
 
@@ -387,7 +362,7 @@ onUnmounted(() => document.removeEventListener('sentinel:sidebar-state', onSideb
   flex: 1 1 100%;
 }
 
-/* Header carries the logs column's sync/trunk status. The messages column has no
+/* Header carries the logs column's sync status. The messages column has no
    header band — its table heading row stands in for it (see thead padding), so
    the two columns' top rows line up. No borders — the boxes are free of
    horizontal/vertical rules. */
@@ -407,21 +382,6 @@ onUnmounted(() => document.removeEventListener('sentinel:sidebar-state', onSideb
 /* Status text ("No sync" / "Synced — decoding") matches the case and font of the
    column-heading labels: 9px Barlow, weight 400, 0.18em tracking, uppercase. */
 .sdr-decode-status {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0;
-  font-family: var(--font-primary, 'Barlow', sans-serif);
-  font-size: 9px;
-  font-weight: 400;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #cfd6dd;
-}
-
-/* Trunk indicator sits just left of the sync status; both left-align at the
-   start of the header (the header's flex gap spaces them). Same label styling. */
-.sdr-decode-trunk {
   display: flex;
   align-items: center;
   gap: 0.4rem;

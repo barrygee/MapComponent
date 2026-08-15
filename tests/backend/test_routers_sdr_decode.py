@@ -22,7 +22,7 @@ import pytest
 
 from backend.config import settings
 from backend.routers import sdr as sdr_router
-from backend.services import sdr_decode, sdr_rigctl
+from backend.services import sdr_decode
 from backend.services.sdr_decode import DigitalDecodeBridge
 
 
@@ -38,17 +38,15 @@ class _FakeBroadcaster:
 
 @pytest.fixture(autouse=True)
 def _reset_decode_state():
-    """Isolate the module-level bridge caches, decode secret, and trunk state."""
+    """Isolate the module-level bridge caches and the decode secret."""
     sdr_decode._bridges.clear()
     sdr_decode._aprs_bridges.clear()
     original_secret = settings.decoder_ingest_secret
-    sdr_rigctl.reset_trunk_config()
     yield
     sdr_decode._bridges.clear()
     sdr_decode._aprs_bridges.clear()
     settings.decoder_ingest_secret = original_secret
     sdr_decode._ingest_secret = None
-    sdr_rigctl.reset_trunk_config()
 
 
 def _add_radio(client, host="h1", port=1234) -> int:
@@ -405,19 +403,11 @@ class TestDecodeConfig:
         )
         assert resp.status_code == 401
 
-    def test_returns_trunk_state_and_rigctl_port(self, client):
+    def test_reports_inactive_without_a_decode_session(self, client):
         settings.decoder_ingest_secret = "s"
-        sdr_rigctl.set_trunk_config(enabled=True, channel_map="sys.csv")
         resp = client.get("/api/sdr/decode/config", headers={"X-Decode-Secret": "s"})
         assert resp.status_code == 200
-        body = resp.json()
-        assert body["trunk"] == {
-            "enabled": True,
-            "channel_map": "sys.csv",
-            "group_list": None,
-        }
-        assert body["rigctl_port"] == settings.decoder_rigctl_port
-        assert body["active"] is False  # no decode session in this test
+        assert resp.json() == {"active": False}
 
     def test_active_true_when_a_session_is_serving_pcm(self, client, monkeypatch):
         # The supervisor gates dsd-fme launch on this flag, so it must be True only
@@ -440,114 +430,3 @@ class TestDecodeConfig:
         )
         resp = client.get("/api/sdr/decode/config", headers={"X-Decode-Secret": "s"})
         assert resp.json()["active"] is False
-
-
-# ── GET /api/sdr/trunk/channel-maps ───────────────────────────────────────────
-
-
-class TestListChannelMaps:
-    def test_lists_only_csv_files_sorted(self, client, monkeypatch, tmp_path):
-        (tmp_path / "beta.csv").write_text("x")
-        (tmp_path / "alpha.csv").write_text("x")
-        (tmp_path / "notes.txt").write_text("x")  # non-csv ignored
-        (tmp_path / "sub").mkdir()  # directories ignored
-        monkeypatch.setattr(settings, "channel_maps_dir", str(tmp_path))
-        body = client.get("/api/sdr/trunk/channel-maps").json()
-        assert body["channel_maps"] == ["alpha.csv", "beta.csv"]
-
-    def test_empty_when_directory_missing(self, client, monkeypatch, tmp_path):
-        monkeypatch.setattr(settings, "channel_maps_dir", str(tmp_path / "nope"))
-        assert client.get("/api/sdr/trunk/channel-maps").json()["channel_maps"] == []
-
-
-# ── Control-socket trunk_decode command ───────────────────────────────────────
-
-
-def _fake_trunk_bridge(running: bool):
-    bridge = MagicMock()
-    bridge.running = running
-    bridge.start = AsyncMock()
-    bridge.connection = _FakeConn()
-    bridge.current_offset_hz = 5000
-    return bridge
-
-
-def _patch_trunk(monkeypatch, bridge):
-    _patch_control(monkeypatch)
-    monkeypatch.setattr(
-        sdr_router.sdr_decode, "get_or_create_bridge", AsyncMock(return_value=bridge)
-    )
-    monkeypatch.setattr(sdr_router.sdr_decode, "get_bridge", lambda host, port: bridge)
-    monkeypatch.setattr(sdr_router.sdr_rigctl, "start_rigctl_server", AsyncMock())
-    monkeypatch.setattr(sdr_router.sdr_rigctl, "stop_rigctl_server", AsyncMock())
-
-
-def _read_until(ws, frame_type):
-    while True:
-        msg = ws.receive_json()
-        if msg.get("type") == frame_type:
-            return msg
-
-
-class TestControlTrunkCommand:
-    def test_enable_starts_rigctl_and_records_control_channel(
-        self, client, monkeypatch
-    ):
-        bridge = _fake_trunk_bridge(running=False)
-        _patch_trunk(monkeypatch, bridge)
-        with client.websocket_connect("/ws/sdr/1") as ws:
-            ws.receive_json()
-            ws.send_json(
-                {
-                    "cmd": "trunk_decode",
-                    "enabled": True,
-                    "channel_map": "sys.csv",
-                    "offset_hz": 5000,
-                    "bw_hz": 12500,
-                }
-            )
-            status = _read_until(ws, "trunk_status")
-            assert status["enabled"] is True
-            # Assert live module state before the socket closes (its teardown
-            # resets trunk config).
-            assert sdr_rigctl.get_trunk_config().channel_map == "sys.csv"
-            assert sdr_rigctl.get_control_channel() == _FakeConn.center_hz + 5000
-        bridge.start.assert_awaited_once()
-        bridge.bounce_decoder.assert_not_called()
-        sdr_router.sdr_rigctl.start_rigctl_server.assert_awaited()
-
-    def test_enable_bounces_already_running_decoder(self, client, monkeypatch):
-        bridge = _fake_trunk_bridge(running=True)
-        _patch_trunk(monkeypatch, bridge)
-        with client.websocket_connect("/ws/sdr/1") as ws:
-            ws.receive_json()
-            ws.send_json(
-                {"cmd": "trunk_decode", "enabled": True, "channel_map": "sys.csv"}
-            )
-            _read_until(ws, "trunk_status")
-        bridge.bounce_decoder.assert_called_once()
-
-    def test_enable_without_channel_map_reports_error(self, client, monkeypatch):
-        bridge = _fake_trunk_bridge(running=False)
-        _patch_trunk(monkeypatch, bridge)
-        with client.websocket_connect("/ws/sdr/1") as ws:
-            ws.receive_json()
-            ws.send_json({"cmd": "trunk_decode", "enabled": True})
-            status = _read_until(ws, "trunk_status")
-            assert status["enabled"] is False
-            assert "channel-map" in status["error"]
-        # Rejected before starting anything.
-        bridge.start.assert_not_awaited()
-
-    def test_disable_resets_and_bounces(self, client, monkeypatch):
-        bridge = _fake_trunk_bridge(running=True)
-        _patch_trunk(monkeypatch, bridge)
-        sdr_rigctl.set_trunk_config(enabled=True, channel_map="sys.csv")
-        with client.websocket_connect("/ws/sdr/1") as ws:
-            ws.receive_json()
-            ws.send_json({"cmd": "trunk_decode", "enabled": False})
-            status = _read_until(ws, "trunk_status")
-            assert status["enabled"] is False
-            assert sdr_rigctl.get_trunk_config().enabled is False
-        bridge.bounce_decoder.assert_called_once()
-        sdr_router.sdr_rigctl.stop_rigctl_server.assert_awaited()

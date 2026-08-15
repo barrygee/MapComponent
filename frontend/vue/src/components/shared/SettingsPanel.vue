@@ -307,7 +307,6 @@ import './SettingsPanel.css'
 import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAppStore } from '@/stores/app'
-import { useSdrStore } from '@/stores/sdr'
 import { useDialog } from '@/composables/useDialog'
 import type { SettingItem } from '@/types/settings'
 import SettingRow from './settings/SettingRow.vue'
@@ -321,7 +320,6 @@ export type { SettingItem }
 
 const store = useSettingsStore()
 const appStore = useAppStore()
-const sdrStore = useSdrStore()
 
 const activeSection = ref('app')
 const searchQuery = ref('')
@@ -641,24 +639,6 @@ const ALL_SETTINGS: SettingItem[] = [
     type: 'sdr-bandplan-file',
   },
   {
-    section: 'sdr',
-    sectionLabel: 'SDR',
-    id: 'sdr-trunk-tracking-toggle',
-    label: 'Trunk Tracking',
-    desc: 'Follow trunked-radio systems by control-channel grants. When on, the TRUNK control and TRUNK SYSTEM channel-map picker appear in the SDR panel and the Trunk Channel Maps editor below is shown. When off, all trunk UI is hidden. Off by default.',
-    type: 'sdr-trunk-tracking-toggle',
-    groupLabel: 'TRUNK DATA',
-  },
-  {
-    section: 'sdr',
-    sectionLabel: 'SDR',
-    id: 'sdr-channelmaps-file',
-    label: 'Trunk Channel Maps (JSON)',
-    desc: 'Add trunked-system channel maps as JSON — each map a name plus a list of {lsn, frequency_hz} pairs. Saved to the database and written out as the CSV files dsd-fme loads for trunk tracking (pick one in the SDR panel’s TRUNK control).',
-    type: 'sdr-channelmaps-file',
-    groupLabel: 'TRUNK DATA',
-  },
-  {
     section: 'app',
     sectionLabel: 'App Settings',
     id: 'config-current',
@@ -683,14 +663,6 @@ const visibleSections = computed(() =>
   ),
 )
 
-// Some rows are gated behind a feature flag rather than always shown. The Trunk
-// Channel Maps (JSON) editor only makes sense — and only appears — when trunk
-// tracking is enabled, so it follows the same master flag as the panel UI.
-function isSettingVisible(item: SettingItem): boolean {
-  if (item.id === 'sdr-channelmaps-file') return sdrStore.trunkTrackingEnabled
-  return true
-}
-
 const sectionHeading = computed(() => {
   if (searchQuery.value.trim()) return 'SEARCH RESULTS'
   const s = NAV_SECTIONS.find((n) => n.key === activeSection.value)
@@ -699,7 +671,7 @@ const sectionHeading = computed(() => {
 })
 
 const currentSectionItems = computed(() =>
-  ALL_SETTINGS.filter((s) => s.section === activeSection.value && isSettingVisible(s)),
+  ALL_SETTINGS.filter((s) => s.section === activeSection.value),
 )
 
 const searchResults = computed<SettingItem[]>(() => {
@@ -711,7 +683,6 @@ const searchResults = computed<SettingItem[]>(() => {
   return ALL_SETTINGS.filter(
     (s) =>
       (!DOMAIN_SECTIONS.has(s.section) || appStore.enabledDomains.includes(s.section)) &&
-      isSettingVisible(s) &&
       (s.label.toLowerCase().includes(q) ||
         s.desc.toLowerCase().includes(q) ||
         (s.searchTerms?.toLowerCase().includes(q) ?? false) ||

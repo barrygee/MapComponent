@@ -1,6 +1,6 @@
 """SDR digital-decode service — server-side FM demodulation + decoder bridge.
 
-Digital voice/trunked protocols (P25, DMR, NXDN, D-STAR, YSF, …) are decoded by
+Digital voice protocols (P25, DMR, NXDN, D-STAR, YSF, …) are decoded by
 an external ``dsd-fme`` sidecar container, NOT in the browser.  ``dsd-fme``'s
 clean input is **FM-demodulated 48 kHz mono s16 PCM over TCP** (the SDR++
 "TCP audio sink" convention) — not raw IQ.  So this module reproduces, on the
@@ -18,7 +18,7 @@ The same FM-discriminator PCM feed also drives **APRS** packet decode: Direwolf
 (the ``aprs-decoder`` sidecar) reads the identical 48 kHz s16 stream and emits
 AX.25/APRS packets. So the PCM-serving spine is shared by a small base class
 (:class:`PcmDecodeBridge`); the voice bridge (:class:`DigitalDecodeBridge`) adds a
-decoded-voice UDP path + trunk support, while the APRS bridge
+decoded-voice UDP path, while the APRS bridge
 (:class:`AprsDecodeBridge`) adds nothing (packets arrive purely as ingested
 events). One sidecar container exists per kind, so at most one voice bridge and
 one APRS bridge are ever active — but they may run **concurrently** on two
@@ -47,7 +47,7 @@ from pathlib import Path
 
 import numpy as np
 from backend.config import settings
-from backend.services.sdr import RadioBroadcaster, RtlTcpConnection, _iq_bytes_to_complex
+from backend.services.sdr import RadioBroadcaster, _iq_bytes_to_complex
 
 logger = logging.getLogger(__name__)
 
@@ -490,21 +490,6 @@ class PcmDecodeBridge:
     def pcm_port(self) -> int:
         return self._pcm_port
 
-    @property
-    def connection(self) -> RtlTcpConnection:
-        """The rtl_tcp connection backing this decode session (for rigctl retunes)."""
-        return self._broadcaster.connection
-
-    @property
-    def current_offset_hz(self) -> int:
-        """Current demod NCO offset from the hardware centre (Hz).
-
-        Combined with ``connection.center_hz`` this yields the absolute frequency
-        the decoder is presently demodulating — the value the rigctl server
-        reports back on a ``get_freq`` (``f``) query.
-        """
-        return self._state.offset_hz
-
     # ── decoder TCP (PCM out) ──────────────────────────────────────────────
     async def _on_decoder_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         peer = writer.get_extra_info("peername")
@@ -592,11 +577,11 @@ class PcmDecodeBridge:
 
 
 class DigitalDecodeBridge(PcmDecodeBridge):
-    """Voice/trunked-decode bridge (dsd-fme sidecar).
+    """Voice-decode bridge (dsd-fme sidecar).
 
     Extends the PCM spine with the decoded-voice UDP path (dsd-fme sends audio
-    back over UDP), a measured-rate resampler that normalises the varying blaster
-    rate to a uniform 48 kHz, and trunk-tracking support (:meth:`bounce_decoder`).
+    back over UDP) and a measured-rate resampler that normalises the varying
+    blaster rate to a uniform 48 kHz.
     """
 
     kind = "voice"
@@ -646,27 +631,6 @@ class DigitalDecodeBridge(PcmDecodeBridge):
 
     def _clear_extra_subscribers(self) -> None:
         self._audio_subs.clear()
-
-    def bounce_decoder(self) -> bool:
-        """Drop the decoder's PCM connection so its supervisor relaunches dsd-fme.
-
-        dsd-fme's trunking/rigctl flags are fixed at launch, so toggling trunk
-        mode on an already-running decoder requires restarting dsd-fme. Closing
-        the PCM writer gives it EOF on its input; it exits and the sidecar
-        supervisor reconnects, re-reading the decode config (and thus the new
-        trunk flags). Returns False if no decoder is currently connected.
-        """
-        writer = self._pcm_writer
-        if writer is None:
-            return False
-        try:
-            writer.close()
-        except Exception:
-            pass
-        self._pcm_writer = None
-        self._decoder_connected = False
-        self._publish_status()
-        return True
 
     @property
     def audio_udp_port(self) -> int:
@@ -761,7 +725,7 @@ class AprsDecodeBridge(PcmDecodeBridge):
 
     Adds nothing to the PCM spine: Direwolf consumes the 48 kHz s16 feed and the
     decoded APRS packets arrive back purely as HTTP-ingested events (there is no
-    decoded-voice UDP stream and no trunk following). Only the default PCM port
+    decoded-voice UDP stream). Only the default PCM port
     and channel bandwidth differ from the voice bridge.
     """
 

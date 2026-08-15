@@ -2,7 +2,6 @@
   <div
     class="settings-item"
     :class="{
-      'settings-item--wide': isWide,
       'settings-item--half': isHalf,
       'settings-item--triple': isTriple,
       'settings-item--natural-height': isNaturalHeight,
@@ -121,17 +120,6 @@
       filename="sdr_bandplan.json"
       @stage="emit('stage', item.id, $event)"
     />
-    <SdrTrunkTrackingToggleControl
-      v-else-if="item.type === 'sdr-trunk-tracking-toggle'"
-      @stage="emit('stage', item.id, $event)"
-    />
-    <JsonDataControl
-      v-else-if="item.type === 'sdr-channelmaps-file'"
-      get-url="/api/sdr/data/channel-maps"
-      post-url="/api/sdr/data/channel-maps"
-      filename="sdr_channel_maps.json"
-      @stage="emit('stage', item.id, $event)"
-    />
     <ConfigCurrentControl
       v-else-if="item.type === 'config-current'"
       @stage="emit('stage', item.id, $event)"
@@ -167,7 +155,6 @@ import SentryHostsControl from './SentryHostsControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import SdrOptionsControl from './SdrOptionsControl.vue'
 import SdrResumeDelayControl from './SdrResumeDelayControl.vue'
-import SdrTrunkTrackingToggleControl from './SdrTrunkTrackingToggleControl.vue'
 import ConfigCurrentControl from './ConfigCurrentControl.vue'
 import ExportAllControl from './ExportAllControl.vue'
 import JsonDataControl from './JsonDataControl.vue'
@@ -181,10 +168,9 @@ const emit = defineEmits<{
   commit: []
 }>()
 
-const WIDE_TYPES = new Set(['sdr-channelmaps-file'])
-// Every JSON-textarea editor sits here (or in WIDE_TYPES) so a config document
-// never gets squeezed into a single 300px column — two columns is the minimum
-// readable width for indented JSON. The SDR options box joins them so its
+// Every JSON-textarea editor sits here so a config document never gets squeezed
+// into a single 300px column — two columns is the minimum readable width for
+// indented JSON. The SDR options box joins them so its
 // option names ("Snap to Known Frequencies") stay on one line beside their
 // checkbox column.
 const HALF_TYPES = new Set([
@@ -203,7 +189,6 @@ const HALF_TYPES = new Set([
   'config-current',
 ])
 const NATURAL_HEIGHT_TYPES = new Set(['location'])
-const isWide = WIDE_TYPES.has(props.item.type)
 const isTriple = false
 const isHalf = HALF_TYPES.has(props.item.type)
 const isNaturalHeight = NATURAL_HEIGHT_TYPES.has(props.item.type)

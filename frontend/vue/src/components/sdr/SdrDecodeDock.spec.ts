@@ -155,47 +155,6 @@ describe('SdrDecodeDock', () => {
     expect(store.decodeEvents).toHaveLength(1) // messages untouched
   })
 
-  it('hides the trunk indicator until trunk tracking is enabled', async () => {
-    const store = useSdrStore()
-    const wrapper = mountDock()
-    expect(wrapper.find('.sdr-decode-trunk').exists()).toBe(false)
-    store.setTrunkEnabled(true)
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('.sdr-decode-trunk').exists()).toBe(true)
-  })
-
-  it('shows the waiting state when trunking with no channel followed yet', async () => {
-    const store = useSdrStore()
-    store.setTrunkEnabled(true)
-    const wrapper = mountDock()
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('.sdr-decode-trunk').text()).toBe('Trunking — waiting for control channel')
-    // No channel followed → idle dot inside the trunk indicator.
-    expect(wrapper.find('.sdr-decode-trunk .sdr-decode-dot--idle').exists()).toBe(true)
-  })
-
-  it('shows the control-channel state with an idle dot and MHz frequency', async () => {
-    const store = useSdrStore()
-    store.setTrunkEnabled(true)
-    store.trunkFollowedHz = 453_012_500
-    store.trunkOnControlChannel = true
-    const wrapper = mountDock()
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('.sdr-decode-trunk').text()).toBe('Control channel — 453.0125 MHz')
-    expect(wrapper.find('.sdr-decode-trunk .sdr-decode-dot--idle').exists()).toBe(true)
-  })
-
-  it('shows the following-call state with a synced dot when off the control channel', async () => {
-    const store = useSdrStore()
-    store.setTrunkEnabled(true)
-    store.trunkFollowedHz = 451_500_000
-    store.trunkOnControlChannel = false
-    const wrapper = mountDock()
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('.sdr-decode-trunk').text()).toBe('Following call — 451.5000 MHz')
-    expect(wrapper.find('.sdr-decode-trunk .sdr-decode-dot--synced').exists()).toBe(true)
-  })
-
   it('reflects the live status text and dot class', async () => {
     const store = useSdrStore()
     const wrapper = mountDock()
