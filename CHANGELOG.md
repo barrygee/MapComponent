@@ -1206,6 +1206,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Move the Space FILTER pane onto BaseFilterPanel (#265)
 - Remove the Full Waterfall Update setting (#279)
 - Gather the SDR options into one checkbox box (#280)
+- Widen the SDR options box and switch its rows to toggles (#281)
 
 ### Documentation
 
