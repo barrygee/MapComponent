@@ -130,6 +130,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Stop offering private and disabled SDRs as sources (#274)
 - Let mirrored radios follow their device, and report availability (#275)
 - Show when a radio's device is unavailable, and why (#276)
+- Render radios whose Sentry device has gone, so they can be removed (#277)
 
 ### Bug Fixes
 
