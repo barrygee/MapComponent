@@ -25,6 +25,7 @@ from typing import Any
 
 from backend.config import settings
 from backend.database import AsyncSessionLocal
+from backend.db_helpers import get_setting, upsert_setting
 from backend.models import SentryHost
 from backend.services.sentry_client import SentryApiError, SentryClient, SentryUnreachableError
 from sqlalchemy import select
@@ -164,7 +165,68 @@ class SentryFleetPoller:
         snapshot.last_error = None
         snapshot.last_success_at = polled_at
         await self._update_host_row(host_id, last_seen_at=polled_at, last_error=None)
+        await self._follow_device_addresses(host_id, response.data)
         return True
+
+    async def _follow_device_addresses(self, host_id: int, payload: dict[str, Any] | None) -> None:
+        """Re-point mirrored radios at wherever their device now answers.
+
+        A Sentinel radio created from a Sentry device is a *mirror*: the device
+        identity is the fact, and the address is a detail Sentry owns and
+        reassigns. Replug a dongle into another USB socket and Sentry may give it
+        a different output port — at which point the mirror is pointing at a port
+        nothing listens on, and connecting to it fails with a bare socket error
+        that says nothing about why.
+
+        Since this poll already carries every device's current address, the
+        cheapest place to notice is here. Nothing is written unless an address
+        actually changed, so the ordinary case costs one comparison per device.
+
+        Deliberately does **not** delete a radio whose device has disappeared. A
+        dongle is unplugged for all sorts of temporary reasons, and quietly
+        destroying the operator's configuration — its name, its frequency groups,
+        its recordings — because a USB plug was loose would be far worse than
+        showing it as unavailable, which is what `GET /api/sdr/radios` now does.
+        """
+        addresses: dict[str, tuple[str, int]] = {}
+        for device in (payload or {}).get("sdrs", []):
+            output = device.get("output") or {}
+            iq_port = output.get("iq_port")
+            device_id = device.get("device_id")
+            if isinstance(device_id, str) and isinstance(iq_port, int):
+                addresses[device_id] = (output.get("host") or "", iq_port)
+
+        if not addresses:
+            return
+
+        async with AsyncSessionLocal() as db:
+            radios = await get_setting(db, "sdr", "radios", default=[])
+            if not isinstance(radios, list):
+                return
+            changed = False
+            for radio in radios:
+                if not isinstance(radio, dict) or radio.get("sentry_host_id") != host_id:
+                    continue
+                current = addresses.get(radio.get("sentry_device_id") or "")
+                if current is None:
+                    continue
+                _, iq_port = current
+                # Only the port is followed. The host in Sentry's payload is its
+                # own view of itself and can be empty or container-internal,
+                # whereas the address the operator registered is the one Sentinel
+                # can actually reach.
+                if radio.get("port") != iq_port:
+                    logger.info(
+                        "Radio %s followed device %s from port %s to %s",
+                        radio.get("id"),
+                        radio.get("sentry_device_id"),
+                        radio.get("port"),
+                        iq_port,
+                    )
+                    radio["port"] = iq_port
+                    changed = True
+            if changed:
+                await upsert_setting(db, "sdr", "radios", radios)
 
     async def _record_failure(self, host_id: int, snapshot: HostSnapshot, message: str) -> None:
         snapshot.reachable = False

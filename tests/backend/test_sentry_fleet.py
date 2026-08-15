@@ -24,6 +24,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.database import Base
+from backend import db_helpers
 from backend.models import SentryHost  # noqa: F401 — register the ORM model with Base
 from backend.services import sentry_fleet
 from backend.services.sentry_client import (
@@ -428,3 +429,127 @@ async def test_update_host_row_tolerates_the_host_being_deleted_mid_poll(
     poller = sentry_fleet.SentryFleetPoller()
 
     await poller._update_host_row(4242, last_seen_at=123, last_error=None)
+
+
+# ── mirrored radios following their device ────────────────────────────────────
+
+
+async def _create_radio(session_factory, *, device_id: str, port: int, host_id: int = 1) -> int:
+    """A Sentinel radio mirroring a Sentry device, as ADD creates one.
+
+    Radios live in the `sdr.radios` UserSettings JSON array, not in the
+    `sdr_radios` table — that table is vestigial for this surface.
+    """
+    async with session_factory() as db:
+        radios = await db_helpers.get_setting(db, "sdr", "radios", default=[])
+        radio_id = len(radios) + 1
+        radios.append(
+            {
+                "id": radio_id,
+                "name": "ADSB",
+                "host": "192.168.5.67",
+                "port": port,
+                "enabled": True,
+                "sentry_host_id": host_id,
+                "sentry_device_id": device_id,
+            }
+        )
+        await db_helpers.upsert_setting(db, "sdr", "radios", radios)
+        return radio_id
+
+
+async def _reload_radio(session_factory, radio_id: int) -> dict | None:
+    async with session_factory() as db:
+        radios = await db_helpers.get_setting(db, "sdr", "radios", default=[])
+    return next((r for r in radios if r.get("id") == radio_id), None)
+
+
+def _status_with_device(device_id: str, iq_port: int) -> SentryResponse:
+    return SentryResponse(
+        data={
+            "generated_at": 1,
+            "sdrs": [
+                {
+                    "device_id": device_id,
+                    "name": "ADSB",
+                    "present": True,
+                    "enabled": True,
+                    "output": {"iq_port": iq_port, "control_port": iq_port + 2, "host": ""},
+                }
+            ],
+        },
+        api_version="1.0",
+    )
+
+
+async def test_a_poll_repoints_a_radio_whose_device_moved_port(session_factory, monkeypatch):
+    """The replug case: Sentry reassigns the port, and the mirror follows.
+
+    Without this the radio points at a port nothing listens on, and connecting
+    fails with a bare socket error naming neither the device nor the reason.
+    """
+    host_id = await _create_host(session_factory)
+    radio_id = await _create_radio(session_factory, device_id="serial:AAA", port=2345, host_id=host_id)
+    monkeypatch.setattr(
+        sentry_fleet,
+        "SentryClient",
+        _fake_client_class([_status_with_device("serial:AAA", 4343)]),
+    )
+
+    await sentry_fleet.SentryFleetPoller()._poll_once(host_id)
+
+    assert (await _reload_radio(session_factory, radio_id))["port"] == 4343
+
+
+async def test_a_poll_leaves_an_already_correct_radio_alone(session_factory, monkeypatch):
+    host_id = await _create_host(session_factory)
+    radio_id = await _create_radio(session_factory, device_id="serial:AAA", port=4343, host_id=host_id)
+    monkeypatch.setattr(
+        sentry_fleet,
+        "SentryClient",
+        _fake_client_class([_status_with_device("serial:AAA", 4343)]),
+    )
+
+    await sentry_fleet.SentryFleetPoller()._poll_once(host_id)
+
+    assert (await _reload_radio(session_factory, radio_id))["port"] == 4343
+
+
+async def test_a_poll_never_deletes_a_radio_whose_device_vanished(session_factory, monkeypatch):
+    """A dongle is unplugged for all sorts of temporary reasons.
+
+    Destroying the operator's configuration — its name, its groups, its
+    recordings — because a USB plug was loose would be far worse than showing it
+    as unavailable, which `GET /api/sdr/radios` does instead.
+    """
+    host_id = await _create_host(session_factory)
+    radio_id = await _create_radio(session_factory, device_id="serial:GONE", port=2345, host_id=host_id)
+    monkeypatch.setattr(
+        sentry_fleet,
+        "SentryClient",
+        _fake_client_class([_status_with_device("usb:1-1.4", 6565)]),
+    )
+
+    await sentry_fleet.SentryFleetPoller()._poll_once(host_id)
+
+    radio = await _reload_radio(session_factory, radio_id)
+    assert radio is not None
+    assert radio["port"] == 2345
+
+
+async def test_a_poll_does_not_touch_another_hosts_radios(session_factory, monkeypatch):
+    # Two Sentries can each have a device with the same id; a poll of one must
+    # not re-point the other's mirror.
+    host_id = await _create_host(session_factory)
+    other_radio = await _create_radio(
+        session_factory, device_id="serial:AAA", port=1111, host_id=host_id + 99
+    )
+    monkeypatch.setattr(
+        sentry_fleet,
+        "SentryClient",
+        _fake_client_class([_status_with_device("serial:AAA", 4343)]),
+    )
+
+    await sentry_fleet.SentryFleetPoller()._poll_once(host_id)
+
+    assert (await _reload_radio(session_factory, other_radio))["port"] == 1111

@@ -42,6 +42,7 @@ from backend.models import SdrFrequencyGroup, SdrFrequencyGroupLink, SdrRecordin
 from backend.services import aprs_store, sdr_channel_maps, sdr_decode, sdr_rigctl
 from backend.services import sdr as sdr_svc
 from backend.services.sdr_data import write_sdr_frequencies_file
+from backend.services.sentry_fleet import fleet_poller
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, field_validator
@@ -394,9 +395,51 @@ _active_iq_recordings: dict[int, asyncio.Queue] = {}
 # ── Radio CRUD — backed by UserSettings sdr.radios ───────────────────────────
 
 
+def _device_availability(radio: dict) -> tuple[bool, str]:
+    """Whether a Sentry-mirrored radio's device is currently there.
+
+    A radio created from a Sentry device is a mirror, and the device can be
+    unplugged, disabled or made private at any moment. Reporting that here is
+    what lets the UI grey the radio out instead of offering a connection that
+    can only fail — and what turns the old bare socket error into a sentence
+    naming the actual reason.
+
+    A manually-entered radio has no Sentry device behind it and is always
+    reported available: nothing here knows any better than the operator did.
+    """
+    host_id = radio.get("sentry_host_id")
+    device_id = radio.get("sentry_device_id")
+    if not isinstance(host_id, int) or not isinstance(device_id, str):
+        return True, ""
+
+    snapshot = fleet_poller.get_snapshot(host_id)
+    if snapshot is None or not snapshot.reachable:
+        return False, "Its Sentry host is not reachable."
+
+    for device in (snapshot.status_payload or {}).get("sdrs", []):
+        if device.get("device_id") != device_id:
+            continue
+        if not device.get("present"):
+            return False, "The dongle is unplugged."
+        if not device.get("enabled"):
+            return False, "The device is disabled on its Sentry."
+        if (device.get("output") or {}).get("iq_port") is None:
+            return False, "Sentry has not assigned this device an output port."
+        return True, ""
+
+    # Known host, live snapshot, no such device: the dongle it mirrors is gone —
+    # most often replugged into another socket, which changes its identity.
+    return False, "Its Sentry no longer has this device."
+
+
 @router.get("/api/sdr/radios")
 async def list_radios(db: AsyncSession = Depends(get_db)):
-    return JSONResponse(await _get_radios(db))
+    radios = await _get_radios(db)
+    for radio in radios:
+        available, reason = _device_availability(radio)
+        radio["device_available"] = available
+        radio["unavailable_reason"] = reason
+    return JSONResponse(radios)
 
 
 @router.post("/api/sdr/radios", status_code=201)
@@ -954,6 +997,15 @@ async def connect_radio(body: ConnectIn, db: AsyncSession = Depends(get_db)):
     radio = _get_radio_by_id(radios, body.radio_id)
     if not radio:
         raise HTTPException(404, "Radio not found")
+    # Checked before dialling: a mirrored radio whose device has been unplugged
+    # or replugged elsewhere would otherwise fail as a bare connection refusal,
+    # which tells the operator nothing about what to do.
+    available, reason = _device_availability(radio)
+    if not available:
+        raise HTTPException(
+            503,
+            f"{radio.get('name') or 'This radio'} is unavailable. {reason}",
+        )
     try:
         conn = await sdr_svc.get_or_create_connection(radio["host"], radio["port"])
         try:
@@ -1464,6 +1516,15 @@ async def aprs_start(body: AprsControlIn, db: AsyncSession = Depends(get_db)):
     radio = _get_radio_by_id(radios, body.radio_id)
     if not radio:
         raise HTTPException(404, "Radio not found")
+    # Checked before dialling: a mirrored radio whose device has been unplugged
+    # or replugged elsewhere would otherwise fail as a bare connection refusal,
+    # which tells the operator nothing about what to do.
+    available, reason = _device_availability(radio)
+    if not available:
+        raise HTTPException(
+            503,
+            f"{radio.get('name') or 'This radio'} is unavailable. {reason}",
+        )
     try:
         broadcaster = await sdr_svc.get_or_create_broadcaster(radio["host"], radio["port"])
     except ConnectionError as exc:
