@@ -11,6 +11,7 @@ from backend.database import (
     backfill_satellite_radio_store,
     create_tables,
     migrate_sdr_radios_to_settings,
+    prune_removed_settings,
     seed_default_settings,
     seed_sdr_bandplan_from_file,
     seed_sdr_data_from_files,
@@ -52,6 +53,9 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler — creates tables and seeds defaults on startup."""
     await create_tables()
     await migrate_sdr_radios_to_settings()
+    # Drop settings rows left behind by removed features before the seeders run,
+    # so a stale key can never be mistaken for a live default.
+    await prune_removed_settings()
     await seed_default_settings()
     await seed_sdr_data_from_files()
     await seed_sdr_bandplan_from_file()
