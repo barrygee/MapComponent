@@ -352,6 +352,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Give the root context a working tsconfig and gate it in CI
 - Align @types/node with the Node 24 toolchain
 - Rebuild the SPA bundle
+- Prune trunk-tracking settings and record the removal in ADRs (#284)
 
 ### Other
 
