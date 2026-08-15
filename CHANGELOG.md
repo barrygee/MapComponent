@@ -329,6 +329,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Widen the JSON config editors to two grid columns
 - Close the gap above an expanded first filter row
 - Tune ADS-B to fixed maximum gain instead of AGC (#273)
+- Stop retrying a radio whose device is unavailable, and say why (#278)
 
 ### Chores
 
