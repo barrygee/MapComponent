@@ -2081,3 +2081,16 @@
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* Why the selected radio cannot be connected to — an unplugged dongle, a
+   disabled device, one replugged into another socket. Sits under the selector
+   so it reads as a property of that choice rather than a global failure.
+   Before this it was only visible as repeated 503s in the browser console. */
+.sdr-radio-unavailable {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+  color: rgba(214, 118, 118, 0.95);
+}

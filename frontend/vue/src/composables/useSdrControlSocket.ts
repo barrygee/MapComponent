@@ -37,6 +37,16 @@ export interface UseSdrControlSocketOptions {
    * the stored id and closed the socket; the panel resets its selection UI.
    */
   onRadioMissing: () => void
+  /**
+   * The connect POST was refused because the radio's device is unavailable —
+   * its dongle unplugged, disabled, or replugged into another socket.
+   *
+   * Separate from `onRadioMissing` because the radio still exists and the
+   * operator's selection is still meaningful: the device may well come back.
+   * The composable has stopped the reconnect loop and left the stored id
+   * alone, so the panel should show `reason` and let them decide.
+   */
+  onDeviceUnavailable: (reason: string) => void
   /** The reachability probe found the device connected — light the dot. */
   onReachable: () => void
   /** Whether the given radio is still the panel's selected one (probe race guard). */
@@ -57,6 +67,7 @@ export function useSdrControlSocket(options: UseSdrControlSocketOptions) {
     onSocketMessage,
     onSocketDown,
     onRadioMissing,
+    onDeviceUnavailable,
     onReachable,
     isRadioStillSelected,
     isAlreadyConnected,
@@ -189,6 +200,23 @@ export function useSdrControlSocket(options: UseSdrControlSocketOptions) {
         sessionStorage.removeItem('sdrLastRadioId')
         closeControlSocket()
         onRadioMissing()
+        return
+      }
+      // 503 means the backend knows this radio's device is not usable — the
+      // dongle is unplugged, disabled, or was replugged into another socket.
+      // Retrying would refuse identically every few seconds for as long as that
+      // is true, filling the console and never succeeding, so the loop stops
+      // here and the reason is shown instead.
+      //
+      // Unlike a 404 the stored id is *kept*: the radio still exists and the
+      // device may come back, so the operator's selection is still meaningful.
+      if (res.status === 503) {
+        const detail = await res
+          .json()
+          .then((body) => (typeof body?.detail === 'string' ? body.detail : ''))
+          .catch(() => '')
+        closeControlSocket()
+        onDeviceUnavailable(detail || 'That radio is currently unavailable.')
         return
       }
     } catch (_) {}

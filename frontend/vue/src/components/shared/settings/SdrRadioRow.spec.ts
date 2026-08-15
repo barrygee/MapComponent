@@ -209,7 +209,7 @@ describe('a radio whose Sentry device is unavailable', () => {
   it('still shows the radio rather than hiding it', () => {
     // It is still the operator's radio to keep, rename or delete — a loose USB
     // plug must not make their configuration disappear.
-    const wrapper = mountRow(unavailable('Its Sentry no longer has this device.'))
+    const wrapper = mountRow(unavailable('Device not found.'))
 
     expect(wrapper.text()).toContain('Roof')
     expect(wrapper.find('[aria-label="Edit device"]').exists()).toBe(true)

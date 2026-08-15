@@ -408,6 +408,26 @@ describe('SdrPanel — control socket lifecycle', () => {
     await flushPromises()
     expect(wrapper.find('.sdr-device-dropdown-text').text()).toContain('select radio')
   })
+
+  it('shows why a radio is unavailable when connect returns 503', async () => {
+    // The refusal that used to retry for ever, visible only as repeated 503s in
+    // the browser console — which said nothing about an unplugged dongle.
+    fetchState.connectStatus = 503
+    const wrapper = await mountReady()
+    await flushPromises()
+
+    expect(wrapper.find('.sdr-radio-unavailable').exists()).toBe(true)
+  })
+
+  it('keeps the radio selected when its device is unavailable', async () => {
+    // Unlike a 404 the radio still exists and its dongle may come back, so
+    // deselecting would lose the operator's choice.
+    fetchState.connectStatus = 503
+    const wrapper = await mountReady()
+    await flushPromises()
+
+    expect(wrapper.find('.sdr-device-dropdown-text').text()).not.toContain('select radio')
+  })
 })
 
 // =============================================================================

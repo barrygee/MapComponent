@@ -128,6 +128,9 @@
             :selected-radio-id="selectedRadioId"
             @select="selectRadio"
           />
+          <p v-if="radioUnavailableReason" class="sdr-radio-unavailable" role="status">
+            {{ radioUnavailableReason }}
+          </p>
         </div>
 
         <!-- Frequency -->
@@ -783,6 +786,15 @@ watch(
   { immediate: true },
 )
 const controlsDisabled = ref(true)
+/**
+ * Why the selected radio cannot be connected to, or empty when it can.
+ *
+ * Shown under the device selector rather than logged: the old behaviour was a
+ * connect that refused every few seconds forever, visible only as repeated 503s
+ * in the browser console — which told the operator nothing about an unplugged
+ * dongle.
+ */
+const radioUnavailableReason = ref('')
 const selectedRadioId = ref<number | null>(null)
 // Store-owned: the SDR store fetches/holds the configured radios (loadRadios);
 // this panel only reads them (dropdown, auto-select) and drives the fetch via
@@ -1106,12 +1118,22 @@ const {
   onSocketDown: () => setStatus(false),
   onRadioMissing: () => {
     // The stale sdrLastRadioId + socket are already cleared; reset the selection UI.
+    radioUnavailableReason.value = ''
     selectedRadioId.value = null
     deviceDropdownLabel.value = '— select radio —'
     controlsDisabled.value = true
   },
+  onDeviceUnavailable: (reason: string) => {
+    // The radio and the selection both stay: its dongle may come back, and
+    // silently deselecting would hide which one the operator had chosen.
+    // Controls are locked because there is nothing behind them to drive.
+    connected.value = false
+    controlsDisabled.value = true
+    radioUnavailableReason.value = reason
+  },
   onReachable: () => {
     connected.value = true
+    radioUnavailableReason.value = ''
   },
   isRadioStillSelected: (radioId) => selectedRadioId.value === radioId,
   isAlreadyConnected: () => connected.value,
@@ -1249,6 +1271,13 @@ const { radiosLoading, deviceDropdownLabel, selectRadio, loadRadios } = useSdrRa
   releaseOwnershipIfHeld,
   openControlSocket,
   closeControlSocket,
+})
+
+// Choosing a different radio clears any previous unavailability message: it
+// described the radio that was selected before, and leaving it up would blame
+// the new one for the old one's problem.
+watch(selectedRadioId, () => {
+  radioUnavailableReason.value = ''
 })
 
 // Publish this instance's within-band demod state (NCO offset, mode, audio
