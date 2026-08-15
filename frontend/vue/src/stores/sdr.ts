@@ -236,44 +236,9 @@ export const useSdrStore = defineStore('sdr', () => {
     }
   }
 
-  // "Full waterfall update" toggle (matches SDR++ User Guide v1.1 p. 34). When
-  // ON, the waterfall history is reset whenever a viewing parameter (Zoom)
-  // changes, so new rows fill the narrower viewport cleanly instead of the
-  // pre-zoom rows staying horizontally-stretched. Default ON in Sentinel
-  // (SDR++'s own default is OFF, but Sentinel users see a cleaner zoom UX).
-  function _readFullWaterfallUpdate(): boolean {
-    try {
-      return localStorage.getItem('sdrFullWaterfallUpdate') !== '0'
-    } catch {
-      return true
-    }
-  }
-  const fullWaterfallUpdate = ref<boolean>(_readFullWaterfallUpdate())
-  function setFullWaterfallUpdate(on: boolean) {
-    fullWaterfallUpdate.value = on
-    try {
-      localStorage.setItem('sdrFullWaterfallUpdate', on ? '1' : '0')
-    } catch {}
-  }
-  // Mirror of hydrateAutoCenterFromDb — keeps the live toggle in sync after a
-  // config JSON upload replaces the DB row.
-  async function hydrateFullWaterfallUpdateFromDb(): Promise<void> {
-    try {
-      const res = await fetch('/api/settings/sdr')
-      if (!res.ok) return
-      const data = await res.json()
-      const v = data?.fullWaterfallUpdate
-      if (typeof v === 'boolean' && v !== fullWaterfallUpdate.value) {
-        setFullWaterfallUpdate(v)
-      }
-    } catch {
-      /* offline / transient — keep current value */
-    }
-  }
-
   // Snap-to-known-frequency toggle. When ON, clicking a known-frequency marker in
   // the spectrum jumps to it, and dragging the tuner bar snaps to a nearby known
-  // frequency. Same persistence pattern as fullWaterfallUpdate (localStorage for
+  // frequency. Same persistence pattern as autoCenterWaterfallOnTune (localStorage for
   // instant restore, DB hydrate on config upload). Default ON.
   function _readSnapToKnown(): boolean {
     try {
@@ -304,7 +269,7 @@ export const useSdrStore = defineStore('sdr', () => {
   }
 
   // Waterfall overlay visibility toggles (bandplan strip and known-frequency
-  // labels). Same persistence pattern as fullWaterfallUpdate: localStorage for
+  // labels). Same persistence pattern as autoCenterWaterfallOnTune: localStorage for
   // instant restore, DB hydrate on config upload. Default ON.
   function _readShowBandPlan(): boolean {
     try {
@@ -1074,9 +1039,6 @@ export const useSdrStore = defineStore('sdr', () => {
     autoCenterWaterfallOnTune,
     setAutoCenterWaterfallOnTune,
     hydrateAutoCenterFromDb,
-    fullWaterfallUpdate,
-    setFullWaterfallUpdate,
-    hydrateFullWaterfallUpdateFromDb,
     snapToKnown,
     setSnapToKnown,
     hydrateSnapToKnownFromDb,

@@ -613,14 +613,6 @@ const ALL_SETTINGS: SettingItem[] = [
   {
     section: 'sdr',
     sectionLabel: 'SDR',
-    id: 'sdr-full-waterfall-update',
-    label: 'Full Waterfall Update',
-    desc: 'When ON, the waterfall history clears each time you change Zoom so new rows fill the new viewport cleanly. When OFF (the SDR++ default), the existing rows stay stretched and only new rows are drawn at the new zoom level.',
-    type: 'sdr-full-waterfall-update',
-  },
-  {
-    section: 'sdr',
-    sectionLabel: 'SDR',
     id: 'sdr-snap-to-known',
     label: 'Snap to Known Frequencies',
     desc: 'When ON, clicking a known-frequency marker in the spectrum jumps straight to it, and dragging the tuner bar snaps to a nearby known frequency from your Frequency Manager.',

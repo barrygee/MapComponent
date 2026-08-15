@@ -1832,8 +1832,8 @@ const MIN_BINS = 1024
 const MAX_BINS = 32768
 function computeDesiredBins(): number {
   const el = wfEl.value
-  // Only ever called after initPlots() (which requires the elements) or from a
-  // debounced timer that is cleared on unmount, so wfEl is always populated.
+  // Only ever called from initPlots(), which requires the elements, so wfEl is
+  // always populated.
   /* v8 ignore start */
   if (!el) return MIN_BINS
   /* v8 ignore stop */
@@ -1847,17 +1847,13 @@ function computeDesiredBins(): number {
   // (downscaling looks sharp; upscaling is what causes blockiness).
   return 1 << Math.ceil(Math.log2(target))
 }
-let lastRequestedBins = 0
-let _fftSizeDebounce: ReturnType<typeof setTimeout> | null = null
-function publishDesiredBins() {
-  const n = computeDesiredBins()
-  if (n === lastRequestedBins) return
-  lastRequestedBins = n
-  store.requestFftSize(n)
-}
-function scheduleDesiredBins() {
-  if (_fftSizeDebounce) clearTimeout(_fftSizeDebounce)
-  _fftSizeDebounce = setTimeout(publishDesiredBins, 250)
+// Called once, from initPlots(): the bin count is pinned for the lifetime of
+// the plots so a zoom or resize can't wipe the waterfall history. Returns the
+// count so the caller can size the layers to the same value.
+function publishDesiredBins(): number {
+  const bins = computeDesiredBins()
+  store.requestFftSize(bins)
+  return bins
 }
 
 function buildPipes(n: number) {
@@ -2022,12 +2018,7 @@ function initPlots() {
 
   // Publish the canvas-sized FFT bin target now so the backend can switch as
   // soon as the WS is up (SdrPanel forwards on socket open if it fires early).
-  publishDesiredBins()
-  // publishDesiredBins() above always assigns lastRequestedBins (≥ MIN_BINS), so
-  // the `|| MIN_BINS` fallback is belt-and-braces and never the taken branch.
-  /* v8 ignore start */
-  buildPipes(lastRequestedBins || MIN_BINS)
-  /* v8 ignore stop */
+  buildPipes(publishDesiredBins())
 
   // Tuned-frequency marker. Two AccordionPlugin instances (one per plot) — see
   // the unit-split note at their declaration. Plugins live on _Gx.plugins with
@@ -2205,10 +2196,8 @@ function initPlots() {
     specPlot?.checkresize()
     wfPlot?.checkresize()
     syncBandInset()
-    // Canvas resize: only refresh the bin target when Full Waterfall Update
-    // is ON. Otherwise the bin count is pinned to its mount-time value so a
+    // The bin count stays pinned to its mount-time value on canvas resize, so a
     // side-panel toggle / browser zoom doesn't wipe the waterfall history.
-    if (store.fullWaterfallUpdate) scheduleDesiredBins()
   })
   ro.observe(specEl.value as HTMLElement)
   ro.observe(wfEl.value as HTMLElement)
@@ -2476,19 +2465,15 @@ watch([zmin, zmax], ([lo, hi]) => {
   syncBandInset()
 })
 
-// Moving the Zoom slider re-windows both plots around the tuned centre. When
-// the "Full Waterfall Update" setting is ON (SDR++ User Guide v1.1 p. 34) we
-// also ask the backend for more FFT bins so the visible window keeps ~1 bin
-// per device px — sharp raster at any zoom level, at the cost of wiping the
-// waterfall history every time the bin count changes (the new bin count
-// triggers buildPipes() in the frame watcher). When OFF, bins are fixed at
-// mount time: the raster gets pixelated when zoomed in, but history is
-// preserved across zoom changes.
+// Moving the Zoom slider re-windows both plots around the tuned centre. The
+// FFT bin count stays pinned to its mount-time value (the SDR++ default
+// behaviour, User Guide v1.1 p. 34): the raster gets pixelated when zoomed in,
+// but the waterfall history is preserved across zoom changes — changing the bin
+// count would trigger buildPipes() in the frame watcher and wipe it.
 watch(zoom, (z) => {
   applyZoom()
   // Persist so the zoom level survives navigating away and back.
   store.setViewSettings({ zoom: z })
-  if (store.fullWaterfallUpdate) scheduleDesiredBins()
 })
 
 // Re-window when the selected frequency moves while zoomed in. Retuning with
@@ -2502,16 +2487,6 @@ watch(
   () => store.currentFreqHz,
   () => {
     if (zoom.value > ZOOM_MIN) applyZoom()
-  },
-)
-
-// Toggling Full Waterfall Update ON mid-session: refresh the bin target
-// immediately so the raster snaps to sharp at the current zoom without
-// waiting for the next zoom action.
-watch(
-  () => store.fullWaterfallUpdate,
-  (on) => {
-    if (on) scheduleDesiredBins()
   },
 )
 
