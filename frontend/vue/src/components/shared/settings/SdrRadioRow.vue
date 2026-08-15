@@ -1,9 +1,16 @@
 <template>
   <div class="sdr-device-item" :class="{ 'sdr-device-item--open': open }">
     <div class="sdr-device-row">
-      <span class="sdr-device-info" :style="confirming ? 'opacity:0.4' : ''">
+      <span
+        class="sdr-device-info"
+        :class="{ 'sdr-device-info--unavailable': isUnavailable }"
+        :style="confirming ? 'opacity:0.4' : ''"
+      >
         <SdrSourceStatusDot :connected="connected" />
         {{ radio.name }}&nbsp;&nbsp;{{ radio.host }}:{{ radio.port }}
+      </span>
+      <span v-if="isUnavailable && !confirming" class="sdr-device-unavailable">
+        {{ radio.unavailable_reason }}
       </span>
       <button
         v-if="!confirming"
@@ -84,10 +91,11 @@
  */
 import SdrSourceStatusDot from './SdrSourceStatusDot.vue'
 import SdrDeviceForm from './SdrDeviceForm.vue'
+import { computed } from 'vue'
 import type { SdrRadioRecord } from '@/services/sdrRadiosApi'
 import type { SentryDeviceStatus } from '@/services/sentryApi'
 
-defineProps<{
+const props = defineProps<{
   radio: SdrRadioRecord
   /** Reachability dot state: manual radios read their rtl_tcp TCP probe;
    * Sentry-mirrored radios read the device's live `present` flag. Null while
@@ -98,6 +106,19 @@ defineProps<{
   /** Live Sentry status for this radio's device, when it mirrors one. */
   sentryDeviceStatus?: SentryDeviceStatus | null
 }>()
+
+/**
+ * Whether this radio's device is currently unusable.
+ *
+ * Reported by the backend against the live fleet snapshot rather than stored,
+ * because a dongle can be unplugged or replugged elsewhere at any moment. Shown
+ * here so the operator sees *why* before trying to connect, instead of after.
+ *
+ * Only an explicit `false` counts. An absent field means an older backend or a
+ * manually-entered radio with no Sentry device behind it, and greying the row
+ * out in either case would be a lie.
+ */
+const isUnavailable = computed(() => props.radio.device_available === false)
 
 const emit = defineEmits<{
   'toggle-edit': []
