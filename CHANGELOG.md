@@ -129,6 +129,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Sentry device management, and Off Grid ADS-B end to end (#271)
 - Stop offering private and disabled SDRs as sources (#274)
 - Let mirrored radios follow their device, and report availability (#275)
+- Show when a radio's device is unavailable, and why (#276)
 
 ### Bug Fixes
 
