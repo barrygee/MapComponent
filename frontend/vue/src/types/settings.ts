@@ -20,6 +20,12 @@ export interface SettingItem {
   id: string
   label: string
   desc: string
+  /**
+   * Extra words the search box matches on but that are never rendered. Used by
+   * controls that deliberately show no descriptive text (e.g. the SDR options
+   * checkbox box) so their individual options stay findable by name.
+   */
+  searchTerms?: string
   groupLabel?: string
   type: string
   // type-specific props

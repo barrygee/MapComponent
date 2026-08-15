@@ -34,12 +34,8 @@ import AdsbTagFieldsControl from './AdsbTagFieldsControl.vue'
 import AprsLabelFieldsControl from './AprsLabelFieldsControl.vue'
 import AirReplayToggleControl from './AirReplayToggleControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
-import SdrAutoCenterControl from './SdrAutoCenterControl.vue'
-import SdrSnapToKnownControl from './SdrSnapToKnownControl.vue'
-import SdrShowBandPlanControl from './SdrShowBandPlanControl.vue'
-import SdrShowKnownFreqsControl from './SdrShowKnownFreqsControl.vue'
+import SdrOptionsControl from './SdrOptionsControl.vue'
 import SdrResumeDelayControl from './SdrResumeDelayControl.vue'
-import SdrDecodeMuteToggleControl from './SdrDecodeMuteToggleControl.vue'
 import SdrTrunkTrackingToggleControl from './SdrTrunkTrackingToggleControl.vue'
 import ConfigCurrentControl from './ConfigCurrentControl.vue'
 import ExportAllControl from './ExportAllControl.vue'
@@ -85,12 +81,8 @@ const TYPE_TO_COMPONENT: Array<[string, Component, Partial<SettingItem>?]> = [
   ['land-aprs-label-fields', AprsLabelFieldsControl],
   ['air-replay-toggle', AirReplayToggleControl],
   ['sdr-devices', SdrDevicesControl],
-  ['sdr-autocenter', SdrAutoCenterControl],
-  ['sdr-snap-to-known', SdrSnapToKnownControl],
-  ['sdr-show-bandplan', SdrShowBandPlanControl],
-  ['sdr-show-known-freqs', SdrShowKnownFreqsControl],
+  ['sdr-options', SdrOptionsControl],
   ['sdr-resume-delay', SdrResumeDelayControl],
-  ['sdr-decode-mute-toggle', SdrDecodeMuteToggleControl],
   ['sdr-trunk-tracking-toggle', SdrTrunkTrackingToggleControl],
   ['sdr-frequencies-file', JsonDataControl],
   ['sdr-bandplan-file', JsonDataControl],

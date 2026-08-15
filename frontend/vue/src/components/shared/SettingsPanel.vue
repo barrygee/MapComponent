@@ -604,35 +604,15 @@ const ALL_SETTINGS: SettingItem[] = [
   {
     section: 'sdr',
     sectionLabel: 'SDR',
-    id: 'sdr-autocenter',
-    label: 'Auto-center on Tune',
-    desc: 'When ON, clicking the spectrum/waterfall re-centers the display on the new frequency. When OFF, the display stays put and the radio tunes to the clicked frequency where you clicked it.',
-    type: 'sdr-autocenter',
-    groupLabel: 'WATERFALL',
-  },
-  {
-    section: 'sdr',
-    sectionLabel: 'SDR',
-    id: 'sdr-snap-to-known',
-    label: 'Snap to Known Frequencies',
-    desc: 'When ON, clicking a known-frequency marker in the spectrum jumps straight to it, and dragging the tuner bar snaps to a nearby known frequency from your Frequency Manager.',
-    type: 'sdr-snap-to-known',
-  },
-  {
-    section: 'sdr',
-    sectionLabel: 'SDR',
-    id: 'sdr-show-bandplan',
-    label: 'Show Band Plan',
-    desc: 'Show the coloured RF band-plan strip (Air Band, FM Broadcast, etc.) along the bottom of the spectrum.',
-    type: 'sdr-show-bandplan',
-  },
-  {
-    section: 'sdr',
-    sectionLabel: 'SDR',
-    id: 'sdr-show-known-freqs',
-    label: 'Show Known Frequencies',
-    desc: 'Show labels on the spectrum for the frequencies tracked in your Frequency Manager.',
-    type: 'sdr-show-known-freqs',
+    id: 'sdr-options',
+    label: 'SDR Options',
+    desc: '',
+    // The options box shows names and checkboxes only, so its per-option prose
+    // lives here instead — searchable without putting text back on the page.
+    searchTerms:
+      'auto-center on tune snap to known frequencies show band plan show known frequencies mute audio while decoding waterfall spectrum',
+    type: 'sdr-options',
+    groupLabel: 'OPTIONS',
   },
   {
     section: 'sdr',
@@ -642,15 +622,6 @@ const ALL_SETTINGS: SettingItem[] = [
     desc: 'When scan or search locks on a signal, wait this many seconds after the signal drops before continuing. 0 resumes immediately on drop. You can always press HOLD/RESUME to force-continue.',
     type: 'sdr-resume-delay',
     groupLabel: 'SCAN & SEARCH',
-  },
-  {
-    section: 'sdr',
-    sectionLabel: 'SDR',
-    id: 'sdr-decode-mute-toggle',
-    label: 'Mute Audio While Decoding',
-    desc: 'When ON, a radio’s analog audio is muted while that radio decodes digital voice (DMR/P25) or APRS — the raw channel is noise, not speech. Only the decoding radio is muted; any other radio you are listening to keeps its audio. Turn OFF to keep hearing the analog demod during decode. On by default.',
-    type: 'sdr-decode-mute-toggle',
-    groupLabel: 'DECODING',
   },
   {
     section: 'sdr',
@@ -743,6 +714,7 @@ const searchResults = computed<SettingItem[]>(() => {
       isSettingVisible(s) &&
       (s.label.toLowerCase().includes(q) ||
         s.desc.toLowerCase().includes(q) ||
+        (s.searchTerms?.toLowerCase().includes(q) ?? false) ||
         s.sectionLabel.toLowerCase().includes(q)),
   )
 })

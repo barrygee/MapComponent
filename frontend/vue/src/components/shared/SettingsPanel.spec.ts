@@ -226,14 +226,16 @@ describe('SettingsPanel', () => {
       await sdrNav.trigger('click')
     }
 
-    it('lists the decode-mute toggle in the SDR section and in search', async () => {
+    // The merged SDR options box carries no on-screen description, so its
+    // individual option names are only findable via the item's searchTerms.
+    it('lists the SDR options box in the SDR section and in search', async () => {
       localStorage.clear()
       const wrapper = mountPanel()
       await openSdrSection(wrapper)
-      expect(renderedItemIds(wrapper)).toContain('sdr-decode-mute-toggle')
+      expect(renderedItemIds(wrapper)).toContain('sdr-options')
 
       await wrapper.find('#settings-search-input').setValue('Mute Audio While Decoding')
-      expect(renderedItemIds(wrapper)).toContain('sdr-decode-mute-toggle')
+      expect(renderedItemIds(wrapper)).toContain('sdr-options')
     })
 
     it('hides the channel-maps editor when trunk tracking is off', async () => {
