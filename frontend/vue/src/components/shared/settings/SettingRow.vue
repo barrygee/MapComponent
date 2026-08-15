@@ -98,20 +98,8 @@
     />
     <SentryHostsControl v-else-if="item.type === 'sdr-sentry-hosts'" />
     <SdrDevicesControl v-else-if="item.type === 'sdr-devices'" />
-    <SdrAutoCenterControl
-      v-else-if="item.type === 'sdr-autocenter'"
-      @stage="emit('stage', item.id, $event)"
-    />
-    <SdrSnapToKnownControl
-      v-else-if="item.type === 'sdr-snap-to-known'"
-      @stage="emit('stage', item.id, $event)"
-    />
-    <SdrShowBandPlanControl
-      v-else-if="item.type === 'sdr-show-bandplan'"
-      @stage="emit('stage', item.id, $event)"
-    />
-    <SdrShowKnownFreqsControl
-      v-else-if="item.type === 'sdr-show-known-freqs'"
+    <SdrOptionsControl
+      v-else-if="item.type === 'sdr-options'"
       @stage="emit('stage', item.id, $event)"
     />
     <SdrResumeDelayControl
@@ -131,10 +119,6 @@
       get-url="/api/sdr/data/bandplan"
       post-url="/api/sdr/data/bandplan"
       filename="sdr_bandplan.json"
-      @stage="emit('stage', item.id, $event)"
-    />
-    <SdrDecodeMuteToggleControl
-      v-else-if="item.type === 'sdr-decode-mute-toggle'"
       @stage="emit('stage', item.id, $event)"
     />
     <SdrTrunkTrackingToggleControl
@@ -181,12 +165,8 @@ import AprsLabelFieldsControl from './AprsLabelFieldsControl.vue'
 import AirReplayToggleControl from './AirReplayToggleControl.vue'
 import SentryHostsControl from './SentryHostsControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
-import SdrAutoCenterControl from './SdrAutoCenterControl.vue'
-import SdrSnapToKnownControl from './SdrSnapToKnownControl.vue'
-import SdrShowBandPlanControl from './SdrShowBandPlanControl.vue'
-import SdrShowKnownFreqsControl from './SdrShowKnownFreqsControl.vue'
+import SdrOptionsControl from './SdrOptionsControl.vue'
 import SdrResumeDelayControl from './SdrResumeDelayControl.vue'
-import SdrDecodeMuteToggleControl from './SdrDecodeMuteToggleControl.vue'
 import SdrTrunkTrackingToggleControl from './SdrTrunkTrackingToggleControl.vue'
 import ConfigCurrentControl from './ConfigCurrentControl.vue'
 import ExportAllControl from './ExportAllControl.vue'
