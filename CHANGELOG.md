@@ -1337,6 +1337,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - White ring on the logo mark and app icon, lighter wordmark
 - Keep the pane's own empty-state styling on the shared shell
 - Reduce header logo wordmark height (#267)
+- Match the SDR options row names to the device rows (#282)
 
 ### Dependencies
 
