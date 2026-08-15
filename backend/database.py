@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 
 from backend.config import settings
-from sqlalchemy import event, select
+from sqlalchemy import and_, event, or_, select
 from sqlalchemy import text as sa_text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -242,6 +242,48 @@ async def migrate_sdr_radios_to_settings() -> None:
                 updated_at=int(time.time() * 1000),
             )
         )
+        await session.commit()
+
+
+# Settings rows left behind by features that no longer exist. Each entry is a
+# (namespace, key) pair that prune_removed_settings() deletes on startup.
+# Removing a feature adds its keys here rather than leaving them to accumulate
+# in every existing database — they would otherwise keep showing up in the
+# Application Config editor and in exported config JSON, where a reader can't
+# tell them apart from live settings.
+_REMOVED_SETTING_KEYS: tuple[tuple[str, str], ...] = (
+    # Trunk tracking (removed 2026-08-15, ADR-0004): the master feature flag
+    # and the channel-map documents rendered to the CSVs dsd-fme loaded.
+    ("sdr", "trunkTrackingEnabled"),
+    ("sdr", "channel_maps"),
+)
+
+
+async def prune_removed_settings() -> None:
+    """Delete settings rows belonging to removed features.
+
+    Idempotent and safe on every startup: a fresh install has no such rows and
+    the delete is a no-op. Nothing reads these keys any more, so there is no
+    value to migrate — they are dropped rather than rewritten.
+    """
+    from backend.models import UserSettings  # avoid circular import
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(UserSettings).where(
+                or_(
+                    *(
+                        and_(UserSettings.namespace == namespace, UserSettings.key == key)
+                        for namespace, key in _REMOVED_SETTING_KEYS
+                    )
+                )
+            )
+        )
+        stale = result.scalars().all()
+        if not stale:
+            return
+        for row in stale:
+            await session.delete(row)
         await session.commit()
 
 

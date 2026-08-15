@@ -96,3 +96,26 @@ it stays.
   `SettingsPanel.css` remains the settings surface's sectioned sheet
   (B10h row); relocating its sub-control families is optional future work
   on the same policy, not a gap in this series.
+
+## Amendment (2026-08-15) — `SdrTrunkSection` no longer exists
+
+Trunk tracking was removed in ADR-0004, taking `SdrTrunkSection.vue` and its
+CSS family with it. The record above is left as written — it describes the
+inventory that motivated the B-series at the time — but three of its references
+now point at code that is gone:
+
+- **Context, teleported dropdown pattern:** `SdrTrunkSection` was one of the
+  five pickers whose duplicated menu state motivated `BaseSelectMenu`. Four
+  remain (`SdrStepPicker`, `SdrSampleRatePicker`, `SdrDeviceSelector`,
+  `SdrSettingsAccordion`), which is still the case for the primitive.
+- **B8 (descoped):** the `sdr-trunk-hint` paragraph cited as a non-list "empty"
+  the primitive could not absorb no longer exists. The descope decision stands
+  on its remaining evidence.
+- **B10c:** the trunk CSS family (`.sdr-trunk-*` and the
+  `#sdr-trunk-section-body` context rules) was co-located into
+  `SdrTrunkSection.vue`, so it was deleted with that component. Co-location is
+  what made this a clean removal rather than a hunt through `SdrPanel.css` —
+  evidence for the B10 policy, not against it.
+
+Nothing in the Decision is invalidated: the primitives, the settled co-location
+policy and the completion status all stand.

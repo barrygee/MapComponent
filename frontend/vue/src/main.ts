@@ -19,6 +19,7 @@ import type { AdsbLabelFields, AdsbTagFields } from './stores/air'
 import { useLandStore } from './stores/land'
 import type { AprsLabelFieldMap } from './stores/land'
 import { useSettingsStore } from './stores/settings'
+import { clearRemovedStorageKeys } from './utils/removedStorageKeys'
 
 // Register PMTiles protocol once at app startup — never inside a component.
 const protocol = new pmtiles.Protocol()
@@ -28,6 +29,10 @@ const pinia = createPinia()
 const app = createApp(App)
 app.use(pinia)
 app.use(router)
+
+// Drop cached keys belonging to removed features before any store reads
+// storage (see utils/removedStorageKeys.ts).
+clearRemovedStorageKeys()
 
 // Hydrate app store from localStorage before first render.
 const appStore = useAppStore()
