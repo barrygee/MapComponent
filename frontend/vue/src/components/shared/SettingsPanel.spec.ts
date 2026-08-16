@@ -404,30 +404,21 @@ describe('SettingsPanel', () => {
     })
   })
 
-  describe('locationSynced event', () => {
-    it('drops a staged location edit when the panel is open on App settings', async () => {
+  // The panel used to drop a staged 'location' edit on settings:locationSynced.
+  // The location card now owns its own SAVE LOCATION button and never stages,
+  // so there is no longer a staged edit for that event to supersede.
+
+  describe('group labels', () => {
+    it('groups App Settings under GENERAL, LOCATION and CONFIGURATION', async () => {
       const store = useSettingsStore()
       store.openPanel('app')
       const wrapper = mountPanel()
-      // Stage a 'location' change, then a sync event supersedes it.
-      wrapper.findComponent(SettingRow).vm.$emit('stage', 'location', vi.fn())
-      window.dispatchEvent(new CustomEvent('settings:locationSynced'))
       await flushPromises()
-
-      // The staged location was dropped → APPLY now finds nothing to commit.
-      await wrapper.find('#settings-apply-btn').trigger('click')
-      expect(wrapper.find('#settings-apply-status').text()).toBe('NO CHANGES')
-    })
-
-    it('ignores the sync event when the panel is closed', async () => {
-      const wrapper = mountPanel()
-      wrapper.findComponent(SettingRow).vm.$emit('stage', 'location', vi.fn())
-      window.dispatchEvent(new CustomEvent('settings:locationSynced'))
-      await flushPromises()
-      // Panel closed (store.open false) → staged edit is kept, so APPLY commits it.
-      await wrapper.find('#settings-apply-btn').trigger('click')
-      await flushPromises()
-      expect(wrapper.find('#settings-apply-status').text()).not.toBe('NO CHANGES')
+      expect(wrapper.findAll('.settings-group-label').map((node) => node.text())).toEqual([
+        'GENERAL',
+        'LOCATION',
+        'CONFIGURATION',
+      ])
     })
   })
 

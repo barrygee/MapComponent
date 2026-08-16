@@ -6,6 +6,19 @@ services:
     container_name: sentinel-app
     ports:
       - "8080:8000"
+
+    # Lets this container address services listening on the DOCKER HOST as
+    # `host.docker.internal`. Needed when Sentry runs on the same machine: it
+    # uses `network_mode: host`, so it never joins this bridge network and has
+    # no container-DNS name, while its per-dongle relays bind 0.0.0.0 on the
+    # host. Configure an SDR device's host as `host.docker.internal` (the
+    # host's LAN IP also works, but does not survive a DHCP change).
+    #
+    # `localhost` in an SDR device address would resolve to THIS container,
+    # which is the mistake this entry exists to avoid.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
     volumes:
       - sentinel_db:/app/data
       - ./backend:/app/backend         # live-reload backend code
