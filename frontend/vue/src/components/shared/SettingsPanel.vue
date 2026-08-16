@@ -363,6 +363,7 @@ const ALL_SETTINGS: SettingItem[] = [
     label: 'Connectivity Mode',
     desc: 'Use online or off grid data sources across the app',
     type: 'connectivity-toggle',
+    groupLabel: 'GENERAL',
   },
   {
     section: 'app',
@@ -387,6 +388,7 @@ const ALL_SETTINGS: SettingItem[] = [
     label: 'My Location',
     desc: 'Set a fixed latitude / longitude for your position',
     type: 'location',
+    groupLabel: 'LOCATION',
   },
   {
     section: 'air',
@@ -651,6 +653,9 @@ const ALL_SETTINGS: SettingItem[] = [
     desc: '',
     searchTerms: 'settings currently stored in the database raw json',
     type: 'config-current',
+    // Export All carries no groupLabel of its own, so it stays under this
+    // heading — the same way the AIR/SPACE sections continue a group.
+    groupLabel: 'CONFIGURATION',
   },
   {
     section: 'app',
@@ -793,13 +798,4 @@ watch(
     }
   },
 )
-
-// A location set elsewhere (right-click, config hydration) supersedes any
-// typed-but-unapplied LAT/LON, so drop the staged 'location' edit. The field
-// sync itself is handled by LocationControl listening for this same event;
-// don't re-dispatch it here (would loop).
-window.addEventListener('settings:locationSynced', () => {
-  if (!store.open || activeSection.value !== 'app') return
-  pending.value.delete('location')
-})
 </script>

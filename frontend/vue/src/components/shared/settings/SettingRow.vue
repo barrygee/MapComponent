@@ -36,11 +36,9 @@
       @stage="emit('stage', item.id, $event)"
       @commit="emit('commit')"
     />
-    <LocationControl
-      v-else-if="item.type === 'location'"
-      @stage="emit('stage', item.id, $event)"
-      @commit="emit('commit')"
-    />
+    <!-- No stage/commit: the location card owns its own SAVE LOCATION button
+         (matching Sentry's panel) rather than committing via APPLY CHANGES. -->
+    <LocationControl v-else-if="item.type === 'location'" />
     <NotificationSoundControl
       v-else-if="item.type === 'notification-sound'"
       @stage="emit('stage', item.id, $event)"
@@ -166,9 +164,11 @@ const emit = defineEmits<{
 }>()
 
 // Two-column controls: wide enough that their labels ("Snap to Known
-// Frequencies") stay on one line beside their checkbox column, or that a device
-// list is not squeezed into a single 300px column.
+// Frequencies") stay on one line beside their checkbox column, that a device
+// list is not squeezed into a single 300px column, or — for the location card —
+// that the sole card under its own LOCATION heading is not a lone 300px sliver.
 const HALF_TYPES = new Set([
+  'location',
   'sdr-sentry-hosts',
   'sdr-devices',
   'sdr-options',

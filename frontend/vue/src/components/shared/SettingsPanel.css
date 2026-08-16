@@ -360,25 +360,43 @@
 }
 
 /* ── Location & data-source labelled inputs ───────────────────────── */
+/* The location fields deliberately mirror Sentry's Sentry Location panel:
+   label above a full-width underlined input, with its range hint (or its
+   validation error) beneath, LAT stacked over LON. The card itself spans two
+   grid columns (see SettingRow's HALF_TYPES) — the fields stay stacked and
+   full-width across it rather than pairing up, keeping Sentry's reading order. */
 .settings-location-wrap {
   display: flex;
-  /* Stacked LAT over LON: the MY LOCATION card is a standard single-column
-     card, too narrow for the two labelled inputs to sit side by side. */
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
   width: 100%;
 }
 
-.settings-location-row {
-  flex: 1;
+.settings-location-status {
+  margin: 0;
+  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: rgba(16, 19, 29, 0.5);
+}
+
+.settings-location-notice {
+  margin: 0;
+  padding: 8px 10px;
+  background: rgba(255, 90, 80, 0.1);
+  border-radius: 4px;
+  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #c23a2d;
+}
+
+.settings-location-field {
   display: flex;
-  align-items: stretch;
-  gap: 0;
-  background: transparent;
-  box-shadow: inset 0 -1px 0 var(--settings-field-line);
-  transition: box-shadow 0.15s;
-  border-radius: 0;
-  overflow: hidden;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .settings-location-label {
@@ -388,35 +406,64 @@
   letter-spacing: 0.16em;
   color: rgba(16, 19, 29, 0.55);
   text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  flex-shrink: 0;
   user-select: none;
 }
 
 .settings-location-input {
-  flex: 1;
+  width: 100%;
   background: none;
   border: none;
-  padding: 9px 12px;
+  border-radius: 0;
+  padding: 6px 0 8px;
   color: rgba(16, 19, 29, 0.92);
   font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
   letter-spacing: 0.04em;
+  box-shadow: inset 0 -1px 0 var(--settings-field-line);
+  transition: box-shadow 0.15s;
   outline: none;
   caret-color: #16191d;
   min-width: 0;
 }
 
-.settings-location-row:focus-within {
+.settings-location-input:focus {
   box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+/* Rejected value keeps its red underline even once focus has moved on, so the
+   error text below it is anchored to a field that still looks wrong. */
+.settings-location-input--invalid,
+.settings-location-input--invalid:focus {
+  box-shadow: inset 0 -2px 0 #d94436;
 }
 
 .settings-location-input::placeholder {
   color: rgba(16, 19, 29, 0.38);
   letter-spacing: 0.1em;
+}
+
+.settings-location-hint {
+  margin: 0;
+  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: rgba(16, 19, 29, 0.45);
+}
+
+.settings-location-error {
+  margin: 0;
+  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #c23a2d;
+}
+
+.settings-location-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* Theme switch (pill). */
