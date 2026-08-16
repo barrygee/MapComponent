@@ -7,7 +7,11 @@
     :show-header="false"
     control="switch"
     @toggle="onToggleOption"
-  />
+  >
+    <template #row-control>
+      <SdrResumeDelayControl @stage="emit('stage', $event)" @commit="emit('commit')" />
+    </template>
+  </LabelFieldsTable>
 </template>
 
 <script setup lang="ts">
@@ -26,6 +30,7 @@
  */
 import { onMounted } from 'vue'
 import LabelFieldsTable, { type LabelFieldColumn, type LabelFieldRow } from './LabelFieldsTable.vue'
+import SdrResumeDelayControl from './SdrResumeDelayControl.vue'
 import { useSdrStore } from '@/stores/sdr'
 import { useDocumentEvent } from '@/composables/useDocumentEvent'
 import * as settingsApi from '@/services/settingsApi'
@@ -41,12 +46,15 @@ interface SdrOption {
 }
 
 const sdrStore = useSdrStore()
-const emit = defineEmits<{ stage: [fn: () => Promise<unknown> | void] }>()
+const emit = defineEmits<{
+  stage: [fn: () => Promise<unknown> | void]
+  commit: []
+}>()
 
 const OPTIONS: SdrOption[] = [
   {
     settingKey: 'autoCenterWaterfallOnTune',
-    label: 'Auto-center on Tune',
+    label: 'Auto-center Waterfall on Tune',
     readFromStore: () => sdrStore.autoCenterWaterfallOnTune,
     mirrorToStore: sdrStore.setAutoCenterWaterfallOnTune,
   },
@@ -64,7 +72,7 @@ const OPTIONS: SdrOption[] = [
   },
   {
     settingKey: 'showKnownFreqs',
-    label: 'Show Known Frequencies',
+    label: 'Display Known Frequencies',
     readFromStore: () => sdrStore.showKnownFreqs,
     mirrorToStore: sdrStore.setShowKnownFreqs,
   },
@@ -78,10 +86,23 @@ const OPTIONS: SdrOption[] = [
 
 const OPTION_COLUMNS: LabelFieldColumn[] = [{ key: 'enabled', label: 'On' }]
 
-const OPTION_ROWS: LabelFieldRow[] = OPTIONS.map((option) => ({
-  key: option.settingKey,
-  label: option.label,
-}))
+// The resume delay rides along as a final row rather than a card of its own:
+// it is another thing the SDR panel does while scanning, and a whole card for
+// one number sat oddly beside the option list it belongs with. It is not a
+// toggle, so it fills its cell through the table's `row-control` slot.
+const RESUME_DELAY_ROW: LabelFieldRow = {
+  key: 'resumeDelaySec',
+  label: 'Scan / Search Resume Delay (Seconds)',
+  control: 'custom',
+}
+
+const OPTION_ROWS: LabelFieldRow[] = [
+  ...OPTIONS.map((option) => ({
+    key: option.settingKey,
+    label: option.label,
+  })),
+  RESUME_DELAY_ROW,
+]
 
 /**
  * Adopts the backend's stored values for every option on open, so the box
@@ -127,6 +148,12 @@ function onToggleOption(_column: string, settingKey: string): void {
 </script>
 
 <style scoped>
+/* Wide enough for the resume-delay row's number field; the toggle rows simply
+   centre in the same column. */
+.sdr-options-table {
+  --lft-col-width: 100px;
+}
+
 /* Match the SDR Devices rows (`.sdr-device-info` in SettingsPanel.css) so the
    two SDR cards read as one family. The size was already the same 12px Barlow
    500 — what set the option names apart was the label-grid's wider 0.08em

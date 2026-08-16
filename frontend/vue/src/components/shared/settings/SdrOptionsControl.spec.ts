@@ -59,10 +59,10 @@ describe('SdrOptionsControl', () => {
     await flushPromises()
     const names = switches(wrapper).map((toggle) => toggle.attributes('aria-label'))
     expect(names).toEqual([
-      'Auto-center on Tune',
+      'Auto-center Waterfall on Tune',
       'Snap to Known Frequencies',
       'Show Band Plan',
-      'Show Known Frequencies',
+      'Display Known Frequencies',
       'Mute Audio While Decoding',
     ])
     // The old per-toggle prose is gone — only the option names are on screen.

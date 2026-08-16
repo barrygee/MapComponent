@@ -35,7 +35,6 @@ import AprsLabelFieldsControl from './AprsLabelFieldsControl.vue'
 import AirReplayToggleControl from './AirReplayToggleControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import SdrOptionsControl from './SdrOptionsControl.vue'
-import SdrResumeDelayControl from './SdrResumeDelayControl.vue'
 import ConfigCurrentControl from './ConfigCurrentControl.vue'
 import ExportAllControl from './ExportAllControl.vue'
 import JsonDataControl from './JsonDataControl.vue'
@@ -81,7 +80,6 @@ const TYPE_TO_COMPONENT: Array<[string, Component, Partial<SettingItem>?]> = [
   ['air-replay-toggle', AirReplayToggleControl],
   ['sdr-devices', SdrDevicesControl],
   ['sdr-options', SdrOptionsControl],
-  ['sdr-resume-delay', SdrResumeDelayControl],
   ['sdr-frequencies-file', JsonDataControl],
   ['sdr-bandplan-file', JsonDataControl],
   ['config-current', ConfigCurrentControl],

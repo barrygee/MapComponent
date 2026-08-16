@@ -491,7 +491,9 @@ const ALL_SETTINGS: SettingItem[] = [
     sectionLabel: 'SPACE',
     id: 'space-sat-radio-file',
     label: 'Satellite Frequencies (JSON)',
-    desc: 'Bulk-edit all satellite frequencies as raw JSON. Saved to backend/data/satellite_radio.json and the database.',
+    desc: '',
+    searchTerms:
+      'bulk-edit all satellite frequencies raw json backend/data/satellite_radio.json database',
     type: 'space-sat-radio-file',
     groupLabel: 'SATELLITE DATA',
   },
@@ -608,25 +610,26 @@ const ALL_SETTINGS: SettingItem[] = [
     // The options box shows names and checkboxes only, so its per-option prose
     // lives here instead — searchable without putting text back on the page.
     searchTerms:
-      'auto-center on tune snap to known frequencies show band plan show known frequencies mute audio while decoding waterfall spectrum',
+      'auto-center waterfall on tune snap to known frequencies show band plan display known frequencies mute audio while decoding waterfall spectrum scan search resume delay seconds hold resume',
     type: 'sdr-options',
-    groupLabel: 'OPTIONS',
+    // The group heading already reads SDR OPTIONS directly above the card, so
+    // the card's own title only said it twice. Kept in the registry (screen
+    // readers and search still need a name for the box) but hidden on screen.
+    hideLabel: true,
+    groupLabel: 'SDR OPTIONS',
   },
-  {
-    section: 'sdr',
-    sectionLabel: 'SDR',
-    id: 'sdr-resume-delay',
-    label: 'Resume Delay',
-    desc: 'When scan or search locks on a signal, wait this many seconds after the signal drops before continuing. 0 resumes immediately on drop. You can always press HOLD/RESUME to force-continue.',
-    type: 'sdr-resume-delay',
-    groupLabel: 'SCAN & SEARCH',
-  },
+  // The raw-JSON editors carry no description: the box below the title already
+  // shows the document, and the prose only pushed the controls down. What it
+  // said stays in `searchTerms` so the boxes are still findable by what they
+  // edit (band plan, search ranges, …) rather than by title alone.
   {
     section: 'sdr',
     sectionLabel: 'SDR',
     id: 'sdr-frequencies-file',
     label: 'Frequencies & Groups (JSON)',
-    desc: 'Bulk-edit frequency groups, stored frequencies, and search ranges as raw JSON. Saved to backend/data/sdr_frequencies.json and the database.',
+    desc: '',
+    searchTerms:
+      'bulk-edit frequency groups stored frequencies search ranges raw json backend/data/sdr_frequencies.json database',
     type: 'sdr-frequencies-file',
     groupLabel: 'FREQUENCY DATA',
   },
@@ -635,7 +638,9 @@ const ALL_SETTINGS: SettingItem[] = [
     sectionLabel: 'SDR',
     id: 'sdr-bandplan-file',
     label: 'Band Plan (JSON)',
-    desc: 'Bulk-edit the coloured RF band-plan strip as raw JSON. Saved to backend/data/sdr_bandplan.json and the database.',
+    desc: '',
+    searchTerms:
+      'bulk-edit coloured rf band-plan strip raw json backend/data/sdr_bandplan.json database',
     type: 'sdr-bandplan-file',
   },
   {
@@ -643,7 +648,8 @@ const ALL_SETTINGS: SettingItem[] = [
     sectionLabel: 'App Settings',
     id: 'config-current',
     label: 'Application Config',
-    desc: 'Settings currently stored in the database',
+    desc: '',
+    searchTerms: 'settings currently stored in the database raw json',
     type: 'config-current',
   },
   {

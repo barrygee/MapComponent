@@ -27,6 +27,12 @@ export interface SettingItem {
    */
   searchTerms?: string
   groupLabel?: string
+  /**
+   * Hide the card's title on screen (it stays in the accessibility tree and in
+   * search). For a card whose group heading already names it, so the title is
+   * not printed twice.
+   */
+  hideLabel?: boolean
   type: string
   // type-specific props
   ns?: string

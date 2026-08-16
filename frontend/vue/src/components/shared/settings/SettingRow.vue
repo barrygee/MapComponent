@@ -3,12 +3,14 @@
     class="settings-item"
     :class="{
       'settings-item--half': isHalf,
+      'settings-item--half-stacked': isHalfStacked,
+      'settings-item--full': isFull,
       'settings-item--triple': isTriple,
       'settings-item--natural-height': isNaturalHeight,
     }"
   >
     <div class="settings-item-info">
-      <div class="settings-item-label">{{ item.label }}</div>
+      <div class="settings-item-label" :class="{ 'sr-only': item.hideLabel }">{{ item.label }}</div>
       <div v-if="item.desc" class="settings-item-desc">{{ item.desc }}</div>
     </div>
     <ConnectivityToggle
@@ -100,10 +102,6 @@
     <SdrOptionsControl
       v-else-if="item.type === 'sdr-options'"
       @stage="emit('stage', item.id, $event)"
-    />
-    <SdrResumeDelayControl
-      v-else-if="item.type === 'sdr-resume-delay'"
-      @stage="emit('stage', item.id, $event)"
       @commit="emit('commit')"
     />
     <JsonDataControl
@@ -154,7 +152,6 @@ import AirReplayToggleControl from './AirReplayToggleControl.vue'
 import SentryHostsControl from './SentryHostsControl.vue'
 import SdrDevicesControl from './SdrDevicesControl.vue'
 import SdrOptionsControl from './SdrOptionsControl.vue'
-import SdrResumeDelayControl from './SdrResumeDelayControl.vue'
 import ConfigCurrentControl from './ConfigCurrentControl.vue'
 import ExportAllControl from './ExportAllControl.vue'
 import JsonDataControl from './JsonDataControl.vue'
@@ -168,11 +165,9 @@ const emit = defineEmits<{
   commit: []
 }>()
 
-// Every JSON-textarea editor sits here so a config document never gets squeezed
-// into a single 300px column — two columns is the minimum readable width for
-// indented JSON. The SDR options box joins them so its
-// option names ("Snap to Known Frequencies") stay on one line beside their
-// checkbox column.
+// Two-column controls: wide enough that their labels ("Snap to Known
+// Frequencies") stay on one line beside their checkbox column, or that a device
+// list is not squeezed into a single 300px column.
 const HALF_TYPES = new Set([
   'sdr-sentry-hosts',
   'sdr-devices',
@@ -180,16 +175,20 @@ const HALF_TYPES = new Set([
   'space-tle-online',
   'space-tle-manual',
   'space-tle-db',
-  'space-sat-radio-file',
   'space-hover-preview',
   'air-tag-fields',
   'land-aprs-label-fields',
-  'sdr-frequencies-file',
-  'sdr-bandplan-file',
-  'config-current',
 ])
+// Two columns wide, but each starting a fresh row, so the SDR pair stacks
+// rather than sitting shoulder to shoulder.
+const HALF_STACKED_TYPES = new Set(['sdr-frequencies-file', 'sdr-bandplan-file'])
+// The remaining raw-JSON editors take the full row, at the width indented JSON
+// wants — neither has a sibling to pair with.
+const FULL_TYPES = new Set(['space-sat-radio-file', 'config-current'])
 const NATURAL_HEIGHT_TYPES = new Set(['location'])
 const isTriple = false
 const isHalf = HALF_TYPES.has(props.item.type)
+const isHalfStacked = HALF_STACKED_TYPES.has(props.item.type)
+const isFull = FULL_TYPES.has(props.item.type)
 const isNaturalHeight = NATURAL_HEIGHT_TYPES.has(props.item.type)
 </script>
