@@ -131,6 +131,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Let mirrored radios follow their device, and report availability (#275)
 - Show when a radio's device is unavailable, and why (#276)
 - Render radios whose Sentry device has gone, so they can be removed (#277)
+- Match My Location panel to Sentry's
 
 ### Bug Fixes
 
@@ -353,6 +354,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Align @types/node with the Node 24 toolchain
 - Rebuild the SPA bundle
 - Prune trunk-tracking settings and record the removal in ADRs (#284)
+- Map host.docker.internal for host-side SDR relays
 
 ### Other
 
@@ -1148,6 +1150,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #264 from barrygee/refactor/air-filter-base-panel
 - Merge pull request #269 from barrygee/fix/settings-json-editors-two-columns
 - Merge pull request #270 from barrygee/fix/filter-first-row-expanded-gap
+- Merge pull request #286 from barrygee/feat/location-panel-sentry-parity
 
 ### Refactoring
 
