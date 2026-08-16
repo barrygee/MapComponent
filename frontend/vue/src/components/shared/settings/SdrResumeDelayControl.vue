@@ -16,8 +16,7 @@ const emit = defineEmits<{
 
 <template>
   <BaseNumberSetting
-    accessible-name="Resume delay in seconds"
-    unit="s"
+    accessible-name="Scan / search resume delay in seconds"
     :max-length="3"
     namespace="sdr"
     setting-key="resumeDelaySec"

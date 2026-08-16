@@ -14,8 +14,11 @@
           <slot name="row-extra" :row="row" />
         </div>
         <div v-for="column in columns" :key="column.key" class="lft-cell">
+          <!-- A row that is not an on/off field at all (e.g. a numeric setting
+               sharing the box) supplies its own control through this slot. -->
+          <slot v-if="row.control === 'custom'" name="row-control" :row="row" />
           <BaseToggleSwitch
-            v-if="control === 'switch'"
+            v-else-if="control === 'switch'"
             :model-value="isChecked(column.key, row.key)"
             :accessible-name="accessibleName(row, column)"
             @update:model-value="emit('toggle', column.key, row.key)"
@@ -78,6 +81,12 @@ export interface LabelFieldRow {
   key: string
   label: string
   abbr?: string
+  /**
+   * Set to `'custom'` for a row whose cell is filled by the `row-control` slot
+   * instead of the table's own on/off control — for a setting that belongs in
+   * the same box but is not a toggle.
+   */
+  control?: 'custom'
 }
 
 const props = withDefaults(

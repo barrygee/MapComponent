@@ -24,8 +24,11 @@ interface BaseNumberSettingProps {
    * existing on-screen text exactly).
    */
   accessibleName: string
-  /** Short unit suffix rendered after the input (e.g. `'s'`, `'NM'`). */
-  unit: string
+  /**
+   * Short unit suffix rendered after the input (e.g. `'NM'`). Omit when the
+   * unit is already stated in the setting's own label.
+   */
+  unit?: string
   /** Native `maxlength` on the input, when the value has a known digit cap. */
   maxLength?: number
   /** Allows a single decimal point plus fractional digits. Defaults to `false` (integers only). */
@@ -62,6 +65,7 @@ interface BaseNumberSettingProps {
 }
 
 const props = withDefaults(defineProps<BaseNumberSettingProps>(), {
+  unit: '',
   maxLength: undefined,
   allowDecimal: false,
   minValue: 0,
@@ -150,7 +154,7 @@ function onInput(event: Event): void {
       @input="onInput"
       @keydown.enter="emit('commit')"
     />
-    <span class="number-setting-unit">{{ unit }}</span>
+    <span v-if="unit" class="number-setting-unit">{{ unit }}</span>
   </div>
 </template>
 
@@ -170,13 +174,15 @@ function onInput(event: Event): void {
 }
 .number-setting-input {
   width: 60px;
-  height: 37px;
-  padding: 0 10px;
-  /* Light-grey fill with dark text — matches the settings panel's
-     input-field treatment (this atom currently renders only in settings). */
-  background: #e8eaed;
+  height: 28px;
+  padding: 0;
+  /* The settings panel's field treatment: no fill, a hairline rule under the
+     value that thickens to the accent on focus — see the field block in
+     SettingsPanel.css, which every other settings input follows. */
+  background: transparent;
   border: none;
   border-radius: 0;
+  box-shadow: inset 0 -1px 0 var(--settings-field-line, rgba(16, 19, 29, 0.18));
   color: rgba(16, 19, 29, 0.92);
   font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
   font-size: 13px;

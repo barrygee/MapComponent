@@ -10,14 +10,23 @@
      primary text  rgba(16,19,29,.92)
      secondary     rgba(16,19,29,.5)
      muted         rgba(16,19,29,.35)
-     input fill    #e8eaed (light grey, a touch below white; dark text)
+     field rule    rgba(16,19,29,.18) (the hairline under a value)
+     surface fill  #e8eaed (search bar, JSON editors, segmented controls)
      hover surface rgba(16,19,29,.06)
      border        rgba(16,19,29,.08)
      accent (lime) #c8ff00      text-on-lime   #0a0c10
      danger        #ff6a5e      sidebar (dark) #000000
+
+   Fields: every editable value in the panel — number, URL, lat/lon, device
+   and host form inputs — carries no fill. It is a value written on the card
+   with a hairline rule beneath it, which thickens to a 2px accent rule on
+   focus, matching the Sentry console's fields so the two apps' forms read as
+   one system. Filled boxes are reserved for surfaces that are not a single
+   value: the search bar, the JSON document editors, and button groups.
    ============================================================ */
 
 #settings-panel {
+  --settings-field-line: rgba(16, 19, 29, 0.18);
   position: fixed;
   top: 68px;
   bottom: 44px;
@@ -300,6 +309,17 @@
   grid-column: span 3;
 }
 
+/* Two columns wide, pinned to the first column so each one starts a new row —
+   the SDR JSON editors are half-width but stacked rather than side by side. */
+.settings-item--half-stacked {
+  grid-column: 1 / span 2;
+}
+
+/* Full-row controls (the raw-JSON editors), so they stack one per row. */
+.settings-item--full {
+  grid-column: 1 / -1;
+}
+
 /* Cards that should not stretch to fill row height (e.g. My Location
    next to a taller expandable card). */
 .settings-item--natural-height {
@@ -354,7 +374,9 @@
   display: flex;
   align-items: stretch;
   gap: 0;
-  background: #e8eaed;
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--settings-field-line);
+  transition: box-shadow 0.15s;
   border-radius: 0;
   overflow: hidden;
 }
@@ -410,7 +432,9 @@
   display: flex;
   align-items: stretch;
   gap: 0;
-  background: #e8eaed;
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--settings-field-line);
+  transition: box-shadow 0.15s;
   border-radius: 0;
   overflow: hidden;
 }
@@ -791,7 +815,8 @@
   display: flex;
   align-items: stretch;
   gap: 0;
-  background: #e8eaed;
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--settings-field-line);
   border-radius: 0;
   overflow: hidden;
 }
@@ -1127,11 +1152,15 @@
 }
 
 /* ── Config JSON editor ───────────────────────────────────────────── */
+/* Fills its card. The editors used to sit in half-width cards and carried a
+   1120px cap so a stray long line could not stretch one; now every editor card
+   spans the row (.settings-item--full), and the cap only left a band of empty
+   card beside the textarea. */
 .settings-config-wrap {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: min(1120px, 100%);
+  width: 100%;
 }
 
 .settings-config-preview--hidden {
@@ -1378,10 +1407,11 @@
 
 .sdr-devices-form-input {
   flex: 1;
-  background: #e8eaed;
+  background: transparent;
   border: none;
   border-radius: 0;
-  padding: 8px 12px;
+  box-shadow: inset 0 -1px 0 var(--settings-field-line);
+  padding: 6px 0;
   color: rgba(16, 19, 29, 0.92);
   font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
   font-size: 13px;
@@ -1533,6 +1563,7 @@
   }
   /* Collapse all multi-column spans to full width on single-column layout. */
   .settings-item--half,
+  .settings-item--half-stacked,
   .settings-item--triple {
     grid-column: 1 / -1;
   }

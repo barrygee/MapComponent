@@ -59,10 +59,10 @@ describe('SdrOptionsControl', () => {
     await flushPromises()
     const names = switches(wrapper).map((toggle) => toggle.attributes('aria-label'))
     expect(names).toEqual([
-      'Auto-center on Tune',
+      'Auto-center Waterfall on Tune',
       'Snap to Known Frequencies',
       'Show Band Plan',
-      'Show Known Frequencies',
+      'Display Known Frequencies',
       'Mute Audio While Decoding',
     ])
     // The old per-toggle prose is gone — only the option names are on screen.
@@ -254,6 +254,53 @@ describe('SdrOptionsControl', () => {
     document.dispatchEvent(new Event('sentinel:config-uploaded'))
     await flushPromises()
     expect(settingsApi.getNamespace).not.toHaveBeenCalled()
+  })
+
+  describe('resume-delay row', () => {
+    /** The number field the resume-delay row contributes to the options table. */
+    function delayInput(wrapper: ReturnType<typeof mount>) {
+      return wrapper.get<HTMLInputElement>(
+        'input[aria-label="Scan / search resume delay in seconds"]',
+      )
+    }
+
+    beforeEach(() => {
+      // The nested control hydrates its value straight from the settings API.
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, json: async () => ({ resumeDelaySec: 5 }) }),
+      )
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('renders the delay as a number field, not a sixth toggle', async () => {
+      const wrapper = mount(SdrOptionsControl)
+      await flushPromises()
+      expect(switches(wrapper)).toHaveLength(5)
+      expect(delayInput(wrapper).element.value).toBe('5')
+    })
+
+    it('re-emits the delay control staged write, which persists the new value', async () => {
+      const wrapper = mount(SdrOptionsControl)
+      await flushPromises()
+
+      await delayInput(wrapper).setValue('9')
+      expect(useSdrStore().resumeDelaySec).toBe(9)
+
+      await runStagedWrite(wrapper)
+      expect(settingsApi.put).toHaveBeenCalledWith('sdr', 'resumeDelaySec', 9)
+    })
+
+    it('re-emits commit when Enter is pressed in the delay field', async () => {
+      const wrapper = mount(SdrOptionsControl)
+      await flushPromises()
+
+      await delayInput(wrapper).trigger('keydown.enter')
+      expect(wrapper.emitted('commit')).toHaveLength(1)
+    })
   })
 
   it('has no accessibility violations', async () => {
