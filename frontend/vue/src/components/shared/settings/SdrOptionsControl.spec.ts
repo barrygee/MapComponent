@@ -259,7 +259,9 @@ describe('SdrOptionsControl', () => {
   describe('resume-delay row', () => {
     /** The number field the resume-delay row contributes to the options table. */
     function delayInput(wrapper: ReturnType<typeof mount>) {
-      return wrapper.get('input[aria-label="Scan / search resume delay in seconds"]')
+      return wrapper.get<HTMLInputElement>(
+        'input[aria-label="Scan / search resume delay in seconds"]',
+      )
     }
 
     beforeEach(() => {
