@@ -2249,7 +2249,13 @@ function drawLoop() {
   drawRaf = 0
   const frame = pendingFrame
   pendingFrame = null
-  if (frame && store.playing && !(store.searchSweeping || store.scanSweeping) && specPlot) {
+  if (
+    frame &&
+    store.playing &&
+    !store.displayPaused &&
+    !(store.searchSweeping || store.scanSweeping) &&
+    specPlot
+  ) {
     specPlot.reload(specUuid, frame.bins)
     // Mx.l / Mx.r / Mx.b are computed by sigplot during its draw pass — the
     // ResizeObserver fires on layout changes, not on draws, so without this
@@ -2268,6 +2274,7 @@ watch(
   (frame) => {
     if (
       !store.playing ||
+      store.displayPaused ||
       store.searchSweeping ||
       store.scanSweeping ||
       !frame ||

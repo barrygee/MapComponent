@@ -705,6 +705,17 @@ export const useSdrStore = defineStore('sdr', () => {
   // True only while a range search is actively stepping (sweeping). The
   // waterfall reads this to freeze rendering while the centre frequency is
   // jumping every dwell_ms — painting those frames produces meaningless noise.
+  /**
+   * Whether the operator has paused the spectrum and waterfall.
+   *
+   * Display only — the IQ stream, tuning and audio are untouched. It exists
+   * because rendering competes for the main thread with the ScriptProcessor
+   * audio fallback, which is what plays on any page that cannot use an
+   * AudioWorklet (most devices, since Sentinel is normally reached over plain
+   * HTTP at a LAN address). Freeing the thread is the difference between
+   * choppy audio and clean audio on a phone.
+   */
+  const displayPaused = ref(false)
   const searchSweeping = ref(false)
   // Range bounds + current step for the search overlay shown by SdrWaterfall.
   // Panel writes these as the sweep advances; null when not searching.
@@ -938,6 +949,7 @@ export const useSdrStore = defineStore('sdr', () => {
     activeTab,
     setActiveTab,
     lastSpectrum,
+    displayPaused,
     searchSweeping,
     searchLowHz,
     searchHighHz,

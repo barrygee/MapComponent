@@ -205,6 +205,29 @@
                 </template>
               </svg>
             </BasePillToggle>
+            <!-- Freezes the spectrum and waterfall only; the stream, tuning and
+                 audio carry on. Rendering competes for the main thread with the
+                 ScriptProcessor audio fallback that any page without a secure
+                 context falls back to, so on a phone this is the difference
+                 between choppy audio and clean audio. -->
+            <BasePillToggle
+              class="sdr-mode-pill sdr-pause-btn"
+              :active="displayPaused"
+              :title="displayPaused ? 'Resume the display' : 'Pause the display (helps audio)'"
+              :aria-label="displayPaused ? 'Resume the display' : 'Pause the display'"
+              :aria-pressed="displayPaused"
+              @click="toggleDisplayPaused"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <template v-if="displayPaused">
+                  <path d="M2 1 L9 5 L2 9 Z" fill="currentColor" />
+                </template>
+                <template v-else>
+                  <rect x="1.5" y="1" width="2.5" height="8" rx="0.5" fill="currentColor" />
+                  <rect x="6" y="1" width="2.5" height="8" rx="0.5" fill="currentColor" />
+                </template>
+              </svg>
+            </BasePillToggle>
           </div>
         </div>
 
@@ -786,6 +809,18 @@ const controlsDisabled = ref(true)
  * in the browser console — which told the operator nothing about an unplugged
  * dongle.
  */
+const displayPaused = computed(() => _sdrStore().displayPaused)
+/**
+ * Freeze or resume the spectrum and waterfall.
+ *
+ * Display only — deliberately does not touch playback, so pausing to clean up
+ * audio on a busy device never costs the operator the thing they were
+ * listening to.
+ */
+function toggleDisplayPaused() {
+  _sdrStore().displayPaused = !_sdrStore().displayPaused
+}
+
 const radioUnavailableReason = ref('')
 
 /**
