@@ -293,6 +293,59 @@ describe('useSdrAudio', () => {
      * path is unavailable and audio was simply silent. These pin that the
      * fallback carries the same demodulator rather than a second copy of it.
      */
+    /**
+     * The iOS audio category.
+     *
+     * Web Audio on iOS defaults to "ambient", which the phone's physical
+     * ring/silent switch mutes — so a graph that builds perfectly and runs
+     * `process()` produces no sound at all, with nothing reported anywhere. The
+     * panel showing a blank audio message while the phone stayed silent is
+     * exactly that state.
+     */
+    describe('iOS audio session', () => {
+      afterEach(() => {
+        delete (navigator as Navigator & { audioSession?: unknown }).audioSession
+      })
+
+      it('asks for playback so the silent switch does not mute the receiver', async () => {
+        const session = { type: 'ambient' }
+        ;(navigator as Navigator & { audioSession?: unknown }).audioSession = session
+        const audio = await loadAudio()
+
+        await audio.initAudio()
+
+        expect(session.type).toBe('playback')
+      })
+
+      it('is inert on browsers with no audioSession', async () => {
+        // Absent on everything except Safari 16.4+, so this must not throw.
+        const audio = await loadAudio()
+
+        await audio.initAudio()
+
+        expect(audio.isReady()).toBe(true)
+      })
+
+      it('still starts audio when the category cannot be set', async () => {
+        // A read-only property throws under strict mode. Audio is worth having
+        // even if it stays subject to the silent switch.
+        ;(navigator as Navigator & { audioSession?: unknown }).audioSession = {
+          get type() {
+            return 'ambient'
+          },
+          set type(_value: string) {
+            throw new Error('read-only')
+          },
+        }
+        const audio = await loadAudio()
+
+        await audio.initAudio()
+
+        expect(audio.isReady()).toBe(true)
+        expect(audio.audioUnavailableReason()).toBeNull()
+      })
+    })
+
     describe('ScriptProcessor fallback', () => {
       async function initWithFallback() {
         const audio = await loadAudio()

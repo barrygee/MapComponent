@@ -514,6 +514,34 @@ function _buildFallbackGraph(
   }
 }
 
+/**
+ * Tell iOS this is media playback, not incidental sound.
+ *
+ * Web Audio on iOS defaults to the "ambient" audio category, which the phone's
+ * physical ring/silent switch mutes — while video, notifications and most apps
+ * are unaffected. The failure is total silence with no error anywhere: the
+ * graph builds, `process()` runs, and nothing comes out. That is the state this
+ * fixes, and it is not something an operator can be expected to guess.
+ *
+ * Relying on a hardware toggle for a receiver to be audible is the wrong
+ * default for an SDR — the point of tuning it is to hear it — so `playback` is
+ * set unconditionally rather than offered as a preference. It also keeps audio
+ * running when the screen locks.
+ *
+ * `navigator.audioSession` is Safari 16.4+ and absent everywhere else, so this
+ * is inert on every other browser.
+ */
+function _configureAudioSession(): void {
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+  if (!session) return
+  try {
+    session.type = 'playback'
+  } catch {
+    // A read-only or restricted property throws under strict mode. Audio is
+    // still worth attempting — it simply stays subject to the silent switch.
+  }
+}
+
 async function _doInitAudio() {
   _unavailableReason = null
   try {
@@ -532,6 +560,9 @@ async function _doInitAudio() {
         _ctx = earlyCtx
         delete (window as Window & { _sdrEarlyCtx?: AudioContext })._sdrEarlyCtx
       } else _ctx = new AudioContext({ sampleRate: 48000 })
+      // Before the first resume, so the category is in force for the context's
+      // whole life rather than applied to one that is already running.
+      _configureAudioSession()
       _watchContextState()
     }
     _ctx.resume().catch(() => {})
