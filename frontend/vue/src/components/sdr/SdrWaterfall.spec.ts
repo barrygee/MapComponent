@@ -2773,3 +2773,62 @@ describe('SdrWaterfall — final branch fall-throughs', () => {
     expect(fftSpy).not.toHaveBeenCalled()
   })
 })
+
+describe('SdrWaterfall — paused display', () => {
+  /**
+   * Pausing exists to free the main thread.
+   *
+   * The ScriptProcessor audio fallback runs there — on any page without a
+   * secure context, which is most of the ways Sentinel is reached — and
+   * rendering competes with it. On a phone that is the difference between
+   * choppy audio and clean audio, so "paused" has to actually stop the work
+   * rather than merely hide the canvas.
+   */
+  it('does no plot work while the display is paused', async () => {
+    const { store } = mountWaterfall()
+    store.displayPaused = true
+    await playWithFrame(store)
+
+    expect(wfPlotInstance().calls.push).toBeUndefined()
+    expect(specPlot().calls.reload).toBeUndefined()
+  })
+
+  it('resumes plotting when unpaused', async () => {
+    const { store } = mountWaterfall()
+    store.displayPaused = true
+    await playWithFrame(store)
+
+    store.displayPaused = false
+    await playWithFrame(store, { center_hz: 146_000_000 })
+
+    expect(wfPlotInstance().calls.push).toBeTruthy()
+    expect(specPlot().calls.reload).toBeTruthy()
+  })
+
+  it('drops a frame that was already queued when the pause landed', async () => {
+    // The watcher queues a frame and the redraw happens on the next animation
+    // frame, so a pause between the two would otherwise paint one last time —
+    // and, worse, keep the draw path warm exactly when the thread is wanted
+    // elsewhere.
+    const { store } = mountWaterfall()
+    store.setPlaying(true)
+    nowMs += 1000
+    store.setSpectrum(makeFrame())
+    await flushPromises()
+
+    store.displayPaused = true
+    flushRaf()
+    await flushPromises()
+
+    expect(specPlot().calls.reload).toBeUndefined()
+  })
+
+  it('leaves playback alone, so pausing never costs the audio', async () => {
+    const { store } = mountWaterfall()
+    await playWithFrame(store)
+
+    store.displayPaused = true
+
+    expect(store.playing).toBe(true)
+  })
+})

@@ -422,6 +422,23 @@ describe('SdrPanel — control socket lifecycle', () => {
     expect(wrapper.find('.sdr-radio-unavailable').exists()).toBe(true)
   })
 
+  it('pauses and resumes the display without touching playback', async () => {
+    // Pausing exists to free the main thread for the ScriptProcessor audio
+    // fallback. It must never disturb playback: the whole point is to keep
+    // listening while the rendering gets out of the way.
+    const { wrapper } = await mountConnected()
+    const store = useSdrStore()
+    const playingBefore = store.playing
+
+    await wrapper.find('.sdr-pause-btn').trigger('click')
+    expect(store.displayPaused).toBe(true)
+    expect(store.playing).toBe(playingBefore)
+
+    await wrapper.find('.sdr-pause-btn').trigger('click')
+    expect(store.displayPaused).toBe(false)
+    expect(store.playing).toBe(playingBefore)
+  })
+
   it('shows why audio cannot start, separately from the radio notice', async () => {
     // A radio can be streaming perfectly — waterfall and all — while audio
     // cannot start, because the two travel different paths. This failure used
