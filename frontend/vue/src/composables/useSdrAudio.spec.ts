@@ -239,6 +239,21 @@ describe('useSdrAudio', () => {
       expect(audio.audioUnavailableReason()).toBe('boom')
     })
 
+    it('reports a non-Error throw without rendering "[object Object]"', async () => {
+      // Nothing guarantees a rejection is an Error — a browser can reject with
+      // a DOMException-like value or a bare string, and the reason is shown to
+      // an operator either way.
+      const audio = await loadAudio()
+      const FailingCtx = class extends FakeAudioContext {
+        audioWorklet = { addModule: vi.fn().mockRejectedValue('worklet blocked') }
+      }
+      vi.stubGlobal('AudioContext', FailingCtx)
+
+      await audio.initAudio()
+
+      expect(audio.audioUnavailableReason()).toBe('worklet blocked')
+    })
+
     it('clears a stale reason when a later attempt succeeds', async () => {
       // A context blocked until the user interacted must not keep reporting a
       // failure after it starts working.
