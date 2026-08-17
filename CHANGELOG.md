@@ -132,6 +132,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Show when a radio's device is unavailable, and why (#276)
 - Render radios whose Sentry device has gone, so they can be removed (#277)
 - Match My Location panel to Sentry's
+- Play audio on pages that cannot use an AudioWorklet (#288)
 
 ### Bug Fixes
 
