@@ -22,6 +22,9 @@ const audioMock = vi.hoisted(() => ({
   onSquelchChange: vi.fn(),
   isReady: vi.fn(() => true),
   isPlaying: vi.fn(() => false),
+  // Null = audio is fine. The panel reads this after every init attempt, so a
+  // double without it makes every test that mounts the panel throw.
+  audioUnavailableReason: vi.fn((): string | null => null),
   // Captured callbacks so tests can drive power/squelch updates.
   _powerCb: null as null | ((dbfs: number, squelchOpen: boolean) => void),
   _squelchCb: null as null | ((open: boolean) => void),
@@ -417,6 +420,24 @@ describe('SdrPanel — control socket lifecycle', () => {
     await flushPromises()
 
     expect(wrapper.find('.sdr-radio-unavailable').exists()).toBe(true)
+  })
+
+  it('shows why audio cannot start, separately from the radio notice', async () => {
+    // A radio can be streaming perfectly — waterfall and all — while audio
+    // cannot start, because the two travel different paths. This failure used
+    // to be swallowed entirely, leaving "no sound" with nothing said anywhere.
+    // Driven through a tune, which is what actually initialises audio.
+    audioMock.audioUnavailableReason.mockReturnValue(
+      'Audio needs a secure context. This page is served over plain HTTP...',
+    )
+    const { wrapper } = await mountConnected()
+    await wrapper.find('.sdr-freq-input-large').setValue('145.500')
+    await wrapper.find('.sdr-tune-btn:not(.sdr-stop-btn):not(.sdr-rec-btn)').trigger('click')
+    await flushPromises()
+
+    const notices = wrapper.findAll('.sdr-radio-unavailable')
+    expect(notices.some((n) => n.text().includes('secure context'))).toBe(true)
+    audioMock.audioUnavailableReason.mockReturnValue(null)
   })
 
   it('keeps the radio selected when its device is unavailable', async () => {

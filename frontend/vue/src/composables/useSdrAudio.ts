@@ -46,6 +46,24 @@ function _isRadioLiveMuted(radioId: number | null): boolean {
 let _iqSocket: WebSocket | null = null
 let _radioId: number | null = null
 let _ready = false
+
+/**
+ * Why audio could not start, or null when it can.
+ *
+ * Audio init used to end in a bare `catch { _ctx = null }`, which meant every
+ * possible failure — an unsupported browser, a blocked context, a worklet that
+ * would not register — produced silence and an empty console. Diagnosing "the
+ * waterfall works but there is no sound" then meant reading this file, because
+ * the running app had destroyed the only evidence.
+ *
+ * The commonest cause by far is the page not being a secure context.
+ * `AudioWorklet` is gated on one, and Sentinel is normally reached over plain
+ * HTTP at a LAN address — which is secure on `localhost` and insecure on
+ * `10.10.10.1`, so the same build plays on the machine hosting it and is silent
+ * on every other device. That is worth naming explicitly rather than reporting
+ * as a generic failure.
+ */
+let _unavailableReason: string | null = null
 // In-flight audio init, shared by concurrent callers so the worklet module is
 // only added once per context (a second addModule() throws "already registered").
 let _initPromise: Promise<void> | null = null
@@ -352,8 +370,28 @@ function _initAudio(): Promise<void> {
   return _initPromise
 }
 
+/** The reason `AudioWorklet` is unusable here, or null when it is available. */
+function _workletBlocker(ctx: AudioContext): string | null {
+  if (ctx.audioWorklet) return null
+  // Checked in this order because the secure-context rule is the actionable
+  // case: it is a property of the URL, not the browser, so the fix is how the
+  // page is reached rather than which device it is opened on.
+  if (typeof isSecureContext !== 'undefined' && !isSecureContext) {
+    return (
+      'Audio needs a secure context. This page is served over plain HTTP at a ' +
+      'non-localhost address, so the browser blocks the audio worklet. Reach ' +
+      'Sentinel over HTTPS or via localhost to hear audio.'
+    )
+  }
+  return 'This browser does not support AudioWorklet, which Sentinel needs for audio.'
+}
+
 async function _doInitAudio() {
+  _unavailableReason = null
   try {
+    if (typeof AudioContext === 'undefined') {
+      throw new Error('This browser has no Web Audio support.')
+    }
     const blob = new Blob([PROCESSOR_SRC], { type: 'application/javascript' })
     const blobUrl = URL.createObjectURL(blob)
     // A failed init always nulls _ctx, so on entry _ctx is either null or fully
@@ -369,6 +407,8 @@ async function _doInitAudio() {
       _watchContextState()
     }
     _ctx.resume().catch(() => {})
+    const blocker = _workletBlocker(_ctx)
+    if (blocker) throw new Error(blocker)
     await _ctx.audioWorklet.addModule(blobUrl)
     URL.revokeObjectURL(blobUrl)
     _worklet = new AudioWorkletNode(_ctx, 'sdr-demod-processor', {
@@ -390,7 +430,12 @@ async function _doInitAudio() {
       if (msg.type === 'pcm_chunk') _onRecChunk?.(new Float32Array(msg.samples))
     }
     _ready = true
-  } catch {
+  } catch (error) {
+    // Recorded and logged rather than swallowed. `_ctx` is still nulled so a
+    // later attempt starts clean, but the reason now outlives the failure and
+    // reaches both the console and anything rendering `audioUnavailableReason`.
+    _unavailableReason = error instanceof Error ? error.message : String(error)
+    console.warn('[sentinel] audio unavailable:', _unavailableReason)
     _ctx = null
   }
 }
@@ -622,6 +667,15 @@ export function useSdrAudio() {
   function isReady() {
     return _ready
   }
+  /**
+   * Why audio is not playing, or null when nothing is wrong.
+   *
+   * Populated only once an init has been attempted — before that there is
+   * nothing to report and null means "not tried yet" rather than "fine".
+   */
+  function audioUnavailableReason() {
+    return _unavailableReason
+  }
   function isPlaying() {
     return sdrStore.playing
   }
@@ -643,5 +697,6 @@ export function useSdrAudio() {
     onSquelchChange,
     isReady,
     isPlaying,
+    audioUnavailableReason,
   }
 }
