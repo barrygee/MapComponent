@@ -408,16 +408,40 @@ function _workletBlocker(ctx: AudioContext): string | null {
 /**
  * How many frames the fallback renders per callback.
  *
- * 4096 at 48 kHz is ~85 ms — large enough that main-thread jitter does not
- * underrun it, small enough to stay under the processor's own ~150 ms buffer
- * ceiling. A `ScriptProcessorNode` runs on the main thread, so a smaller buffer
- * would glitch whenever the UI does anything expensive.
+ * 8192 at 48 kHz is ~170 ms. A `ScriptProcessorNode` runs on the **main
+ * thread**, competing with the waterfall and everything else the UI does, so
+ * the callback arrives whenever the browser gets round to it rather than on the
+ * audio thread's fixed cadence. 4096 (~85 ms) was audibly jumpy on a phone:
+ * too little work per callback to absorb that jitter.
+ *
+ * The cost is latency, which for listening to a receiver is a fair trade
+ * against dropouts — tuning feedback stays well under a quarter-second.
  */
-const FALLBACK_BUFFER_SIZE = 4096
+const FALLBACK_BUFFER_SIZE = 8192
+
+/**
+ * Buffering the fallback asks the processor for, in seconds.
+ *
+ * The processor's own defaults (80 ms preroll, 150 ms ceiling) are tuned for
+ * the worklet, where callbacks land on the audio thread like clockwork. On the
+ * main thread each callback drains {@link FALLBACK_BUFFER_SIZE} frames at once,
+ * so a 150 ms ceiling leaves barely a callback's worth of slack — and the ring
+ * spends its time alternating between underrun (silence while it refills) and
+ * overflow, where it fast-forwards past the oldest samples. That fast-forward
+ * *is* the jump you hear.
+ *
+ * Roughly triple the headroom, well inside the processor's one-second buffer.
+ */
+const FALLBACK_PREROLL_S = 0.25
+const FALLBACK_MAX_BUFFERED_S = 0.5
+const OUTPUT_SAMPLE_RATE = 48000
 
 /** The processor class the source registers, as this module uses it. */
 interface DemodProcessor {
   process(inputs: unknown, outputs: Float32Array[][]): boolean
+  /** Frames buffered before playback starts, and the ceiling before it drops. */
+  _preroll: number
+  _maxBuffered: number
 }
 
 /**
@@ -481,6 +505,11 @@ function _buildFallbackGraph(
   processor: DemodProcessor,
   channel: MessageChannel,
 ): DemodNode {
+  // Set directly rather than messaged in: the processor is an ordinary object
+  // on this thread, which is the one advantage this path has over the worklet.
+  processor._preroll = Math.round(OUTPUT_SAMPLE_RATE * FALLBACK_PREROLL_S)
+  processor._maxBuffered = Math.round(OUTPUT_SAMPLE_RATE * FALLBACK_MAX_BUFFERED_S)
+
   const node = ctx.createScriptProcessor(FALLBACK_BUFFER_SIZE, 1, 1)
   node.onaudioprocess = (event: AudioProcessingEvent) => {
     // `process` fills the array it is handed, exactly as the worklet calls it.
