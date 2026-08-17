@@ -334,6 +334,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Stop retrying a radio whose device is unavailable, and say why (#278)
 - Report why audio cannot start instead of failing silently (#287)
 - Let iOS play the receiver through the silent switch (#289)
+- Smooth the fallback's audio on a busy main thread (#290)
 
 ### Chores
 
