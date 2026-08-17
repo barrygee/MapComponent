@@ -403,6 +403,16 @@ describe('useSdrAudio', () => {
         expect(lastScriptNode).not.toBeNull()
       })
 
+      it('renders a callback large enough to absorb main-thread jitter', async () => {
+        // The fallback runs on the main thread, competing with the waterfall, so
+        // the callback lands whenever the browser gets round to it rather than on
+        // the audio thread's fixed cadence. 4096 (~85 ms) was audibly jumpy on a
+        // phone; this is the lever that fixed it, so it is pinned.
+        await initWithFallback()
+
+        expect(lastCtx?.createScriptProcessor).toHaveBeenCalledWith(8192, 1, 1)
+      })
+
       it('tears the fallback graph down on stop', async () => {
         const audio = await initWithFallback()
         const node = lastScriptNode
