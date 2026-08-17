@@ -331,6 +331,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Close the gap above an expanded first filter row
 - Tune ADS-B to fixed maximum gain instead of AGC (#273)
 - Stop retrying a radio whose device is unavailable, and say why (#278)
+- Report why audio cannot start instead of failing silently (#287)
 
 ### Chores
 
