@@ -26,12 +26,34 @@ class FakeGain {
   connect = vi.fn()
   disconnect = vi.fn()
 }
+class FakeScriptNode {
+  onaudioprocess: ((event: unknown) => void) | null = null
+  connect = vi.fn()
+  disconnect = vi.fn()
+}
+class FakeConstantSource {
+  offset = { value: 1 }
+  connect = vi.fn()
+  disconnect = vi.fn()
+  start = vi.fn()
+  stop = vi.fn()
+}
+let lastScriptNode: FakeScriptNode | null = null
+
 class FakeAudioContext {
   state = 'running'
   destination = {}
   resume = vi.fn().mockResolvedValue(undefined)
   close = vi.fn()
   createGain = vi.fn(() => new FakeGain())
+  // The ScriptProcessor fallback's two nodes. Present by default so a context
+  // without a worklet exercises the fallback rather than failing; tests that
+  // want the fallback *unavailable* delete them.
+  createScriptProcessor = vi.fn(() => {
+    lastScriptNode = new FakeScriptNode()
+    return lastScriptNode
+  })
+  createConstantSource = vi.fn(() => new FakeConstantSource())
   audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) }
   stateListener: Listener | null = null
   addEventListener = vi.fn((_type: string, cb: Listener) => {
@@ -67,6 +89,28 @@ function installGlobals() {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 7 }) }))
   URL.createObjectURL = vi.fn(() => 'blob:fake')
   URL.revokeObjectURL = vi.fn()
+}
+
+/**
+ * A context whose browser has no `audioWorklet`, with or without the nodes the
+ * ScriptProcessor fallback needs — the two conditions that decide whether a
+ * blocked worklet is recoverable.
+ */
+function noWorkletContext({ withFallback = true }: { withFallback?: boolean } = {}) {
+  // Two separate classes rather than a conditional field: the fake's methods are
+  // instance fields, so `super.createScriptProcessor` resolves to undefined and
+  // the "keep it" branch would silently remove the very thing it means to keep.
+  if (withFallback) {
+    return class extends FakeAudioContext {
+      // Modelling a browser that exposes no `audioWorklet` at all, which the
+      // fake's type does not allow for — the cast is the point of the test.
+      audioWorklet = undefined as unknown as FakeAudioContext['audioWorklet']
+    }
+  }
+  return class extends FakeAudioContext {
+    audioWorklet = undefined as unknown as FakeAudioContext['audioWorklet']
+    createScriptProcessor = undefined as unknown as FakeAudioContext['createScriptProcessor']
+  }
 }
 
 async function loadAudio() {
@@ -180,18 +224,25 @@ describe('useSdrAudio', () => {
       expect(audio.audioUnavailableReason()).toBeNull()
     })
 
-    it('names an insecure context, which is the commonest cause', async () => {
-      // AudioWorklet is gated on a secure context, so Sentinel reached over
-      // plain HTTP at a LAN address is silent while the same build played from
-      // localhost works. Naming it is the whole point: the fix is how the page
-      // is reached, not which device is opening it.
+    it('reports nothing when a blocked worklet falls back successfully', async () => {
+      // An insecure context is no longer fatal: the same demodulator runs on
+      // the main thread instead, so there is nothing to report.
       const audio = await loadAudio()
-      const NoWorkletCtx = class extends FakeAudioContext {
-        // Modelling a browser that exposes no `audioWorklet` at all, which the
-        // fake's type does not allow for — the cast is the point of the test.
-        audioWorklet = undefined as unknown as FakeAudioContext['audioWorklet']
-      }
-      vi.stubGlobal('AudioContext', NoWorkletCtx)
+      vi.stubGlobal('AudioContext', noWorkletContext())
+      vi.stubGlobal('isSecureContext', false)
+
+      await audio.initAudio()
+
+      expect(audio.isReady()).toBe(true)
+      expect(audio.audioUnavailableReason()).toBeNull()
+    })
+
+    it('names an insecure context when the fallback is unavailable too', async () => {
+      // Both paths gone is the only remaining fatal case, and the secure
+      // context is still the actionable half of it: the fix is how the page is
+      // reached, not which device is opening it.
+      const audio = await loadAudio()
+      vi.stubGlobal('AudioContext', noWorkletContext({ withFallback: false }))
       vi.stubGlobal('isSecureContext', false)
 
       await audio.initAudio()
@@ -204,12 +255,7 @@ describe('useSdrAudio', () => {
       // Same missing capability, different cause — and a different fix, so the
       // two must not collapse into one message.
       const audio = await loadAudio()
-      const NoWorkletCtx = class extends FakeAudioContext {
-        // Modelling a browser that exposes no `audioWorklet` at all, which the
-        // fake's type does not allow for — the cast is the point of the test.
-        audioWorklet = undefined as unknown as FakeAudioContext['audioWorklet']
-      }
-      vi.stubGlobal('AudioContext', NoWorkletCtx)
+      vi.stubGlobal('AudioContext', noWorkletContext({ withFallback: false }))
       vi.stubGlobal('isSecureContext', true)
 
       await audio.initAudio()
@@ -237,6 +283,82 @@ describe('useSdrAudio', () => {
       await audio.initAudio()
 
       expect(audio.audioUnavailableReason()).toBe('boom')
+    })
+
+    /**
+     * The ScriptProcessor fallback.
+     *
+     * `AudioWorklet` needs a secure context, which a LAN address over plain HTTP
+     * is not — so on every device except the one hosting Sentinel the worklet
+     * path is unavailable and audio was simply silent. These pin that the
+     * fallback carries the same demodulator rather than a second copy of it.
+     */
+    describe('ScriptProcessor fallback', () => {
+      async function initWithFallback() {
+        const audio = await loadAudio()
+        vi.stubGlobal('AudioContext', noWorkletContext())
+        vi.stubGlobal('isSecureContext', false)
+        await audio.initAudio()
+        return audio
+      }
+
+      it('builds the graph and reports ready', async () => {
+        const audio = await initWithFallback()
+
+        expect(audio.isReady()).toBe(true)
+        expect(lastCtx?.createScriptProcessor).toHaveBeenCalled()
+        expect(lastScriptNode?.onaudioprocess).toBeTypeOf('function')
+      })
+
+      it('feeds a silent source in so the callback actually fires', async () => {
+        // A ScriptProcessorNode with nothing connected to its input does not
+        // reliably run — Safari in particular wants a live input — which would
+        // leave a graph that looks correct and produces nothing.
+        await initWithFallback()
+
+        expect(lastCtx?.createConstantSource).toHaveBeenCalled()
+      })
+
+      it('renders into the buffer it is handed', async () => {
+        // The proof the same `process()` the worklet calls is being driven here:
+        // it fills the array rather than returning one.
+        await initWithFallback()
+        const output = new Float32Array(8).fill(1)
+
+        lastScriptNode?.onaudioprocess?.({
+          outputBuffer: { getChannelData: () => output },
+        })
+
+        // Silent (no IQ has arrived yet) rather than untouched — the processor
+        // zero-fills while it is buffering, which is exactly what it does in the
+        // worklet on the first callback.
+        expect(Array.from(output)).toEqual(new Array(8).fill(0))
+      })
+
+      it('routes messages both ways over a real MessagePort', async () => {
+        // The processor sets `this.port.onmessage` in its constructor and the app
+        // posts IQ to it; a hand-rolled shim that only worked one way would look
+        // fine until audio stayed silent.
+        const audio = await initWithFallback()
+        const powerReadings: number[] = []
+        audio.onPower((dbfs) => powerReadings.push(dbfs))
+
+        audio.setMode('AM')
+
+        // Delivery is async on a MessageChannel, matching a worklet port.
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        expect(lastScriptNode).not.toBeNull()
+      })
+
+      it('tears the fallback graph down on stop', async () => {
+        const audio = await initWithFallback()
+        const node = lastScriptNode
+
+        audio.stop()
+
+        expect(node?.onaudioprocess).toBeNull()
+        expect(audio.isReady()).toBe(false)
+      })
     })
 
     it('reports a non-Error throw without rendering "[object Object]"', async () => {

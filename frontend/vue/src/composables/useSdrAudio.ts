@@ -9,7 +9,26 @@ import type { SdrMode } from '@/stores/sdr'
 
 // ── Module-level audio state (never reactive) ────────────────────────────────
 let _ctx: AudioContext | null = null
-let _worklet: AudioWorkletNode | null = null
+/**
+ * The subset of `AudioWorkletNode` this module drives.
+ *
+ * Widened from the concrete class because audio has two implementations now:
+ * the worklet, and a `ScriptProcessorNode` fallback for pages that cannot use
+ * one. `AudioWorkletNode` satisfies this as-is, so every call site below is
+ * unchanged and neither path is the special case.
+ */
+interface DemodNode {
+  readonly port: {
+    postMessage(message: unknown, transfer?: Transferable[]): void
+    onmessage: ((event: MessageEvent) => void) | null
+  }
+  connect(destination: AudioNode): unknown
+  disconnect(): void
+}
+
+let _worklet: DemodNode | null = null
+/** Extra teardown the fallback needs, or null when the worklet path is in use. */
+let _fallbackTeardown: (() => void) | null = null
 let _gain: GainNode | null = null
 // User-set output volume.
 let _volume = 1.0
@@ -386,6 +405,115 @@ function _workletBlocker(ctx: AudioContext): string | null {
   return 'This browser does not support AudioWorklet, which Sentinel needs for audio.'
 }
 
+/**
+ * How many frames the fallback renders per callback.
+ *
+ * 4096 at 48 kHz is ~85 ms — large enough that main-thread jitter does not
+ * underrun it, small enough to stay under the processor's own ~150 ms buffer
+ * ceiling. A `ScriptProcessorNode` runs on the main thread, so a smaller buffer
+ * would glitch whenever the UI does anything expensive.
+ */
+const FALLBACK_BUFFER_SIZE = 4096
+
+/** The processor class the source registers, as this module uses it. */
+interface DemodProcessor {
+  process(inputs: unknown, outputs: Float32Array[][]): boolean
+}
+
+/**
+ * Run the demodulator on the main thread, for pages that cannot use a worklet.
+ *
+ * `AudioWorklet` is gated on a secure context, and Sentinel is normally reached
+ * over plain HTTP at a LAN address — so on every device except the one hosting
+ * it, the worklet path is simply unavailable and audio was silent.
+ * `ScriptProcessorNode` is deprecated but carries no such gate, so it restores
+ * audio everywhere with no certificates.
+ *
+ * **The DSP is not duplicated.** The exact same `PROCESSOR_SRC` is evaluated
+ * here with `registerProcessor` and `AudioWorkletProcessor` shimmed, so both
+ * paths run byte-identical demodulation and a change to the algorithm cannot
+ * apply to only one of them. The source depends on nothing else from the
+ * worklet scope — no `sampleRate`, no `currentTime` — which is what makes this
+ * possible.
+ *
+ * Returns null when the source cannot be evaluated at all, which a page with a
+ * strict `script-src` (no `unsafe-eval`) would cause; the caller then reports
+ * the original worklet blocker rather than a confusing second failure.
+ */
+function _createFallbackNode(ctx: AudioContext): DemodNode | null {
+  let ProcessorClass: (new () => DemodProcessor) | null = null
+  // A real MessageChannel rather than a hand-rolled pair: it gives the same
+  // async delivery and structured-clone semantics as a worklet port, including
+  // the transferables the IQ path relies on, so the processor cannot tell the
+  // difference.
+  const channel = new MessageChannel()
+  class ProcessorBase {
+    port = channel.port2
+  }
+  try {
+    new Function('registerProcessor', 'AudioWorkletProcessor', PROCESSOR_SRC)(
+      (_name: string, cls: new () => DemodProcessor) => {
+        ProcessorClass = cls
+      },
+      ProcessorBase,
+    )
+    // One catch, not two. Everything that can go wrong here is handled the
+    // same way — a page whose CSP forbids `unsafe-eval` so the source cannot be
+    // evaluated, a source that registered nothing (leaving `ProcessorClass`
+    // null, which the construction below throws on), or a browser with no
+    // `createScriptProcessor`. In every case the caller reports the original
+    // worklet blocker, which is the half an operator can act on.
+    return _buildFallbackGraph(
+      ctx,
+      new (ProcessorClass as unknown as new () => DemodProcessor)(),
+      channel,
+    )
+  } catch {
+    channel.port1.close()
+    channel.port2.close()
+    return null
+  }
+}
+
+/** Wire the demodulator into a ScriptProcessor graph. Throws if the nodes are unavailable. */
+function _buildFallbackGraph(
+  ctx: AudioContext,
+  processor: DemodProcessor,
+  channel: MessageChannel,
+): DemodNode {
+  const node = ctx.createScriptProcessor(FALLBACK_BUFFER_SIZE, 1, 1)
+  node.onaudioprocess = (event: AudioProcessingEvent) => {
+    // `process` fills the array it is handed, exactly as the worklet calls it.
+    processor.process(null, [[event.outputBuffer.getChannelData(0)]])
+  }
+
+  // A ScriptProcessorNode with nothing feeding it does not reliably fire its
+  // callback — Safari in particular wants a live input. A constant source at
+  // zero costs nothing audible and guarantees the graph pulls on it.
+  const silence = ctx.createConstantSource()
+  silence.offset.value = 0
+  silence.connect(node)
+  silence.start()
+
+  _fallbackTeardown = () => {
+    node.onaudioprocess = null
+    try {
+      silence.stop()
+    } catch {
+      // Already stopped, which is not a failure worth surfacing.
+    }
+    silence.disconnect()
+    channel.port1.close()
+    channel.port2.close()
+  }
+
+  return {
+    port: channel.port1,
+    connect: (destination: AudioNode) => node.connect(destination),
+    disconnect: () => node.disconnect(),
+  }
+}
+
 async function _doInitAudio() {
   _unavailableReason = null
   try {
@@ -408,14 +536,23 @@ async function _doInitAudio() {
     }
     _ctx.resume().catch(() => {})
     const blocker = _workletBlocker(_ctx)
-    if (blocker) throw new Error(blocker)
-    await _ctx.audioWorklet.addModule(blobUrl)
-    URL.revokeObjectURL(blobUrl)
-    _worklet = new AudioWorkletNode(_ctx, 'sdr-demod-processor', {
-      numberOfInputs: 0,
-      numberOfOutputs: 1,
-      outputChannelCount: [1],
-    })
+    if (blocker) {
+      // Not fatal any more: the same demodulator runs on the main thread, which
+      // is what makes audio work on the plain-HTTP LAN address Sentinel is
+      // normally reached at.
+      URL.revokeObjectURL(blobUrl)
+      _worklet = _createFallbackNode(_ctx)
+      if (!_worklet) throw new Error(blocker)
+      console.info('[sentinel] audio: %s Using the ScriptProcessor fallback.', blocker)
+    } else {
+      await _ctx.audioWorklet.addModule(blobUrl)
+      URL.revokeObjectURL(blobUrl)
+      _worklet = new AudioWorkletNode(_ctx, 'sdr-demod-processor', {
+        numberOfInputs: 0,
+        numberOfOutputs: 1,
+        outputChannelCount: [1],
+      })
+    }
     _gain = _ctx.createGain()
     _gain.gain.value = _isRadioLiveMuted(_radioId) ? 0 : _volume
     _worklet.connect(_gain)
@@ -476,6 +613,10 @@ export function useSdrAudio() {
       _worklet.port.onmessage = null
       _worklet.disconnect()
       _worklet = null
+    }
+    if (_fallbackTeardown) {
+      _fallbackTeardown()
+      _fallbackTeardown = null
     }
     if (_gain) {
       _gain.disconnect()
