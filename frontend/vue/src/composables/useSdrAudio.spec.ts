@@ -154,6 +154,110 @@ describe('useSdrAudio', () => {
     })
   })
 
+  /**
+   * Why audio did not start.
+   *
+   * These exist because the failure used to be swallowed whole: a bare
+   * `catch { _ctx = null }` meant an unsupported browser, a blocked context and
+   * a worklet that would not register all produced silence and an empty
+   * console. "The waterfall works but there is no sound" was then only
+   * diagnosable by reading the source.
+   */
+  describe('reporting why audio is unavailable', () => {
+    it('reports nothing before anything has been tried', async () => {
+      const audio = await loadAudio()
+
+      // null here means "not attempted", not "everything is fine" — the
+      // distinction matters to a caller deciding whether to render a notice.
+      expect(audio.audioUnavailableReason()).toBeNull()
+    })
+
+    it('reports nothing once audio is running', async () => {
+      const audio = await loadAudio()
+      await audio.initAudio()
+
+      expect(audio.isReady()).toBe(true)
+      expect(audio.audioUnavailableReason()).toBeNull()
+    })
+
+    it('names an insecure context, which is the commonest cause', async () => {
+      // AudioWorklet is gated on a secure context, so Sentinel reached over
+      // plain HTTP at a LAN address is silent while the same build played from
+      // localhost works. Naming it is the whole point: the fix is how the page
+      // is reached, not which device is opening it.
+      const audio = await loadAudio()
+      const NoWorkletCtx = class extends FakeAudioContext {
+        // Modelling a browser that exposes no `audioWorklet` at all, which the
+        // fake's type does not allow for — the cast is the point of the test.
+        audioWorklet = undefined as unknown as FakeAudioContext['audioWorklet']
+      }
+      vi.stubGlobal('AudioContext', NoWorkletCtx)
+      vi.stubGlobal('isSecureContext', false)
+
+      await audio.initAudio()
+
+      expect(audio.isReady()).toBe(false)
+      expect(audio.audioUnavailableReason()).toContain('secure context')
+    })
+
+    it('blames the browser when a worklet is missing on a secure page', async () => {
+      // Same missing capability, different cause — and a different fix, so the
+      // two must not collapse into one message.
+      const audio = await loadAudio()
+      const NoWorkletCtx = class extends FakeAudioContext {
+        // Modelling a browser that exposes no `audioWorklet` at all, which the
+        // fake's type does not allow for — the cast is the point of the test.
+        audioWorklet = undefined as unknown as FakeAudioContext['audioWorklet']
+      }
+      vi.stubGlobal('AudioContext', NoWorkletCtx)
+      vi.stubGlobal('isSecureContext', true)
+
+      await audio.initAudio()
+
+      expect(audio.audioUnavailableReason()).toContain('does not support AudioWorklet')
+      expect(audio.audioUnavailableReason()).not.toContain('secure context')
+    })
+
+    it('reports a browser with no Web Audio at all', async () => {
+      const audio = await loadAudio()
+      vi.stubGlobal('AudioContext', undefined)
+
+      await audio.initAudio()
+
+      expect(audio.audioUnavailableReason()).toContain('no Web Audio support')
+    })
+
+    it('keeps the reason from a failing worklet load rather than discarding it', async () => {
+      const audio = await loadAudio()
+      const FailingCtx = class extends FakeAudioContext {
+        audioWorklet = { addModule: vi.fn().mockRejectedValue(new Error('boom')) }
+      }
+      vi.stubGlobal('AudioContext', FailingCtx)
+
+      await audio.initAudio()
+
+      expect(audio.audioUnavailableReason()).toBe('boom')
+    })
+
+    it('clears a stale reason when a later attempt succeeds', async () => {
+      // A context blocked until the user interacted must not keep reporting a
+      // failure after it starts working.
+      const audio = await loadAudio()
+      const FailingCtx = class extends FakeAudioContext {
+        audioWorklet = { addModule: vi.fn().mockRejectedValue(new Error('boom')) }
+      }
+      vi.stubGlobal('AudioContext', FailingCtx)
+      await audio.initAudio()
+      expect(audio.audioUnavailableReason()).toBe('boom')
+
+      vi.stubGlobal('AudioContext', FakeAudioContext)
+      await audio.initAudio()
+
+      expect(audio.isReady()).toBe(true)
+      expect(audio.audioUnavailableReason()).toBeNull()
+    })
+  })
+
   describe('worklet port messages', () => {
     it('routes power and squelch messages to the registered callbacks', async () => {
       const audio = await loadAudio()

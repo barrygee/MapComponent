@@ -131,6 +131,14 @@
           <p v-if="radioUnavailableReason" class="sdr-radio-unavailable" role="status">
             {{ radioUnavailableReason }}
           </p>
+          <!-- Separate from the radio notice above: the radio can be perfectly
+               healthy and streaming — waterfall and all — while audio cannot
+               start, because the two travel different paths. Reported here
+               rather than only in the console, which is where this failure
+               used to live and why it read as "no sound, no reason". -->
+          <p v-if="audioUnavailableReason" class="sdr-radio-unavailable" role="status">
+            {{ audioUnavailableReason }}
+          </p>
         </div>
 
         <!-- Frequency -->
@@ -779,6 +787,19 @@ const controlsDisabled = ref(true)
  * dongle.
  */
 const radioUnavailableReason = ref('')
+
+/**
+ * Why audio is not playing, when the radio itself is fine.
+ *
+ * Read from the audio composable after each init attempt rather than pushed by
+ * it: init is fire-and-forget from several call sites here, and a ref the
+ * composable owned would make every one of them a subscriber for a string that
+ * changes at most twice a session.
+ */
+const audioUnavailableReason = ref('')
+function refreshAudioUnavailableReason() {
+  audioUnavailableReason.value = sdrAudio.audioUnavailableReason() ?? ''
+}
 const selectedRadioId = ref<number | null>(null)
 // Store-owned: the SDR store fetches/holds the configured radios (loadRadios);
 // this panel only reads them (dropdown, auto-select) and drives the fetch via
@@ -1284,6 +1305,7 @@ function onCtrlSocketOpen(radioId: number) {
     // must be pushed AFTER initAudio creates the worklet, hence the chain.
     const restoredBwHz = bwHz.value
     void Promise.resolve(sdrAudio.initAudio(radioId)).then(() => {
+      refreshAudioUnavailableReason()
       sdrAudio.setBandwidthHz(restoredBwHz)
     })
     // Re-assert the restored demod mode to the backend so its reported state
@@ -1420,7 +1442,9 @@ const {
   /* v8 ignore start */
   startAudioForSearch: (mode: string) => {
     if (selectedRadioId.value) {
-      sdrAudio.initAudio(selectedRadioId.value)
+      void Promise.resolve(sdrAudio.initAudio(selectedRadioId.value)).then(
+        refreshAudioUnavailableReason,
+      )
       sdrAudio.setMode(mode as SdrMode)
       const bw = defaultBwHz(mode)
       sdrAudio.setBandwidthHz(bw)
@@ -1495,7 +1519,9 @@ function tune() {
   if (!hz) return
   currentFreqHz.value = hz
   activeFreqDisplay.value = (hz / 1e6).toFixed(3) + ' MHz'
-  sdrAudio.initAudio(selectedRadioId.value)
+  void Promise.resolve(sdrAudio.initAudio(selectedRadioId.value)).then(
+    refreshAudioUnavailableReason,
+  )
   sdrAudio.setMode(currentMode.value as SdrMode)
   const bw = defaultBwHz(currentMode.value)
   sdrAudio.setBandwidthHz(bw)
@@ -1882,7 +1908,9 @@ function playFreq(f: SdrStoredFrequency) {
   currentMode.value = f.mode
   freqInputVal.value = (f.frequency_hz / 1e6).toFixed(4)
   activeFreqDisplay.value = (f.frequency_hz / 1e6).toFixed(3) + ' MHz'
-  sdrAudio.initAudio(selectedRadioId.value)
+  void Promise.resolve(sdrAudio.initAudio(selectedRadioId.value)).then(
+    refreshAudioUnavailableReason,
+  )
   sdrAudio.setMode(f.mode as SdrMode)
   setPlayingState(true)
   sessionStorage.setItem('sdrLastFreqHz', String(f.frequency_hz))
