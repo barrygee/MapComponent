@@ -1349,6 +1349,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Keep the pane's own empty-state styling on the shared shell
 - Reduce header logo wordmark height (#267)
 - Match the SDR options row names to the device rows (#282)
+- Flatten the settings panel onto a single column (#292)
 
 ### Dependencies
 
