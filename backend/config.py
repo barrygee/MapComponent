@@ -22,6 +22,16 @@ class Settings(BaseSettings):
     # serving cached data instead. Capped at one interval so a burst of callers
     # cannot pile into an ever-growing queue.
     adsb_rate_limit_max_wait_ms: int = 5000
+    # How long outbound calls to a host are suspended after it answers 429.
+    # adsb.lol documents no fixed request budget ("rate limits are dynamic based
+    # on the environment load"), so the fixed interval above is a floor, not a
+    # guarantee: when the upstream refuses a call we stop calling it for a while
+    # and serve cached data instead. 60 seconds — long enough to clear a busy
+    # spell, short enough that the map recovers without a restart.
+    adsb_rate_limit_penalty_ms: int = 60_000
+    # Ceiling applied to an upstream `Retry-After` before it is honoured, so a
+    # misconfigured or hostile header cannot park the feed for hours.
+    adsb_rate_limit_max_penalty_ms: int = 600_000
 
     # TLE data TTL — 6 hours (TLE changes slowly; Celestrak updates daily)
     tle_ttl_ms: int = 21_600_000

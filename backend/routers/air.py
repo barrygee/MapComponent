@@ -128,7 +128,15 @@ async def get_aircraft_near_point(
             continue
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:
+                # Visible on purpose: the local limiter is meant to keep us
+                # under the upstream's threshold, so a 429 means the threshold
+                # moved (adsb.lol's limits vary with load) and the configured
+                # interval may need raising.
                 rate_limited = True
+                logger.warning(
+                    "ADS-B upstream %s rate limited us (HTTP 429); backing off and serving cached data",
+                    urlsplit(base_url).netloc or base_url,
+                )
             else:
                 # Anything else — an auth failure above all — is indistinguishable
                 # from "no aircraft overhead" once we fall through to the next
