@@ -17,7 +17,9 @@ async def fetch_aircraft(lat: float, lon: float, radius: int, base_url: str) -> 
     Outbound calls are rate limited per upstream host (see
     `adsb_min_request_interval_ms`); a call that would have to wait too long for
     a free slot is refused locally rather than queued, so the caller can serve
-    cached data instead.
+    cached data instead. If the upstream answers 429 the host is put in a
+    cooldown (its `Retry-After`, else `adsb_rate_limit_penalty_ms`) so the next
+    poll is refused locally rather than repeating the breach.
 
     Args:
         lat: Centre latitude of the search area.
@@ -41,11 +43,44 @@ async def fetch_aircraft(lat: float, lon: float, radius: int, base_url: str) -> 
     )
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        if _is_readsb(base_url):
-            payload = await _get_json(client, _readsb_url(base_url))
-            return _readsb_to_airplanes(payload, lat, lon, radius)
-        url = f"{base_url}/point/{lat}/{lon}/{radius}"
-        return await _get_json(client, url)
+        try:
+            if _is_readsb(base_url):
+                payload = await _get_json(client, _readsb_url(base_url))
+                return _readsb_to_airplanes(payload, lat, lon, radius)
+            url = f"{base_url}/point/{lat}/{lon}/{radius}"
+            return await _get_json(client, url)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429:
+                # The upstream has told us we are over its (undocumented,
+                # load-dependent) limit. Suspend calls to this host so the
+                # retry a few seconds later does not compound the breach.
+                await _adsb_rate_limiter.penalize(
+                    upstream_host,
+                    _cooldown_seconds(exc.response.headers.get("retry-after")),
+                )
+            raise
+
+
+def _cooldown_seconds(retry_after_header: str | None) -> float:
+    """How long to stop calling a host that answered 429.
+
+    Prefers the upstream's own `Retry-After` when it gives one as a delay in
+    seconds, since that is the only authoritative statement of when it will
+    accept traffic again. Anything else — absent, an HTTP-date, or unparseable
+    — falls back to the configured default rather than guessing, and the value
+    is clamped so a wild header cannot take the feed offline indefinitely.
+    """
+    default_seconds = settings.adsb_rate_limit_penalty_ms / 1000
+    max_seconds = settings.adsb_rate_limit_max_penalty_ms / 1000
+    if retry_after_header is None:
+        return default_seconds
+    try:
+        requested_seconds = float(retry_after_header.strip())
+    except ValueError:
+        return default_seconds
+    if requested_seconds <= 0:
+        return default_seconds
+    return min(requested_seconds, max_seconds)
 
 
 async def _get_json(client: httpx.AsyncClient, url: str) -> dict:

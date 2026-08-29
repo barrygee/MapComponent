@@ -68,3 +68,26 @@ class MinimumIntervalRateLimiter:
         # reservation bookkeeping behind the wait and break the max_wait check.
         if wait_seconds > 0:
             await asyncio.sleep(wait_seconds)
+
+    async def penalize(self, host_key: str, cooldown_seconds: float) -> None:
+        """Block new call slots for `host_key` until `cooldown_seconds` from now.
+
+        Called when the upstream itself says we are going too fast (HTTP 429).
+        adsb.lol publishes no fixed request budget — its documentation says only
+        that "rate limits are dynamic based on the environment load" — so a
+        fixed minimum interval cannot be relied on to stay inside the limit when
+        the upstream is busy. Honouring the refusal with a cooldown is what
+        keeps a burst of 429s from becoming a ban: the limiter stops handing out
+        slots entirely, callers are refused locally, and they serve cached data
+        until the window passes.
+
+        The cooldown only ever pushes the next slot further out; a penalty that
+        lands while a longer one is already in force is ignored rather than
+        shortening it.
+        """
+        async with self._reservation_lock:
+            cooldown_ends_at = time.monotonic() + cooldown_seconds
+            self._next_free_slot_at[host_key] = max(
+                self._next_free_slot_at.get(host_key, 0.0),
+                cooldown_ends_at,
+            )
