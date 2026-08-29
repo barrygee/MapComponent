@@ -3,6 +3,12 @@ proxy, which hits external HTTP)."""
 
 from __future__ import annotations
 
+import logging
+
+import httpx
+
+from backend.services import adsb as adsb_service
+
 
 # ── /api/air/messages ─────────────────────────────────────────────────────────
 
@@ -190,3 +196,138 @@ class TestFlightsList:
         # Pin current contract — should not 500.
         resp = client.delete("/api/air/flights/UNKNOWN")
         assert resp.status_code in (200, 404)
+
+
+# ── /api/air/adsb/point — upstream failure handling ───────────────────────────
+
+
+class TestAdsbUpstreamFailover:
+    """The source loop's failure branches, which decide what an outage looks like.
+
+    These mock `fetch_aircraft` rather than hitting the network, so unlike the
+    rest of the proxy they are safe to run offline.
+
+    The regression that motivated them: airplanes.live closed its v2 API behind
+    an auth key, and the resulting 403 was indistinguishable from "no aircraft
+    overhead" — it fell through to the offgrid source and returned its empty
+    list with no log line naming the real cause.
+    """
+
+    ONLINE = "https://online.example/v2"
+    OFFGRID = "http://offgrid.example/data/aircraft.json"
+    POINT = "/api/air/adsb/point/54.0/-1.5/100"
+
+    def _configure_sources(self, client):
+        """Give the router both an online and an offgrid source to fail over between."""
+        client.put("/api/settings/air/onlineDataSourceURL", json={"value": self.ONLINE})
+        client.put(
+            "/api/settings/air/offgridDataSourceURL",
+            json={"value": {"url": self.OFFGRID}},
+        )
+
+    @staticmethod
+    def _status_error(status_code: int) -> httpx.HTTPStatusError:
+        request = httpx.Request("GET", "https://online.example/v2/point/54.0/-1.5/100")
+        response = httpx.Response(status_code, request=request)
+        return httpx.HTTPStatusError("boom", request=request, response=response)
+
+    @staticmethod
+    def _air_warnings(caplog) -> str:
+        """Only this router's warnings — caplog also collects httpx's INFO chatter."""
+        return "\n".join(
+            record.getMessage()
+            for record in caplog.records
+            if record.name == "backend.routers.air"
+            and record.levelno >= logging.WARNING
+        )
+
+    def _patch_fetch(self, monkeypatch, behaviour):
+        """Replace the upstream fetch with `behaviour(base_url)`, recording calls."""
+        calls: list[str] = []
+
+        async def fake_fetch(lat, lon, radius, base_url):
+            calls.append(base_url)
+            return behaviour(base_url)
+
+        monkeypatch.setattr(adsb_service, "fetch_aircraft", fake_fetch)
+        return calls
+
+    def test_403_falls_through_to_offgrid_and_warns(self, client, monkeypatch, caplog):
+        """An auth failure must not masquerade as an empty sky."""
+        self._configure_sources(client)
+        payload = {"ac": [{"hex": "abc123"}], "total": 1}
+
+        def behaviour(base_url):
+            if base_url == self.ONLINE:
+                raise self._status_error(403)
+            return payload
+
+        calls = self._patch_fetch(monkeypatch, behaviour)
+
+        with caplog.at_level(logging.WARNING, logger="backend.routers.air"):
+            resp = client.get(self.POINT)
+
+        # Failed over rather than surfacing the error to the client.
+        assert resp.status_code == 200
+        assert resp.json() == payload
+        assert resp.headers["X-Cache"] == "MISS"
+        # Both sources were tried, online first.
+        assert calls == [self.ONLINE, self.OFFGRID]
+        # ...and the 403 named itself, with host and status.
+        warnings = self._air_warnings(caplog)
+        assert "online.example" in warnings
+        assert "403" in warnings
+
+    def test_429_does_not_log_the_status_warning(self, client, monkeypatch, caplog):
+        """429 is an expected, self-correcting condition — it has its own path."""
+        self._configure_sources(client)
+
+        def behaviour(base_url):
+            raise self._status_error(429)
+
+        self._patch_fetch(monkeypatch, behaviour)
+
+        with caplog.at_level(logging.WARNING, logger="backend.routers.air"):
+            resp = client.get(self.POINT)
+
+        # No cached row exists, so an all-sources failure is a 503.
+        assert resp.status_code == 503
+        # The "returned HTTP" warning belongs to the non-429 branch only.
+        assert "returned HTTP" not in self._air_warnings(caplog)
+
+    def test_transport_error_warns_with_exception_name(
+        self, client, monkeypatch, caplog
+    ):
+        """An unreachable host is the other way this silently produced a blank map."""
+        self._configure_sources(client)
+
+        def behaviour(base_url):
+            raise httpx.ConnectError("no route to host")
+
+        self._patch_fetch(monkeypatch, behaviour)
+
+        with caplog.at_level(logging.WARNING, logger="backend.routers.air"):
+            resp = client.get(self.POINT)
+
+        assert resp.status_code == 503
+        warnings = self._air_warnings(caplog)
+        assert "unreachable" in warnings
+        assert "ConnectError" in warnings
+        # Both sources are named, so a two-source outage is fully diagnosable.
+        assert "online.example" in warnings
+        assert "offgrid.example" in warnings
+
+    def test_successful_primary_short_circuits_and_stays_quiet(
+        self, client, monkeypatch, caplog
+    ):
+        """The happy path must not touch the fallback or log anything."""
+        self._configure_sources(client)
+        payload = {"ac": [], "total": 0}
+        calls = self._patch_fetch(monkeypatch, lambda base_url: payload)
+
+        with caplog.at_level(logging.WARNING, logger="backend.routers.air"):
+            resp = client.get(self.POINT)
+
+        assert resp.status_code == 200
+        assert calls == [self.ONLINE]
+        assert self._air_warnings(caplog) == ""
