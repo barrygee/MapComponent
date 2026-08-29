@@ -337,6 +337,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Let iOS play the receiver through the silent switch (#289)
 - Smooth the fallback's audio on a busy main thread (#290)
 - Restore the Air domain's live aircraft feed (#293)
+- Back off when the ADS-B upstream returns 429 (#294)
 
 ### Chores
 
