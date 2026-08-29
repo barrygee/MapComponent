@@ -13,6 +13,8 @@ Endpoints:
 """
 
 import json
+import logging
+from urllib.parse import urlsplit
 
 import httpx
 from backend.cache import is_fresh, is_within_stale, now_ms
@@ -31,6 +33,8 @@ from sqlalchemy import select
 from sqlalchemy import text as sa_text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 # ── Request body schemas ───────────────────────────────────────────────────────
 
@@ -73,7 +77,7 @@ async def get_aircraft_near_point(
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Proxy the airplanes.live /v2/point endpoint with a SQLite write-through cache.
+    """Proxy the upstream /v2/point endpoint with a SQLite write-through cache.
 
     Cache strategy:
       - HIT:    fresh row exists (within adsb_ttl_ms) → return immediately
@@ -125,8 +129,23 @@ async def get_aircraft_near_point(
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:
                 rate_limited = True
+            else:
+                # Anything else — an auth failure above all — is indistinguishable
+                # from "no aircraft overhead" once we fall through to the next
+                # source and return its empty list. Name the source and status so
+                # a closed-off upstream shows up here rather than as a blank map.
+                logger.warning(
+                    "ADS-B upstream %s returned HTTP %s; trying next source",
+                    urlsplit(base_url).netloc or base_url,
+                    exc.response.status_code,
+                )
             continue
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
+            logger.warning(
+                "ADS-B upstream %s unreachable (%s); trying next source",
+                urlsplit(base_url).netloc or base_url,
+                exc.__class__.__name__,
+            )
             continue
 
     if data is not None:

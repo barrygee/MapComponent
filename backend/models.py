@@ -3,7 +3,7 @@ from sqlalchemy import Boolean, Column, Float, Integer, Text, UniqueConstraint
 
 
 class AdsbCache(Base):
-    """Cached ADS-B response from airplanes.live.
+    """Cached ADS-B response from the online ADS-B feed.
 
     Each row stores one bounding-box query result (lat/lon/radius).
     Served fresh within adsb_ttl_ms, or stale within adsb_stale_ms on upstream failure.
@@ -16,7 +16,7 @@ class AdsbCache(Base):
     lat = Column(Float, nullable=False)  # query centre latitude
     lon = Column(Float, nullable=False)  # query centre longitude
     radius_nm = Column(Integer, nullable=False, default=250)  # search radius in nautical miles
-    payload = Column(Text, nullable=False)  # raw JSON string from airplanes.live
+    payload = Column(Text, nullable=False)  # raw JSON string from the upstream feed
     ac_count = Column(Integer)  # number of aircraft in the response
     fetched_at = Column(Integer, nullable=False)  # Unix ms when this row was fetched
     expires_at = Column(Integer, nullable=False)  # fetched_at + TTL_MS

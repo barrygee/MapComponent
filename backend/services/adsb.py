@@ -63,11 +63,11 @@ async def _get_json(client: httpx.AsyncClient, url: str) -> dict:
 
 
 def _is_readsb(base_url: str) -> bool:
-    """Whether this source is a local readsb/tar1090 rather than the airplanes.live API.
+    """Whether this source is a local readsb/tar1090 rather than the online ADS-B API.
 
     Keyed on the URL ending in `.json`, or naming readsb's well-known
     `/data/aircraft.json`, because that is the one thing the two sources cannot
-    share: airplanes.live is a query API addressed as
+    share: the online feed is a query API addressed as
     `/point/{lat}/{lon}/{radius}`, while readsb writes a single static file
     holding everything its aerial can currently hear.
 
@@ -89,9 +89,9 @@ def _readsb_url(base_url: str) -> str:
 
 
 def _readsb_to_airplanes(payload: dict, lat: float, lon: float, radius: int) -> dict:
-    """Map readsb's `aircraft.json` onto the airplanes.live v2 shape the app reads.
+    """Map readsb's `aircraft.json` onto the v2 shape the app reads.
 
-    The two are closer than they look — airplanes.live derives its own feed from
+    The two are closer than they look — the v2 feeds derive their own data from
     readsb, so the per-aircraft fields (`hex`, `flight`, `lat`, `lon`,
     `alt_baro`, `gs`, `track`, `squawk`, `category`, `r`, `t`) already match.
     Two things do not, and both are handled here.

@@ -1,6 +1,6 @@
 """Client-side rate limiting for outbound upstream API calls.
 
-Third-party feeds (airplanes.live in particular) publish a minimum interval
+Third-party feeds (adsb.lol in particular) publish a minimum interval
 between requests and ban clients that exceed it. The response cache in the
 routers keeps *most* traffic off the wire, but it is keyed per lat/lon/radius:
 several map panes, several browser tabs, or a cache expiry that lands on more
