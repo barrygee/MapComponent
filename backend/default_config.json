@@ -13,7 +13,7 @@
     "enabled": true,
     "replayEnabled": false,
     "sourceOverride": "auto",
-    "onlineDataSourceURL": "https://api.airplanes.live/v2",
+    "onlineDataSourceURL": "https://api.adsb.lol/v2",
     "offgridDataSourceURL": {
       "url": ""
     },

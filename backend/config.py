@@ -5,15 +5,18 @@ class Settings(BaseSettings):
     # Path to the SQLite database file (relative to the project root)
     db_path: str = "backend/sentinel.db"
 
-    # How long ADS-B aircraft data is considered fresh (10 seconds — matches airplanes.live rate limit)
+    # How long ADS-B aircraft data is considered fresh (10 seconds — matches the upstream rate limit)
     adsb_ttl_ms: int = 10000
     # How long a stale ADS-B response can still be served if the upstream fails (60 seconds)
     adsb_stale_ms: int = 60000
 
-    # Base URL for the airplanes.live ADS-B API
-    adsb_upstream_base: str = "https://api.airplanes.live/v2"
+    # Base URL for the online ADS-B API. adsb.lol serves the same `/point/{lat}/
+    # {lon}/{radius}` shape airplanes.live used to: airplanes.live closed its v2
+    # endpoint behind an auth key ("403: Check auth key"), and this feed is the
+    # keyless drop-in replacement — same response fields, no registration.
+    adsb_upstream_base: str = "https://api.adsb.lol/v2"
     # Minimum gap between two outbound ADS-B requests to the same upstream host
-    # (5 seconds — airplanes.live bans clients that poll faster than this).
+    # (5 seconds — these feeds ban clients that poll faster than this).
     adsb_min_request_interval_ms: int = 5000
     # Longest a request will wait for a free upstream slot before giving up and
     # serving cached data instead. Capped at one interval so a burst of callers
