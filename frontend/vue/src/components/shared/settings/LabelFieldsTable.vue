@@ -143,6 +143,10 @@ function accessibleName(row: LabelFieldRow, column: LabelFieldColumn): string {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* The table only needs room for a field name plus its checkbox columns. Left
+     to fill the settings card it stretched to the full column width, stranding
+     the checkboxes an inch of empty space away from the labels they belong to. */
+  max-width: var(--settings-control-measure, 500px);
 }
 .lft-table {
   display: flex;
@@ -172,7 +176,7 @@ function accessibleName(row: LabelFieldRow, column: LabelFieldColumn): string {
   display: grid;
   align-items: center;
   background: rgba(16, 19, 29, 0.015);
-  border-radius: 6px;
+  border-radius: 0;
   margin-bottom: 4px;
   transition: background 0.1s;
 }
