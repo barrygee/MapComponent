@@ -14,6 +14,17 @@ describe('BaseDataGrid', () => {
     expect(wrapper.find('.probe-cell').exists()).toBe(true)
   })
 
+  // Used by a titled container (e.g. the Sentry MORE disclosure) whose first
+  // section would only repeat its heading — the row must not render as a blank
+  // line in that case.
+  it('renders no title row at all when no title is given', () => {
+    const wrapper = mount(BaseDataGrid, {
+      slots: { default: '<div class="probe-cell">cell</div>' },
+    })
+    expect(wrapper.find('.ba-data-grid-title').exists()).toBe(false)
+    expect(wrapper.find('.probe-cell').exists()).toBe(true)
+  })
+
   it('defaults to a two-column grid', () => {
     const wrapper = mount(BaseDataGrid, { props: { title: 'RADIO' } })
     expect(wrapper.find('.ba-data-grid').classes()).not.toContain('ba-data-grid--three')

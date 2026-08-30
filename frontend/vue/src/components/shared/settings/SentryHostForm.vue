@@ -65,6 +65,10 @@
 
     <div v-if="errorMsg" class="sdr-devices-form-error">{{ errorMsg }}</div>
 
+    <!-- Only for a host that exists: there is nothing to report about one that
+         has not been registered yet. -->
+    <SentryHostDetails v-if="host" :host="host" />
+
     <div class="sdr-devices-form-actions">
       <BaseButton
         v-if="host"
@@ -113,12 +117,17 @@
  * form never shows a stored value, only the "password set" placeholder text and
  * a blank field that keeps the stored one when left empty on edit.
 
+ * Below the fields (and above the actions) sits the collapsed `MORE`
+ * disclosure — everything else known about this host, including its
+ * latitude/longitude — so the editable fields stay the form's first content.
+ *
  * It is Sentry's *console password*, not a token: Sentry has no token auth
  * (its ADR-0010), and the client exchanges this for a session cookie.
  */
 import { ref, onMounted } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import SdrSourceStatusDot from './SdrSourceStatusDot.vue'
+import SentryHostDetails from './SentryHostDetails.vue'
 import {
   createSentryHost,
   updateSentryHost,

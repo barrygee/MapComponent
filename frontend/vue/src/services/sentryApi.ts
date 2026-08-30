@@ -32,6 +32,45 @@ export interface SentryHost {
   api_version: string | null
 }
 
+/** Where the Sentry reports itself to be, from its `/api/v1/sdrs` `source.location`. */
+export interface SentryLocation {
+  latitude: number | null
+  longitude: number | null
+  updated_at: number | null
+}
+
+/** The Sentry's own description of itself, from `/api/v1/sdrs`'s `source` block. */
+export interface SentrySource {
+  name: string | null
+  version: string | null
+  host: string | null
+  http_port: number | null
+  location: SentryLocation | null
+}
+
+/**
+ * Everything Sentinel knows about one host — `GET /api/sdr/sentry-hosts/{id}/info`.
+ *
+ * A superset of `SentryHost` carrying the poller's telemetry plus a live read
+ * of Sentry's two unauthenticated self-report endpoints: `health` (raw
+ * `GET /api/health` body — version, uptime, database/hotplug health, device
+ * counts) and `source`/`location` (from `GET /api/v1/sdrs`, the only place the
+ * Sentry's latitude/longitude is published).
+ *
+ * Always resolves for a registered host, reachable or not: an unreachable Pi
+ * comes back with `reachable: false`, a human-readable `detail`, and null live
+ * blocks.
+ */
+export interface SentryHostInfo extends SentryHost {
+  detail: string
+  last_polled_at: number | null
+  last_success_at: number | null
+  health: Record<string, unknown> | null
+  source: SentrySource | null
+  location: SentryLocation | null
+  control_port_offset: number | null
+}
+
 /** Body for `POST /api/sdr/sentry-hosts` — register a new host. */
 export interface SentryHostCreateInput {
   name?: string | null
@@ -327,6 +366,17 @@ export async function updateSentryHost(
 
 export async function deleteSentryHost(hostId: number): Promise<void> {
   await requestJson<undefined>(`${BASE}/${hostId}`, { method: 'DELETE' })
+}
+
+/**
+ * Every known detail of one host, for the details view: the stored record, the
+ * poller's telemetry, and a live read of Sentry's health and `source` blocks.
+ *
+ * Like `testSentryHost`, never throws for an unreachable host — the backend
+ * answers 200 with `reachable: false` — so callers render gaps, not an error.
+ */
+export async function getSentryHostInfo(hostId: number): Promise<SentryHostInfo> {
+  return requestJson<SentryHostInfo>(`${BASE}/${hostId}/info`)
 }
 
 /**

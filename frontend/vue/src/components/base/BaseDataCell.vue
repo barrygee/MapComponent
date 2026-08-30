@@ -13,12 +13,14 @@
  * Per-site pixel deltas (TrackingPanel's tighter spacing, lighter value weight,
  * and free-text wrapping vs SpaceFilter's fixed-width truncated telemetry) are
  * expressed as CSS custom properties a caller sets on an ancestor element —
- * `--ba-cell-gap`, `--ba-cell-label-color`, `--ba-cell-value-font-size`,
+ * `--ba-cell-gap`, `--ba-cell-label-color`, `--ba-cell-label-font-size`,
+ * `--ba-cell-label-font-weight`, `--ba-cell-label-letter-spacing`, `--ba-cell-value-font-size`,
  * `--ba-cell-value-font-weight`, `--ba-cell-value-white-space`,
  * `--ba-cell-value-overflow`, `--ba-cell-value-text-overflow`,
  * `--ba-cell-value-word-break`, `--ba-cell-value-overflow-wrap`,
  * `--ba-cell-value-line-height`, `--ba-cell-value-color`,
- * `--ba-cell-value-letter-spacing` (free prose reads better unspaced and
+ * `--ba-cell-value-letter-spacing`, `--ba-cell-value-emphasis-color`
+ * (free prose reads better unspaced and
  * slightly dimmed than fixed-width telemetry does), `--ba-cell-align`
  * (SpaceFilter/SpacePasses's
  * RADIO grid left-aligns each cell at its natural width — `flex-start` —
@@ -80,9 +82,9 @@ withDefaults(defineProps<BaseDataCellProps>(), {
   align-items: center;
   gap: 6px;
   font-family: var(--font-primary);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-size: var(--ba-cell-label-font-size, 9px);
+  font-weight: var(--ba-cell-label-font-weight, 700);
+  letter-spacing: var(--ba-cell-label-letter-spacing, 0.14em);
   color: var(--ba-cell-label-color, rgba(255, 255, 255, 0.35));
   text-transform: uppercase;
 }
@@ -102,7 +104,7 @@ withDefaults(defineProps<BaseDataCellProps>(), {
 }
 
 .ba-data-cell-value--emphasis {
-  color: #ff4040;
+  color: var(--ba-cell-value-emphasis-color, #ff4040);
   font-weight: 700;
 }
 

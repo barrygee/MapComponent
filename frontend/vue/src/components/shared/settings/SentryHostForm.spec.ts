@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
 import { mount, flushPromises } from '@vue/test-utils'
 import { axe } from 'jest-axe'
 import SentryHostForm from './SentryHostForm.vue'
@@ -40,6 +41,9 @@ function makeSavedHost(overrides: Partial<SentryHost> = {}): SentryHost {
 
 describe('SentryHostForm', () => {
   beforeEach(() => {
+    // The form's MORE disclosure reads appStore.isOnline to decide
+    // whether the site map can load, so these mounts need an active Pinia.
+    setActivePinia(createPinia())
     vi.clearAllMocks()
   })
   afterEach(() => {

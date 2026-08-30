@@ -7,6 +7,7 @@ import {
   testSentryHost,
   getSentryHostDevices,
   getSentryDeviceRecords,
+  getSentryHostInfo,
   patchSentryDevice,
   deleteSentryDevice,
   flashSentryDeviceSerial,
@@ -14,6 +15,7 @@ import {
   type SentryHost,
   type SentryHostCreateInput,
   type SentryDeviceSnapshot,
+  type SentryHostInfo,
   type SentryDeviceRecordsPayload,
   type SentryDeviceRecord,
   type SentryHealthProbeResult,
@@ -111,6 +113,40 @@ describe('getSentryHostDevices', () => {
     mockFetch(() => ({ ok: true, json: () => Promise.resolve(snapshot) }))
     await expect(getSentryHostDevices(1)).resolves.toEqual(snapshot)
     expect(global.fetch).toHaveBeenCalledWith('/api/sdr/sentry-hosts/1/devices', undefined)
+  })
+})
+
+describe('getSentryHostInfo', () => {
+  it("returns the host record merged with Sentry's live self-report", async () => {
+    const info = {
+      id: 1,
+      name: 'Gateshead',
+      address: '192.168.5.67',
+      port: 8000,
+      enabled: true,
+      auth_token_set: true,
+      created_at: 1,
+      last_seen_at: 2,
+      last_error: null,
+      reachable: true,
+      api_version: '1',
+      detail: 'ok',
+      last_polled_at: 3,
+      last_success_at: 3,
+      health: { status: 'ok' },
+      source: {
+        name: 'sentry',
+        version: '0.1.0',
+        host: '192.168.5.67',
+        http_port: 8000,
+        location: { latitude: 54.95, longitude: -1.53, updated_at: 4 },
+      },
+      location: { latitude: 54.95, longitude: -1.53, updated_at: 4 },
+      control_port_offset: 2,
+    } satisfies SentryHostInfo
+    mockFetch(() => ({ ok: true, json: () => Promise.resolve(info) }))
+    await expect(getSentryHostInfo(1)).resolves.toEqual(info)
+    expect(global.fetch).toHaveBeenCalledWith('/api/sdr/sentry-hosts/1/info', undefined)
   })
 })
 
