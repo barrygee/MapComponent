@@ -134,6 +134,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Match My Location panel to Sentry's
 - Play audio on pages that cannot use an AudioWorklet (#288)
 - Let the operator pause the spectrum and waterfall (#291)
+- Show every known detail of a Sentry host, with a site map (#296)
 
 ### Bug Fixes
 
