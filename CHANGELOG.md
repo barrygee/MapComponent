@@ -1233,6 +1233,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Document the Playwright e2e gate and the two e2e suites
 - Document Off Grid ADS-B setup and the decoder sidecar (#272)
 - Add the Sentinel design guide (#295)
+- Add the Sentinel backend guide (#297)
 
 ### Tests
 
