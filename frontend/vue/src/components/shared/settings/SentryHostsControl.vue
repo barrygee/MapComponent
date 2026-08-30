@@ -106,6 +106,10 @@
  * `.sdr-devices-*`/`.sdr-device-*` chrome) — kept as its own component
  * because it manages a genuinely different resource (hosts, not radios).
  *
+ * Expanding a row shows `SentryHostForm`, which carries both the editable
+ * fields and (in its own `MORE` disclosure) everything else known
+ * about that host.
+ *
  * Dispatches `sdr:sentry-hosts-changed` on `document` after every add/edit/
  * delete so `SdrDevicesControl` (which groups radios by Sentry host) picks up
  * the change without polling this control's own state.

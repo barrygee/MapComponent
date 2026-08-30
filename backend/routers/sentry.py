@@ -14,6 +14,7 @@ Endpoints:
   PUT    /api/sdr/sentry-hosts/{host_id}                         — update a host
   DELETE /api/sdr/sentry-hosts/{host_id}                         — forget a host
   POST   /api/sdr/sentry-hosts/{host_id}/test                    — probe GET /api/health
+  GET    /api/sdr/sentry-hosts/{host_id}/info                    — everything known about a host
 
   GET    /api/sdr/sentry-hosts/{host_id}/devices                 — cached status snapshot
   PATCH  /api/sdr/sentry-hosts/{host_id}/devices/{device_id}     — proxy PATCH /api/devices/{id}
@@ -203,6 +204,53 @@ class HealthProbeResult(BaseModel):
     detail: str
     api_version: str | None = None
     health: dict[str, Any] | None = None
+
+
+class SentryLocationOut(BaseModel):
+    """Where the Sentry itself is, as it reports it in `/api/v1/sdrs`'s `source.location`.
+
+    Every field is optional: a Sentry that has never had its position set
+    reports `location: null`, which is a normal state, not an error.
+    """
+
+    latitude: float | None = None
+    longitude: float | None = None
+    updated_at: int | None = None
+
+
+class SentrySourceOut(BaseModel):
+    """The `source` block of `/api/v1/sdrs` — the Sentry's own description of itself."""
+
+    name: str | None = None
+    version: str | None = None
+    host: str | None = None
+    http_port: int | None = None
+    location: SentryLocationOut | None = None
+
+
+class SentryHostInfoOut(SentryHostOut):
+    """Everything Sentinel knows about one Sentry host, for the details view.
+
+    A superset of `SentryHostOut`: the stored record, the poller's telemetry,
+    and a live read of the two *unauthenticated* Sentry endpoints that carry
+    the rest — `GET /api/health` (version, uptime, database/hotplug health,
+    device counts) and `GET /api/v1/sdrs` (the `source` block, which is the
+    only place the Sentry's latitude/longitude is published). Both are
+    unauthenticated by Sentry's design (its ADR-0010), so this still fills in
+    for a host whose console password Sentinel does not hold.
+
+    Never raises for an unreachable host — `reachable`/`detail` report that,
+    and the live blocks come back null, so a Pi that is off the network renders
+    as a details view with gaps rather than as an error.
+    """
+
+    detail: str
+    last_polled_at: int | None = None
+    last_success_at: int | None = None
+    health: dict[str, Any] | None = None
+    source: SentrySourceOut | None = None
+    location: SentryLocationOut | None = None
+    control_port_offset: int | None = None
 
 
 class DeviceSnapshotOut(BaseModel):
@@ -471,6 +519,94 @@ async def test_host(host_id: int, db: AsyncSession = Depends(get_db)) -> HealthP
     except SentryApiError as exc:
         return HealthProbeResult(reachable=False, detail=f"{exc.code}: {exc.message}")
     return HealthProbeResult(reachable=True, detail="ok", api_version=response.api_version, health=response.data)
+
+
+def _coerce_source(export_payload: dict[str, Any] | None) -> SentrySourceOut | None:
+    """Pull the `source` block out of a `/api/v1/sdrs` body, tolerating any shape.
+
+    The export is a remote service's response, so nothing about it is
+    guaranteed: an older Sentry may omit `source` entirely, and a newer one may
+    add keys. Anything unrecognised is dropped rather than allowed to fail the
+    whole details read.
+    """
+    source = (export_payload or {}).get("source")
+    if not isinstance(source, dict):
+        return None
+    raw_location = source.get("location")
+    location = (
+        SentryLocationOut(
+            **{key: value for key, value in raw_location.items() if key in SentryLocationOut.model_fields}
+        )
+        if isinstance(raw_location, dict)
+        else None
+    )
+    return SentrySourceOut(
+        name=source.get("name") if isinstance(source.get("name"), str) else None,
+        version=source.get("version") if isinstance(source.get("version"), str) else None,
+        host=source.get("host") if isinstance(source.get("host"), str) else None,
+        http_port=source.get("http_port") if isinstance(source.get("http_port"), int) else None,
+        location=location,
+    )
+
+
+@router.get("/{host_id}/info", response_model=SentryHostInfoOut)
+async def get_host_info(host_id: int, db: AsyncSession = Depends(get_db)) -> SentryHostInfoOut:
+    """Return every known detail of one Sentry host — record, telemetry, and live self-report.
+
+    Always 200. Reading a details view must not fail because the Pi is asleep,
+    so an unreachable host answers with `reachable: false`, a human-readable
+    `detail`, and null live blocks.
+    """
+    host = await _get_host_or_404(host_id, db)
+    client = _client_for(host)
+    snapshot = fleet_poller.get_snapshot(host.id)
+
+    detail = "ok"
+    health: dict[str, Any] | None = None
+    api_version: str | None = None
+    reachable = False
+    try:
+        health_response = await client.get_health()
+    except SentryUnreachableError as exc:
+        detail = str(exc)
+    except SentryApiError as exc:
+        detail = f"{exc.code}: {exc.message}"
+    else:
+        reachable = True
+        health = health_response.data
+        api_version = health_response.api_version
+
+    export_payload: dict[str, Any] | None = None
+    if reachable:
+        # Only worth a second round trip once the host has answered at all —
+        # and a failure here (an older Sentry without the v1 export) leaves the
+        # location blank rather than downgrading the host to unreachable.
+        try:
+            export_payload = (await client.get_sdr_export()).data
+        except (SentryUnreachableError, SentryApiError):
+            export_payload = None
+
+    source = _coerce_source(export_payload)
+    control_port_offset = (export_payload or {}).get("control_port_offset")
+
+    # This request just probed the host, so its result is fresher than the
+    # poller snapshot `_host_to_out` overlays: the live reachability wins, and
+    # so does the live API version when the probe reported one (a host that has
+    # just gone down keeps the snapshot's last-known version).
+    base_fields = _host_to_out(host).model_dump()
+    base_fields["reachable"] = reachable
+    if api_version is not None:
+        base_fields["api_version"] = api_version
+    return SentryHostInfoOut(
+        **base_fields,
+        detail=detail,
+        last_polled_at=snapshot.last_polled_at if snapshot is not None else None,
+        last_success_at=snapshot.last_success_at if snapshot is not None else None,
+        health=health,
+        source=source,
+        location=source.location if source is not None else None,
+        control_port_offset=control_port_offset if isinstance(control_port_offset, int) else None,
+    )
 
 
 # ── Cached device snapshot ──────────────────────────────────────────────────────

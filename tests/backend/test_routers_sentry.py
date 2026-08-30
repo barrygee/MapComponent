@@ -408,6 +408,261 @@ class TestGetHostDevices:
         }
 
 
+class TestHostInfo:
+    """`GET /{host_id}/info` — the details view's record + live self-report."""
+
+    @staticmethod
+    def _route_health_and_export(monkeypatch, *, health, export, export_status=200):
+        """Answer `/api/health` and `/api/v1/sdrs` differently, like a real Sentry."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/api/health":
+                if isinstance(health, Exception):
+                    raise health
+                return httpx.Response(
+                    200, json=health, headers={"X-Sentry-Api-Version": "1.4"}
+                )
+            assert request.url.path == "/api/v1/sdrs"
+            return httpx.Response(export_status, json=export)
+
+        _install_mock_transport(monkeypatch, handler)
+
+    def test_unknown_host_returns_404(self, client):
+        assert client.get("/api/sdr/sentry-hosts/999/info").status_code == 404
+
+    def test_reachable_host_returns_health_source_and_location(
+        self, client, monkeypatch
+    ):
+        created = _create_host(client)
+        self._route_health_and_export(
+            monkeypatch,
+            health={"status": "ok", "version": "0.1.0", "uptime_s": 12.5},
+            export={
+                "control_port_offset": 2,
+                "source": {
+                    "name": "sentry",
+                    "version": "0.1.0",
+                    "host": "10.0.0.5",
+                    "http_port": 8000,
+                    "location": {
+                        "latitude": 54.951186,
+                        "longitude": -1.532995,
+                        "updated_at": 1786634207233,
+                    },
+                },
+            },
+        )
+
+        resp = client.get(f"/api/sdr/sentry-hosts/{created['id']}/info")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["reachable"] is True
+        assert body["detail"] == "ok"
+        assert body["health"] == {"status": "ok", "version": "0.1.0", "uptime_s": 12.5}
+        assert body["source"]["name"] == "sentry"
+        assert body["source"]["http_port"] == 8000
+        assert body["location"] == {
+            "latitude": 54.951186,
+            "longitude": -1.532995,
+            "updated_at": 1786634207233,
+        }
+        assert body["control_port_offset"] == 2
+        # The live probe's version wins over the (absent) poller snapshot's.
+        assert body["api_version"] == "1.4"
+
+    def test_never_leaks_the_auth_token(self, client, monkeypatch):
+        created = _create_host(client, auth_token="TOP-SECRET-VALUE")
+        self._route_health_and_export(monkeypatch, health={"status": "ok"}, export={})
+
+        resp = client.get(f"/api/sdr/sentry-hosts/{created['id']}/info")
+
+        assert "TOP-SECRET-VALUE" not in resp.text
+        assert resp.json()["auth_token_set"] is True
+
+    def test_unreachable_host_returns_200_with_null_live_blocks(
+        self, client, monkeypatch
+    ):
+        created = _create_host(client)
+        self._route_health_and_export(
+            monkeypatch, health=httpx.ConnectError("simulated"), export={}
+        )
+
+        resp = client.get(f"/api/sdr/sentry-hosts/{created['id']}/info")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["reachable"] is False
+        assert "Could not reach Sentry host" in body["detail"]
+        assert body["health"] is None
+        assert body["source"] is None
+        assert body["location"] is None
+        assert body["control_port_offset"] is None
+
+    def test_rejected_health_surfaces_sentrys_own_code_and_message(
+        self, client, monkeypatch
+    ):
+        created = _create_host(client)
+        handler, _ = _json_handler(
+            503, {"detail": {"code": "starting", "message": "Still booting."}}
+        )
+        _install_mock_transport(monkeypatch, handler)
+
+        resp = client.get(f"/api/sdr/sentry-hosts/{created['id']}/info")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["reachable"] is False
+        assert body["detail"] == "starting: Still booting."
+        assert body["health"] is None
+
+    def test_failed_export_leaves_location_blank_but_host_reachable(
+        self, client, monkeypatch
+    ):
+        """An older Sentry without `/api/v1/sdrs` is reachable, just unlocated."""
+        created = _create_host(client)
+        self._route_health_and_export(
+            monkeypatch,
+            health={"status": "ok"},
+            export={"detail": {"code": "not_found", "message": "No such route."}},
+            export_status=404,
+        )
+
+        resp = client.get(f"/api/sdr/sentry-hosts/{created['id']}/info")
+
+        body = resp.json()
+        assert body["reachable"] is True
+        assert body["health"] == {"status": "ok"}
+        assert body["source"] is None
+        assert body["location"] is None
+
+    @pytest.mark.parametrize(
+        "export",
+        [
+            {},
+            {"source": None},
+            {"source": "not-an-object"},
+            {"source": []},
+        ],
+    )
+    def test_export_without_a_usable_source_block_yields_no_source(
+        self, client, monkeypatch, export
+    ):
+        created = _create_host(client)
+        self._route_health_and_export(
+            monkeypatch, health={"status": "ok"}, export=export
+        )
+
+        body = client.get(f"/api/sdr/sentry-hosts/{created['id']}/info").json()
+
+        assert body["source"] is None
+        assert body["location"] is None
+
+    def test_source_fields_of_the_wrong_type_are_dropped_not_fatal(
+        self, client, monkeypatch
+    ):
+        """Sentry is a remote service — a surprising payload must degrade, not 500."""
+        created = _create_host(client)
+        self._route_health_and_export(
+            monkeypatch,
+            health={"status": "ok"},
+            export={
+                "control_port_offset": "two",
+                "source": {
+                    "name": 42,
+                    "version": None,
+                    "host": ["10.0.0.5"],
+                    "http_port": "8000",
+                    "location": "somewhere",
+                },
+            },
+        )
+
+        body = client.get(f"/api/sdr/sentry-hosts/{created['id']}/info").json()
+
+        assert body["source"] == {
+            "name": None,
+            "version": None,
+            "host": None,
+            "http_port": None,
+            "location": None,
+        }
+        assert body["location"] is None
+        assert body["control_port_offset"] is None
+
+    def test_unknown_location_keys_are_ignored(self, client, monkeypatch):
+        """A newer Sentry may add keys; only the three known ones are read."""
+        created = _create_host(client)
+        self._route_health_and_export(
+            monkeypatch,
+            health={"status": "ok"},
+            export={
+                "source": {
+                    "location": {
+                        "latitude": 1.5,
+                        "longitude": 2.5,
+                        "updated_at": 99,
+                        "altitude_m": 130,
+                    }
+                }
+            },
+        )
+
+        body = client.get(f"/api/sdr/sentry-hosts/{created['id']}/info").json()
+
+        assert body["location"] == {
+            "latitude": 1.5,
+            "longitude": 2.5,
+            "updated_at": 99,
+        }
+
+    def test_poller_telemetry_is_included_when_a_snapshot_exists(
+        self, client, monkeypatch
+    ):
+        from backend.services.sentry_fleet import HostSnapshot
+
+        created = _create_host(client)
+        monkeypatch.setattr(
+            sentry_router.fleet_poller,
+            "get_snapshot",
+            lambda host_id: HostSnapshot(
+                host_id=host_id,
+                reachable=True,
+                api_version="9.9",
+                last_polled_at=4321,
+                last_success_at=1234,
+            ),
+        )
+        self._route_health_and_export(monkeypatch, health={"status": "ok"}, export={})
+
+        body = client.get(f"/api/sdr/sentry-hosts/{created['id']}/info").json()
+
+        assert body["last_polled_at"] == 4321
+        assert body["last_success_at"] == 1234
+
+    def test_snapshot_api_version_is_used_when_the_probe_reports_none(
+        self, client, monkeypatch
+    ):
+        from backend.services.sentry_fleet import HostSnapshot
+
+        created = _create_host(client)
+        monkeypatch.setattr(
+            sentry_router.fleet_poller,
+            "get_snapshot",
+            lambda host_id: HostSnapshot(host_id=host_id, api_version="7.7"),
+        )
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            # No X-Sentry-Api-Version header on either response.
+            return httpx.Response(200, json={"status": "ok"})
+
+        _install_mock_transport(monkeypatch, handler)
+
+        body = client.get(f"/api/sdr/sentry-hosts/{created['id']}/info").json()
+
+        assert body["api_version"] == "7.7"
+
+
 # ── device proxy ───────────────────────────────────────────────────────────────
 
 

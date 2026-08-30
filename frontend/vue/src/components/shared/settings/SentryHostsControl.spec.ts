@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
 import { mount, flushPromises } from '@vue/test-utils'
 import { axe } from 'jest-axe'
 import SentryHostsControl from './SentryHostsControl.vue'
@@ -44,6 +45,9 @@ const UNREACHABLE_HOST: SentryHost = {
 
 describe('SentryHostsControl', () => {
   beforeEach(() => {
+    // The form's MORE disclosure reads appStore.isOnline to decide
+    // whether the site map can load, so these mounts need an active Pinia.
+    setActivePinia(createPinia())
     vi.clearAllMocks()
   })
   afterEach(() => {

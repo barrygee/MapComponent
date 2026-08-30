@@ -590,7 +590,10 @@ const ALL_SETTINGS: SettingItem[] = [
     sectionLabel: 'SDR',
     id: 'sdr-sentry-hosts',
     label: 'Sentry Hosts',
-    desc: 'Register Raspberry Pis running Sentry to manage their SDR devices remotely',
+    // No description: the SENTRY HOSTS group heading already names the card.
+    // The former blurb stays as search terms so the card is still findable.
+    desc: '',
+    searchTerms: 'register raspberry pi sentry remote sdr devices',
     type: 'sdr-sentry-hosts',
     groupLabel: 'SENTRY HOSTS',
   },

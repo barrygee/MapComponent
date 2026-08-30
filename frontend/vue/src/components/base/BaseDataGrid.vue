@@ -12,12 +12,17 @@
  * `--ba-grid-column-gap`, `--ba-grid-row-gap`, `--ba-grid-section-gap`,
  * `--ba-grid-section-padding-top`, `--ba-grid-section-padding-bottom`,
  * `--ba-grid-section-padding-x` (SpacePasses's accordion body is 28px
- * left/right vs SpaceFilter/TrackingPanel's 24px) — following the same
- * pattern as `BaseButton`'s `--ba-rail-*` properties.
+ * left/right vs SpaceFilter/TrackingPanel's 24px), `--ba-grid-title-color`
+ * (the accent title reads as a highlight on the dark map panels this grid was
+ * extracted from, but as a stray lime heading on the light settings panel) —
+ * following the same pattern as `BaseButton`'s `--ba-rail-*` properties.
  */
 interface BaseDataGridProps {
-  /** The section caption, e.g. "POSITION DATA". */
-  title: string
+  /** The section caption, e.g. "POSITION DATA". Omit it for a grid whose
+   * heading would only repeat its container's (e.g. a titled disclosure whose
+   * first section needs no caption of its own) — the title row is then not
+   * rendered at all rather than left as an empty line. */
+  title?: string
   /** Grid column count. Real usage is either two (the RADIO section) or three
    * (POSITION DATA / ORBITAL DATA). Defaults to 2. */
   columns?: 2 | 3
@@ -39,6 +44,7 @@ interface BaseDataGridProps {
 }
 
 withDefaults(defineProps<BaseDataGridProps>(), {
+  title: undefined,
   columns: 2,
   collapseOnNarrow: false,
   bare: false,
@@ -47,7 +53,7 @@ withDefaults(defineProps<BaseDataGridProps>(), {
 
 <template>
   <div class="ba-data-grid-section" :class="{ 'ba-data-grid-section--bare': bare }">
-    <div class="ba-data-grid-title">{{ title }}</div>
+    <div v-if="title" class="ba-data-grid-title">{{ title }}</div>
     <div
       class="ba-data-grid"
       :class="{
@@ -75,10 +81,10 @@ withDefaults(defineProps<BaseDataGridProps>(), {
 
 .ba-data-grid-title {
   font-family: var(--font-primary);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  color: var(--color-accent);
+  font-size: var(--ba-grid-title-font-size, 9px);
+  font-weight: var(--ba-grid-title-font-weight, 700);
+  letter-spacing: var(--ba-grid-title-letter-spacing, 0.18em);
+  color: var(--ba-grid-title-color, var(--color-accent));
   text-transform: uppercase;
 }
 
