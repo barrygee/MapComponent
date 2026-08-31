@@ -341,6 +341,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Smooth the fallback's audio on a busy main thread (#290)
 - Restore the Air domain's live aircraft feed (#293)
 - Back off when the ADS-B upstream returns 429 (#294)
+- Keep map markers on their own coordinates, and lighten the Sentry dot (#300)
 
 ### Chores
 
