@@ -469,9 +469,7 @@ describe('SentrySitesControl', () => {
     it('shows the name, where it answers, a reachability dot, and its position', () => {
       const { panel } = addSite()
       expect(panel.querySelector('.sentry-map-marker-name')!.textContent).toBe('Roof Pi')
-      expect(panel.querySelector('.sentry-map-marker-meta')!.textContent).toContain(
-        '192.168.1.60:8000',
-      )
+      expect(panel.querySelector('.sentry-map-marker-meta')!.textContent).toBe('192.168.1.60:8000')
       expect(panel.querySelector('.sentry-map-marker-status')!.className).toContain(
         'sentry-map-marker-status--online',
       )
@@ -479,6 +477,14 @@ describe('SentrySitesControl', () => {
       expect(panel.querySelector('.sentry-map-marker-coords')!.textContent).toBe(
         '51.50000° N  0.10000° W',
       )
+    })
+
+    it('leads the name with the status dot, so reachability is read first', () => {
+      const { panel } = addSite()
+      const name = panel.querySelector('.sentry-map-marker-name')!
+      expect(name.firstElementChild!.className).toContain('sentry-map-marker-status')
+      // The dot is not part of the name's text — it sits before it.
+      expect(name.textContent).toBe('Roof Pi')
     })
 
     it('writes southern and eastern positions with their own hemispheres', () => {

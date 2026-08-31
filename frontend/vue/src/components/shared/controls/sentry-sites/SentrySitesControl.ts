@@ -314,19 +314,21 @@ export class SentrySitesControl extends SentinelControlBase {
     details.className = 'sentry-map-marker-info'
     details.setAttribute('aria-hidden', 'true')
 
+    // The status dot leads the name, so whether a host is up is the first thing
+    // read rather than something noticed halfway down the panel.
     const name = document.createElement('span')
     name.className = 'sentry-map-marker-name'
-    name.textContent = siteLabel(site)
-    details.appendChild(name)
-
-    const meta = document.createElement('span')
-    meta.className = 'sentry-map-marker-meta'
     const statusDot = document.createElement('span')
     statusDot.className = `sentry-map-marker-status sentry-map-marker-status--${
       site.reachable ? 'online' : 'offair'
     }`
-    meta.appendChild(statusDot)
-    meta.appendChild(document.createTextNode(`${site.address}:${site.port}`))
+    name.appendChild(statusDot)
+    name.appendChild(document.createTextNode(siteLabel(site)))
+    details.appendChild(name)
+
+    const meta = document.createElement('span')
+    meta.className = 'sentry-map-marker-meta'
+    meta.textContent = `${site.address}:${site.port}`
     details.appendChild(meta)
 
     const coordinates = document.createElement('span')
