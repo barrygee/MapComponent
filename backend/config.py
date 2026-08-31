@@ -96,6 +96,11 @@ class Settings(BaseSettings):
     # Cap on the exponential poll-retry backoff, so a long-dead host is still
     # retried periodically rather than abandoned.
     sentry_poll_backoff_max_s: float = 30.0
+    # How often a host's self-reported position (GET /api/v1/sdrs `source.location`)
+    # is refreshed, in seconds. Far slower than the status poll on purpose: a
+    # Sentry is a fixed installation, so its position changes when an operator
+    # re-sites it, not between one status frame and the next.
+    sentry_location_refresh_s: float = 60.0
     # TCP connect timeout (seconds) for calls to a Sentry host — the Pi may be
     # slow to respond or simply off the network.
     sentry_connect_timeout_s: float = 3.0

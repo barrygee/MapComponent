@@ -48,6 +48,9 @@ vi.mock('./controls/daynight/DaynightControl', () => ({
 vi.mock('@/components/shared/controls/names/NamesToggleControl', () => ({
   NamesToggleControl: controlMocks.make('names'),
 }))
+vi.mock('@/components/shared/controls/sentry-sites/SentrySitesControl', () => ({
+  SentrySitesControl: controlMocks.make('sentrySites'),
+}))
 
 vi.mock('@/components/shared/UserLocationMarker', () => ({
   UserLocationMarker: class {

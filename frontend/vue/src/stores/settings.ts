@@ -9,10 +9,29 @@ export const useSettingsStore = defineStore('settings', () => {
   const sidebarOpen = ref(true)
   const activeSection = ref<string | null>(null)
   const allSettings = ref<Record<string, Record<string, unknown>>>({})
+  /**
+   * The Sentry host the SDR section should expand when it next renders, or
+   * null. Set by the Sentry markers on the domain maps (`SentrySitesControl`)
+   * so "MORE" on a marker lands the operator on that host's own row rather than
+   * on the section and a hunt through the list. `SentryHostsControl` clears it
+   * once it has acted on it, so a later manual visit opens as usual.
+   */
+  const focusSentryHostId = ref<number | null>(null)
 
   function openPanel(section?: string) {
     open.value = true
     if (section) activeSection.value = section
+  }
+
+  /** Open the settings panel on the SDR section with one Sentry host expanded. */
+  function openSentryHost(hostId: number) {
+    focusSentryHostId.value = hostId
+    openPanel('sdr')
+  }
+
+  /** Forget a pending Sentry-host focus, once it has been acted on. */
+  function clearSentryHostFocus() {
+    focusSentryHostId.value = null
   }
 
   function closePanel() {
@@ -64,7 +83,10 @@ export const useSettingsStore = defineStore('settings', () => {
     sidebarOpen,
     activeSection,
     allSettings,
+    focusSentryHostId,
     openPanel,
+    openSentryHost,
+    clearSentryHostFocus,
     closePanel,
     togglePanel,
     toggleSidebar,

@@ -24,6 +24,8 @@ import {
   clearSatelliteClickHandler,
 } from '@/stores/notifications'
 import { useTrackingStore } from '@/stores/tracking'
+import { useSentrySitesStore } from '@/stores/sentrySites'
+import { useSettingsStore } from '@/stores/settings'
 import { useConnectivity } from '@/composables/useConnectivity'
 import { useUserLocation } from '@/composables/useUserLocation'
 import { useMapContextMenu } from '@/composables/useMapContextMenu'
@@ -32,10 +34,13 @@ import { UserLocationMarker } from '@/components/shared/UserLocationMarker'
 import { SatelliteControl } from './controls/satellite/SatelliteControl'
 import { DaynightControl } from './controls/daynight/DaynightControl'
 import { NamesToggleControl } from '@/components/shared/controls/names/NamesToggleControl'
+import { SentrySitesControl } from '@/components/shared/controls/sentry-sites/SentrySitesControl'
 
 const appStore = useAppStore()
 const spaceStore = useSpaceStore()
 const basemapStore = useBasemapStore()
+const sentrySitesStore = useSentrySitesStore()
+const settingsStore = useSettingsStore()
 const notificationsStore = useNotificationsStore()
 const trackingStore = useTrackingStore()
 const { location: userLocation, start: startLocation } = useUserLocation()
@@ -54,6 +59,9 @@ const satelliteControlRef = shallowRef<SatelliteControl | null>(null)
 let satelliteControl: SatelliteControl | null = null
 let daynightControl: DaynightControl | null = null
 let namesControl: NamesToggleControl | null = null
+// Sentry sites are plotted on every domain map, this one included — see
+// SentrySitesControl. Added without a button: the sites are always shown.
+let sentrySitesControl: SentrySitesControl | null = null
 const _locationMarker = new UserLocationMarker('space-user-location-marker')
 const ctxMenu = useMapContextMenu()
 
@@ -129,6 +137,9 @@ function onStyleLoaded(m: MapLibreGlMap) {
   daynightControl = new DaynightControl(spaceStore)
   namesControl = new NamesToggleControl(basemapStore)
 
+  sentrySitesControl = new SentrySitesControl(sentrySitesStore, settingsStore)
+  sentrySitesControl.onAdd(m)
+
   m.addControl(satelliteControl, 'top-right')
   m.addControl(daynightControl, 'top-right')
   m.addControl(namesControl, 'top-right')
@@ -166,6 +177,8 @@ onBeforeUnmount(() => {
     spaceStore.saveMapState([center.lng, center.lat], m.getZoom())
   }
   _map = null
+  sentrySitesControl?.onRemove()
+  sentrySitesControl = null
   satelliteControl = null
   daynightControl = null
   namesControl = null

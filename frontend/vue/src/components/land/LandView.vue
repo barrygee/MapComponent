@@ -48,9 +48,12 @@ import LandFilter from '@/components/land/LandFilter.vue'
 import { sidebarPaneSelector } from '@/constants/sidebarPanes'
 import { useSidebarPaneTarget } from '@/composables/useSidebarPaneTarget'
 import { UserLocationMarker } from '@/components/shared/UserLocationMarker'
+import { useSentrySitesStore } from '@/stores/sentrySites'
+import { useSettingsStore } from '@/stores/settings'
 import { AprsStationsControl } from '@/components/land/controls/aprs/AprsStationsControl'
 import { LandRangeRingsControl } from '@/components/land/controls/range-rings/LandRangeRingsControl'
 import { NamesToggleControl } from '@/components/shared/controls/names/NamesToggleControl'
+import { SentrySitesControl } from '@/components/shared/controls/sentry-sites/SentrySitesControl'
 import { RoadsToggleControl } from '@/components/shared/controls/roads/RoadsToggleControl'
 
 /** Zoom level the map flies to when centring on the user's location. */
@@ -59,6 +62,8 @@ const LOCATE_ZOOM = 10
 const appStore = useAppStore()
 const landStore = useLandStore()
 const basemapStore = useBasemapStore()
+const sentrySitesStore = useSentrySitesStore()
+const settingsStore = useSettingsStore()
 const mapRef = ref<InstanceType<typeof MapLibreMap> | null>(null)
 const { ready: searchPaneReady } = useSidebarPaneTarget('search')
 
@@ -79,6 +84,9 @@ let _initialStyleUrl: string | null = null
 let _aprsControl: AprsStationsControl | null = null
 let _rangeRingsControl: LandRangeRingsControl | null = null
 let _namesControl: NamesToggleControl | null = null
+// Sentry sites are plotted on every domain map, this one included — see
+// SentrySitesControl. No side-menu button: the sites are always shown.
+let _sentrySitesControl: SentrySitesControl | null = null
 let _roadsControl: RoadsToggleControl | null = null
 
 // Reactive toggle state backing the side-menu buttons' active (green) styling.
@@ -111,6 +119,8 @@ function onMapCreated(m: Map) {
   // apply the stored visibility to this map's style.
   _namesControl = new NamesToggleControl(basemapStore)
   _roadsControl = new RoadsToggleControl(basemapStore)
+  _sentrySitesControl = new SentrySitesControl(sentrySitesStore, settingsStore)
+  _sentrySitesControl.onAdd(m)
   _rangeRingsControl.onAdd(m)
   _aprsControl.onAdd(m)
   _namesControl.onAdd(m)
@@ -188,6 +198,8 @@ onUnmounted(() => {
   _aprsControl?.onRemove()
   _namesControl?.onRemove()
   _roadsControl?.onRemove()
+  _sentrySitesControl?.onRemove()
+  _sentrySitesControl = null
   _locationMarker.remove()
   _rangeRingsControl = _aprsControl = null
   _namesControl = _roadsControl = null

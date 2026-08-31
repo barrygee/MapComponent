@@ -196,6 +196,97 @@ defineExpose({ getMap })
   overflow: visible;
 }
 
+/* Sentry sites (SentrySitesControl) — the ⊙ mark again, but operable: a button
+   carrying the same SVG, sized like the user-location marker it matches. */
+.sentry-map-marker {
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: none;
+  background: none;
+  overflow: visible;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.sentry-map-marker svg {
+  overflow: visible;
+}
+
+/* The map's own focus ring: the marker is a circle in the middle of a large
+   transparent box, so the default outline would float well clear of it. */
+.sentry-map-marker:focus-visible {
+  outline: none;
+}
+
+.sentry-map-marker:focus-visible svg circle:first-of-type {
+  stroke: #3ce0a0;
+  stroke-width: 3.4;
+}
+
+.sentry-site-popup .maplibregl-popup-content {
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0;
+  padding: 10px 14px 12px;
+  font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.9);
+  min-width: 150px;
+}
+
+.sentry-site-popup .maplibregl-popup-tip {
+  border-top-color: #000;
+  border-bottom-color: #000;
+  border-left-color: #000;
+  border-right-color: #000;
+}
+
+.sentry-site-popup .maplibregl-popup-close-button {
+  color: rgba(255, 255, 255, 0.55);
+  background: none;
+  font-size: 16px;
+  padding: 0 6px;
+}
+
+.sentry-site-popup .maplibregl-popup-close-button:hover {
+  background: none;
+  color: #ffffff;
+}
+
+.sentry-site-popup-name {
+  margin: 0;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sentry-site-popup-meta {
+  margin: 2px 0 10px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sentry-site-popup-more {
+  /* The Sentry mark's own green, not the app accent — the popup belongs to the
+     site it opened from. */
+  border: 1px solid rgba(60, 224, 160, 0.5);
+  background: none;
+  color: #3ce0a0;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.sentry-site-popup-more:hover {
+  background: rgba(60, 224, 160, 0.12);
+}
+
 .sentinel-context-menu {
   position: absolute;
   background: #000;

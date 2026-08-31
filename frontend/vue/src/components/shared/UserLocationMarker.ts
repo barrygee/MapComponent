@@ -1,20 +1,37 @@
 import maplibregl from 'maplibre-gl'
 
-function _buildElement(cssClass: string): HTMLElement {
-  const wrapper = document.createElement('div')
-  wrapper.className = cssClass
-  // The SENTINEL ⊙ logo mark (same ring/dot proportions as
-  // frontend/assets/logo.svg): white ring, green dot. The dasharray/
-  // dashoffset equal the ring's circumference (2π·13.1) so the draw-in
-  // animation traces one full turn. The dot is deliberately static — no pulse.
-  wrapper.innerHTML = `
+/** The dot colour of the operator's own position — the app accent. */
+export const LOCATION_MARKER_DOT_COLOR = '#c8ff00'
+
+/**
+ * The SENTINEL ⊙ logo mark as SVG markup (same ring/dot proportions as
+ * `frontend/assets/logo.svg`): white ring, filled dot.
+ *
+ * The dasharray/dashoffset equal the ring's circumference (2π·13.1) so the
+ * draw-in animation traces one full turn. The dot is deliberately static — no
+ * pulse.
+ *
+ * Exported because the mark is not only the user's own position any more: the
+ * Sentry sites plotted on every domain map (`SentrySitesControl`) are the same
+ * mark, built here rather than copied so the two cannot drift apart. They differ
+ * only in the dot's colour, which is what `dotColor` is for — the shape says
+ * "a place Sentinel knows"; the colour says whose place it is.
+ */
+export function buildLocationMarkerSvg(dotColor: string = LOCATION_MARKER_DOT_COLOR): string {
+  return `
         <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" overflow="visible">
             <circle cx="30" cy="30" r="13.1"
                 fill="none" stroke="#ffffff" stroke-width="2.2"
                 stroke-dasharray="82.31" stroke-dashoffset="82.31"
                 style="animation: marker-circle-draw 0.6s ease forwards" />
-            <circle cx="30" cy="30" r="5.2" fill="#c8ff00" />
+            <circle cx="30" cy="30" r="5.2" fill="${dotColor}" />
         </svg>`
+}
+
+function _buildElement(cssClass: string): HTMLElement {
+  const wrapper = document.createElement('div')
+  wrapper.className = cssClass
+  wrapper.innerHTML = buildLocationMarkerSvg()
   return wrapper
 }
 

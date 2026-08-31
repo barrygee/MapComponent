@@ -71,6 +71,25 @@ export interface SentryHostInfo extends SentryHost {
   control_port_offset: number | null
 }
 
+/**
+ * One Sentry host that reports where it is — a point for the domain maps.
+ *
+ * Only hosts with a usable position are returned by
+ * `listSentrySites`, so unlike `SentryLocation` the coordinates here are never
+ * null: a map plots points, and "somewhere unknown" is not one.
+ */
+export interface SentrySite {
+  id: number
+  name: string | null
+  address: string
+  port: number
+  reachable: boolean
+  latitude: number
+  longitude: number
+  /** When the Sentry says it last updated its own position (Unix ms), if it says. */
+  updated_at: number | null
+}
+
 /** Body for `POST /api/sdr/sentry-hosts` — register a new host. */
 export interface SentryHostCreateInput {
   name?: string | null
@@ -351,6 +370,18 @@ function jsonInit(method: string, body?: unknown): RequestInit {
 
 export async function listSentryHosts(): Promise<SentryHost[]> {
   return requestJson<SentryHost[]>(BASE)
+}
+
+/**
+ * Every enabled Sentry host that reports a position, for plotting on the maps.
+ *
+ * Served entirely from the backend's poller cache, so it is cheap enough for
+ * each domain map to poll while it is open. A host that has gone unreachable
+ * keeps its last known position and comes back with `reachable: false` rather
+ * than disappearing.
+ */
+export async function listSentrySites(): Promise<SentrySite[]> {
+  return requestJson<SentrySite[]>(`${BASE}/locations`)
 }
 
 export async function createSentryHost(input: SentryHostCreateInput): Promise<SentryHost> {

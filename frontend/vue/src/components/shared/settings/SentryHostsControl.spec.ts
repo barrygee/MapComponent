@@ -5,6 +5,7 @@ import { axe } from 'jest-axe'
 import SentryHostsControl from './SentryHostsControl.vue'
 import SentryHostForm from './SentryHostForm.vue'
 import { SENTRY_HOSTS_CHANGED_EVENT } from '@/composables/sdrDeviceEvents'
+import { useSettingsStore } from '@/stores/settings'
 import type { SentryHost } from '@/services/sentryApi'
 
 vi.mock('@/services/sentryApi', async (importOriginal) => {
@@ -231,6 +232,80 @@ describe('SentryHostsControl', () => {
     await flushPromises()
     wrapper.unmount()
     expect(clearSpy).toHaveBeenCalled()
+  })
+
+  describe('opening a host from a map marker', () => {
+    it('expands the requested host once the list holding it has loaded', async () => {
+      mockListSentryHosts.mockResolvedValue([REACHABLE_HOST])
+      const settingsStore = useSettingsStore()
+      settingsStore.openSentryHost(REACHABLE_HOST.id)
+      const wrapper = mount(SentryHostsControl)
+      await flushPromises()
+      expect(wrapper.findComponent(SentryHostForm).props('host')).toMatchObject({
+        id: REACHABLE_HOST.id,
+      })
+    })
+
+    it('acts on a request that arrives after it is already mounted', async () => {
+      mockListSentryHosts.mockResolvedValue([REACHABLE_HOST])
+      const settingsStore = useSettingsStore()
+      const wrapper = mount(SentryHostsControl)
+      await flushPromises()
+      expect(wrapper.findComponent(SentryHostForm).exists()).toBe(false)
+      settingsStore.openSentryHost(REACHABLE_HOST.id)
+      await flushPromises()
+      expect(wrapper.findComponent(SentryHostForm).exists()).toBe(true)
+    })
+
+    it('clears the request once acted on, so the row can be closed again', async () => {
+      mockListSentryHosts.mockResolvedValue([REACHABLE_HOST])
+      const settingsStore = useSettingsStore()
+      settingsStore.openSentryHost(REACHABLE_HOST.id)
+      const wrapper = mount(SentryHostsControl)
+      await flushPromises()
+      expect(settingsStore.focusSentryHostId).toBeNull()
+      // With the request cleared, the edit toggle closes the row rather than
+      // the watch immediately re-opening it.
+      await wrapper.find('button[aria-label="Edit Sentry host"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.findComponent(SentryHostForm).exists()).toBe(false)
+    })
+
+    it('scrolls the requested host into view', async () => {
+      const scrollSpy = vi.fn()
+      // jsdom has no layout, so scrollIntoView is not implemented on elements.
+      Element.prototype.scrollIntoView = scrollSpy
+      mockListSentryHosts.mockResolvedValue([REACHABLE_HOST])
+      useSettingsStore().openSentryHost(REACHABLE_HOST.id)
+      mount(SentryHostsControl)
+      await flushPromises()
+      expect(scrollSpy).toHaveBeenCalledWith({ block: 'nearest' })
+    })
+
+    it('waits rather than acting on a host the list does not hold', async () => {
+      mockListSentryHosts.mockResolvedValue([REACHABLE_HOST])
+      const settingsStore = useSettingsStore()
+      settingsStore.openSentryHost(4242) // deleted host, or a stale marker
+      const wrapper = mount(SentryHostsControl)
+      await flushPromises()
+      expect(wrapper.findComponent(SentryHostForm).exists()).toBe(false)
+      // The request is kept, not discarded: the host may still arrive on a
+      // later poll (this one just has not loaded it yet).
+      expect(settingsStore.focusSentryHostId).toBe(4242)
+    })
+
+    it('cancels a pending delete confirmation when a host is opened from a marker', async () => {
+      mockListSentryHosts.mockResolvedValue([REACHABLE_HOST])
+      const settingsStore = useSettingsStore()
+      const wrapper = mount(SentryHostsControl)
+      await flushPromises()
+      await wrapper.find('button[aria-label="Delete Sentry host"]').trigger('click')
+      expect(wrapper.find('.sdr-device-confirm').exists()).toBe(true)
+      settingsStore.openSentryHost(REACHABLE_HOST.id)
+      await flushPromises()
+      expect(wrapper.find('.sdr-device-confirm').exists()).toBe(false)
+      expect(wrapper.findComponent(SentryHostForm).exists()).toBe(true)
+    })
   })
 
   it('has no accessibility violations', async () => {
