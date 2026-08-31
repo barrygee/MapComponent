@@ -7,6 +7,7 @@ const markerRegistry = vi.hoisted(() => ({ instances: [] as FakeMarker[] }))
 
 interface FakeMarker {
   options: { element: HTMLElement; anchor: string }
+  getElement: () => HTMLElement
   setLngLat: ReturnType<typeof vi.fn>
   addTo: ReturnType<typeof vi.fn>
   remove: ReturnType<typeof vi.fn>
@@ -21,6 +22,7 @@ vi.mock('maplibre-gl', () => {
     this.setLngLat = vi.fn().mockReturnThis()
     this.addTo = vi.fn().mockReturnThis()
     this.remove = vi.fn()
+    this.getElement = () => this.options.element
     markerRegistry.instances.push(this)
   }
   return { default: { Marker } }
@@ -106,6 +108,32 @@ describe('UserLocationMarker', () => {
     marker.addTo(fakeMap)
     expect(() => marker.remove()).not.toThrow()
     expect(markerRegistry.instances).toHaveLength(0)
+  })
+
+  describe('setHidden', () => {
+    it('hides and shows the rendered marker without discarding it', () => {
+      const marker = new UserLocationMarker()
+      marker.addTo(fakeMap)
+      marker.update(1, 1)
+      const element = markerRegistry.instances[0]!.options.element
+
+      marker.setHidden(true)
+      expect(element.style.display).toBe('none')
+      marker.setHidden(false)
+      expect(element.style.display).toBe('')
+      // Hiding is not removing: the same marker is still the one on the map.
+      expect(markerRegistry.instances).toHaveLength(1)
+      expect(markerRegistry.instances[0]!.remove).not.toHaveBeenCalled()
+    })
+
+    it('is a safe no-op before the marker exists', () => {
+      const marker = new UserLocationMarker()
+      marker.addTo(fakeMap)
+      expect(() => marker.setHidden(true)).not.toThrow()
+      // …and the marker the next fix builds is visible, not born hidden.
+      marker.update(1, 1)
+      expect(markerRegistry.instances[0]!.options.element.style.display).toBe('')
+    })
   })
 
   it('destroy() removes the marker and releases the map so updates stop', () => {

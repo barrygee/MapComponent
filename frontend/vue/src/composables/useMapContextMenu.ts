@@ -1,4 +1,5 @@
 import type { Map as MapLibreGlMap, MapMouseEvent } from 'maplibre-gl'
+import { formatLatitude, formatLongitude } from '@/utils/locationUtils'
 
 export function useMapContextMenu() {
   let _ctxMenu: HTMLElement | null = null
@@ -17,8 +18,8 @@ export function useMapContextMenu() {
   function show(e: MapMouseEvent): void {
     remove()
     const { lng, lat } = e.lngLat
-    const latStr = `${Math.abs(lat).toFixed(5)}° ${lat >= 0 ? 'N' : 'S'}`
-    const lonStr = `${Math.abs(lng).toFixed(5)}° ${lng >= 0 ? 'E' : 'W'}`
+    const latStr = formatLatitude(lat)
+    const lonStr = formatLongitude(lng)
     const cx = e.originalEvent.clientX
     const cy = e.originalEvent.clientY
 

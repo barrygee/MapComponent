@@ -120,37 +120,48 @@ test.describe('Sentry sites on the map', () => {
     }
   })
 
-  test('a site opens its details on hover, and the mark still takes its own clicks', async ({
-    page,
-  }) => {
+  test('a site shows its details on hover, position included', async ({ page }) => {
     await openMapWithSites(page)
-    const mark = page.locator('.sentry-map-marker-mark').first()
+    const marker = page.locator('.sentry-map-marker').first()
     const details = page.locator('.sentry-map-marker-info').first()
 
     await expect(details).toBeHidden()
-    await mark.hover()
+    await marker.hover()
     await expect(details).toBeVisible()
     // Case-insensitive: the name is uppercased by CSS, not in the DOM.
     await expect(details).toContainText(/gateshead/i)
     await expect(details).toContainText('192.168.5.67:8000')
-
-    // The details panel starts at the mark's own centre with a circle masked
-    // out of it — and a mask hides pixels without giving up pointer events, so
-    // this is what catches the panel swallowing the mark's clicks.
-    await mark.click()
-    await expect(mark).toHaveAttribute('aria-expanded', 'true')
-    // Latched, so it survives the pointer leaving the marker entirely.
-    await page.mouse.move(5, 5)
-    await expect(details).toBeVisible()
+    await expect(details).toContainText('54.95119° N')
+    await expect(details).toContainText('1.53300° W')
   })
 
-  test('MORE opens that host in the SDR settings section', async ({ page }) => {
+  test('clicking the marker opens that host in the SDR settings section', async ({ page }) => {
     await openMapWithSites(page)
-    await page.locator('.sentry-map-marker-mark').first().click()
-    await page.getByRole('button', { name: /open gateshead in settings/i }).click()
+    // The details panel starts at the mark's own centre with a circle masked out
+    // of it, and a mask hides pixels without giving up pointer events — so this
+    // also catches the panel swallowing a click meant for the mark.
+    await page.locator('.sentry-map-marker').first().click()
 
     const settings = page.getByRole('dialog', { name: /settings/i })
     await expect(settings).toBeVisible()
     await expect(settings).toContainText('SDR SETTINGS')
+  })
+
+  test('a crowded map shows a count until it is zoomed in', async ({ page }) => {
+    await openMapWithSites(page)
+    // Far enough out that the two sites land on top of each other.
+    await page.evaluate(() => {
+      const map = (window as unknown as { map: maplibregl.Map }).map
+      map.jumpTo({ center: [-1.7, 53.7], zoom: 2 })
+    })
+    const counts = page.locator('.sentry-cluster-marker')
+    await expect(counts).toHaveCount(1)
+    await expect(counts.first()).toHaveText('2')
+    await expect(page.locator('.sentry-map-marker')).toHaveCount(0)
+
+    // One click on the count is enough to take the group apart.
+    await counts.first().click()
+    await expect(page.locator('.sentry-map-marker')).toHaveCount(2)
+    await expect(counts).toHaveCount(0)
   })
 })

@@ -107,20 +107,10 @@ function siteMarkers(): RecordedMarker[] {
   return liveMarkers().filter((marker) => marker.element.className.startsWith('sentry-map-marker'))
 }
 
-/** The ⊙ button inside a site marker — what a pointer or the keyboard acts on. */
-function markButton(marker: RecordedMarker): HTMLButtonElement {
-  return marker.element.querySelector<HTMLButtonElement>('.sentry-map-marker-mark')!
-}
-
-/** One site marker's details panel. */
-function flyout(marker: RecordedMarker): HTMLElement {
+/** One site marker's details panel — revealed by CSS on hover/focus, which
+ *  jsdom has no layout to exercise; its content is asserted directly. */
+function details(marker: RecordedMarker): HTMLElement {
   return marker.element.querySelector<HTMLElement>('.sentry-map-marker-info')!
-}
-
-/** Whether a marker's details are latched open (hover and focus are CSS, and
- *  jsdom has no layout to assert them through). */
-function isLatchedOpen(marker: RecordedMarker): boolean {
-  return marker.element.classList.contains('sentry-map-marker--open')
 }
 
 function clusterMarkers(): RecordedMarker[] {
@@ -147,11 +137,31 @@ describe('SentrySitesControl', () => {
     document.body.innerHTML = ''
   })
 
-  function addControl() {
-    const control = new SentrySitesControl(sitesStore, settingsStore)
+  /** The operator's own ⊙, as the views hand it over: a marker this control may
+   *  hide while a count stands for its position. */
+  function fakeUserMarker() {
+    return {
+      hidden: false,
+      setHidden(hidden: boolean) {
+        this.hidden = hidden
+      },
+    }
+  }
+
+  function addControl(
+    options: {
+      userLocation?: [number, number] | null
+      userMarker?: ReturnType<typeof fakeUserMarker> | null
+    } = {},
+  ) {
+    const userMarker = options.userMarker === undefined ? fakeUserMarker() : options.userMarker
+    const control = new SentrySitesControl(sitesStore, settingsStore, {
+      getUserLocation: () => options.userLocation ?? null,
+      userMarker,
+    })
     const map = makeFakeMap()
     control.onAdd(map as never)
-    return { control, map }
+    return { control, map, userMarker }
   }
 
   describe('lifecycle', () => {
@@ -165,32 +175,15 @@ describe('SentrySitesControl', () => {
       expect(siteMarkers()[0]!.anchor).toBe('center')
     })
 
-    it('stops polling and tears down markers, details and the a11y region on remove', () => {
+    it('stops polling and tears down markers and the a11y region on remove', () => {
       const stopSpy = vi.spyOn(sitesStore, 'stopPolling')
       sitesStore.sites = [site()]
       const { control, map } = addControl()
-      const marker = siteMarkers()[0]!
-      markButton(marker).dispatchEvent(new Event('click'))
       control.onRemove()
       expect(stopSpy).toHaveBeenCalledOnce()
       expect(created.markers.every((each) => each.removed)).toBe(true)
-      expect(isLatchedOpen(marker)).toBe(false)
       expect(map._container.querySelector('[role="region"]')).toBeNull()
       expect(map._handlerCount('moveend')).toBe(0)
-    })
-
-    it('stops listening for Escape on remove', () => {
-      const removeSpy = vi.spyOn(document, 'removeEventListener')
-      sitesStore.sites = [site()]
-      const { control } = addControl()
-      control.onRemove()
-      expect(removeSpy).toHaveBeenCalledWith('keydown', expect.any(Function))
-      // …and the handler that went is the one that was registered, so a later
-      // Escape cannot reach a control whose map is gone.
-      const registered = removeSpy.mock.calls.find(([event]) => event === 'keydown')![1]
-      expect(typeof registered).toBe('function')
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-      expect(() => (registered as EventListener)(new KeyboardEvent('keydown'))).not.toThrow()
     })
 
     it('tears down the count markers too, not only the site marks', () => {
@@ -227,7 +220,7 @@ describe('SentrySitesControl', () => {
     it('draws each site with the ⊙ mark, its centre dot in the settings off-white', () => {
       sitesStore.sites = [site()]
       addControl()
-      const mark = markButton(siteMarkers()[0]!)
+      const mark = siteMarkers()[0]!.element
       expect(mark.tagName).toBe('BUTTON')
       expect(mark.innerHTML).toContain('r="5.2" fill="#f6f6f4"') // the settings-panel off-white
       expect(mark.innerHTML).toContain('#ffffff') // the shared white ring
@@ -235,21 +228,20 @@ describe('SentrySitesControl', () => {
       expect(mark.innerHTML).not.toContain('#c8ff00')
     })
 
-    it("names the mark for assistive tech, and takes MapLibre's generic name off the container", () => {
+    it('names each marker for assistive tech, after MapLibre overwrites it', () => {
       sitesStore.sites = [site()]
       addControl()
-      const marker = siteMarkers()[0]!
-      expect(markButton(marker).getAttribute('aria-label')).toBe('Sentry Roof Pi — show details')
-      // ARIA prohibits aria-label on a container with no role, and MapLibre
-      // stamps one on as it adds the marker.
-      expect(marker.element.hasAttribute('aria-label')).toBe(false)
+      // MapLibre stamps its own generic "Map marker" on as it adds one.
+      expect(siteMarkers()[0]!.element.getAttribute('aria-label')).toBe(
+        'Sentry Roof Pi, 192.168.1.60:8000, online, at 51.50000° N 0.10000° W — open in Settings',
+      )
     })
 
     it('falls back to address:port for a host with no name', () => {
       sitesStore.sites = [site({ name: null })]
       addControl()
-      expect(markButton(siteMarkers()[0]!).getAttribute('aria-label')).toBe(
-        'Sentry 192.168.1.60:8000 — show details',
+      expect(siteMarkers()[0]!.element.getAttribute('aria-label')).toContain(
+        'Sentry 192.168.1.60:8000,',
       )
     })
 
@@ -322,15 +314,27 @@ describe('SentrySitesControl', () => {
       })
     })
 
-    it('never zooms past the ceiling, however far in the map already is', () => {
+    it('never lands short of the reveal zoom, however far out the map started', () => {
       sitesStore.sites = crowdedSites()
       const { map } = addControl()
-      map.zoom = 13
+      map.zoom = 1
       map._emit('moveend')
       clusterMarkers()[0]!.element.dispatchEvent(new Event('click'))
-      expect(map.easeTo).toHaveBeenCalledWith(
-        expect.objectContaining({ zoom: 14 }), // capped, not 16
-      )
+      // 1 + 3 would still be a view where the group is one blob, so the click
+      // goes to the zoom the marks are revealed at instead.
+      expect(map.easeTo).toHaveBeenCalledWith(expect.objectContaining({ zoom: 7 }))
+    })
+
+    it('stops counting once the map is zoomed in past the reveal zoom', () => {
+      sitesStore.sites = crowdedSites()
+      const { map } = addControl()
+      expect(clusterMarkers()).toHaveLength(1)
+      map.zoom = 7
+      map._emit('moveend')
+      // The operator has asked for this area specifically: every mark is drawn,
+      // overlapping or not, exactly as the Land map's APRS labels behave.
+      expect(clusterMarkers()).toHaveLength(0)
+      expect(siteMarkers()).toHaveLength(3)
     })
 
     it('keeps a count marker while its membership holds, and rebuilds it when it changes', async () => {
@@ -372,12 +376,86 @@ describe('SentrySitesControl', () => {
     })
   })
 
+  describe("the operator's own position", () => {
+    /** A site at the same spot the operator is standing. */
+    const CO_SITED: [number, number] = [0, 0]
+
+    it('collapses a Sentry standing on the operator into one count', () => {
+      sitesStore.sites = [site({ id: 1, longitude: 0.000_01, latitude: 0 })]
+      const { userMarker } = addControl({ userLocation: CO_SITED })
+      expect(siteMarkers()).toHaveLength(0)
+      expect(clusterMarkers()).toHaveLength(1)
+      // Two marks, not one: the count stands for the site AND the operator.
+      expect(clusterMarkers()[0]!.element.textContent).toBe('2')
+      // …so the view's own marker is hidden, or the position shows twice.
+      expect(userMarker!.hidden).toBe(true)
+    })
+
+    it('says so in the count name, rather than appearing to miscount the sites', () => {
+      sitesStore.sites = [site({ id: 1, longitude: 0.000_01, latitude: 0 })]
+      addControl({ userLocation: CO_SITED })
+      expect(clusterMarkers()[0]!.element.getAttribute('aria-label')).toBe(
+        '2 markers here, including your location, — zoom in to see them',
+      )
+    })
+
+    it('gives the marker back when the group breaks up', async () => {
+      sitesStore.sites = [site({ id: 1, longitude: 0.000_01, latitude: 0 })]
+      const { userMarker } = addControl({ userLocation: CO_SITED })
+      expect(userMarker!.hidden).toBe(true)
+      sitesStore.sites = [site({ id: 1, longitude: 9, latitude: 9 })]
+      await nextTick()
+      expect(userMarker!.hidden).toBe(false)
+      expect(siteMarkers()).toHaveLength(1)
+      expect(clusterMarkers()).toHaveLength(0)
+    })
+
+    it('leaves the marker alone when nothing is near it', () => {
+      sitesStore.sites = [site({ id: 1, longitude: 9, latitude: 9 })]
+      const { userMarker } = addControl({ userLocation: CO_SITED })
+      expect(userMarker!.hidden).toBe(false)
+      // The operator's position is never plotted by this control — it is the
+      // view's marker, and it stays the view's marker.
+      expect(siteMarkers()).toHaveLength(1)
+    })
+
+    it('is never a count on its own', () => {
+      sitesStore.sites = []
+      const { userMarker } = addControl({ userLocation: CO_SITED })
+      expect(clusterMarkers()).toHaveLength(0)
+      expect(userMarker!.hidden).toBe(false)
+    })
+
+    it('gives the marker back on teardown, since it was only ever borrowed', () => {
+      sitesStore.sites = [site({ id: 1, longitude: 0.000_01, latitude: 0 })]
+      const { control, userMarker } = addControl({ userLocation: CO_SITED })
+      expect(userMarker!.hidden).toBe(true)
+      control.onRemove()
+      expect(userMarker!.hidden).toBe(false)
+    })
+
+    it('counts a Sentry with the operator even when the two are alone', () => {
+      // Guards the count against being read off the site list rather than the
+      // group: one site plus the operator is still a group of two.
+      sitesStore.sites = [site({ id: 1, longitude: 0, latitude: 0 })]
+      addControl({ userLocation: CO_SITED })
+      expect(clusterMarkers()[0]!.element.textContent).toBe('2')
+    })
+
+    it('works on a view that draws no marker of its own', () => {
+      // Sea has no user-location marker; the control must not assume one.
+      sitesStore.sites = [site({ id: 1, longitude: 0.000_01, latitude: 0 })]
+      expect(() => addControl({ userLocation: CO_SITED, userMarker: null })).not.toThrow()
+      expect(clusterMarkers()).toHaveLength(1)
+    })
+  })
+
   describe("a site's details", () => {
     function addSite(overrides: Partial<SentrySite> = {}) {
       sitesStore.sites = [site(overrides)]
       const added = addControl()
       const marker = siteMarkers()[0]!
-      return { ...added, marker, panel: flyout(marker) }
+      return { ...added, marker, panel: details(marker) }
     }
 
     it('sits inside the marker, so it travels with it rather than being placed', () => {
@@ -388,29 +466,33 @@ describe('SentrySitesControl', () => {
       expect(marker.element.children).toHaveLength(2) // the mark, then its details
     })
 
-    it('shows the name, where it answers, and a reachability dot', () => {
+    it('shows the name, where it answers, a reachability dot, and its position', () => {
       const { panel } = addSite()
       expect(panel.querySelector('.sentry-map-marker-name')!.textContent).toBe('Roof Pi')
       expect(panel.querySelector('.sentry-map-marker-meta')!.textContent).toContain(
         '192.168.1.60:8000',
       )
-      const dot = panel.querySelector('.sentry-map-marker-status')!
-      expect(dot.classList.contains('sentry-map-marker-status--online')).toBe(true)
+      expect(panel.querySelector('.sentry-map-marker-status')!.className).toContain(
+        'sentry-map-marker-status--online',
+      )
+      // The same coordinate format the map's right-click menu writes.
+      expect(panel.querySelector('.sentry-map-marker-coords')!.textContent).toBe(
+        '51.50000° N  0.10000° W',
+      )
     })
 
-    it('never leaves the status to colour alone', () => {
-      const { panel } = addSite()
-      const dot = panel.querySelector<HTMLElement>('.sentry-map-marker-status')!
-      expect(dot.title).toBe('Online')
-      expect(dot.querySelector('.sr-only')!.textContent).toBe('Online')
+    it('writes southern and eastern positions with their own hemispheres', () => {
+      const { panel } = addSite({ latitude: -33.8688, longitude: 151.2093 })
+      expect(panel.querySelector('.sentry-map-marker-coords')!.textContent).toBe(
+        '33.86880° S  151.20930° E',
+      )
     })
 
     it('marks a host that is off the network as off air, not as missing', () => {
       const { panel } = addSite({ reachable: false })
-      const dot = panel.querySelector<HTMLElement>('.sentry-map-marker-status')!
-      expect(dot.classList.contains('sentry-map-marker-status--offair')).toBe(true)
-      expect(dot.title).toBe('Off air')
-      expect(dot.querySelector('.sr-only')!.textContent).toBe('Off air')
+      expect(panel.querySelector('.sentry-map-marker-status')!.className).toContain(
+        'sentry-map-marker-status--offair',
+      )
     })
 
     it('names an unlabelled host by where it answers', () => {
@@ -418,84 +500,61 @@ describe('SentrySitesControl', () => {
       expect(panel.querySelector('.sentry-map-marker-name')!.textContent).toBe('192.168.1.60:8000')
     })
 
-    it('is closed until the operator asks for it', () => {
-      const { marker } = addSite()
-      expect(isLatchedOpen(marker)).toBe(false)
-      expect(markButton(marker).getAttribute('aria-expanded')).toBe('false')
+    it('hides the panel from assistive tech, which hears the marker name instead', () => {
+      const { marker, panel } = addSite()
+      expect(panel.getAttribute('aria-hidden')).toBe('true')
+      // Everything the panel shows is in the name, so nothing is lost by it.
+      const label = marker.element.getAttribute('aria-label')!
+      expect(label).toContain('Roof Pi')
+      expect(label).toContain('192.168.1.60:8000')
+      expect(label).toContain('online')
+      expect(label).toContain('51.50000° N')
+      expect(label).toContain('0.10000° W')
+      expect(label).toContain('open in Settings')
     })
 
-    it('latches open on press, and closed again on a second press', () => {
-      const { marker } = addSite()
-      markButton(marker).dispatchEvent(new Event('click'))
-      expect(isLatchedOpen(marker)).toBe(true)
-      expect(markButton(marker).getAttribute('aria-expanded')).toBe('true')
-      markButton(marker).dispatchEvent(new Event('click'))
-      expect(isLatchedOpen(marker)).toBe(false)
-      expect(markButton(marker).getAttribute('aria-expanded')).toBe('false')
+    it('says in words when a host is off air, never by the dot alone', () => {
+      const { marker } = addSite({ reachable: false })
+      expect(marker.element.getAttribute('aria-label')).toContain('off air')
     })
+  })
 
-    it('points the mark at the details it opens, for assistive tech', () => {
-      const { marker, panel } = addSite({ id: 7 })
-      expect(panel.id).toBe('sentry-site-flyout-7')
-      expect(markButton(marker).getAttribute('aria-controls')).toBe(panel.id)
-    })
-
-    it('closes whichever panel was open when another is pressed', () => {
-      sitesStore.sites = [
-        site({ id: 1, name: 'A', longitude: 0, latitude: 0 }),
-        site({ id: 2, name: 'B', longitude: 5, latitude: 5 }),
-      ]
+  describe('opening a site', () => {
+    it('opens that host in the SDR settings section when the marker is clicked', () => {
+      sitesStore.sites = [site({ id: 7 })]
       addControl()
-      const [first, second] = siteMarkers() as [RecordedMarker, RecordedMarker]
-      markButton(first).dispatchEvent(new Event('click'))
-      markButton(second).dispatchEvent(new Event('click'))
-      expect(isLatchedOpen(first)).toBe(false)
-      expect(isLatchedOpen(second)).toBe(true)
-    })
-
-    it('closes on Escape', () => {
-      const { marker } = addSite()
-      markButton(marker).dispatchEvent(new Event('click'))
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-      expect(isLatchedOpen(marker)).toBe(false)
-    })
-
-    it('ignores other keys', () => {
-      const { marker } = addSite()
-      markButton(marker).dispatchEvent(new Event('click'))
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
-      expect(isLatchedOpen(marker)).toBe(true)
-    })
-
-    it('closes with the site when it leaves the map', async () => {
-      const { marker } = addSite()
-      markButton(marker).dispatchEvent(new Event('click'))
-      sitesStore.sites = []
-      await nextTick()
-      expect(isLatchedOpen(marker)).toBe(false)
-    })
-
-    it('MORE opens that host in the SDR settings section and closes the details', () => {
-      const { marker, panel } = addSite({ id: 7 })
-      markButton(marker).dispatchEvent(new Event('click'))
-      const more = panel.querySelector<HTMLButtonElement>('.sentry-map-marker-more')!
-      expect(more.textContent).toBe('MORE')
-      expect(more.getAttribute('aria-label')).toBe('Open Roof Pi in Settings')
-      more.dispatchEvent(new Event('click'))
+      siteMarkers()[0]!.element.dispatchEvent(new Event('click'))
       expect(settingsStore.open).toBe(true)
       expect(settingsStore.activeSection).toBe('sdr')
       expect(settingsStore.focusSentryHostId).toBe(7)
-      expect(isLatchedOpen(marker)).toBe(false)
     })
 
-    it('has no accessibility violations', async () => {
-      const { marker } = addSite()
-      markButton(marker).dispatchEvent(new Event('click'))
-      const host = document.createElement('div')
-      host.appendChild(marker.element)
-      // `region` is off: this is a map marker in isolation, not a page — the
-      // landmark it belongs to is the map container itself.
-      expect(await axe(host, { rules: { region: { enabled: false } } })).toHaveNoViolations()
+    it('opens from a click on the details panel too — the whole marker is the button', () => {
+      sitesStore.sites = [site({ id: 7 })]
+      addControl()
+      const marker = siteMarkers()[0]!
+      // A click inside the panel bubbles to the marker button that contains it.
+      details(marker)
+        .querySelector('.sentry-map-marker-name')!
+        .dispatchEvent(new Event('click', { bubbles: true }))
+      expect(settingsStore.focusSentryHostId).toBe(7)
+    })
+
+    it('is a single tab stop carrying a single name', () => {
+      sitesStore.sites = [site()]
+      addControl()
+      const marker = siteMarkers()[0]!
+      expect(marker.element.tagName).toBe('BUTTON')
+      expect(marker.element.querySelectorAll('button')).toHaveLength(0)
+    })
+
+    it('keeps the click off the map beneath it', () => {
+      sitesStore.sites = [site()]
+      addControl()
+      const clickEvent = new Event('click', { bubbles: true, cancelable: true })
+      const stopped = vi.spyOn(clickEvent, 'stopPropagation')
+      siteMarkers()[0]!.element.dispatchEvent(clickEvent)
+      expect(stopped).toHaveBeenCalled()
     })
   })
 
@@ -522,13 +581,11 @@ describe('SentrySitesControl', () => {
       expect(siteMarkers()).toHaveLength(1)
     })
 
-    it('closes an open details panel when the sites are hidden', () => {
+    it('takes the details away with the marker when the sites are hidden', () => {
       sitesStore.sites = [site()]
       const { control } = addControl()
-      const marker = siteMarkers()[0]!
-      markButton(marker).dispatchEvent(new Event('click'))
       control.setVisible(false)
-      expect(isLatchedOpen(marker)).toBe(false)
+      expect(siteMarkers()).toHaveLength(0)
     })
 
     it('keeps the accessible table while the sites are hidden', () => {

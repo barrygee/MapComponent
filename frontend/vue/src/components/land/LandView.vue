@@ -119,7 +119,13 @@ function onMapCreated(m: Map) {
   // apply the stored visibility to this map's style.
   _namesControl = new NamesToggleControl(basemapStore)
   _roadsControl = new RoadsToggleControl(basemapStore)
-  _sentrySitesControl = new SentrySitesControl(sentrySitesStore, settingsStore)
+  _sentrySitesControl = new SentrySitesControl(sentrySitesStore, settingsStore, {
+    // The operator's own position joins the grouping pass, so a Sentry sitting
+    // on top of it collapses into a count instead of two marks smearing
+    // together; the marker is handed over so the count can stand in for it.
+    getUserLocation,
+    userMarker: _locationMarker,
+  })
   _sentrySitesControl.onAdd(m)
   _rangeRingsControl.onAdd(m)
   _aprsControl.onAdd(m)
