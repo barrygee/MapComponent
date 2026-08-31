@@ -479,6 +479,15 @@ describe('SentrySitesControl', () => {
       )
     })
 
+    it('reads name, position, then address', () => {
+      const { panel } = addSite()
+      expect([...panel.children].map((child) => child.className)).toEqual([
+        'sentry-map-marker-name',
+        'sentry-map-marker-coords',
+        'sentry-map-marker-meta',
+      ])
+    })
+
     it('leads the name with the status dot, so reachability is read first', () => {
       const { panel } = addSite()
       const name = panel.querySelector('.sentry-map-marker-name')!

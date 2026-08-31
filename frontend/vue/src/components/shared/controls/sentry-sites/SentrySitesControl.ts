@@ -326,15 +326,17 @@ export class SentrySitesControl extends SentinelControlBase {
     name.appendChild(document.createTextNode(siteLabel(site)))
     details.appendChild(name)
 
-    const meta = document.createElement('span')
-    meta.className = 'sentry-map-marker-meta'
-    meta.textContent = `${site.address}:${site.port}`
-    details.appendChild(meta)
-
+    // Position before address: where a site is says more about the mark the
+    // operator is looking at than how Sentinel reaches it.
     const coordinates = document.createElement('span')
     coordinates.className = 'sentry-map-marker-coords'
     coordinates.textContent = `${formatLatitude(site.latitude)}  ${formatLongitude(site.longitude)}`
     details.appendChild(coordinates)
+
+    const meta = document.createElement('span')
+    meta.className = 'sentry-map-marker-meta'
+    meta.textContent = `${site.address}:${site.port}`
+    details.appendChild(meta)
 
     return details
   }
