@@ -27,9 +27,9 @@ type SettingsStore = ReturnType<typeof useSettingsStore>
  * lives under `shared/controls/` rather than in one domain's folder.
  *
  * Each site is drawn with the SENTINEL ⊙ mark — the same marker the operator's
- * own location uses, its dot blacked out so that on a map showing both, a site
- * is not mistaken for where the operator is standing — and sites too close
- * together to tell apart collapse into
+ * own location uses, its dot in the settings panel's off-white so that on a map
+ * showing both, a site is not mistaken for where the operator is standing — and
+ * sites too close together to tell apart collapse into
  * one numbered count that zooms in when clicked — the same treatment crowded
  * APRS stations get on the Land map, from the same shared clustering module.
  * Hovering or pressing a site opens its details alongside the mark — name,
@@ -464,13 +464,16 @@ function escapeHtml(value: string): string {
 /**
  * The dot at the centre of a Sentry's ⊙ mark.
  *
- * Black, against the lit accent dot the operator's own location marker carries
+ * The off-white the settings panel is built on (`SettingsPanel.css`), against
+ * the lit accent dot the operator's own location marker carries
  * (`LOCATION_MARKER_DOT_COLOR`, #c8ff00): unmistakable side by side, and it
- * reads as a fixed installation rather than as a live position. The white ring
- * is shared and deliberately untouched — the mark is the same mark; only whose
- * place it is changes.
+ * reads as a fixed installation rather than as a live position. Duplicated as a
+ * hex rather than read from the stylesheet because marker elements are handed to
+ * MapLibre and live outside the Vue tree. The white ring is shared and
+ * deliberately untouched — the mark is the same mark; only whose place it is
+ * changes.
  */
-const SENTRY_MARKER_DOT_COLOR = '#000000'
+const SENTRY_MARKER_DOT_COLOR = '#f6f6f4'
 
 /** How close two sites must be to share a count, in pixels — the ⊙ mark's own
  *  ring diameter, so sites are grouped exactly when their marks would overlap. */
@@ -491,6 +494,7 @@ const SENTRY_COUNT_RING = 'rgba(20, 23, 28, 0.55)'
 /** Fill of a Sentry count marker's centre. */
 const SENTRY_COUNT_FILL = '#000000'
 
-/** Colour of the count itself. White, not the site dot's black: the count sits
- *  on a black centre, so following the dot would leave it invisible. */
-const SENTRY_COUNT_TEXT = '#ffffff'
+/** Colour of the count itself — a site's own dot colour, which reads clearly on
+ *  the count's black centre, so a group of Sentries is recognisably the same
+ *  thing as the marks it stands in for. */
+const SENTRY_COUNT_TEXT = SENTRY_MARKER_DOT_COLOR
