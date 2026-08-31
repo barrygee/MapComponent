@@ -15,3 +15,16 @@ import type maplibregl from 'maplibre-gl'
 export function setMarkerAccessibleName(marker: maplibregl.Marker, name: string): void {
   marker.getElement().setAttribute('aria-label', name)
 }
+
+/**
+ * Take MapLibre's generic name back off a marker element.
+ *
+ * For a marker whose element is a plain container — one whose children carry
+ * the real names — `addTo`'s stamped `aria-label` is worse than nothing: ARIA
+ * prohibits `aria-label` on an element with no role, so it is both ignored by
+ * assistive tech and reported as a violation. Removing it lets the children
+ * speak for themselves.
+ */
+export function removeMarkerAccessibleName(marker: maplibregl.Marker): void {
+  marker.getElement().removeAttribute('aria-label')
+}
