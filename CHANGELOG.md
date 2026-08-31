@@ -138,6 +138,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Plot connected Sentry sites on every domain map (#298)
 - Black Sentry dot, with details in the map's own pill style (#299)
 - Whole Sentry marker is the button, counted with your own position (#301)
+- Hold a Sentry count until its marks genuinely clear each other (#304)
 
 ### Bug Fixes
 
