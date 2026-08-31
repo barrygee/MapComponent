@@ -224,12 +224,12 @@ describe('SentrySitesControl', () => {
   })
 
   describe('plotting sites', () => {
-    it('draws each site with the ⊙ mark, its centre dot blacked out', () => {
+    it('draws each site with the ⊙ mark, its centre dot in the settings off-white', () => {
       sitesStore.sites = [site()]
       addControl()
       const mark = markButton(siteMarkers()[0]!)
       expect(mark.tagName).toBe('BUTTON')
-      expect(mark.innerHTML).toContain('r="5.2" fill="#000000"') // the blacked-out centre
+      expect(mark.innerHTML).toContain('r="5.2" fill="#f6f6f4"') // the settings-panel off-white
       expect(mark.innerHTML).toContain('#ffffff') // the shared white ring
       // Never the operator's own accent dot — that is what tells the two apart.
       expect(mark.innerHTML).not.toContain('#c8ff00')

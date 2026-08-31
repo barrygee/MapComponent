@@ -182,13 +182,20 @@ defineExpose({ getMap })
 /* (The former marker-dot-pulse / marker-dot-end-pulse keyframes are gone —
    the ⊙ marker's dot is now static solid white by design.) */
 
+/* NB: no `position` here. MapLibre positions a marker element itself, with
+   `.maplibregl-marker { position: absolute }` plus a transform — and this rule
+   has the same specificity, so declaring `position: relative` took that
+   absolute positioning away. The element then sat in the canvas container's
+   normal flow, where every marker after the first was pushed 60px down the
+   page by the ones before it and its transform carried it that far off its own
+   coordinates. Constant in pixels, so it reads as a small error zoomed in and a
+   wild one zoomed out. */
 .user-location-marker,
 .space-user-location-marker {
   cursor: pointer;
   width: 60px;
   height: 60px;
   overflow: visible;
-  position: relative;
 }
 
 .user-location-marker svg,
@@ -201,7 +208,9 @@ defineExpose({ getMap })
    the site's details in a pill butted against it, built like the map's own
    right-click menu so the two read as one piece of map furniture. */
 .sentry-map-marker {
-  position: relative;
+  /* No `position` — see the note on `.user-location-marker` above. MapLibre's
+     own `position: absolute` stands, and is the positioned ancestor the details
+     pill below is placed against. */
   width: 60px;
   height: 60px;
   overflow: visible;
