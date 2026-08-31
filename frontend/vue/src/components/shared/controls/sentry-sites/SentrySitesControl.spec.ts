@@ -78,7 +78,10 @@ function makeFakeMap() {
     _container: container,
     // Scaled so any two distinct fixture positions land far apart — clustering
     // tests set positions deliberately close.
-    project: ([lon, lat]: [number, number]) => ({ x: lon * 1_000_000, y: -lat * 1_000_000 }),
+    scale: 1_000_000,
+    project([lon, lat]: [number, number]) {
+      return { x: lon * this.scale, y: -lat * this.scale }
+    },
     zoom: 6,
     getZoom(): number {
       return this.zoom
@@ -314,27 +317,42 @@ describe('SentrySitesControl', () => {
       })
     })
 
-    it('never lands short of the reveal zoom, however far out the map started', () => {
+    it('never zooms past the ceiling, however far in the map already is', () => {
       sitesStore.sites = crowdedSites()
       const { map } = addControl()
-      map.zoom = 1
+      map.zoom = 16
       map._emit('moveend')
       clusterMarkers()[0]!.element.dispatchEvent(new Event('click'))
-      // 1 + 3 would still be a view where the group is one blob, so the click
-      // goes to the zoom the marks are revealed at instead.
-      expect(map.easeTo).toHaveBeenCalledWith(expect.objectContaining({ zoom: 7 }))
+      // Two hosts at one address never separate, so the click stops at street
+      // level rather than zooming into an emptier and emptier view.
+      expect(map.easeTo).toHaveBeenCalledWith(expect.objectContaining({ zoom: 17 }))
     })
 
-    it('stops counting once the map is zoomed in past the reveal zoom', () => {
+    it('keeps the count while the marks still overlap, however far in the map is', () => {
       sitesStore.sites = crowdedSites()
       const { map } = addControl()
       expect(clusterMarkers()).toHaveLength(1)
-      map.zoom = 7
+      // Zoom alone does not release a group — the map's projection is what
+      // decides, and this fixture's two sites stay on top of each other.
+      map.zoom = 15
       map._emit('moveend')
-      // The operator has asked for this area specifically: every mark is drawn,
-      // overlapping or not, exactly as the Land map's APRS labels behave.
+      expect(clusterMarkers()).toHaveLength(1)
+      expect(siteMarkers()).toHaveLength(1) // still just the one clear of them
+    })
+
+    it('splits the group the moment its marks clear each other', () => {
+      // The fake map projects 1e6 px per degree, so this pair is ~10px apart —
+      // inside the grouping radius — until the projection pulls them past it.
+      sitesStore.sites = [
+        site({ id: 1, name: 'A', longitude: 0, latitude: 0 }),
+        site({ id: 2, name: 'B', longitude: 0.000_01, latitude: 0 }),
+      ]
+      const { map } = addControl()
+      expect(clusterMarkers()).toHaveLength(1)
+      map.scale = 5_000_000 // the same pair now lands ~50px apart
+      map._emit('moveend')
       expect(clusterMarkers()).toHaveLength(0)
-      expect(siteMarkers()).toHaveLength(3)
+      expect(siteMarkers()).toHaveLength(2)
     })
 
     it('keeps a count marker while its membership holds, and rebuilds it when it changes', async () => {

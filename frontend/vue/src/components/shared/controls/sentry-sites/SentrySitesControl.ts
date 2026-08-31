@@ -29,10 +29,11 @@ type SettingsStore = ReturnType<typeof useSettingsStore>
  * showing both, a site is not mistaken for where the operator is standing — and
  * sites too close together to tell apart collapse into
  * one numbered count that zooms in when clicked — the same treatment crowded
- * APRS stations get on the Land map, from the same shared clustering module and
- * at the same reveal zoom. The operator's own position is counted alongside the
- * sites, so a Sentry standing where the operator is standing collapses into a
- * count rather than the two marks smearing into one.
+ * APRS stations get on the Land map, from the same shared clustering module.
+ * A count holds until the marks it stands for genuinely clear each other, at
+ * whatever zoom that happens. The operator's own position is counted alongside
+ * the sites, so a Sentry standing where the operator is standing collapses into
+ * a count rather than the two marks smearing into one.
  * Hovering a site (or giving it keyboard focus) shows its details alongside the
  * mark — name, reachability dot, address and position — drawn as the same pill
  * the map's right-click menu uses, so the two read as one piece of map
@@ -189,10 +190,12 @@ export class SentrySitesControl extends SentinelControlBase {
    * Split what is on the map into marks drawn as themselves and groups shown as
    * one count, by how close together they land on screen at this zoom.
    *
-   * Past the reveal zoom nothing is counted: by then the operator has asked for
-   * that area specifically, and overlapping marks they can pan between beat a
-   * number they cannot open. This is the rule the Land map's APRS counts follow,
-   * at the same zoom, so the two layers behave alike.
+   * A count holds for as long as the marks it stands for would overlap — at any
+   * zoom, not up to a fixed one. Zooming in pulls a group apart the moment its
+   * marks clear each other, and until then the number is the honest answer:
+   * superimposed ⊙ marks look like one site, and would hide how many are there.
+   * (This is deliberately stricter than the Land map's APRS counts, which give
+   * way to their labels at a set zoom whether they overlap or not.)
    *
    * The operator's own position takes part as an ordinary point — a Sentry
    * standing where the operator is standing is exactly the overlap that needs
@@ -200,9 +203,6 @@ export class SentrySitesControl extends SentinelControlBase {
    * than plotted by this control.
    */
   private _planMarkers(sites: SentrySite[]): MarkerPlan {
-    if (this.map.getZoom() >= SITE_REVEAL_ZOOM) {
-      return { plotted: sites, clusters: [], userLocationCounted: false }
-    }
     const positions = new Map<string, ScreenPosition>()
     const points: ClusterPoint[] = sites.map((site) => {
       positions.set(siteKey(site), this.map.project([site.longitude, site.latitude]))
@@ -366,11 +366,9 @@ export class SentrySitesControl extends SentinelControlBase {
       // Far enough in to take the group apart, wherever the operator started
       // from — the count's whole purpose is to say "there is something here",
       // so one click should show what.
-      // Always far enough in to take the group apart — at least the zoom the
-      // marks are revealed at, however far out the operator started.
       this.map.easeTo({
         center: coords,
-        zoom: Math.max(this.map.getZoom() + CLUSTER_ZOOM_STEP, SITE_REVEAL_ZOOM),
+        zoom: Math.min(this.map.getZoom() + CLUSTER_ZOOM_STEP, CLUSTER_ZOOM_MAX),
         duration: 300,
       })
     })
@@ -544,20 +542,20 @@ const SENTRY_MARKER_DOT_COLOR = '#f6f6f4'
  *  ring diameter, so sites are grouped exactly when their marks would overlap. */
 const SITE_GROUP_RADIUS_PX = 30
 
-/**
- * The zoom at which a crowded group gives way to its own marks.
- *
- * The same step-in from the standard view the Land map's APRS counts use, and
- * the same number, so a count means the same thing on either layer: below this,
- * overlapping marks are summarised; at or above it, the operator has asked for
- * this area specifically and gets every mark, overlapping or not.
- */
-const SITE_REVEAL_ZOOM = 7
-
 /** How far in one click on a count goes, in zoom levels. Three steps splits a
- *  typical huddle without throwing the operator down to street level — and never
- *  lands short of the reveal zoom, so a click always shows what it stood for. */
+ *  typical huddle in one go; a group that is tighter than that survives the
+ *  click as a smaller count, and another click takes it further in. */
 const CLUSTER_ZOOM_STEP = 3
+
+/**
+ * Ceiling for that zoom.
+ *
+ * Two Sentries at the same address never separate however far the map goes in,
+ * so without a ceiling their count would keep answering clicks by zooming into
+ * an emptier and emptier view. Street level is as far as it is worth taking an
+ * operator to answer "how many are here".
+ */
+const CLUSTER_ZOOM_MAX = 17
 
 /** Ring around a Sentry count marker — the same nearly-black, semitransparent
  *  ring the APRS counts use, so a count reads the same wherever it appears. */
