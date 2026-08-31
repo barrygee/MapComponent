@@ -286,6 +286,8 @@ defineExpose({ getMap })
 }
 
 .sentry-map-marker-name {
+  display: flex;
+  align-items: center;
   color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 600;
@@ -298,6 +300,9 @@ defineExpose({ getMap })
 .sentry-map-marker-coords {
   display: flex;
   align-items: center;
+  /* Indented past the status dot so they line up with the name itself, leaving
+     the dot hanging clear of the column like a bullet. */
+  padding-left: 12px;
   color: rgba(255, 255, 255, 0.45);
   font-size: 9px;
   font-weight: 400;
