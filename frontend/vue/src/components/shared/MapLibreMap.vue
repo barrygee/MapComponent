@@ -196,9 +196,27 @@ defineExpose({ getMap })
   overflow: visible;
 }
 
-/* Sentry sites (SentrySitesControl) — the ⊙ mark again, but operable: a button
-   carrying the same SVG, sized like the user-location marker it matches. */
+/* ── Sentry sites (SentrySitesControl) ──────────────────────────────────────
+   The ⊙ mark again — same size and shape as the user-location marker — with
+   the site's details in a pill butted against it, built like the map's own
+   right-click menu so the two read as one piece of map furniture. */
 .sentry-map-marker {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  overflow: visible;
+  line-height: 0;
+  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.sentry-map-marker-mark {
+  display: block;
+  /* Above the details pill, which starts at this mark's own centre: the pill
+     has a circle masked out of its leading edge so the ⊙ shows through, but a
+     mask hides pixels without giving up pointer events — so without this the
+     pill would swallow clicks aimed at the mark it is hanging off. */
+  position: relative;
+  z-index: 3;
   width: 60px;
   height: 60px;
   padding: 0;
@@ -209,82 +227,119 @@ defineExpose({ getMap })
   line-height: 0;
 }
 
-.sentry-map-marker svg {
+.sentry-map-marker-mark svg {
   overflow: visible;
 }
 
-/* The map's own focus ring: the marker is a circle in the middle of a large
-   transparent box, so the default outline would float well clear of it. */
-.sentry-map-marker:focus-visible {
+/* The mark is a circle in the middle of a large transparent box, so the default
+   outline would float well clear of it — the ring itself lights up instead. */
+.sentry-map-marker-mark:focus-visible {
   outline: none;
 }
 
-.sentry-map-marker:focus-visible svg circle:first-of-type {
-  stroke: #3ce0a0;
+.sentry-map-marker-mark:focus-visible svg circle:first-of-type {
+  stroke: var(--color-accent);
   stroke-width: 3.4;
 }
 
-.sentry-site-popup .maplibregl-popup-content {
+/* The details pill. Starts at the mark's centre and has a circle masked out of
+   its leading edge, so the ⊙ stays whole and the panel appears to hang off it —
+   the same construction the "SET LOCATION" menu uses. */
+.sentry-map-marker-info {
+  position: absolute;
+  left: 30px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 42px;
+  /* Left padding clears the mark's full box, not just the masked circle, so no
+     text sits under the mark's own hit area. */
+  padding: 6px 14px 6px 32px;
   background: #000;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 0;
-  padding: 10px 14px 12px;
-  font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+  border-radius: 6px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.9);
-  min-width: 150px;
+  white-space: nowrap;
+  -webkit-mask-image: radial-gradient(circle 16px at 0 50%, transparent 16px, black 16.5px);
+  mask-image: radial-gradient(circle 16px at 0 50%, transparent 16px, black 16.5px);
+  z-index: 2;
 }
 
-.sentry-site-popup .maplibregl-popup-tip {
-  border-top-color: #000;
-  border-bottom-color: #000;
-  border-left-color: #000;
-  border-right-color: #000;
+/* Shown while the pointer is over the marker, while anything inside it holds
+   focus (so the MORE action is reachable by keyboard), and once a press has
+   latched it open. */
+.sentry-map-marker:hover .sentry-map-marker-info,
+.sentry-map-marker:focus-within .sentry-map-marker-info,
+.sentry-map-marker--open .sentry-map-marker-info {
+  display: flex;
 }
 
-.sentry-site-popup .maplibregl-popup-close-button {
-  color: rgba(255, 255, 255, 0.55);
-  background: none;
-  font-size: 16px;
-  padding: 0 6px;
-}
-
-.sentry-site-popup .maplibregl-popup-close-button:hover {
-  background: none;
-  color: #ffffff;
-}
-
-.sentry-site-popup-name {
-  margin: 0;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.sentry-site-popup-meta {
-  margin: 2px 0 10px;
-  color: rgba(255, 255, 255, 0.55);
+.sentry-map-marker-name {
+  color: var(--color-text-muted);
   font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.sentry-site-popup-more {
-  /* The Sentry mark's own green, not the app accent — the popup belongs to the
-     site it opened from. */
-  border: 1px solid rgba(60, 224, 160, 0.5);
-  background: none;
-  color: #3ce0a0;
-  font-family: inherit;
-  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.16em;
-  padding: 4px 12px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.sentry-map-marker-meta {
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+/* Reachability, matching the dot the SDR settings rows use. Never the only
+   carrier of the state — the markup pairs it with a title and an sr-only
+   label. */
+.sentry-map-marker-status {
+  display: inline-block;
+  position: relative;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #555;
+  flex-shrink: 0;
+}
+
+.sentry-map-marker-status--online {
+  background: var(--color-accent);
+}
+
+.sentry-map-marker-status--offair {
+  background: #ef4444;
+}
+
+/* A text link, not a boxed button: the pill is small, and the action is a way
+   onward rather than the point of the panel. */
+.sentry-map-marker-more {
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 2px;
   cursor: pointer;
 }
 
-.sentry-site-popup-more:hover {
-  background: rgba(60, 224, 160, 0.12);
+.sentry-map-marker-more:hover {
+  color: #ffffff;
 }
 
 .sentinel-context-menu {

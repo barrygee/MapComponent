@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { nextTick } from 'vue'
 import { axe } from 'jest-axe'
 
-// ── maplibre-gl mock: record the markers and popups the control creates, so its
+// ── maplibre-gl mock: record the markers the control creates, so its
 //    DOM and lifecycle effects can be asserted without a real map. The classes
 //    live in vi.hoisted so they exist when the (hoisted) vi.mock factory runs. ─
 interface RecordedMarker {
@@ -12,15 +12,8 @@ interface RecordedMarker {
   lngLat: [number, number] | null
   removed: boolean
 }
-interface RecordedPopup {
-  options: { className?: string; offset?: number; closeOnClick?: boolean; anchor?: string }
-  lngLat: [number, number] | null
-  content: HTMLElement | null
-  added: boolean
-  removed: boolean
-}
 const mocks = vi.hoisted(() => {
-  const created = { markers: [] as RecordedMarker[], popups: [] as RecordedPopup[] }
+  const created = { markers: [] as RecordedMarker[] }
   class MockMarker {
     element: HTMLElement
     anchor: string | undefined
@@ -50,41 +43,12 @@ const mocks = vi.hoisted(() => {
       return this
     }
   }
-  class MockPopup {
-    options: RecordedPopup['options']
-    lngLat: [number, number] | null = null
-    content: HTMLElement | null = null
-    added = false
-    removed = false
-    constructor(options: RecordedPopup['options'] = {}) {
-      this.options = options
-      created.popups.push(this as unknown as RecordedPopup)
-    }
-    setLngLat(coords: [number, number]): this {
-      this.lngLat = coords
-      return this
-    }
-    setDOMContent(content: HTMLElement): this {
-      this.content = content
-      return this
-    }
-    addTo(): this {
-      this.added = true
-      return this
-    }
-    remove(): this {
-      this.removed = true
-      return this
-    }
-  }
-  return { created, MockMarker, MockPopup }
+  return { created, MockMarker }
 })
 
 const created = mocks.created
 
-vi.mock('maplibre-gl', () => ({
-  default: { Marker: mocks.MockMarker, Popup: mocks.MockPopup },
-}))
+vi.mock('maplibre-gl', () => ({ default: { Marker: mocks.MockMarker } }))
 
 import { SentrySitesControl, siteLabel } from './SentrySitesControl'
 import { useSentrySitesStore } from '@/stores/sentrySites'
@@ -140,7 +104,23 @@ function liveMarkers(): RecordedMarker[] {
 
 /** The site markers among them — the ⊙ marks, as opposed to the counts. */
 function siteMarkers(): RecordedMarker[] {
-  return liveMarkers().filter((marker) => marker.element.className === 'sentry-map-marker')
+  return liveMarkers().filter((marker) => marker.element.className.startsWith('sentry-map-marker'))
+}
+
+/** The ⊙ button inside a site marker — what a pointer or the keyboard acts on. */
+function markButton(marker: RecordedMarker): HTMLButtonElement {
+  return marker.element.querySelector<HTMLButtonElement>('.sentry-map-marker-mark')!
+}
+
+/** One site marker's details panel. */
+function flyout(marker: RecordedMarker): HTMLElement {
+  return marker.element.querySelector<HTMLElement>('.sentry-map-marker-info')!
+}
+
+/** Whether a marker's details are latched open (hover and focus are CSS, and
+ *  jsdom has no layout to assert them through). */
+function isLatchedOpen(marker: RecordedMarker): boolean {
+  return marker.element.classList.contains('sentry-map-marker--open')
 }
 
 function clusterMarkers(): RecordedMarker[] {
@@ -154,7 +134,6 @@ describe('SentrySitesControl', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     created.markers.length = 0
-    created.popups.length = 0
     // The control starts the store polling on init; stub fetch so it never hits
     // the network.
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }))
@@ -186,15 +165,16 @@ describe('SentrySitesControl', () => {
       expect(siteMarkers()[0]!.anchor).toBe('center')
     })
 
-    it('stops polling and tears down markers, popup and the a11y region on remove', () => {
+    it('stops polling and tears down markers, details and the a11y region on remove', () => {
       const stopSpy = vi.spyOn(sitesStore, 'stopPolling')
       sitesStore.sites = [site()]
       const { control, map } = addControl()
-      siteMarkers()[0]!.element.dispatchEvent(new Event('click'))
+      const marker = siteMarkers()[0]!
+      markButton(marker).dispatchEvent(new Event('click'))
       control.onRemove()
       expect(stopSpy).toHaveBeenCalledOnce()
-      expect(created.markers.every((marker) => marker.removed)).toBe(true)
-      expect(created.popups.every((popup) => popup.removed)).toBe(true)
+      expect(created.markers.every((each) => each.removed)).toBe(true)
+      expect(isLatchedOpen(marker)).toBe(false)
       expect(map._container.querySelector('[role="region"]')).toBeNull()
       expect(map._handlerCount('moveend')).toBe(0)
     })
@@ -244,27 +224,31 @@ describe('SentrySitesControl', () => {
   })
 
   describe('plotting sites', () => {
-    it('draws each site with the ⊙ mark, in the Sentry dot colour', () => {
+    it('draws each site with the ⊙ mark, its centre dot blacked out', () => {
       sitesStore.sites = [site()]
       addControl()
-      const element = siteMarkers()[0]!.element
-      expect(element.tagName).toBe('BUTTON')
-      expect(element.innerHTML).toContain('#3ce0a0') // the Sentry dot
-      expect(element.innerHTML).toContain('#ffffff') // the shared white ring
+      const mark = markButton(siteMarkers()[0]!)
+      expect(mark.tagName).toBe('BUTTON')
+      expect(mark.innerHTML).toContain('r="5.2" fill="#000000"') // the blacked-out centre
+      expect(mark.innerHTML).toContain('#ffffff') // the shared white ring
+      // Never the operator's own accent dot — that is what tells the two apart.
+      expect(mark.innerHTML).not.toContain('#c8ff00')
     })
 
-    it('names each site marker for assistive tech, after MapLibre overwrites it', () => {
+    it("names the mark for assistive tech, and takes MapLibre's generic name off the container", () => {
       sitesStore.sites = [site()]
       addControl()
-      expect(siteMarkers()[0]!.element.getAttribute('aria-label')).toBe(
-        'Sentry Roof Pi — show details',
-      )
+      const marker = siteMarkers()[0]!
+      expect(markButton(marker).getAttribute('aria-label')).toBe('Sentry Roof Pi — show details')
+      // ARIA prohibits aria-label on a container with no role, and MapLibre
+      // stamps one on as it adds the marker.
+      expect(marker.element.hasAttribute('aria-label')).toBe(false)
     })
 
     it('falls back to address:port for a host with no name', () => {
       sitesStore.sites = [site({ name: null })]
       addControl()
-      expect(siteMarkers()[0]!.element.getAttribute('aria-label')).toBe(
+      expect(markButton(siteMarkers()[0]!).getAttribute('aria-label')).toBe(
         'Sentry 192.168.1.60:8000 — show details',
       )
     })
@@ -388,90 +372,130 @@ describe('SentrySitesControl', () => {
     })
   })
 
-  describe('the site popup', () => {
-    function openPopup(overrides: Partial<SentrySite> = {}) {
+  describe("a site's details", () => {
+    function addSite(overrides: Partial<SentrySite> = {}) {
       sitesStore.sites = [site(overrides)]
       const added = addControl()
-      siteMarkers()[0]!.element.dispatchEvent(new Event('click'))
-      const popup = created.popups[created.popups.length - 1]!
-      return { ...added, popup }
+      const marker = siteMarkers()[0]!
+      return { ...added, marker, panel: flyout(marker) }
     }
 
-    it('opens beside the site with its name, address and status', () => {
-      const { popup } = openPopup()
-      expect(popup.added).toBe(true)
-      expect(popup.lngLat).toEqual([-0.1, 51.5])
-      expect(popup.options.className).toBe('sentry-site-popup')
-      expect(popup.content!.querySelector('.sentry-site-popup-name')!.textContent).toBe('Roof Pi')
-      expect(popup.content!.querySelector('.sentry-site-popup-meta')!.textContent).toBe(
-        '192.168.1.60:8000 · ONLINE',
-      )
+    it('sits inside the marker, so it travels with it rather than being placed', () => {
+      const { marker, panel } = addSite()
+      // Built into the marker element itself: no separate popup is created, and
+      // nothing has to be re-anchored when the map moves.
+      expect(marker.element.contains(panel)).toBe(true)
+      expect(marker.element.children).toHaveLength(2) // the mark, then its details
     })
 
-    it('reports a host that is off the network as off air, not as missing', () => {
-      const { popup } = openPopup({ reachable: false })
-      expect(popup.content!.querySelector('.sentry-site-popup-meta')!.textContent).toContain(
-        'OFF AIR',
+    it('shows the name, where it answers, and a reachability dot', () => {
+      const { panel } = addSite()
+      expect(panel.querySelector('.sentry-map-marker-name')!.textContent).toBe('Roof Pi')
+      expect(panel.querySelector('.sentry-map-marker-meta')!.textContent).toContain(
+        '192.168.1.60:8000',
       )
+      const dot = panel.querySelector('.sentry-map-marker-status')!
+      expect(dot.classList.contains('sentry-map-marker-status--online')).toBe(true)
+    })
+
+    it('never leaves the status to colour alone', () => {
+      const { panel } = addSite()
+      const dot = panel.querySelector<HTMLElement>('.sentry-map-marker-status')!
+      expect(dot.title).toBe('Online')
+      expect(dot.querySelector('.sr-only')!.textContent).toBe('Online')
+    })
+
+    it('marks a host that is off the network as off air, not as missing', () => {
+      const { panel } = addSite({ reachable: false })
+      const dot = panel.querySelector<HTMLElement>('.sentry-map-marker-status')!
+      expect(dot.classList.contains('sentry-map-marker-status--offair')).toBe(true)
+      expect(dot.title).toBe('Off air')
+      expect(dot.querySelector('.sr-only')!.textContent).toBe('Off air')
     })
 
     it('names an unlabelled host by where it answers', () => {
-      const { popup } = openPopup({ name: null })
-      expect(popup.content!.querySelector('.sentry-site-popup-name')!.textContent).toBe(
-        '192.168.1.60:8000',
-      )
+      const { panel } = addSite({ name: null })
+      expect(panel.querySelector('.sentry-map-marker-name')!.textContent).toBe('192.168.1.60:8000')
     })
 
-    it('MORE opens that host in the SDR settings section and closes the popup', () => {
-      const { popup } = openPopup({ id: 7 })
-      const more = popup.content!.querySelector<HTMLButtonElement>('.sentry-site-popup-more')!
-      expect(more.getAttribute('aria-label')).toBe('Open Roof Pi in Settings')
-      more.click()
-      expect(settingsStore.open).toBe(true)
-      expect(settingsStore.activeSection).toBe('sdr')
-      expect(settingsStore.focusSentryHostId).toBe(7)
-      expect(popup.removed).toBe(true)
+    it('is closed until the operator asks for it', () => {
+      const { marker } = addSite()
+      expect(isLatchedOpen(marker)).toBe(false)
+      expect(markButton(marker).getAttribute('aria-expanded')).toBe('false')
     })
 
-    it('replaces an open popup rather than stacking a second one', () => {
-      const { popup } = openPopup()
-      siteMarkers()[0]!.element.dispatchEvent(new Event('click'))
-      expect(popup.removed).toBe(true)
-      expect(created.popups).toHaveLength(2)
-      expect(created.popups[1]!.removed).toBe(false)
+    it('latches open on press, and closed again on a second press', () => {
+      const { marker } = addSite()
+      markButton(marker).dispatchEvent(new Event('click'))
+      expect(isLatchedOpen(marker)).toBe(true)
+      expect(markButton(marker).getAttribute('aria-expanded')).toBe('true')
+      markButton(marker).dispatchEvent(new Event('click'))
+      expect(isLatchedOpen(marker)).toBe(false)
+      expect(markButton(marker).getAttribute('aria-expanded')).toBe('false')
+    })
+
+    it('points the mark at the details it opens, for assistive tech', () => {
+      const { marker, panel } = addSite({ id: 7 })
+      expect(panel.id).toBe('sentry-site-flyout-7')
+      expect(markButton(marker).getAttribute('aria-controls')).toBe(panel.id)
+    })
+
+    it('closes whichever panel was open when another is pressed', () => {
+      sitesStore.sites = [
+        site({ id: 1, name: 'A', longitude: 0, latitude: 0 }),
+        site({ id: 2, name: 'B', longitude: 5, latitude: 5 }),
+      ]
+      addControl()
+      const [first, second] = siteMarkers() as [RecordedMarker, RecordedMarker]
+      markButton(first).dispatchEvent(new Event('click'))
+      markButton(second).dispatchEvent(new Event('click'))
+      expect(isLatchedOpen(first)).toBe(false)
+      expect(isLatchedOpen(second)).toBe(true)
     })
 
     it('closes on Escape', () => {
-      const { popup } = openPopup()
+      const { marker } = addSite()
+      markButton(marker).dispatchEvent(new Event('click'))
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-      expect(popup.removed).toBe(true)
+      expect(isLatchedOpen(marker)).toBe(false)
     })
 
     it('ignores other keys', () => {
-      const { popup } = openPopup()
+      const { marker } = addSite()
+      markButton(marker).dispatchEvent(new Event('click'))
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
-      expect(popup.removed).toBe(false)
+      expect(isLatchedOpen(marker)).toBe(true)
     })
 
-    it('opens below a site sitting under the header, where MapLibre would hide it', () => {
-      // project() negates latitude, so a small positive latitude lands near the
-      // top of the map — where the app's fixed header covers the space MapLibre
-      // would otherwise open into.
-      const { popup } = openPopup({ latitude: -0.000_05 })
-      expect(popup.options.anchor).toBe('top')
+    it('closes with the site when it leaves the map', async () => {
+      const { marker } = addSite()
+      markButton(marker).dispatchEvent(new Event('click'))
+      sitesStore.sites = []
+      await nextTick()
+      expect(isLatchedOpen(marker)).toBe(false)
     })
 
-    it('leaves the side to MapLibre anywhere there is genuinely room', () => {
-      const { popup } = openPopup({ latitude: -0.001 })
-      expect(popup.options.anchor).toBeUndefined()
+    it('MORE opens that host in the SDR settings section and closes the details', () => {
+      const { marker, panel } = addSite({ id: 7 })
+      markButton(marker).dispatchEvent(new Event('click'))
+      const more = panel.querySelector<HTMLButtonElement>('.sentry-map-marker-more')!
+      expect(more.textContent).toBe('MORE')
+      expect(more.getAttribute('aria-label')).toBe('Open Roof Pi in Settings')
+      more.dispatchEvent(new Event('click'))
+      expect(settingsStore.open).toBe(true)
+      expect(settingsStore.activeSection).toBe('sdr')
+      expect(settingsStore.focusSentryHostId).toBe(7)
+      expect(isLatchedOpen(marker)).toBe(false)
     })
 
-    it('measures the header from the layout custom property when it is set', () => {
-      // A shorter header (the mobile value) leaves room where the desktop one
-      // would not, so the same site keeps MapLibre's own choice.
-      document.documentElement.style.setProperty('--nav-height', '0px')
-      const { popup } = openPopup({ latitude: -0.000_15 })
-      expect(popup.options.anchor).toBeUndefined()
+    it('has no accessibility violations', async () => {
+      const { marker } = addSite()
+      markButton(marker).dispatchEvent(new Event('click'))
+      const host = document.createElement('div')
+      host.appendChild(marker.element)
+      // `region` is off: this is a map marker in isolation, not a page — the
+      // landmark it belongs to is the map container itself.
+      expect(await axe(host, { rules: { region: { enabled: false } } })).toHaveNoViolations()
     })
   })
 
@@ -498,12 +522,13 @@ describe('SentrySitesControl', () => {
       expect(siteMarkers()).toHaveLength(1)
     })
 
-    it('closes an open popup when the sites are hidden', () => {
+    it('closes an open details panel when the sites are hidden', () => {
       sitesStore.sites = [site()]
       const { control } = addControl()
-      siteMarkers()[0]!.element.dispatchEvent(new Event('click'))
+      const marker = siteMarkers()[0]!
+      markButton(marker).dispatchEvent(new Event('click'))
       control.setVisible(false)
-      expect(created.popups[0]!.removed).toBe(true)
+      expect(isLatchedOpen(marker)).toBe(false)
     })
 
     it('keeps the accessible table while the sites are hidden', () => {

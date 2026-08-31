@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type maplibregl from 'maplibre-gl'
-import { setMarkerAccessibleName } from './mapMarkerAria'
+import { removeMarkerAccessibleName, setMarkerAccessibleName } from './mapMarkerAria'
 
 /** The part of MapLibre's Marker this helper touches, with `addTo`'s own
  *  overwrite of the element's name reproduced — that overwrite is the whole
@@ -39,5 +39,25 @@ describe('setMarkerAccessibleName', () => {
     setMarkerAccessibleName(marker as unknown as maplibregl.Marker, 'first')
     setMarkerAccessibleName(marker as unknown as maplibregl.Marker, 'second')
     expect(element.getAttribute('aria-label')).toBe('second')
+  })
+})
+
+describe('removeMarkerAccessibleName', () => {
+  it("takes MapLibre's generic name back off a container element", () => {
+    const element = document.createElement('div')
+    const marker = fakeMarker(element)
+    marker.addTo()
+    expect(element.getAttribute('aria-label')).toBe('Map marker')
+    removeMarkerAccessibleName(marker as unknown as maplibregl.Marker)
+    // ARIA prohibits aria-label on an element with no role, so the container is
+    // left bare and its children speak for themselves.
+    expect(element.hasAttribute('aria-label')).toBe(false)
+  })
+
+  it('is a safe no-op on an element that carries no name', () => {
+    const element = document.createElement('div')
+    const marker = fakeMarker(element)
+    expect(() => removeMarkerAccessibleName(marker as unknown as maplibregl.Marker)).not.toThrow()
+    expect(element.hasAttribute('aria-label')).toBe(false)
   })
 })
