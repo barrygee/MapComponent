@@ -7,10 +7,8 @@ import {
   groupByProximity,
   type ScreenPosition,
 } from '@/components/shared/map-cluster/mapCluster'
-import {
-  removeMarkerAccessibleName,
-  setMarkerAccessibleName,
-} from '@/components/shared/map-label/mapMarkerAria'
+import { setMarkerAccessibleName } from '@/components/shared/map-label/mapMarkerAria'
+import { formatLatitude, formatLongitude } from '@/utils/locationUtils'
 import type { SentrySite } from '@/services/sentryApi'
 import type { useSentrySitesStore } from '@/stores/sentrySites'
 import type { useSettingsStore } from '@/stores/settings'
@@ -31,11 +29,15 @@ type SettingsStore = ReturnType<typeof useSettingsStore>
  * showing both, a site is not mistaken for where the operator is standing — and
  * sites too close together to tell apart collapse into
  * one numbered count that zooms in when clicked — the same treatment crowded
- * APRS stations get on the Land map, from the same shared clustering module.
- * Hovering or pressing a site opens its details alongside the mark — name,
- * address, a reachability dot, and a MORE action that lands on that host's own
- * row in Settings → SDR — drawn as the same pill the map's right-click menu
- * uses, so the two read as one piece of map furniture.
+ * APRS stations get on the Land map, from the same shared clustering module and
+ * at the same reveal zoom. The operator's own position is counted alongside the
+ * sites, so a Sentry standing where the operator is standing collapses into a
+ * count rather than the two marks smearing into one.
+ * Hovering a site (or giving it keyboard focus) shows its details alongside the
+ * mark — name, reachability dot, address and position — drawn as the same pill
+ * the map's right-click menu uses, so the two read as one piece of map
+ * furniture. The marker as a whole is the button: clicking the mark or its
+ * details opens that host's own row in Settings → SDR.
  *
  * The map canvas is opaque to assistive tech, so the control also maintains a
  * visually-hidden table of the sites as the accessible equivalent, per
@@ -49,18 +51,34 @@ export class SentrySitesControl extends SentinelControlBase {
   /** How many sites each count stands for, so it is only rebuilt when that
    *  number changes. */
   private _clusterCounts = new Map<string, number>()
-  /** The marker whose details are currently latched open, if any. */
-  private _openFlyout: HTMLElement | null = null
+  private readonly _getUserLocation: () => [number, number] | null
+  private readonly _userMarker: HideableMarker | null
   private _onMapMoveEnd: (() => void) | null = null
-  private _onDocumentKeydown: ((event: KeyboardEvent) => void) | null = null
   private _stopWatch: WatchStopHandle | null = null
   private _a11yRegion: HTMLDivElement | null = null
   private _visible = true
 
-  constructor(sitesStore: SentrySitesStore, settingsStore: SettingsStore) {
+  /**
+   * @param options.getUserLocation Where the operator's own ⊙ marker is, if the
+   *   view draws one. Its position joins the sites in the grouping pass, so a
+   *   Sentry sitting on top of the operator's own position collapses into a
+   *   count rather than the two marks smearing into one unreadable blob.
+   * @param options.userMarker That marker, so it can be hidden while a count
+   *   stands for it. Views without one (Sea) pass neither.
+   */
+  constructor(
+    sitesStore: SentrySitesStore,
+    settingsStore: SettingsStore,
+    options: {
+      getUserLocation?: () => [number, number] | null
+      userMarker?: HideableMarker | null
+    } = {},
+  ) {
     super()
     this._sitesStore = sitesStore
     this._settingsStore = settingsStore
+    this._getUserLocation = options.getUserLocation ?? (() => null)
+    this._userMarker = options.userMarker ?? null
   }
 
   get buttonLabel(): string {
@@ -87,19 +105,13 @@ export class SentrySitesControl extends SentinelControlBase {
     // projection's scale distortion into play at high latitudes.
     this._onMapMoveEnd = () => this._render()
     this.map.on('moveend', this._onMapMoveEnd)
-    // A latched panel the keyboard cannot dismiss would fail WCAG 2.1.2, and
-    // Escape is where an operator reaches for that first.
-    this._onDocumentKeydown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') this._closeFlyout()
-    }
-    document.addEventListener('keydown', this._onDocumentKeydown)
+    // Re-group on either input: a new fleet snapshot, or the operator's own
+    // position moving — a fix that lands on top of a Sentry has to collapse the
+    // two into a count just as two Sentries would.
     this._stopWatch = watch(
-      () => this._sitesStore.sites,
+      () => [this._sitesStore.sites, this._getUserLocation()] as const,
       () => this._render(),
-      {
-        immediate: true,
-        deep: true,
-      },
+      { immediate: true, deep: true },
     )
   }
 
@@ -112,7 +124,6 @@ export class SentrySitesControl extends SentinelControlBase {
     if (this._visible === visible) return
     this._visible = visible
     this.setButtonActive(visible)
-    if (!visible) this._closeFlyout()
     this._render()
   }
 
@@ -120,14 +131,11 @@ export class SentrySitesControl extends SentinelControlBase {
     /* v8 ignore start -- defensive: onInit always assigns these, and MapLibre
        never removes a control it did not add */
     if (this._onMapMoveEnd) this.map.off('moveend', this._onMapMoveEnd)
-    if (this._onDocumentKeydown) document.removeEventListener('keydown', this._onDocumentKeydown)
     /* v8 ignore stop */
     this._onMapMoveEnd = null
-    this._onDocumentKeydown = null
     this._stopWatch?.()
     this._stopWatch = null
     this._sitesStore.stopPolling()
-    this._closeFlyout()
     this._clearMarkers()
     this._a11yRegion?.remove()
     this._a11yRegion = null
@@ -144,7 +152,7 @@ export class SentrySitesControl extends SentinelControlBase {
 
   /** Add/update/remove markers so the on-map set matches `sites`. */
   private _syncMarkers(sites: SentrySite[]): void {
-    const { plotted, clusters } = this._planMarkers(sites)
+    const { plotted, clusters, userLocationCounted } = this._planMarkers(sites)
     const seenSites = new Set<number>()
     const seenClusters = new Set<string>()
 
@@ -156,14 +164,15 @@ export class SentrySitesControl extends SentinelControlBase {
       seenClusters.add(cluster.key)
       this._syncClusterMarker(cluster)
     }
+    // The operator's own marker belongs to the view, not to this control — but
+    // while a count stands for it, leaving it drawn would show one position
+    // twice, as both a mark and a number.
+    this._userMarker?.setHidden(userLocationCounted)
 
     // Drop markers for sites no longer plotted — deregistered, disabled, or now
     // inside a count.
     for (const [siteId, marker] of this._markers) {
       if (seenSites.has(siteId)) continue
-      // A site being taken off the map takes its open details with it, or the
-      // panel would be left latched open against a marker that is gone.
-      if (this._openFlyout === marker.getElement()) this._closeFlyout()
       marker.remove()
       this._markers.delete(siteId)
     }
@@ -177,34 +186,62 @@ export class SentrySitesControl extends SentinelControlBase {
   }
 
   /**
-   * Split the sites into those drawn as themselves and those collapsed into a
-   * count, by how close together they land on screen at this zoom.
+   * Split what is on the map into marks drawn as themselves and groups shown as
+   * one count, by how close together they land on screen at this zoom.
    *
-   * A group of one is never a count: a "1" says less than the marker it would
-   * replace, and that marker is the one an operator can actually open.
+   * Past the reveal zoom nothing is counted: by then the operator has asked for
+   * that area specifically, and overlapping marks they can pan between beat a
+   * number they cannot open. This is the rule the Land map's APRS counts follow,
+   * at the same zoom, so the two layers behave alike.
+   *
+   * The operator's own position takes part as an ordinary point — a Sentry
+   * standing where the operator is standing is exactly the overlap that needs
+   * collapsing — but it is not a site, so it is reported back separately rather
+   * than plotted by this control.
    */
-  private _planMarkers(sites: SentrySite[]): { plotted: SentrySite[]; clusters: SentryCluster[] } {
+  private _planMarkers(sites: SentrySite[]): MarkerPlan {
+    if (this.map.getZoom() >= SITE_REVEAL_ZOOM) {
+      return { plotted: sites, clusters: [], userLocationCounted: false }
+    }
     const positions = new Map<string, ScreenPosition>()
-    const points = sites.map((site) => {
+    const points: ClusterPoint[] = sites.map((site) => {
       positions.set(siteKey(site), this.map.project([site.longitude, site.latitude]))
       return { key: siteKey(site), site }
     })
+    const userLocation = this._getUserLocation()
+    if (userLocation) {
+      positions.set(USER_LOCATION_KEY, this.map.project(userLocation))
+      points.push({ key: USER_LOCATION_KEY, site: null })
+    }
+
     const plotted: SentrySite[] = []
     const clusters: SentryCluster[] = []
+    let userLocationCounted = false
     for (const group of groupByProximity(points, positions, SITE_GROUP_RADIUS_PX)) {
-      const members = group.members.map((point) => point.site)
-      if (members.length === 1) {
-        plotted.push(members[0]!)
+      const groupSites = group.members.map((point) => point.site).filter(isSite)
+      // A group of one is never a count: a "1" says less than the mark it would
+      // replace, and that mark is the one an operator can actually open.
+      if (group.members.length === 1) {
+        if (groupSites[0]) plotted.push(groupSites[0])
         continue
       }
+      const holdsUserLocation = groupSites.length < group.members.length
+      if (holdsUserLocation) userLocationCounted = true
+      // A counted group always holds at least one site: the only point that is
+      // not a site is the operator's own position, and on its own that is a
+      // group of one, which is never counted. So the first site is always there
+      // to put the count on.
+      const anchor = groupSites[0]!
       clusters.push({
         key: group.key,
-        sites: members,
-        longitude: members[0]!.longitude,
-        latitude: members[0]!.latitude,
+        sites: groupSites,
+        holdsUserLocation,
+        memberCount: group.members.length,
+        longitude: anchor.longitude,
+        latitude: anchor.latitude,
       })
     }
-    return { plotted, clusters }
+    return { plotted, clusters, userLocationCounted }
   }
 
   /** Add or move one site's marker. */
@@ -221,48 +258,42 @@ export class SentrySitesControl extends SentinelControlBase {
     })
       .setLngLat(coords)
       .addTo(this.map)
-    // After addTo: MapLibre stamps its own generic "Map marker" onto the
-    // element as it adds one. The element here is a plain container whose
-    // children carry the real names, and `aria-label` on a container with no
-    // role is both ignored by assistive tech and flagged as a prohibited
-    // attribute — so the stamp is taken back off rather than replaced.
-    removeMarkerAccessibleName(marker)
+    // After addTo: MapLibre replaces the element's aria-label with its own
+    // generic "Map marker" as it adds one, so the site's is put back.
+    setMarkerAccessibleName(marker, siteMarkerLabel(site))
     this._markers.set(site.id, marker)
   }
 
   /**
-   * The marker for one site: the SENTINEL ⊙ mark, with its details alongside.
+   * The marker for one site: the SENTINEL ⊙ mark with the site's details
+   * alongside it, as a single button.
    *
-   * A container rather than a single button, because two things here are
-   * operable: the mark itself, which opens the details, and the MORE action
-   * inside them. Nesting the second inside the first would be invalid markup
-   * and unreachable by keyboard, so the mark is a button and the details are
-   * its sibling, described by `aria-controls`.
+   * One button rather than a mark plus a separate action, because there is only
+   * one thing to do here — open the host in Settings — and the whole marker
+   * does it, mark and details alike. That keeps it to one tab stop with one
+   * name, and means the details panel cannot swallow a click meant for the mark
+   * it is butted against.
    */
   private _buildSiteElement(site: SentrySite): HTMLElement {
-    const element = document.createElement('div')
+    const element = document.createElement('button')
+    element.type = 'button'
     element.className = 'sentry-map-marker'
-
-    const flyoutId = `sentry-site-flyout-${site.id}`
-    const mark = document.createElement('button')
-    mark.type = 'button'
-    mark.className = 'sentry-map-marker-mark'
-    mark.setAttribute('aria-label', `Sentry ${siteLabel(site)} — show details`)
-    mark.setAttribute('aria-expanded', 'false')
-    mark.setAttribute('aria-controls', flyoutId)
-    mark.innerHTML = buildLocationMarkerSvg(SENTRY_MARKER_DOT_COLOR)
-    // Press latches the details open, so they can be read (and their MORE
-    // action reached) without holding the pointer over the marker. Hover and
-    // keyboard focus reveal them too, but only for as long as they last — see
-    // the `:hover`/`:focus-within` rules in MapLibreMap.vue.
-    mark.addEventListener('click', (domEvent: Event) => {
+    element.setAttribute('aria-label', siteMarkerLabel(site))
+    element.appendChild(this._buildMark())
+    element.appendChild(this._buildDetails(site))
+    element.addEventListener('click', (domEvent: Event) => {
       domEvent.stopPropagation()
-      this._toggleFlyout(element)
+      this._settingsStore.openSentryHost(site.id)
     })
-    element.appendChild(mark)
-
-    element.appendChild(this._buildFlyout(site, flyoutId))
     return element
+  }
+
+  /** The ⊙ itself. */
+  private _buildMark(): HTMLElement {
+    const mark = document.createElement('span')
+    mark.className = 'sentry-map-marker-mark'
+    mark.innerHTML = buildLocationMarkerSvg(SENTRY_MARKER_DOT_COLOR)
+    return mark
   }
 
   /**
@@ -270,20 +301,23 @@ export class SentrySitesControl extends SentinelControlBase {
    * a black panel butted against the ⊙ mark, with a circle masked out of its
    * leading edge so the mark stays whole and the two read as one object.
    *
-   * Deliberately short — name, where it answers, whether it is up, and a way
-   * through. Everything else Sentinel knows about a Sentry already has a home
-   * in Settings → SDR, so this hands the operator over rather than reproducing
-   * that view over the map it is covering.
+   * Shown on hover and on keyboard focus. It is the operator's shorthand for
+   * the host — what it is called, whether it is up, where it answers, and where
+   * it is — while the action it offers belongs to the marker as a whole.
+   *
+   * `aria-hidden`, because the marker's own accessible name already carries
+   * every one of these values: a screen reader should hear them once, not
+   * twice.
    */
-  private _buildFlyout(site: SentrySite, flyoutId: string): HTMLElement {
-    const flyout = document.createElement('div')
-    flyout.className = 'sentry-map-marker-info'
-    flyout.id = flyoutId
+  private _buildDetails(site: SentrySite): HTMLElement {
+    const details = document.createElement('span')
+    details.className = 'sentry-map-marker-info'
+    details.setAttribute('aria-hidden', 'true')
 
     const name = document.createElement('span')
     name.className = 'sentry-map-marker-name'
     name.textContent = siteLabel(site)
-    flyout.appendChild(name)
+    details.appendChild(name)
 
     const meta = document.createElement('span')
     meta.className = 'sentry-map-marker-meta'
@@ -291,51 +325,16 @@ export class SentrySitesControl extends SentinelControlBase {
     statusDot.className = `sentry-map-marker-status sentry-map-marker-status--${
       site.reachable ? 'online' : 'offair'
     }`
-    // Never state by colour alone (WCAG 1.4.1): the dot carries a tooltip and a
-    // visually-hidden label saying the same thing in words.
-    const statusText = site.reachable ? 'Online' : 'Off air'
-    statusDot.title = statusText
-    const statusLabel = document.createElement('span')
-    statusLabel.className = 'sr-only'
-    statusLabel.textContent = statusText
-    statusDot.appendChild(statusLabel)
     meta.appendChild(statusDot)
     meta.appendChild(document.createTextNode(`${site.address}:${site.port}`))
-    flyout.appendChild(meta)
+    details.appendChild(meta)
 
-    const more = document.createElement('button')
-    more.type = 'button'
-    more.className = 'sentry-map-marker-more'
-    more.textContent = 'MORE'
-    more.setAttribute('aria-label', `Open ${siteLabel(site)} in Settings`)
-    more.addEventListener('click', (domEvent: Event) => {
-      domEvent.stopPropagation()
-      this._closeFlyout()
-      this._settingsStore.openSentryHost(site.id)
-    })
-    flyout.appendChild(more)
+    const coordinates = document.createElement('span')
+    coordinates.className = 'sentry-map-marker-coords'
+    coordinates.textContent = `${formatLatitude(site.latitude)}  ${formatLongitude(site.longitude)}`
+    details.appendChild(coordinates)
 
-    return flyout
-  }
-
-  /** Latch one site's details open, closing whichever was open before — two
-   *  panels over the map at once would overlap each other's markers. */
-  private _toggleFlyout(element: HTMLElement): void {
-    const alreadyOpen = this._openFlyout === element
-    this._closeFlyout()
-    if (alreadyOpen) return
-    element.classList.add('sentry-map-marker--open')
-    element.querySelector('.sentry-map-marker-mark')?.setAttribute('aria-expanded', 'true')
-    this._openFlyout = element
-  }
-
-  private _closeFlyout(): void {
-    if (!this._openFlyout) return
-    this._openFlyout.classList.remove('sentry-map-marker--open')
-    this._openFlyout
-      .querySelector('.sentry-map-marker-mark')
-      ?.setAttribute('aria-expanded', 'false')
-    this._openFlyout = null
+    return details
   }
 
   /** Place (or move) the count standing for a group of sites, and zoom in on
@@ -343,14 +342,14 @@ export class SentrySitesControl extends SentinelControlBase {
   private _syncClusterMarker(cluster: SentryCluster): void {
     const coords: [number, number] = [cluster.longitude, cluster.latitude]
     const existing = this._clusterMarkers.get(cluster.key)
-    if (existing && this._clusterCounts.get(cluster.key) === cluster.sites.length) {
+    if (existing && this._clusterCounts.get(cluster.key) === cluster.memberCount) {
       existing.setLngLat(coords)
       return
     }
     existing?.remove()
-    const countLabel = `${cluster.sites.length} Sentry sites here — zoom in to see them`
+    const countLabel = clusterLabel(cluster)
     const element = buildCountMarker({
-      count: cluster.sites.length,
+      count: cluster.memberCount,
       ariaLabel: countLabel,
       className: 'sentry-cluster-marker',
       countClassName: 'sentry-cluster-count',
@@ -363,9 +362,11 @@ export class SentrySitesControl extends SentinelControlBase {
       // Far enough in to take the group apart, wherever the operator started
       // from — the count's whole purpose is to say "there is something here",
       // so one click should show what.
+      // Always far enough in to take the group apart — at least the zoom the
+      // marks are revealed at, however far out the operator started.
       this.map.easeTo({
         center: coords,
-        zoom: Math.min(this.map.getZoom() + CLUSTER_ZOOM_STEP, CLUSTER_ZOOM_MAX),
+        zoom: Math.max(this.map.getZoom() + CLUSTER_ZOOM_STEP, SITE_REVEAL_ZOOM),
         duration: 300,
       })
     })
@@ -374,7 +375,7 @@ export class SentrySitesControl extends SentinelControlBase {
       .addTo(this.map)
     setMarkerAccessibleName(marker, countLabel)
     this._clusterMarkers.set(cluster.key, marker)
-    this._clusterCounts.set(cluster.key, cluster.sites.length)
+    this._clusterCounts.set(cluster.key, cluster.memberCount)
   }
 
   // ── accessibility ──────────────────────────────────────────────────────────
@@ -421,7 +422,9 @@ export class SentrySitesControl extends SentinelControlBase {
   }
 
   private _clearMarkers(): void {
-    this._closeFlyout()
+    // The view's own marker was only ever hidden by this control, so it is
+    // handed back visible.
+    this._userMarker?.setHidden(false)
     for (const marker of this._markers.values()) marker.remove()
     this._markers.clear()
     for (const marker of this._clusterMarkers.values()) marker.remove()
@@ -430,13 +433,71 @@ export class SentrySitesControl extends SentinelControlBase {
   }
 }
 
-/** A group of sites too close together to tell apart at this zoom. */
+/** A marker whose visibility this control borrows — the view's own ⊙ for the
+ *  operator's position, while a count stands for it. */
+export interface HideableMarker {
+  setHidden(hidden: boolean): void
+}
+
+/** One point in the grouping pass: a site, or the operator's own position
+ *  (`site: null` — it is grouped like any other point, but never plotted here). */
+interface ClusterPoint {
+  key: string
+  site: SentrySite | null
+}
+
+/** A group of marks too close together to tell apart at this zoom. */
 interface SentryCluster {
   key: string
+  /** The sites in the group — everything but the operator's own position. */
   sites: SentrySite[]
-  /** Where the count sits — the first site's position. */
+  /** Whether the operator's own position is one of the marks counted. */
+  holdsUserLocation: boolean
+  /** How many marks the count stands for, the operator's position included. */
+  memberCount: number
+  /** Where the count sits — the first member's position. */
   longitude: number
   latitude: number
+}
+
+/** How the marks in view are split between drawn and counted. */
+interface MarkerPlan {
+  plotted: SentrySite[]
+  clusters: SentryCluster[]
+  /** Whether a count now stands for the operator's own position, so the view's
+   *  marker for it must be hidden. */
+  userLocationCounted: boolean
+}
+
+/** Narrows a group's members to the ones that are sites. */
+function isSite(site: SentrySite | null): site is SentrySite {
+  return site !== null
+}
+
+/** Identity of the operator's own position in the grouping pass. Not a number,
+ *  so it can never collide with a host id. */
+const USER_LOCATION_KEY = 'user-location'
+
+/**
+ * What a count says it stands for.
+ *
+ * Names the operator's own position when it is one of the marks counted:
+ * otherwise the number would be one higher than the sites it appears to
+ * summarise, which reads as a miscount.
+ */
+function clusterLabel(cluster: SentryCluster): string {
+  const subject = cluster.holdsUserLocation
+    ? `${cluster.memberCount} markers here, including your location,`
+    : `${cluster.memberCount} Sentry sites here`
+  return `${subject} — zoom in to see them`
+}
+
+/** Everything a site marker says, as its accessible name — the same values its
+ *  details panel shows, which is why that panel is `aria-hidden`. */
+function siteMarkerLabel(site: SentrySite): string {
+  const status = site.reachable ? 'online' : 'off air'
+  const position = `${formatLatitude(site.latitude)} ${formatLongitude(site.longitude)}`
+  return `Sentry ${siteLabel(site)}, ${site.address}:${site.port}, ${status}, at ${position} — open in Settings`
 }
 
 /** Identity of a site for clustering — its host id, which is stable across polls. */
@@ -479,13 +540,20 @@ const SENTRY_MARKER_DOT_COLOR = '#f6f6f4'
  *  ring diameter, so sites are grouped exactly when their marks would overlap. */
 const SITE_GROUP_RADIUS_PX = 30
 
-/** How far in one click on a count goes, in zoom levels. Three steps splits a
- *  typical huddle without throwing the operator down to street level. */
-const CLUSTER_ZOOM_STEP = 3
+/**
+ * The zoom at which a crowded group gives way to its own marks.
+ *
+ * The same step-in from the standard view the Land map's APRS counts use, and
+ * the same number, so a count means the same thing on either layer: below this,
+ * overlapping marks are summarised; at or above it, the operator has asked for
+ * this area specifically and gets every mark, overlapping or not.
+ */
+const SITE_REVEAL_ZOOM = 7
 
-/** Ceiling for that zoom: two Sentries in the same building never separate, and
- *  zooming past this would just leave an empty map around one count. */
-const CLUSTER_ZOOM_MAX = 14
+/** How far in one click on a count goes, in zoom levels. Three steps splits a
+ *  typical huddle without throwing the operator down to street level — and never
+ *  lands short of the reveal zoom, so a click always shows what it stood for. */
+const CLUSTER_ZOOM_STEP = 3
 
 /** Ring around a Sentry count marker — the same nearly-black, semitransparent
  *  ring the APRS counts use, so a count reads the same wherever it appears. */

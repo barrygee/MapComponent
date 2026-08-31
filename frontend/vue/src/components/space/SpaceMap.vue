@@ -137,7 +137,13 @@ function onStyleLoaded(m: MapLibreGlMap) {
   daynightControl = new DaynightControl(spaceStore)
   namesControl = new NamesToggleControl(basemapStore)
 
-  sentrySitesControl = new SentrySitesControl(sentrySitesStore, settingsStore)
+  sentrySitesControl = new SentrySitesControl(sentrySitesStore, settingsStore, {
+    // The operator's own position joins the grouping pass, so a Sentry sitting
+    // on top of it collapses into a count instead of two marks smearing
+    // together; the marker is handed over so the count can stand in for it.
+    getUserLocation,
+    userMarker: _locationMarker,
+  })
   sentrySitesControl.onAdd(m)
 
   m.addControl(satelliteControl, 'top-right')

@@ -42,12 +42,20 @@ vi.mock('@/composables/useUserLocation', async () => {
 })
 
 // UserLocationMarker: spy on its map methods (a class so it can be `new`-ed).
-const markerSpies = vi.hoisted(() => ({ addTo: vi.fn(), update: vi.fn(), remove: vi.fn() }))
+const markerSpies = vi.hoisted(() => ({
+  addTo: vi.fn(),
+  update: vi.fn(),
+  remove: vi.fn(),
+  setHidden: vi.fn(),
+}))
 vi.mock('@/components/shared/UserLocationMarker', () => ({
   UserLocationMarker: class {
     addTo = markerSpies.addTo
     update = markerSpies.update
     remove = markerSpies.remove
+    // Borrowed by SentrySitesControl, which hides this marker while one of its
+    // counts stands for the operator's position.
+    setHidden = markerSpies.setHidden
   },
 }))
 

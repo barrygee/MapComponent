@@ -206,26 +206,13 @@ defineExpose({ getMap })
 /* ── Sentry sites (SentrySitesControl) ──────────────────────────────────────
    The ⊙ mark again — same size and shape as the user-location marker — with
    the site's details in a pill butted against it, built like the map's own
-   right-click menu so the two read as one piece of map furniture. */
-.sentry-map-marker {
-  /* No `position` — see the note on `.user-location-marker` above. MapLibre's
-     own `position: absolute` stands, and is the positioned ancestor the details
-     pill below is placed against. */
-  width: 60px;
-  height: 60px;
-  overflow: visible;
-  line-height: 0;
-  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-}
+   right-click menu so the two read as one piece of map furniture. The whole
+   marker is one button: clicking the mark or its details opens that host in
+   Settings.
 
-.sentry-map-marker-mark {
+   NB: no `position` here — see the note on `.user-location-marker` above. */
+.sentry-map-marker {
   display: block;
-  /* Above the details pill, which starts at this mark's own centre: the pill
-     has a circle masked out of its leading edge so the ⊙ shows through, but a
-     mask hides pixels without giving up pointer events — so without this the
-     pill would swallow clicks aimed at the mark it is hanging off. */
-  position: relative;
-  z-index: 3;
   width: 60px;
   height: 60px;
   padding: 0;
@@ -234,6 +221,19 @@ defineExpose({ getMap })
   overflow: visible;
   cursor: pointer;
   line-height: 0;
+  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.sentry-map-marker-mark {
+  display: block;
+  width: 60px;
+  height: 60px;
+  overflow: visible;
+  /* Above the details pill, which starts at this mark's own centre: the pill
+     has a circle masked out of its leading edge so the ⊙ shows through, and
+     stacking the mark on top keeps the ring crisp against it. */
+  position: relative;
+  z-index: 3;
 }
 
 .sentry-map-marker-mark svg {
@@ -242,11 +242,11 @@ defineExpose({ getMap })
 
 /* The mark is a circle in the middle of a large transparent box, so the default
    outline would float well clear of it — the ring itself lights up instead. */
-.sentry-map-marker-mark:focus-visible {
+.sentry-map-marker:focus-visible {
   outline: none;
 }
 
-.sentry-map-marker-mark:focus-visible svg circle:first-of-type {
+.sentry-map-marker:focus-visible svg circle:first-of-type {
   stroke: var(--color-accent);
   stroke-width: 3.4;
 }
@@ -266,23 +266,22 @@ defineExpose({ getMap })
   gap: 2px;
   min-height: 42px;
   /* Left padding clears the mark's full box, not just the masked circle, so no
-     text sits under the mark's own hit area. */
+     text sits under the ⊙ it hangs off. */
   padding: 6px 14px 6px 32px;
   background: #000;
   border-radius: 6px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.9);
   white-space: nowrap;
+  text-align: left;
   -webkit-mask-image: radial-gradient(circle 16px at 0 50%, transparent 16px, black 16.5px);
   mask-image: radial-gradient(circle 16px at 0 50%, transparent 16px, black 16.5px);
   z-index: 2;
 }
 
-/* Shown while the pointer is over the marker, while anything inside it holds
-   focus (so the MORE action is reachable by keyboard), and once a press has
-   latched it open. */
+/* Shown while the pointer is over the marker and while it holds keyboard focus,
+   so what the button will open is legible either way round. */
 .sentry-map-marker:hover .sentry-map-marker-info,
-.sentry-map-marker:focus-within .sentry-map-marker-info,
-.sentry-map-marker--open .sentry-map-marker-info {
+.sentry-map-marker:focus-visible .sentry-map-marker-info {
   display: flex;
 }
 
@@ -295,7 +294,8 @@ defineExpose({ getMap })
   text-transform: uppercase;
 }
 
-.sentry-map-marker-meta {
+.sentry-map-marker-meta,
+.sentry-map-marker-coords {
   display: flex;
   align-items: center;
   color: rgba(255, 255, 255, 0.45);
@@ -306,9 +306,8 @@ defineExpose({ getMap })
   text-transform: uppercase;
 }
 
-/* Reachability, matching the dot the SDR settings rows use. Never the only
-   carrier of the state — the markup pairs it with a title and an sr-only
-   label. */
+/* Reachability, matching the dot the SDR settings rows use. Not the only
+   carrier of the state: the marker's accessible name says it in words. */
 .sentry-map-marker-status {
   display: inline-block;
   position: relative;
@@ -326,29 +325,6 @@ defineExpose({ getMap })
 
 .sentry-map-marker-status--offair {
   background: #ef4444;
-}
-
-/* A text link, not a boxed button: the pill is small, and the action is a way
-   onward rather than the point of the panel. */
-.sentry-map-marker-more {
-  margin-top: 2px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--color-accent);
-  font-family: inherit;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  line-height: 1.2;
-  text-transform: uppercase;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-.sentry-map-marker-more:hover {
-  color: #ffffff;
 }
 
 .sentinel-context-menu {

@@ -61,6 +61,19 @@ export class UserLocationMarker {
   }
 
   /**
+   * Show or hide the rendered marker without discarding it.
+   *
+   * For a caller that borrows this marker's visibility rather than owning it —
+   * `SentrySitesControl` hides it while one of its counts stands for this
+   * position, and shows it again when the count breaks up. Safe before the
+   * marker exists: the next `update()` builds it visible.
+   */
+  setHidden(hidden: boolean): void {
+    const element = this._marker?.getElement()
+    if (element) element.style.display = hidden ? 'none' : ''
+  }
+
+  /**
    * Remove the rendered marker but keep the map reference, so a later
    * update() (e.g. a GPS fix after the config location was cleared) can
    * re-create it. Use destroy() for teardown that also drops the map.
