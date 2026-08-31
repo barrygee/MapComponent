@@ -1359,6 +1359,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Reduce header logo wordmark height (#267)
 - Match the SDR options row names to the device rows (#282)
 - Flatten the settings panel onto a single column (#292)
+- Lead a Sentry's details with its status dot (#302)
 
 ### Dependencies
 
