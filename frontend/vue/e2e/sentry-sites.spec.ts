@@ -42,9 +42,29 @@ const SITES = [
  *  in pixels — allows for sub-pixel rounding, nothing more. */
 const POSITION_TOLERANCE_PX = 2
 
+/**
+ * A blank but valid MapLibre style, stubbed in for the basemap.
+ *
+ * The real styles live under `/assets/`, which the FastAPI backend serves and
+ * `vite preview` does not — so on a machine running the backend they arrive
+ * through the dev proxy and everywhere else (CI included) they never load, the
+ * map's `style.load` never fires, and no map control is ever created. Stubbing
+ * the style makes that the same everywhere; these tests are about marker
+ * placement, and the basemap underneath is irrelevant to it.
+ */
+const BLANK_MAP_STYLE = {
+  version: 8,
+  name: 'test-blank',
+  sources: {},
+  layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#2d3548' } }],
+}
+
 async function openMapWithSites(page: Page): Promise<void> {
   await clearPersistedState(page)
   await installDefaultMocks(page)
+  await page.route('**/assets/fiord*.json', (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(BLANK_MAP_STYLE) }),
+  )
   await page.route('**/api/sdr/sentry-hosts/locations', (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(SITES) }),
   )
