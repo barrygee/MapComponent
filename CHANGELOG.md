@@ -1360,6 +1360,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Match the SDR options row names to the device rows (#282)
 - Flatten the settings panel onto a single column (#292)
 - Lead a Sentry's details with its status dot (#302)
+- Show a Sentry's position above its address (#303)
 
 ### Dependencies
 
