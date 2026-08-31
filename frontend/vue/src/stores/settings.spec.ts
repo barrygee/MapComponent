@@ -33,6 +33,41 @@ describe('settings store', () => {
     expect(store.activeSection).toBe('air')
   })
 
+  it('openSentryHost opens the SDR section and flags the host to expand', () => {
+    const store = useSettingsStore()
+    store.openSentryHost(7)
+    expect(store.open).toBe(true)
+    expect(store.activeSection).toBe('sdr')
+    expect(store.focusSentryHostId).toBe(7)
+  })
+
+  it('starts with no Sentry host in focus', () => {
+    expect(useSettingsStore().focusSentryHostId).toBeNull()
+  })
+
+  it('openSentryHost replaces an earlier request rather than queueing it', () => {
+    const store = useSettingsStore()
+    store.openSentryHost(7)
+    store.openSentryHost(9)
+    expect(store.focusSentryHostId).toBe(9)
+  })
+
+  it('clearSentryHostFocus forgets the request, so a later manual visit opens as usual', () => {
+    const store = useSettingsStore()
+    store.openSentryHost(7)
+    store.clearSentryHostFocus()
+    expect(store.focusSentryHostId).toBeNull()
+    // The panel itself stays open — only the pending expand is dropped.
+    expect(store.open).toBe(true)
+    expect(store.activeSection).toBe('sdr')
+  })
+
+  it('clearSentryHostFocus with nothing in focus is a safe no-op', () => {
+    const store = useSettingsStore()
+    expect(() => store.clearSentryHostFocus()).not.toThrow()
+    expect(store.focusSentryHostId).toBeNull()
+  })
+
   it('closePanel closes the panel and dispatches a close event', () => {
     const store = useSettingsStore()
     store.openPanel()

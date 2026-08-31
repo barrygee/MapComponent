@@ -360,6 +360,242 @@ class TestHealthProbe:
 # ── cached device snapshot ─────────────────────────────────────────────────────
 
 
+class TestListHostLocations:
+    """`GET /api/sdr/sentry-hosts/locations` — the fleet's positions, for the maps."""
+
+    @staticmethod
+    def _snapshot_with_location(
+        host_id: int,
+        *,
+        latitude: float | None = 51.5,
+        longitude: float | None = -0.1,
+        updated_at: int | None = 4242,
+        reachable: bool = True,
+        name: str | None = "sentry-roof",
+    ):
+        from backend.services.sentry_fleet import HostSnapshot
+
+        location: dict | None = None
+        if latitude is not None or longitude is not None:
+            location = {
+                "latitude": latitude,
+                "longitude": longitude,
+                "updated_at": updated_at,
+            }
+        return HostSnapshot(
+            host_id=host_id,
+            reachable=reachable,
+            export_payload={"source": {"name": name, "location": location}},
+        )
+
+    def _patch_snapshots(self, monkeypatch, snapshots: dict) -> None:
+        monkeypatch.setattr(
+            sentry_router.fleet_poller,
+            "get_snapshot",
+            lambda host_id: snapshots.get(host_id),
+        )
+
+    def test_empty_with_no_hosts(self, client):
+        resp = client.get("/api/sdr/sentry-hosts/locations")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_returns_the_position_a_host_reports(self, client, monkeypatch):
+        created = _create_host(client, name="Roof Pi")
+        self._patch_snapshots(
+            monkeypatch, {created["id"]: self._snapshot_with_location(created["id"])}
+        )
+
+        resp = client.get("/api/sdr/sentry-hosts/locations")
+
+        assert resp.status_code == 200
+        assert resp.json() == [
+            {
+                "id": created["id"],
+                "name": "Roof Pi",
+                "address": "10.0.0.5",
+                "port": 8000,
+                "reachable": True,
+                "latitude": 51.5,
+                "longitude": -0.1,
+                "updated_at": 4242,
+            }
+        ]
+
+    def test_falls_back_to_the_name_the_sentry_calls_itself(self, client, monkeypatch):
+        """A host registered without a label takes Sentry's own name for itself."""
+        resp = client.post("/api/sdr/sentry-hosts", json={"address": "10.0.0.7"})
+        host_id = resp.json()["id"]
+        self._patch_snapshots(
+            monkeypatch,
+            {host_id: self._snapshot_with_location(host_id, name="sentry-barn")},
+        )
+
+        body = client.get("/api/sdr/sentry-hosts/locations").json()
+
+        assert body[0]["name"] == "sentry-barn"
+
+    def test_name_stays_null_when_neither_side_has_one(self, client, monkeypatch):
+        resp = client.post("/api/sdr/sentry-hosts", json={"address": "10.0.0.7"})
+        host_id = resp.json()["id"]
+        self._patch_snapshots(
+            monkeypatch, {host_id: self._snapshot_with_location(host_id, name=None)}
+        )
+
+        assert client.get("/api/sdr/sentry-hosts/locations").json()[0]["name"] is None
+
+    def test_omits_a_host_that_reports_no_location(self, client, monkeypatch):
+        created = _create_host(client)
+        self._patch_snapshots(
+            monkeypatch,
+            {
+                created["id"]: self._snapshot_with_location(
+                    created["id"], latitude=None, longitude=None
+                )
+            },
+        )
+
+        assert client.get("/api/sdr/sentry-hosts/locations").json() == []
+
+    def test_omits_a_host_reporting_half_a_position(self, client, monkeypatch):
+        """Latitude without longitude is not a point, and must not be plotted."""
+        created = _create_host(client)
+        self._patch_snapshots(
+            monkeypatch,
+            {
+                created["id"]: self._snapshot_with_location(
+                    created["id"], longitude=None
+                )
+            },
+        )
+
+        assert client.get("/api/sdr/sentry-hosts/locations").json() == []
+
+    def test_omits_a_host_the_poller_has_never_polled(self, client, monkeypatch):
+        _create_host(client)
+        self._patch_snapshots(monkeypatch, {})
+
+        assert client.get("/api/sdr/sentry-hosts/locations").json() == []
+
+    def test_omits_a_host_whose_export_has_no_source_block(self, client, monkeypatch):
+        from backend.services.sentry_fleet import HostSnapshot
+
+        created = _create_host(client)
+        self._patch_snapshots(
+            monkeypatch,
+            {
+                created["id"]: HostSnapshot(
+                    host_id=created["id"], export_payload={"sdrs": []}
+                )
+            },
+        )
+
+        assert client.get("/api/sdr/sentry-hosts/locations").json() == []
+
+    def test_omits_a_disabled_host_even_when_its_position_is_known(
+        self, client, monkeypatch
+    ):
+        """A host the operator has switched off is not part of the fleet on the map."""
+        created = _create_host(client, enabled=False)
+        self._patch_snapshots(
+            monkeypatch, {created["id"]: self._snapshot_with_location(created["id"])}
+        )
+
+        assert client.get("/api/sdr/sentry-hosts/locations").json() == []
+
+    def test_keeps_an_unreachable_host_at_its_last_known_position(
+        self, client, monkeypatch
+    ):
+        """A Pi that drops off the network is a site that is off the air, not one
+        that has vanished."""
+        created = _create_host(client)
+        self._patch_snapshots(
+            monkeypatch,
+            {
+                created["id"]: self._snapshot_with_location(
+                    created["id"], reachable=False
+                )
+            },
+        )
+
+        body = client.get("/api/sdr/sentry-hosts/locations").json()
+
+        assert len(body) == 1
+        assert body[0]["reachable"] is False
+        assert body[0]["latitude"] == 51.5
+
+    def test_tolerates_a_location_without_an_update_time(self, client, monkeypatch):
+        created = _create_host(client)
+        self._patch_snapshots(
+            monkeypatch,
+            {
+                created["id"]: self._snapshot_with_location(
+                    created["id"], updated_at=None
+                )
+            },
+        )
+
+        assert (
+            client.get("/api/sdr/sentry-hosts/locations").json()[0]["updated_at"]
+            is None
+        )
+
+    def test_lists_every_positioned_host_in_id_order(self, client, monkeypatch):
+        first = _create_host(client, address="10.0.0.5", name="A")
+        second = _create_host(client, address="10.0.0.6", name="B")
+        third = _create_host(client, address="10.0.0.7", name="C")
+        self._patch_snapshots(
+            monkeypatch,
+            {
+                first["id"]: self._snapshot_with_location(first["id"]),
+                # The middle host has no fix — it drops out, the others stay in order.
+                second["id"]: self._snapshot_with_location(
+                    second["id"], latitude=None, longitude=None
+                ),
+                third["id"]: self._snapshot_with_location(third["id"], latitude=52.0),
+            },
+        )
+
+        body = client.get("/api/sdr/sentry-hosts/locations").json()
+
+        assert [entry["name"] for entry in body] == ["A", "C"]
+
+    def test_never_leaks_the_auth_token(self, client, monkeypatch):
+        created = _create_host(client, auth_token="TOP-SECRET-VALUE")
+        self._patch_snapshots(
+            monkeypatch, {created["id"]: self._snapshot_with_location(created["id"])}
+        )
+
+        resp = client.get("/api/sdr/sentry-hosts/locations")
+
+        assert "TOP-SECRET-VALUE" not in resp.text
+
+    def test_locations_is_not_parsed_as_a_host_id(self, client, monkeypatch):
+        """Route order: `/locations` must win over `/{host_id}`, which would 422."""
+        self._patch_snapshots(monkeypatch, {})
+        assert client.get("/api/sdr/sentry-hosts/locations").status_code == 200
+        # …and the id route itself still resolves.
+        created = _create_host(client)
+        assert client.get(f"/api/sdr/sentry-hosts/{created['id']}").status_code == 200
+
+    def test_reads_only_the_cache_and_never_the_network(self, client, monkeypatch):
+        """A slow or dead Pi must not stall a map poll, so no request is made."""
+        calls: list = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(request)
+            return httpx.Response(200, json={})
+
+        _install_mock_transport(monkeypatch, handler)
+        created = _create_host(client)
+        self._patch_snapshots(
+            monkeypatch, {created["id"]: self._snapshot_with_location(created["id"])}
+        )
+
+        assert client.get("/api/sdr/sentry-hosts/locations").status_code == 200
+        assert calls == []
+
+
 class TestGetHostDevices:
     def test_unknown_host_returns_404(self, client):
         resp = client.get("/api/sdr/sentry-hosts/999/devices")

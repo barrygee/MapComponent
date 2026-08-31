@@ -7,6 +7,7 @@
       <div
         v-for="sentryHost in hosts"
         :key="sentryHost.id"
+        :ref="(el) => registerRow(sentryHost.id, el as HTMLElement | null)"
         class="sdr-device-item"
         :class="{ 'sdr-device-item--open': openId === sentryHost.id }"
       >
@@ -114,16 +115,28 @@
  * delete so `SdrDevicesControl` (which groups radios by Sentry host) picks up
  * the change without polling this control's own state.
  */
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import { useSettingsStore } from '@/stores/settings'
 import SdrSourceStatusDot from './SdrSourceStatusDot.vue'
 import SentryHostForm from './SentryHostForm.vue'
 import { listSentryHosts, deleteSentryHost, type SentryHost } from '@/services/sentryApi'
 import { SENTRY_HOSTS_CHANGED_EVENT } from '@/composables/sdrDeviceEvents'
 
+const settingsStore = useSettingsStore()
+
 const hosts = ref<SentryHost[]>([])
 const openId = ref<number | 'new' | null>(null)
 const confirmId = ref<number | null>(null)
+
+// Row elements by host id, so a host arrived at from a map marker can be
+// scrolled into view inside the settings panel's own scroller.
+const rowElements = new Map<number, HTMLElement>()
+
+function registerRow(hostId: number, element: HTMLElement | null): void {
+  if (element) rowElements.set(hostId, element)
+  else rowElements.delete(hostId)
+}
 
 // Guards the periodic reachability refresh the same way SdrDevicesControl
 // guards its status poll — a slow tick must never stack on top of another.
@@ -178,6 +191,29 @@ async function onSave(): Promise<void> {
 }
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
+
+/**
+ * Expand the host the operator asked for from a Sentry marker on a map, once
+ * the list holding it has loaded, and clear the request so a later manual visit
+ * opens as usual.
+ *
+ * Waits for the host to actually be in `hosts`: the control mounts with an
+ * empty list and fills it asynchronously, so acting on the id immediately would
+ * expand a row that does not exist yet.
+ */
+watch(
+  [() => settingsStore.focusSentryHostId, hosts],
+  async ([focusHostId]) => {
+    if (focusHostId === null) return
+    if (!hosts.value.some((sentryHost) => sentryHost.id === focusHostId)) return
+    openId.value = focusHostId
+    confirmId.value = null
+    settingsStore.clearSentryHostFocus()
+    await nextTick()
+    rowElements.get(focusHostId)?.scrollIntoView({ block: 'nearest' })
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   void load()

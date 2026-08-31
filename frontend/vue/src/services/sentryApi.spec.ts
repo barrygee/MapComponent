@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   listSentryHosts,
+  listSentrySites,
   createSentryHost,
   updateSentryHost,
   deleteSentryHost,
@@ -13,6 +14,7 @@ import {
   flashSentryDeviceSerial,
   SentryApiRequestError,
   type SentryHost,
+  type SentrySite,
   type SentryHostCreateInput,
   type SentryDeviceSnapshot,
   type SentryHostInfo,
@@ -56,6 +58,44 @@ describe('listSentryHosts', () => {
     mockFetch(() => ({ ok: true, json: () => Promise.resolve([sampleHost]) }))
     await expect(listSentryHosts()).resolves.toEqual([sampleHost])
     expect(global.fetch).toHaveBeenCalledWith('/api/sdr/sentry-hosts', undefined)
+  })
+})
+
+const sampleSite: SentrySite = {
+  id: 1,
+  name: 'Pi Roof',
+  address: '192.168.1.60',
+  port: 8000,
+  reachable: true,
+  latitude: 51.5,
+  longitude: -0.1,
+  updated_at: 2000,
+}
+
+describe('listSentrySites', () => {
+  it('returns the parsed sites on success', async () => {
+    mockFetch(() => ({ ok: true, json: () => Promise.resolve([sampleSite]) }))
+    await expect(listSentrySites()).resolves.toEqual([sampleSite])
+    expect(global.fetch).toHaveBeenCalledWith('/api/sdr/sentry-hosts/locations', undefined)
+  })
+
+  it('returns an empty list when no host reports a position', async () => {
+    mockFetch(() => ({ ok: true, json: () => Promise.resolve([]) }))
+    await expect(listSentrySites()).resolves.toEqual([])
+  })
+
+  it('throws the parsed rejection when the backend refuses', async () => {
+    mockFetch(() => ({
+      ok: false,
+      status: 503,
+      json: () => Promise.resolve({ detail: { code: 'unavailable', message: 'Poller is down.' } }),
+    }))
+    await expect(listSentrySites()).rejects.toMatchObject({
+      name: 'SentryApiRequestError',
+      status: 503,
+      code: 'unavailable',
+      message: 'Poller is down.',
+    })
   })
 })
 

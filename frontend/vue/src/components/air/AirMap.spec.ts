@@ -61,6 +61,9 @@ vi.mock('@/components/shared/controls/names/NamesToggleControl', () => ({
 vi.mock('@/components/shared/controls/roads/RoadsToggleControl', () => ({
   RoadsToggleControl: controlMocks.make('roads'),
 }))
+vi.mock('@/components/shared/controls/sentry-sites/SentrySitesControl', () => ({
+  SentrySitesControl: controlMocks.make('sentrySites'),
+}))
 vi.mock('./controls/range-rings/RangeRingsControl', () => ({
   RangeRingsControl: controlMocks.make('rangeRings'),
 }))

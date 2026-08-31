@@ -15,6 +15,7 @@ Endpoints:
   DELETE /api/sdr/sentry-hosts/{host_id}                         — forget a host
   POST   /api/sdr/sentry-hosts/{host_id}/test                    — probe GET /api/health
   GET    /api/sdr/sentry-hosts/{host_id}/info                    — everything known about a host
+  GET    /api/sdr/sentry-hosts/locations                         — every host with a known position
 
   GET    /api/sdr/sentry-hosts/{host_id}/devices                 — cached status snapshot
   PATCH  /api/sdr/sentry-hosts/{host_id}/devices/{device_id}     — proxy PATCH /api/devices/{id}
@@ -253,6 +254,25 @@ class SentryHostInfoOut(SentryHostOut):
     control_port_offset: int | None = None
 
 
+class SentrySiteOut(BaseModel):
+    """One Sentry host that has told Sentinel where it is — a point for the domain maps.
+
+    Only hosts with a usable position appear, so every entry carries a real
+    latitude/longitude rather than the nullable pair `SentryLocationOut` uses:
+    a map plots points, and "somewhere unknown" is not one.
+    """
+
+    id: int
+    name: str | None
+    address: str
+    port: int
+    reachable: bool
+    latitude: float
+    longitude: float
+    # When the Sentry says it last updated its own position (Unix ms), if it says.
+    updated_at: int | None = None
+
+
 class DeviceSnapshotOut(BaseModel):
     """Response for `GET /api/sdr/sentry-hosts/{host_id}/devices` — the cached poll snapshot."""
 
@@ -436,6 +456,47 @@ async def create_host(body: SentryHostIn, db: AsyncSession = Depends(get_db)) ->
     if host.enabled:
         await fleet_poller.start_host(host.id)
     return _host_to_out(host)
+
+
+@router.get("/locations", response_model=list[SentrySiteOut])
+async def list_host_locations(db: AsyncSession = Depends(get_db)) -> list[SentrySiteOut]:
+    """List every enabled Sentry host that reports a position, for plotting on the domain maps.
+
+    Reads only the fleet poller's cached export — never the network — because
+    every domain map polls this while it is open: a round trip per host per poll
+    would make a slow Pi stall the map. A host that has gone unreachable keeps
+    its last known position and is reported with `reachable: false`, so an
+    operator sees a site that is off the air rather than a site that vanished.
+
+    Declared before `/{host_id}` on purpose: FastAPI matches routes in
+    declaration order, so the reverse would parse "locations" as a host id.
+    """
+    hosts = (await db.execute(select(SentryHost).order_by(SentryHost.id))).scalars().all()
+    sites: list[SentrySiteOut] = []
+    for host in hosts:
+        if not host.enabled:
+            continue
+        snapshot = fleet_poller.get_snapshot(host.id)
+        source = _coerce_source(snapshot.export_payload if snapshot is not None else None)
+        location = source.location if source is not None else None
+        if location is None or location.latitude is None or location.longitude is None:
+            continue
+        sites.append(
+            SentrySiteOut(
+                id=host.id,
+                # Sentry's own name for itself is the better label when Sentinel
+                # has not been given one — it is what the operator set on the Pi.
+                # `source` is never None here: the position came out of it.
+                name=host.name or source.name,
+                address=host.address,
+                port=host.port,
+                reachable=snapshot.reachable if snapshot is not None else False,
+                latitude=location.latitude,
+                longitude=location.longitude,
+                updated_at=location.updated_at,
+            )
+        )
+    return sites
 
 
 @router.get("/{host_id}", response_model=SentryHostOut)

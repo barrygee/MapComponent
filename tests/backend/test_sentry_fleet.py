@@ -73,12 +73,24 @@ async def _reload_host(session_factory, host_id: int) -> SentryHost:
         return await session.get(SentryHost, host_id)
 
 
-def _fake_client_class(outcomes: list):
+def _fake_client_class(outcomes: list, export_outcomes: list | None = None):
     """A SentryClient stand-in whose get_status() yields `outcomes` in order
-    (repeating the last entry), raising anything that is an Exception."""
-    state = {"count": 0}
+    (repeating the last entry), raising anything that is an Exception.
+
+    get_sdr_export() behaves the same way over `export_outcomes`, and records
+    how many times it was called on the class, so the poller's deliberately
+    rate-limited position refresh can be asserted.
+    """
+    state = {"count": 0, "export_count": 0}
+    exports = (
+        export_outcomes
+        if export_outcomes is not None
+        else [SentryResponse(data={}, api_version=None)]
+    )
 
     class _FakeSentryClient:
+        calls = state
+
         def __init__(self, address, port, auth_token) -> None:
             self.address = address
             self.port = port
@@ -92,7 +104,161 @@ def _fake_client_class(outcomes: list):
                 raise outcome
             return outcome
 
+        async def get_sdr_export(self) -> SentryResponse:
+            index = min(state["export_count"], len(exports) - 1)
+            state["export_count"] += 1
+            outcome = exports[index]
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
     return _FakeSentryClient
+
+
+def _status_ok() -> SentryResponse:
+    return SentryResponse(data={"generated_at": 1, "sdrs": []}, api_version="1.0")
+
+
+def _export_with_location(latitude: float = 51.5) -> SentryResponse:
+    return SentryResponse(
+        data={
+            "source": {
+                "name": "sentry-roof",
+                "location": {"latitude": latitude, "longitude": -0.1},
+            }
+        },
+        api_version="1.0",
+    )
+
+
+# ── the position refresh (_refresh_export) ─────────────────────────────────────
+
+
+async def test_poll_caches_the_hosts_self_reported_position(
+    session_factory, monkeypatch
+):
+    host_id = await _create_host(session_factory)
+    client_class = _fake_client_class([_status_ok()], [_export_with_location()])
+    monkeypatch.setattr(sentry_fleet, "SentryClient", client_class)
+    poller = sentry_fleet.SentryFleetPoller()
+
+    await poller._poll_once(host_id)
+
+    snapshot = poller.get_snapshot(host_id)
+    assert snapshot.export_payload["source"]["location"]["latitude"] == 51.5
+    assert snapshot.export_fetched_at is not None
+    assert client_class.calls["export_count"] == 1
+
+
+async def test_position_is_not_refetched_within_the_refresh_window(
+    session_factory, monkeypatch
+):
+    """The status poll runs every couple of seconds; the position must not."""
+    host_id = await _create_host(session_factory)
+    client_class = _fake_client_class([_status_ok()], [_export_with_location()])
+    monkeypatch.setattr(sentry_fleet, "SentryClient", client_class)
+    poller = sentry_fleet.SentryFleetPoller()
+
+    await poller._poll_once(host_id)
+    await poller._poll_once(host_id)
+    await poller._poll_once(host_id)
+
+    assert client_class.calls["count"] == 3  # every status poll ran…
+    assert client_class.calls["export_count"] == 1  # …but the position was read once
+
+
+async def test_position_is_refetched_once_the_window_has_elapsed(
+    session_factory, monkeypatch
+):
+    host_id = await _create_host(session_factory)
+    client_class = _fake_client_class(
+        [_status_ok()], [_export_with_location(51.5), _export_with_location(52.5)]
+    )
+    monkeypatch.setattr(sentry_fleet, "SentryClient", client_class)
+    poller = sentry_fleet.SentryFleetPoller()
+
+    now = time.time()
+    monkeypatch.setattr(sentry_fleet.time, "time", lambda: now)
+    await poller._poll_once(host_id)
+    # Move past the refresh interval; the next poll reads the position again.
+    monkeypatch.setattr(
+        sentry_fleet.time,
+        "time",
+        lambda: now + sentry_fleet.settings.sentry_location_refresh_s + 1,
+    )
+    await poller._poll_once(host_id)
+
+    assert client_class.calls["export_count"] == 2
+    snapshot = poller.get_snapshot(host_id)
+    assert snapshot.export_payload["source"]["location"]["latitude"] == 52.5
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        SentryUnreachableError("connection refused"),
+        SentryApiError(404, "not_found", "No such endpoint."),
+    ],
+)
+async def test_a_failed_position_read_keeps_the_last_one_and_does_not_hammer(
+    session_factory, monkeypatch, failure
+):
+    """An older Sentry without the versioned export must not be retried every poll."""
+    host_id = await _create_host(session_factory)
+    client_class = _fake_client_class(
+        [_status_ok()], [_export_with_location(), failure]
+    )
+    monkeypatch.setattr(sentry_fleet, "SentryClient", client_class)
+    poller = sentry_fleet.SentryFleetPoller()
+
+    now = time.time()
+    monkeypatch.setattr(sentry_fleet.time, "time", lambda: now)
+    await poller._poll_once(host_id)
+    later = now + sentry_fleet.settings.sentry_location_refresh_s + 1
+    monkeypatch.setattr(sentry_fleet.time, "time", lambda: later)
+    ok = await poller._poll_once(host_id)
+
+    assert ok is True  # a position that cannot be read is not a poll failure
+    snapshot = poller.get_snapshot(host_id)
+    assert snapshot.export_payload["source"]["location"]["latitude"] == 51.5  # kept
+    assert snapshot.export_fetched_at == int(later * 1000)  # attempt still stamped
+    assert snapshot.reachable is True
+
+
+async def test_an_unexpected_error_reading_the_position_is_caught_and_logged(
+    session_factory, monkeypatch, caplog
+):
+    host_id = await _create_host(session_factory)
+    monkeypatch.setattr(
+        sentry_fleet,
+        "SentryClient",
+        _fake_client_class([_status_ok()], [ValueError("boom")]),
+    )
+    poller = sentry_fleet.SentryFleetPoller()
+
+    with caplog.at_level(logging.ERROR):
+        ok = await poller._poll_once(host_id)
+
+    assert ok is True  # the loop keeping device state fresh survives
+    assert poller.get_snapshot(host_id).export_payload is None
+    assert "Unexpected error reading the Sentry export" in caplog.text
+
+
+async def test_no_position_read_when_the_status_poll_itself_failed(
+    session_factory, monkeypatch
+):
+    host_id = await _create_host(session_factory)
+    client_class = _fake_client_class(
+        [SentryUnreachableError("down")], [_export_with_location()]
+    )
+    monkeypatch.setattr(sentry_fleet, "SentryClient", client_class)
+    poller = sentry_fleet.SentryFleetPoller()
+
+    ok = await poller._poll_once(host_id)
+
+    assert ok is False
+    assert client_class.calls["export_count"] == 0
+    assert poller.get_snapshot(host_id).export_payload is None
 
 
 # ── _poll_once ─────────────────────────────────────────────────────────────────
@@ -434,7 +600,9 @@ async def test_update_host_row_tolerates_the_host_being_deleted_mid_poll(
 # ── mirrored radios following their device ────────────────────────────────────
 
 
-async def _create_radio(session_factory, *, device_id: str, port: int, host_id: int = 1) -> int:
+async def _create_radio(
+    session_factory, *, device_id: str, port: int, host_id: int = 1
+) -> int:
     """A Sentinel radio mirroring a Sentry device, as ADD creates one.
 
     Radios live in the `sdr.radios` UserSettings JSON array, not in the
@@ -474,7 +642,11 @@ def _status_with_device(device_id: str, iq_port: int) -> SentryResponse:
                     "name": "ADSB",
                     "present": True,
                     "enabled": True,
-                    "output": {"iq_port": iq_port, "control_port": iq_port + 2, "host": ""},
+                    "output": {
+                        "iq_port": iq_port,
+                        "control_port": iq_port + 2,
+                        "host": "",
+                    },
                 }
             ],
         },
@@ -482,14 +654,18 @@ def _status_with_device(device_id: str, iq_port: int) -> SentryResponse:
     )
 
 
-async def test_a_poll_repoints_a_radio_whose_device_moved_port(session_factory, monkeypatch):
+async def test_a_poll_repoints_a_radio_whose_device_moved_port(
+    session_factory, monkeypatch
+):
     """The replug case: Sentry reassigns the port, and the mirror follows.
 
     Without this the radio points at a port nothing listens on, and connecting
     fails with a bare socket error naming neither the device nor the reason.
     """
     host_id = await _create_host(session_factory)
-    radio_id = await _create_radio(session_factory, device_id="serial:AAA", port=2345, host_id=host_id)
+    radio_id = await _create_radio(
+        session_factory, device_id="serial:AAA", port=2345, host_id=host_id
+    )
     monkeypatch.setattr(
         sentry_fleet,
         "SentryClient",
@@ -501,9 +677,13 @@ async def test_a_poll_repoints_a_radio_whose_device_moved_port(session_factory, 
     assert (await _reload_radio(session_factory, radio_id))["port"] == 4343
 
 
-async def test_a_poll_leaves_an_already_correct_radio_alone(session_factory, monkeypatch):
+async def test_a_poll_leaves_an_already_correct_radio_alone(
+    session_factory, monkeypatch
+):
     host_id = await _create_host(session_factory)
-    radio_id = await _create_radio(session_factory, device_id="serial:AAA", port=4343, host_id=host_id)
+    radio_id = await _create_radio(
+        session_factory, device_id="serial:AAA", port=4343, host_id=host_id
+    )
     monkeypatch.setattr(
         sentry_fleet,
         "SentryClient",
@@ -515,7 +695,9 @@ async def test_a_poll_leaves_an_already_correct_radio_alone(session_factory, mon
     assert (await _reload_radio(session_factory, radio_id))["port"] == 4343
 
 
-async def test_a_poll_never_deletes_a_radio_whose_device_vanished(session_factory, monkeypatch):
+async def test_a_poll_never_deletes_a_radio_whose_device_vanished(
+    session_factory, monkeypatch
+):
     """A dongle is unplugged for all sorts of temporary reasons.
 
     Destroying the operator's configuration — its name, its groups, its
@@ -523,7 +705,9 @@ async def test_a_poll_never_deletes_a_radio_whose_device_vanished(session_factor
     as unavailable, which `GET /api/sdr/radios` does instead.
     """
     host_id = await _create_host(session_factory)
-    radio_id = await _create_radio(session_factory, device_id="serial:GONE", port=2345, host_id=host_id)
+    radio_id = await _create_radio(
+        session_factory, device_id="serial:GONE", port=2345, host_id=host_id
+    )
     monkeypatch.setattr(
         sentry_fleet,
         "SentryClient",

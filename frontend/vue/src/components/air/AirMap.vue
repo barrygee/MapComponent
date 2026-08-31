@@ -24,6 +24,7 @@ import { useNotificationsStore, registerAircraftClickHandler } from '@/stores/no
 import { useAirNotifStore } from '@/stores/airNotif'
 import { useTrackingStore } from '@/stores/tracking'
 import { useSettingsStore } from '@/stores/settings'
+import { useSentrySitesStore } from '@/stores/sentrySites'
 import { useConnectivity } from '@/composables/useConnectivity'
 import { useUserLocation } from '@/composables/useUserLocation'
 import { useMapContextMenu } from '@/composables/useMapContextMenu'
@@ -31,6 +32,7 @@ import MapLibreMap from '@/components/shared/MapLibreMap.vue'
 import { UserLocationMarker } from '@/components/shared/UserLocationMarker'
 
 import { NamesToggleControl } from '@/components/shared/controls/names/NamesToggleControl'
+import { SentrySitesControl } from '@/components/shared/controls/sentry-sites/SentrySitesControl'
 import { RoadsToggleControl } from '@/components/shared/controls/roads/RoadsToggleControl'
 import { RangeRingsControl } from './controls/range-rings/RangeRingsControl'
 import { OverheadZoneControl } from './controls/overhead-zone/OverheadZoneControl'
@@ -52,6 +54,7 @@ const airNotifStore = useAirNotifStore()
 const trackingStore = useTrackingStore()
 const settingsStore = useSettingsStore()
 const playbackStore = usePlaybackStore()
+const sentrySitesStore = useSentrySitesStore()
 
 const mapRef = ref<InstanceType<typeof MapLibreMap> | null>(null)
 
@@ -94,6 +97,9 @@ let militaryBasesControl: MilitaryBasesToggleControl | null = null
 let aaraControl: AaraToggleControl | null = null
 let awacsControl: AwacToggleControl | null = null
 let clearControl: ClearOverlaysControl | null = null
+// Sentry sites are plotted on every domain map, not just this one — see
+// SentrySitesControl. No side-menu button: the sites are always shown.
+let sentrySitesControl: SentrySitesControl | null = null
 
 // Expose for AirSideMenu
 const getAdsbControl = () => adsbControl
@@ -239,6 +245,8 @@ function onStyleLoaded(m: MapLibreGlMap) {
   aaraControl.onAdd(m)
   awacsControl.onAdd(m)
   overheadZoneControl.onAdd(m)
+  sentrySitesControl = new SentrySitesControl(sentrySitesStore, settingsStore)
+  sentrySitesControl.onAdd(m)
 
   // Restore 3D pitch after initial load
   if (_tiltActive) m.easeTo({ pitch: 45, duration: 400 })

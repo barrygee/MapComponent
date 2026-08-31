@@ -21,6 +21,14 @@ import {
   MAP_LABEL_GLYPH_SIZE_PX,
   MAP_LABEL_SIZE_PX,
 } from '@/components/shared/map-label/mapLabelParts'
+import {
+  buildCountMarker,
+  COUNT_MARKER_SIZE_PX,
+  formatCount as formatClusterCount,
+  groupByProximity,
+  type ScreenPosition,
+} from '@/components/shared/map-cluster/mapCluster'
+import { setMarkerAccessibleName } from '@/components/shared/map-label/mapMarkerAria'
 import type { AprsStation, useLandStore } from '@/stores/land'
 
 type LandStore = ReturnType<typeof useLandStore>
@@ -245,6 +253,13 @@ export class AprsStationsControl extends SentinelControlBase {
     const marker = new maplibregl.Marker({ element, anchor: 'center' })
       .setLngLat(coords)
       .addTo(this.map)
+    // After addTo: MapLibre replaces the element's aria-label with its own
+    // generic "Map marker" as it adds one, and a count with no name of its own
+    // is the one marker here a screen-reader user cannot identify.
+    setMarkerAccessibleName(
+      marker,
+      `${cluster.stations.length} APRS stations here — zoom in to see them`,
+    )
     this._clusterMarkers.set(cluster.key, marker)
     this._clusterCounts.set(cluster.key, cluster.stations.length)
   }
@@ -464,101 +479,32 @@ export class AprsStationsControl extends SentinelControlBase {
  */
 const LABEL_REVEAL_ZOOM = 7
 
-/**
- * Largest count shown as a number; beyond it the marker reads "99+".
- *
- * The marker is a fixed circle, so the text has to fit it — and past a hundred
- * the exact figure tells an operator nothing the "+" does not. Capping the
- * displayed text rather than the group keeps every station inside one marker;
- * splitting a huddle into several 99s would just stack markers on one spot.
- */
-const MAX_DISPLAYED_COUNT = 99
-
-/** Text for a count marker, capped so it always fits the circle. */
-export function formatCount(count: number): string {
-  return count > MAX_DISPLAYED_COUNT ? `${MAX_DISPLAYED_COUNT}+` : String(count)
-}
-
-/** Width of the ring around a count marker, in pixels. */
-const CLUSTER_MARKER_RING_PX = 6
-
-/** Diameter of the filled centre the count sits on, in pixels. */
-const CLUSTER_MARKER_CENTRE_PX = 20
-
-/** Diameter of a count marker, in pixels — the ring's outer edge. Derived, so
- *  the ring always meets the centre exactly: no gap, whatever the two are set
- *  to. */
-const CLUSTER_MARKER_SIZE_PX = CLUSTER_MARKER_CENTRE_PX + CLUSTER_MARKER_RING_PX * 2
+/** Text for a count marker, capped so it always fits the circle.
+ *  Re-exported from the shared cluster module, which owns the cap. */
+export const formatCount = formatClusterCount
 
 /** How close two unlabelled stations must be to share a count, in pixels.
  *  The marker's own width, so a count never covers more ground than it draws
  *  over, and two counts never land on top of each other. */
-const COUNT_GROUP_RADIUS_PX = CLUSTER_MARKER_SIZE_PX
+const COUNT_GROUP_RADIUS_PX = COUNT_MARKER_SIZE_PX
 
 /**
  * The marker standing for a group of stations too close together to label.
  *
- * Built like the user-location marker — a broad ring sitting flush against a
- * filled centre — so a marker that stands for a place reads the same wherever
- * it appears. Its own colours, though: a semitransparent grey ring and a black
- * centre rather than the location marker's white and accent, which would claim
- * more attention than a group of stations deserves.
- *
- * Interactive, unlike a label: it takes pointer events so a click can zoom in
- * to reveal what it stands for, and it carries a name for assistive tech
- * because it is the only thing on the map representing those stations.
+ * The shared count marker, in APRS's own colours: a semitransparent grey ring
+ * and a black centre rather than the location marker's white and accent, which
+ * would claim more attention than a group of stations deserves.
  */
 export function buildClusterMarker(count: number): HTMLElement {
-  const text = formatCount(count)
-  const marker = document.createElement('button')
-  marker.type = 'button'
-  marker.className = 'aprs-cluster-marker'
-  // The name carries the true figure even when the face is capped: a screen
-  // reader has room for it where the circle does not.
-  marker.setAttribute('aria-label', `${count} APRS stations here — zoom in to see them`)
-  marker.style.cssText = [
-    `width:${CLUSTER_MARKER_SIZE_PX}px`,
-    `height:${CLUSTER_MARKER_SIZE_PX}px`,
-    'box-sizing:border-box',
-    'padding:0',
-    `border:${CLUSTER_MARKER_RING_PX}px solid ${APRS_COUNT_RING}`,
-    'border-radius:50%',
-    // No fill of its own: the ring is the border alone, and it blends with the
-    // map behind it rather than with a backing disc.
-    'background:none',
-    'display:flex',
-    'align-items:center',
-    'justify-content:center',
-    'cursor:pointer',
-    'pointer-events:auto',
-  ].join(';')
-
-  const centre = document.createElement('span')
-  centre.className = 'aprs-cluster-count'
-  centre.style.cssText = [
-    `width:${CLUSTER_MARKER_CENTRE_PX}px`,
-    `height:${CLUSTER_MARKER_CENTRE_PX}px`,
-    'border-radius:50%',
-    `background:${APRS_COUNT_FILL}`,
-    'display:flex',
-    'align-items:center',
-    'justify-content:center',
-    `color:${APRS_ACCENT_COLOR}`,
-    "font-family:'Barlow Condensed','Barlow',sans-serif",
-    // Three characters ("99+") need a smaller face to keep clear of the disc's
-    // edge; one or two have room at full size.
-    `font-size:${text.length > 2 ? 10 : 13}px`,
-    // The same weight a callsign carries on a label, so a count reads as part
-    // of the same set rather than as an alert.
-    'font-weight:400',
-    'letter-spacing:.04em',
-    // The count is centred on the disc rather than filling it, so it never
-    // touches the edge however many digits it runs to.
-    'line-height:1',
-  ].join(';')
-  centre.textContent = text
-  marker.appendChild(centre)
-  return marker
+  return buildCountMarker({
+    count,
+    ariaLabel: `${count} APRS stations here — zoom in to see them`,
+    className: 'aprs-cluster-marker',
+    countClassName: 'aprs-cluster-count',
+    ringColor: APRS_COUNT_RING,
+    fillColor: APRS_COUNT_FILL,
+    textColor: APRS_ACCENT_COLOR,
+  })
 }
 
 /**
@@ -690,48 +636,21 @@ export function planLabels(
  * Grouped by how close the stations actually are, not by whether their labels
  * would have overlapped. A label is far wider than the station it names, so
  * grouping on label overlap chains across a whole region and produces one count
- * standing for places nowhere near each other. The radius here is the count
+ * standing for places nowhere near each other. The radius used is the count
  * marker's own width, which keeps each group to what a single marker can
  * honestly cover — and stops two counts landing on top of each other.
  *
- * Single-linkage within that radius: if A is beside B and B beside C, the three
- * are one huddle and belong under one count.
+ * The grouping itself is the shared single-linkage pass; this only re-shapes
+ * its result into the site/station pair the label planner works in.
  */
-function groupNearby(
-  sites: StationSite[],
-  positions: Map<string, { x: number; y: number }>,
-): SiteCluster[] {
-  const isNear = (left: StationSite, right: StationSite) => {
-    const a = positions.get(left.key)!
-    const b = positions.get(right.key)!
-    return Math.hypot(a.x - b.x, a.y - b.y) < COUNT_GROUP_RADIUS_PX
-  }
-
-  const clusters: SiteCluster[] = []
-  for (const site of sites) {
-    const touching = clusters.filter((cluster) =>
-      cluster.sites.some((member) => isNear(member, site)),
-    )
-    if (touching.length === 0) {
-      clusters.push({
-        key: site.key,
-        sites: [site],
-        stations: [...site.stations],
-        longitude: site.longitude,
-        latitude: site.latitude,
-      })
-      continue
-    }
-    const [first, ...rest] = touching as [SiteCluster, ...SiteCluster[]]
-    first.sites.push(site)
-    first.stations.push(...site.stations)
-    for (const merged of rest) {
-      first.sites.push(...merged.sites)
-      first.stations.push(...merged.stations)
-      clusters.splice(clusters.indexOf(merged), 1)
-    }
-  }
-  return clusters
+function groupNearby(sites: StationSite[], positions: Map<string, ScreenPosition>): SiteCluster[] {
+  return groupByProximity(sites, positions, COUNT_GROUP_RADIUS_PX).map((cluster) => ({
+    key: cluster.key,
+    sites: cluster.members,
+    stations: cluster.members.flatMap((site) => site.stations),
+    longitude: cluster.members[0]!.longitude,
+    latitude: cluster.members[0]!.latitude,
+  }))
 }
 
 /** Stations sharing one position, with the position they share. */

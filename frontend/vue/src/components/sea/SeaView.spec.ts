@@ -45,10 +45,27 @@ const OFFLINE_STYLE = '/assets/fiord.json'
 
 interface FakeMap {
   setStyle: ReturnType<typeof vi.fn>
+  getContainer: () => HTMLElement
+  on: ReturnType<typeof vi.fn>
+  off: ReturnType<typeof vi.fn>
+  project: ReturnType<typeof vi.fn>
+  getZoom: ReturnType<typeof vi.fn>
+  easeTo: ReturnType<typeof vi.fn>
 }
 
 function makeFakeMap(): FakeMap {
-  return { setStyle: vi.fn() }
+  const container = document.createElement('div')
+  return {
+    setStyle: vi.fn(),
+    // The Sentry-sites control appends its accessible table to the map
+    // container and regroups its markers on movement.
+    getContainer: () => container,
+    on: vi.fn(),
+    off: vi.fn(),
+    project: vi.fn(() => ({ x: 0, y: 0 })),
+    getZoom: vi.fn(() => 5),
+    easeTo: vi.fn(),
+  }
 }
 
 function mountView() {

@@ -44,6 +44,12 @@ class HostSnapshot:
     last_error: str | None = None
     last_polled_at: int | None = None
     last_success_at: int | None = None
+    # Raw GET /api/v1/sdrs body, refreshed far less often than the status poll —
+    # the only place a Sentry publishes where it is (`source.location`), which
+    # the domain maps plot. Kept on the last successful read, so a host that
+    # drops off the network stays on the map at its last known position.
+    export_payload: dict[str, Any] | None = None
+    export_fetched_at: int | None = None  # Unix ms of the last export ATTEMPT, successful or not
 
 
 class SentryFleetPoller:
@@ -166,7 +172,33 @@ class SentryFleetPoller:
         snapshot.last_success_at = polled_at
         await self._update_host_row(host_id, last_seen_at=polled_at, last_error=None)
         await self._follow_device_addresses(host_id, response.data)
+        await self._refresh_export(snapshot, client, polled_at)
         return True
+
+    async def _refresh_export(self, snapshot: HostSnapshot, client: SentryClient, polled_at: int) -> None:
+        """Top up the host's cached `/api/v1/sdrs` export, at most once per refresh window.
+
+        Deliberately rate-limited well below the status poll: the export exists
+        here only for the Sentry's own `source` block (its name and position),
+        which changes when an operator re-sites the Pi, not every two seconds.
+
+        Never raises and never downgrades the host: an older Sentry without the
+        versioned export simply leaves the previous payload (or none) in place,
+        and the attempt timestamp is still recorded so a host that cannot serve
+        it is not retried on every poll.
+        """
+        due_at = (snapshot.export_fetched_at or 0) + int(settings.sentry_location_refresh_s * 1000)
+        if snapshot.export_fetched_at is not None and polled_at < due_at:
+            return
+        snapshot.export_fetched_at = polled_at
+        try:
+            snapshot.export_payload = (await client.get_sdr_export()).data
+        except (SentryUnreachableError, SentryApiError):
+            pass
+        except Exception:
+            # Same defence-in-depth as the status poll: a surprise here must not
+            # take down the loop that keeps device state fresh.
+            logger.exception("Unexpected error reading the Sentry export for host %d", snapshot.host_id)
 
     async def _follow_device_addresses(self, host_id: int, payload: dict[str, Any] | None) -> None:
         """Re-point mirrored radios at wherever their device now answers.

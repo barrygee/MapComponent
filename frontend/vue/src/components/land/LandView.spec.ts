@@ -214,6 +214,12 @@ function makeFakeMap() {
     zoomOut: vi.fn(),
     flyTo: vi.fn(),
     getZoom: vi.fn(() => 6),
+    // Map-movement hooks + projection: the APRS and Sentry-site controls
+    // regroup their markers whenever a movement settles.
+    on: vi.fn(),
+    off: vi.fn(),
+    project: vi.fn(() => ({ x: 0, y: 0 })),
+    easeTo: vi.fn(),
     // The shared location-names/roads controls query and restyle base-map layers.
     isStyleLoaded: vi.fn(() => true),
     once: vi.fn(),
