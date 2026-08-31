@@ -147,6 +147,43 @@ test.describe('Sentry sites on the map', () => {
     await expect(settings).toContainText('SDR SETTINGS')
   })
 
+  test('a count holds while the marks overlap, at any zoom, and splits when they clear', async ({
+    page,
+  }) => {
+    // Two Sentries about 250m apart — far enough to separate eventually, close
+    // enough to still be one blob at a zoom the old fixed reveal would have
+    // split them at.
+    const closeSites = [
+      { ...SITES[0]!, id: 10, name: 'Mast A' },
+      { ...SITES[0]!, id: 11, name: 'Mast B', latitude: 54.953_4, longitude: -1.532_995 },
+    ]
+    await clearPersistedState(page)
+    await installDefaultMocks(page)
+    await page.route('**/assets/fiord*.json', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify(BLANK_MAP_STYLE) }),
+    )
+    await page.route('**/api/sdr/sentry-hosts/locations', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify(closeSites) }),
+    )
+    await page.goto('/air/')
+    await waitForShellHydration(page)
+
+    const jumpTo = (zoom: number) =>
+      page.evaluate((zoomLevel) => {
+        const map = (window as unknown as { map: maplibregl.Map }).map
+        map.jumpTo({ center: [-1.532995, 54.9522], zoom: zoomLevel })
+      }, zoom)
+
+    await jumpTo(12)
+    await expect(page.locator('.sentry-cluster-marker')).toHaveCount(1)
+    await expect(page.locator('.sentry-map-marker')).toHaveCount(0)
+
+    // Far enough in that 250m is well clear of the marks' own width.
+    await jumpTo(16)
+    await expect(page.locator('.sentry-cluster-marker')).toHaveCount(0)
+    await expect(page.locator('.sentry-map-marker')).toHaveCount(2)
+  })
+
   test('a crowded map shows a count until it is zoomed in', async ({ page }) => {
     await openMapWithSites(page)
     // Far enough out that the two sites land on top of each other.
