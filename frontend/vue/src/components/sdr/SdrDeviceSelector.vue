@@ -66,18 +66,24 @@
           :class="{
             'sdr-device-menu-item--active': highlight === index + 1,
             'sdr-device-menu-item--readonly': isRadioReadOnly(r),
+            'sdr-device-menu-item--reserved': reservationFor(r) !== null,
           }"
           :aria-selected="highlight === index + 1"
+          :aria-disabled="reservationFor(r) !== null"
           @click="pickRadio(r)"
           @mousemove="highlight = index + 1"
         >
           <span class="sdr-device-menu-item-label"
-            >{{ r.name }}<span class="sdr-device-menu-item-host">{{ r.host }}</span></span
+            >{{ r.name
+            }}<span class="sdr-device-menu-item-host">{{
+              reservationFor(r) ? `RESERVED · ${reservationFor(r)} RECEIVER` : r.host
+            }}</span></span
           >
-          <!-- Padlock: this radio is controlled by another Sentinel. Only the
-               connected radio's lock is known, so only its row is marked. -->
+          <!-- Padlock: this radio is controlled by another Sentinel, or is
+               reserved as a domain receiver. Only the connected radio's remote
+               lock is known, so only its row is marked for that case. -->
           <svg
-            v-if="isRadioReadOnly(r)"
+            v-if="isRadioReadOnly(r) || reservationFor(r) !== null"
             class="sdr-device-lock sdr-device-menu-item-lock"
             width="12"
             height="12"
@@ -165,6 +171,18 @@ function isRadioReadOnly(radio: SdrRadio): boolean {
   return readOnly.value && radio.id === props.selectedRadioId
 }
 
+/**
+ * Which domain has reserved a radio ('APRS' / 'ADS-B'), or null when it is free.
+ *
+ * A reserved radio is doing a job for another domain — holding a decode bridge,
+ * or tuned to 1090 MHz for AIR — so it is listed but not selectable here, with
+ * the reason on the row. Retuning it from the panel would silently break that
+ * domain; the way to get it back is to deselect it in Settings.
+ */
+function reservationFor(radio: SdrRadio): string | null {
+  return sdrStore.radioReservation(radio.id)
+}
+
 const selectMenuRef = ref<InstanceType<typeof BaseSelectMenu> | null>(null)
 // Mirrors the base menu's open state reactively (null before first render).
 const menuOpen = computed(() => selectMenuRef.value?.menuOpen ?? false)
@@ -206,6 +224,9 @@ function onMenuOpen() {
 }
 
 function pickRadio(radio: SdrRadio | null) {
+  // A reserved row is inert: the menu stays open so the operator can pick
+  // another radio, and the reason is already on the row they clicked.
+  if (radio && reservationFor(radio) !== null) return
   // The options only render once the menu (and therefore the ref) exists.
   selectMenuRef.value!.closeMenu()
   emit('select', radio)

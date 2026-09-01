@@ -43,7 +43,10 @@
     </BaseIconButton>
 
     <!-- FILTER group: which station types are plotted. APRS is the only Land
-         feed today, so it is the sole entry — more join it as they land. -->
+         feed today, so it is the sole entry — more join it as they land. The
+         APRS button is disabled until a radio has been named as the APRS
+         receiver in Settings → LAND: with nothing decoding there is no traffic
+         to plot, and a live-looking toggle over an empty map reads as a bug. -->
     <IconRailAccordion panel-id="land-filter-panel">
       <template #trigger="{ open: filterAccordionOpen, toggle: toggleFilterAccordion }">
         <BaseIconButton
@@ -69,10 +72,15 @@
             --ba-rail-transition: color 0.15s ease;
           "
           tooltip-side="left"
-          tooltip="APRS STATIONS"
-          accessible-name="APRS stations"
+          :tooltip="aprsSourceConfigured ? 'APRS STATIONS' : 'APRS STATIONS — NO SDR SET'"
+          :accessible-name="
+            aprsSourceConfigured
+              ? 'APRS stations'
+              : 'APRS stations — unavailable until an APRS SDR is chosen in Land settings'
+          "
           :class="{ active: aprsActive }"
           :active="aprsActive"
+          :disabled="!aprsSourceConfigured"
           @click="toggleAprs"
         >
           <svg
@@ -203,6 +211,8 @@ defineProps<{
   toggleNames: () => void
   rangeRingsActive: boolean
   aprsActive: boolean
+  /** Whether an SDR has been chosen as the APRS receiver in Settings → LAND. */
+  aprsSourceConfigured: boolean
   locationActive: boolean
 }>()
 

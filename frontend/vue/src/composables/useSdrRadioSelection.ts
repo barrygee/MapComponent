@@ -79,6 +79,9 @@ export function useSdrRadioSelection(options: UseSdrRadioSelectionOptions) {
   }
 
   function selectRadio(r: SdrRadio | null) {
+    // Belt and braces with the dropdown's own guard: a reserved radio is locked
+    // out of the panel until it is deselected in Settings.
+    if (r && _sdrStore().radioReservation(r.id) !== null) return
     if (_sdrStore().digitalEnabled) setDigital(false)
     if (!r) {
       clearRadioSelection()
@@ -110,7 +113,13 @@ export function useSdrRadioSelection(options: UseSdrRadioSelectionOptions) {
       sessionStorage.setItem(RADIOS_CACHE_KEY2, JSON.stringify(radios))
     } catch (_) {}
     const savedId = parseInt(sessionStorage.getItem('sdrLastRadioId') || '', 10)
-    const savedRadio = savedId ? radios.find((r) => r.id === savedId && r.enabled) : undefined
+    // A radio reserved as a domain receiver (AIR's ADS-B source, LAND's APRS
+    // decoder) is not available here, so it can neither be remembered into the
+    // panel nor auto-selected as "the only one" — doing either would retune a
+    // dongle another domain depends on.
+    const isSelectable = (radio: SdrRadio) =>
+      radio.enabled && _sdrStore().radioReservation(radio.id) === null
+    const savedRadio = savedId ? radios.find((r) => r.id === savedId && isSelectable(r)) : undefined
     // Pick a radio to make the panel usable without a manual dropdown selection:
     //   1. the remembered radio (if still present + enabled), else
     //   2. the sole enabled radio — when there's exactly one, there's nothing to
@@ -118,7 +127,7 @@ export function useSdrRadioSelection(options: UseSdrRadioSelectionOptions) {
     //      whole radio panel locked / no way to type a frequency").
     // With two or more enabled radios and nothing remembered we can't guess which
     // one the user wants, so fall back to the "select radio" placeholder.
-    const enabledRadios = radios.filter((r) => r.enabled)
+    const enabledRadios = radios.filter(isSelectable)
     const autoRadio = savedRadio ?? (enabledRadios.length === 1 ? enabledRadios[0] : undefined)
     if (autoRadio) {
       selectedRadioId.value = autoRadio.id

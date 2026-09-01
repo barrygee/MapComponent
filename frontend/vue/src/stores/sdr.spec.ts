@@ -1051,4 +1051,133 @@ describe('sdr store', () => {
       expect(store.frequencies).toEqual(original)
     })
   })
+
+  // ── Domain reservations (AIR's ADS-B receiver, LAND's APRS receiver) ───────
+  // A reserved radio is locked out of the SDR panel, so getting this wrong
+  // either strands a dongle the operator can still use, or hands the panel a
+  // receiver another domain is depending on.
+  describe('radio reservations', () => {
+    const mirroredRadio = {
+      id: 3,
+      name: 'Attic',
+      host: '10.0.0.5',
+      port: 1234,
+      enabled: true,
+      sentry_host_id: 7,
+      sentry_device_id: 'serial:97710286',
+    }
+
+    it('reports no reservation on a free radio', () => {
+      const store = useSdrStore()
+      store.radios = [mirroredRadio]
+      expect(store.radioReservation(3)).toBeNull()
+    })
+
+    it('reserves the radio decoding APRS', () => {
+      const store = useSdrStore()
+      store.setAprsRadioId(3)
+      expect(store.radioReservation(3)).toBe('APRS')
+      expect(store.radioReservation(4)).toBeNull()
+    })
+
+    it('reserves the radio mirroring the ADS-B source device', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            configured: true,
+            sentry_host_id: 7,
+            sentry_device_id: 'serial:97710286',
+          }),
+        }),
+      )
+      const store = useSdrStore()
+      store.radios = [mirroredRadio]
+      await store.hydrateAdsbSourceFromDb()
+
+      expect(store.adsbSourceKey).toBe('7:serial:97710286')
+      expect(store.radioReservation(3)).toBe('ADS-B')
+    })
+
+    it('does not reserve a radio mirroring a different device on the same host', async () => {
+      // The device id is what identifies the dongle; two on one Pi must not be
+      // confused for each other.
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            configured: true,
+            sentry_host_id: 7,
+            sentry_device_id: 'usb:1-1.2',
+          }),
+        }),
+      )
+      const store = useSdrStore()
+      store.radios = [mirroredRadio]
+      await store.hydrateAdsbSourceFromDb()
+
+      expect(store.radioReservation(3)).toBeNull()
+    })
+
+    it('never reserves a hand-entered radio, which mirrors no device', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            configured: true,
+            sentry_host_id: 7,
+            sentry_device_id: 'serial:97710286',
+          }),
+        }),
+      )
+      const store = useSdrStore()
+      store.radios = [{ ...mirroredRadio, sentry_host_id: null, sentry_device_id: null }]
+      await store.hydrateAdsbSourceFromDb()
+
+      expect(store.radioReservation(3)).toBeNull()
+    })
+
+    it('reserves nothing for a radio id the list has never heard of', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            configured: true,
+            sentry_host_id: 7,
+            sentry_device_id: 'serial:97710286',
+          }),
+        }),
+      )
+      const store = useSdrStore()
+      store.radios = []
+      await store.hydrateAdsbSourceFromDb()
+
+      expect(store.radioReservation(3)).toBeNull()
+    })
+
+    it.each([
+      [
+        'an unconfigured source',
+        { configured: false, sentry_host_id: null, sentry_device_id: null },
+      ],
+      ['a half-written source', { configured: true, sentry_host_id: 7, sentry_device_id: '' }],
+      ['a source with no host', { configured: true, sentry_host_id: null, sentry_device_id: 'x' }],
+      ['an unreachable backend', null],
+    ])('holds no ADS-B reservation for %s', async (_label, payload) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: payload !== null, json: async () => payload }),
+      )
+      const store = useSdrStore()
+      store.radios = [mirroredRadio]
+      await store.hydrateAdsbSourceFromDb()
+
+      expect(store.adsbSourceKey).toBeNull()
+      expect(store.radioReservation(3)).toBeNull()
+    })
+  })
 })

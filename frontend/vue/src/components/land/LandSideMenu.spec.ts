@@ -15,6 +15,7 @@ function makeProps(overrides: Record<string, unknown> = {}) {
     toggleNames: vi.fn(),
     rangeRingsActive: false,
     aprsActive: true,
+    aprsSourceConfigured: true,
     locationActive: false,
     ...overrides,
   }
@@ -214,5 +215,39 @@ describe('LandSideMenu accessibility', () => {
     await wrapper.find('[aria-label="Filter stations"]').trigger('click')
     await wrapper.find('[aria-label="Map layers"]').trigger('click')
     expect(await axe(wrapper.element)).toHaveNoViolations()
+  })
+})
+
+// The APRS layer has no data behind it until a radio is named as the APRS
+// receiver in Settings → LAND, so the button must not offer a toggle that could
+// only ever show an empty map.
+describe('LandSideMenu — APRS with no receiver', () => {
+  it('disables the APRS button and says why in its accessible name', () => {
+    const { wrapper } = mountMenu({ aprsSourceConfigured: false })
+    const aprsButton = wrapper.find(
+      '[aria-label="APRS stations — unavailable until an APRS SDR is chosen in Land settings"]',
+    )
+
+    expect((aprsButton.element as HTMLButtonElement).disabled).toBe(true)
+    expect(aprsButton.attributes('data-tooltip')).toBe('APRS STATIONS — NO SDR SET')
+  })
+
+  it('leaves the button enabled, plainly named, once a receiver is set', () => {
+    const { wrapper } = mountMenu({ aprsSourceConfigured: true })
+    const aprsButton = wrapper.find('[aria-label="APRS stations"]')
+
+    expect((aprsButton.element as HTMLButtonElement).disabled).toBe(false)
+    expect(aprsButton.attributes('data-tooltip')).toBe('APRS STATIONS')
+  })
+
+  it('cannot be toggled while disabled', async () => {
+    const { wrapper, props } = mountMenu({ aprsSourceConfigured: false })
+    await wrapper
+      .find(
+        '[aria-label="APRS stations — unavailable until an APRS SDR is chosen in Land settings"]',
+      )
+      .trigger('click')
+
+    expect(props.toggleAprs).not.toHaveBeenCalled()
   })
 })

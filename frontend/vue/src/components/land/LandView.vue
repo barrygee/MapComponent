@@ -21,6 +21,7 @@
       :toggle-names="toggleNames"
       :range-rings-active="rangeRingsActive"
       :aprs-active="aprsActive"
+      :aprs-source-configured="aprsSourceConfigured"
       :location-active="locationActive"
     />
     <!-- msb-pane-search lives in MapSidebar, a sibling of <RouterView> in
@@ -50,6 +51,7 @@ import { useSidebarPaneTarget } from '@/composables/useSidebarPaneTarget'
 import { UserLocationMarker } from '@/components/shared/UserLocationMarker'
 import { useSentrySitesStore } from '@/stores/sentrySites'
 import { useSettingsStore } from '@/stores/settings'
+import { useSdrStore } from '@/stores/sdr'
 import { AprsStationsControl } from '@/components/land/controls/aprs/AprsStationsControl'
 import { LandRangeRingsControl } from '@/components/land/controls/range-rings/LandRangeRingsControl'
 import { NamesToggleControl } from '@/components/shared/controls/names/NamesToggleControl'
@@ -64,6 +66,7 @@ const landStore = useLandStore()
 const basemapStore = useBasemapStore()
 const sentrySitesStore = useSentrySitesStore()
 const settingsStore = useSettingsStore()
+const sdrStore = useSdrStore()
 const mapRef = ref<InstanceType<typeof MapLibreMap> | null>(null)
 const { ready: searchPaneReady } = useSidebarPaneTarget('search')
 
@@ -93,6 +96,12 @@ let _roadsControl: RoadsToggleControl | null = null
 // APRS visibility lives on the store, so the map and the side panel's station
 // list can never disagree about what is currently shown.
 const aprsActive = computed(() => landStore.aprsLayerVisible)
+// APRS has a receiver only once an SDR has been named as the APRS radio in
+// Settings → LAND (backed by the same single backend decode bridge the SDR
+// panel's APRS button drives). Without one nothing is decoding, so the layer is
+// forced off and its side-menu button disabled rather than offering a toggle
+// that could only ever show an empty map.
+const aprsSourceConfigured = computed(() => sdrStore.aprsRadioId !== null)
 const rangeRingsActive = ref(false)
 const locationActive = computed(() => userLocation.value !== null)
 
@@ -131,8 +140,9 @@ function onMapCreated(m: Map) {
   _aprsControl.onAdd(m)
   _namesControl.onAdd(m)
   _roadsControl.onAdd(m)
-  // APRS starts visible per the land.defaultLayers config (default ["aprs"]).
-  _aprsControl.setVisible(landStore.defaultLayers.includes('aprs'))
+  // APRS starts visible per the land.defaultLayers config (default ["aprs"]),
+  // but only once a radio is decoding it.
+  _aprsControl.setVisible(aprsSourceConfigured.value && landStore.defaultLayers.includes('aprs'))
   rangeRingsActive.value = _rangeRingsControl.visible
 
   const nativeCtrl = m.getContainer().querySelector<HTMLElement>('.maplibregl-ctrl-top-right')
@@ -162,6 +172,9 @@ function toggleRangeRings() {
   rangeRingsActive.value = !rangeRingsActive.value
 }
 function toggleAprs() {
+  // Guarded as well as disabled in the rail: the button is the only caller
+  // today, but a layer with no decoder behind it must never be switchable.
+  if (!aprsSourceConfigured.value) return
   // The control flips the shared store flag, which `aprsActive` tracks.
   _aprsControl?.handleClickPublic()
 }
@@ -171,15 +184,17 @@ function toggleNames() {
 }
 
 onMounted(() => {
+  // The backend resumes the persisted APRS radio on startup, so the database is
+  // the truth about whether anything is decoding — the store's localStorage
+  // cache can be stale on a browser that never opened the SDR panel.
+  void sdrStore.hydrateAprsFromDb()
+
   // Load the default-layers config, then apply it to the APRS layer (and keep it
-  // in sync if the config changes).
+  // in sync if the config changes, or if the APRS radio is chosen/cleared).
   void landStore.hydrateDefaultLayers()
-  watch(
-    () => landStore.defaultLayers,
-    (layers) => {
-      _aprsControl?.setVisible(layers.includes('aprs'))
-    },
-  )
+  watch([() => landStore.defaultLayers, aprsSourceConfigured], ([layers, hasSource]) => {
+    _aprsControl?.setVisible(hasSource && layers.includes('aprs'))
+  })
 
   // Keep the location marker + range-rings centre in sync with the live fix.
   watch(

@@ -296,24 +296,11 @@
                 >
                   DMR
                 </BasePillToggle>
-                <!-- APRS runs in the BACKGROUND (independent of the analog view),
-                     so it needs a selected radio but not `playing`. Its active
-                     state is per-radio (`aprsEnabled` = "decoding on the VIEWED
-                     radio"), so switching radios shows this radio's state, not
-                     the global one. It is mutually exclusive with voice decode on
-                     this radio (one channel), hence each disables the other. -->
-                <BasePillToggle
-                  class="sdr-mode-pill sdr-digital-btn"
-                  :active="aprsEnabled"
-                  active-class="sdr-digital-btn--active"
-                  :title="aprsEnabled ? 'Stop APRS decode' : 'Decode APRS packets'"
-                  :aria-label="aprsEnabled ? 'Stop APRS decode' : 'Decode APRS packets'"
-                  :aria-pressed="aprsEnabled"
-                  :disabled="!selectedRadioId || digitalEnabled"
-                  @click="toggleAprs"
-                >
-                  APRS
-                </BasePillToggle>
+                <!-- No APRS button here by design: the APRS receiver is chosen
+                     in Settings → LAND, which reserves that radio and locks it
+                     out of this panel (see `radioReservation` in the SDR store).
+                     A toggle here would have started decode on the radio being
+                     viewed and instantly locked the operator out of it. -->
               </div>
             </div>
 
@@ -1200,11 +1187,9 @@ const { digitalEnabled, setDigital, toggleDigital } = useSdrDigitalDecode({
 // it is driven by the store's HTTP start/stop endpoints rather than the spectrum
 // WS. The panel still opens the decode event socket so the waterfall panels show
 // the packets, and clears the decode buffers so the dock switches cleanly.
-// Whether APRS is decoding on the radio currently being VIEWED. The store's
-// aprsEnabled is global (decode continues in the background whichever radio the
-// panel shows), so the button must key off the decoding radio instead —
-// otherwise it stays lit after switching radios and a click would stop decode on
-// a radio that was never decoding.
+// Whether APRS is decoding on the radio currently being VIEWED. Normally false
+// — an APRS receiver is reserved and cannot be selected here — but it still
+// gates the voice-decode pill, because the two share one channel on a radio.
 const aprsEnabled = computed(
   () => _sdrStore().aprsRadioId != null && _sdrStore().aprsRadioId === selectedRadioId.value,
 )
@@ -1251,47 +1236,38 @@ watch(
   { immediate: true },
 )
 
-async function toggleAprs() {
-  const radioId = selectedRadioId.value
-  if (!radioId) return
-  // Toggling acts on the VIEWED radio: stop only when it is the one decoding,
-  // otherwise start here. The backend runs a single APRS bridge, so starting on
-  // another radio hands decode over rather than running two.
-  const next = !aprsEnabled.value
-  _sdrStore().setAprsEnabled(next)
-  _sdrStore().clearDecode()
-  if (next) {
-    const started = await _sdrStore().startAprs(radioId, _sdrStore().tuningOffsetHz, bwHz.value)
-    if (!started) {
-      _sdrStore().setAprsEnabled(false)
-      return
-    }
-    sdrDecode.start(radioId)
-  } else {
-    sdrDecode.stop()
-    await _sdrStore().stopAprs(radioId)
-    _sdrStore().clearDecode()
-  }
-}
-
 // ── Radio selection ───────────────────────────────────────────────────────────
 // Manual select/deselect, the radio-list load (with its sessionStorage cache)
 // and the remembered/sole-enabled auto-select live in useSdrRadioSelection;
 // the panel injects its socket/audio/state chokepoints so the selection
 // choreography is unchanged.
-const { radiosLoading, deviceDropdownLabel, selectRadio, loadRadios } = useSdrRadioSelection({
-  sdrStore: _sdrStore,
-  selectedRadioId,
-  controlsDisabled,
-  playing,
-  setPlayingState,
-  setStatus,
-  stopAudio: sdrAudio.stop,
-  setDigital,
-  releaseOwnershipIfHeld,
-  openControlSocket,
-  closeControlSocket,
-})
+const { radiosLoading, deviceDropdownLabel, selectRadio, clearRadioSelection, loadRadios } =
+  useSdrRadioSelection({
+    sdrStore: _sdrStore,
+    selectedRadioId,
+    controlsDisabled,
+    playing,
+    setPlayingState,
+    setStatus,
+    stopAudio: sdrAudio.stop,
+    setDigital,
+    releaseOwnershipIfHeld,
+    openControlSocket,
+    closeControlSocket,
+  })
+
+// Drop a selection that turns out to be reserved for a domain receiver. The
+// ADS-B reservation arrives from an async read that can land after the radio
+// list has already auto-selected, and the operator can name the radio they are
+// viewing as the APRS receiver from Settings — either way the panel must let go
+// rather than keep a control socket on a dongle another domain now owns.
+watch(
+  () =>
+    selectedRadioId.value === null ? null : _sdrStore().radioReservation(selectedRadioId.value),
+  (reservation) => {
+    if (reservation !== null) clearRadioSelection()
+  },
+)
 
 // Choosing a different radio clears any previous unavailability message: it
 // described the radio that was selected before, and leaving it up would blame
@@ -2028,6 +2004,10 @@ onMounted(() => {
   // decode-mute setting, which the Settings panel may never have been opened to.
   void _sdrStore().hydrateAprsFromDb()
   void _sdrStore().hydrateMuteAudioWhileDecodingFromDb()
+  // Which radio (if any) AIR holds as its ADS-B receiver. Together with the
+  // APRS radio above this is what locks a reserved dongle out of this panel,
+  // so it is read on every mount rather than trusted from a cache.
+  void _sdrStore().hydrateAdsbSourceFromDb()
 
   sdrAudio.onSquelchChange(onSquelchChangeCallback)
   sdrAudio.onPower(updateSignalBar)

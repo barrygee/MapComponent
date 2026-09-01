@@ -1,19 +1,14 @@
 <template>
   <div class="settings-datasource-wrap">
-    <div class="settings-datasource-row">
+    <div class="settings-datasource-row settings-datasource-row--dropdown">
       <span class="settings-datasource-label">SDR</span>
-      <select
+      <SettingsDropdown
         v-model="selected"
-        class="settings-datasource-input"
-        aria-label="ADS-B source SDR"
-        :disabled="isLoading"
-        @change="onChange"
-      >
-        <option value="">{{ placeholderText }}</option>
-        <option v-for="device in devices" :key="device.value" :value="device.value">
-          {{ device.label }}
-        </option>
-      </select>
+        :options="dropdownOptions"
+        :placeholder="placeholderText"
+        :disabled="isLoading || dropdownOptions.length === 0"
+        accessible-name="ADS-B source SDR"
+      />
     </div>
     <p v-if="hint" class="settings-datasource-hint">{{ hint }}</p>
   </div>
@@ -35,17 +30,13 @@
  * settings, because the AIR view acts on it the moment it is set, and a choice
  * that only took effect on some later Save would look broken in between.
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getAdsbSource, setAdsbSource } from '@/services/adsbSourceApi'
+import SettingsDropdown, { type SettingsDropdownOption } from './SettingsDropdown.vue'
 import { getSentryHostDevices, listSentryHosts, type SentryHost } from '@/services/sentryApi'
 
-interface DeviceOption {
-  /** `${hostId}:${deviceId}` — the two ids the backend needs, in one select value. */
-  value: string
-  label: string
-}
-
-const devices = ref<DeviceOption[]>([])
+/** A device option's `value` is `${hostId}:${deviceId}` — the two ids the backend needs, in one. */
+const devices = ref<SettingsDropdownOption[]>([])
 const selected = ref('')
 const isLoading = ref(true)
 const hostCount = ref(0)
@@ -73,6 +64,21 @@ let isUnmounted = false
  * has to re-read that cached view, not reach the Pi.
  */
 const REFRESH_INTERVAL_MS = 5000
+
+/**
+ * True while the persisted choice is written into the dropdown, so the model
+ * watcher can tell hydration apart from an operator's pick and not re-save what
+ * the backend already had.
+ */
+let isHydrating = false
+
+/**
+ * What the dropdown offers: the devices, plus an explicit "unset" row once one
+ * is chosen — the custom dropdown has no empty entry of its own.
+ */
+const dropdownOptions = computed<SettingsDropdownOption[]>(() =>
+  selected.value ? [{ value: '', label: 'Not set' }, ...devices.value] : devices.value,
+)
 
 const placeholderText = computed(() => {
   if (isLoading.value) return 'Loading…'
@@ -107,7 +113,7 @@ async function loadDevices(): Promise<void> {
   }
   hostCount.value = hosts.length
 
-  const options: DeviceOption[] = []
+  const options: SettingsDropdownOption[] = []
   for (const host of hosts) {
     if (!host.enabled) continue
     try {
@@ -147,19 +153,40 @@ async function loadDevices(): Promise<void> {
 async function loadSelection(): Promise<void> {
   const source = await getAdsbSource()
   if (source?.configured && source.sentry_host_id !== null && source.sentry_device_id) {
+    isHydrating = true
     selected.value = `${source.sentry_host_id}:${source.sentry_device_id}`
+    isHydrating = false
   }
 }
 
-async function onChange(): Promise<void> {
-  if (!selected.value) return
+/** Persist the chosen device. See the note above on why this saves immediately. */
+async function saveSelection(value: string): Promise<void> {
+  if (!value) return
   // `device_id` itself contains a colon ("serial:ABC"), so split once only.
-  const separator = selected.value.indexOf(':')
-  const hostId = Number(selected.value.slice(0, separator))
-  const deviceId = selected.value.slice(separator + 1)
+  const separator = value.indexOf(':')
+  const hostId = Number(value.slice(0, separator))
+  const deviceId = value.slice(separator + 1)
+  /* v8 ignore start -- defensive: every option value is built from a numeric
+     host id and a non-empty device id in loadDevices, so this cannot trip from
+     the UI; it guards a hand-edited stored setting. */
   if (!Number.isFinite(hostId) || !deviceId) return
+  /* v8 ignore stop */
   await setAdsbSource(hostId, deviceId)
 }
+
+// Watched rather than handled on a change event: the dropdown is a listbox, so
+// its model is the only signal that the operator picked something.
+watch(
+  selected,
+  (value) => {
+    if (isHydrating) return
+    void saveSelection(value)
+  },
+  // Synchronous so the `isHydrating` flag still stands when the watcher runs:
+  // the default pre-flush would fire after hydration had already cleared it,
+  // and the restored choice would be treated as an operator's pick.
+  { flush: 'sync' },
+)
 
 onMounted(async () => {
   // Selection first: `loadDevices` needs it to know which withdrawn device to

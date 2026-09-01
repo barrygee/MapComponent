@@ -191,3 +191,50 @@ describe('useSdrRadioSelection — loadRadios', () => {
     expect(harness.options.selectedRadioId.value).toBe(1) // sole enabled auto-select
   })
 })
+
+// A radio reserved as a domain receiver (AIR's ADS-B source, LAND's APRS
+// decoder) is locked out of the panel, so neither path that picks a radio
+// *for* the operator may land on one.
+describe('useSdrRadioSelection — radios reserved by a domain', () => {
+  it('refuses to select a reserved radio', () => {
+    const harness = createHarness()
+    useSdrStore().setAprsRadioId(1)
+
+    harness.selection.selectRadio(makeRadio({ id: 1 }))
+
+    expect(harness.options.selectedRadioId.value).toBeNull()
+    expect(harness.openControlSocket).not.toHaveBeenCalled()
+    expect(harness.options.controlsDisabled.value).toBe(true)
+  })
+
+  it('does not auto-select the remembered radio once it is reserved', () => {
+    sessionStorage.setItem('sdrLastRadioId', '1')
+    const harness = createHarness()
+    useSdrStore().setAprsRadioId(1)
+
+    harness.selection.populateRadios([makeRadio({ id: 1 })])
+
+    expect(harness.options.selectedRadioId.value).toBeNull()
+    expect(harness.selection.deviceDropdownLabel.value).toBe('— select radio —')
+  })
+
+  it('does not treat a reserved radio as the "sole enabled" one', () => {
+    const harness = createHarness()
+    useSdrStore().setAprsRadioId(1)
+
+    harness.selection.populateRadios([makeRadio({ id: 1 })])
+
+    expect(harness.options.selectedRadioId.value).toBeNull()
+    expect(harness.openControlSocket).not.toHaveBeenCalled()
+  })
+
+  it('auto-selects the one free radio when its neighbour is reserved', () => {
+    const harness = createHarness()
+    useSdrStore().setAprsRadioId(2)
+
+    harness.selection.populateRadios([makeRadio({ id: 1 }), makeRadio({ id: 2, name: 'Attic' })])
+
+    expect(harness.options.selectedRadioId.value).toBe(1)
+    expect(harness.openControlSocket).toHaveBeenCalledWith(1)
+  })
+})

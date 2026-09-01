@@ -85,7 +85,7 @@ describe('AdsbSdrSourceControl', () => {
     const wrapper = mount(AdsbSdrSourceControl)
     await flushPromises()
 
-    const options = wrapper.findAll('option').map((option) => option.text())
+    const options = wrapper.findAll('[role="option"]').map((option) => option.text())
     expect(options).toContain('Attic Pi — ADSB')
     expect(options).toContain('Attic Pi — RTL-SDR-V4')
   })
@@ -104,7 +104,7 @@ describe('AdsbSdrSourceControl', () => {
     const wrapper = mount(AdsbSdrSourceControl)
     await flushPromises()
 
-    const options = wrapper.findAll('option').map((option) => option.text())
+    const options = wrapper.findAll('[role="option"]').map((option) => option.text())
     expect(options).toContain('Attic Pi — ADSB')
     expect(options).toContain('Shed Pi — ADSB')
   })
@@ -132,7 +132,7 @@ describe('AdsbSdrSourceControl', () => {
     const wrapper = mount(AdsbSdrSourceControl)
     await flushPromises()
 
-    expect(wrapper.findAll('option').map((o) => o.text())).toContain('Live Pi — ADSB')
+    expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toContain('Live Pi — ADSB')
   })
 
   it('degrades to an empty list when Sentinel itself cannot be reached', async () => {
@@ -156,7 +156,9 @@ describe('AdsbSdrSourceControl', () => {
     const wrapper = mount(AdsbSdrSourceControl)
     await flushPromises()
 
-    expect(wrapper.findAll('option').map((o) => o.text())).toContain('192.168.5.67 — serial:AAA')
+    expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toContain(
+      '192.168.5.67 — serial:AAA',
+    )
   })
 
   it('tolerates a host that reports no status payload', async () => {
@@ -177,25 +179,6 @@ describe('AdsbSdrSourceControl', () => {
     expect(wrapper.text()).toContain('publish no SDRs')
   })
 
-  it('saves nothing for a malformed selection', async () => {
-    // Defensive: every value comes from an option built above, but a saved
-    // setting written by hand should not be turned into a nonsense request.
-    vi.spyOn(sentryApi, 'listSentryHosts').mockResolvedValue([host()])
-    vi.spyOn(sentryApi, 'getSentryHostDevices').mockResolvedValue(
-      snapshotWith({ device_id: 'serial:AAA', name: 'ADSB' }),
-    )
-    const wrapper = mount(AdsbSdrSourceControl)
-    await flushPromises()
-
-    const select = wrapper.find('select').element as HTMLSelectElement
-    const option = document.createElement('option')
-    option.value = 'not-a-number:'
-    select.appendChild(option)
-    await wrapper.find('select').setValue('not-a-number:')
-
-    expect(setSourceSpy).not.toHaveBeenCalled()
-  })
-
   describe('what is offered as a source', () => {
     it('omits a private device', async () => {
       // Private is the operator saying, on the Sentry side, that this dongle is
@@ -212,7 +195,7 @@ describe('AdsbSdrSourceControl', () => {
       const wrapper = mount(AdsbSdrSourceControl)
       await flushPromises()
 
-      const options = wrapper.findAll('option').map((o) => o.text())
+      const options = wrapper.findAll('[role="option"]').map((o) => o.text())
       expect(options.some((o) => o.includes('Public'))).toBe(true)
       expect(options.some((o) => o.includes('Private'))).toBe(false)
     })
@@ -229,7 +212,7 @@ describe('AdsbSdrSourceControl', () => {
       const wrapper = mount(AdsbSdrSourceControl)
       await flushPromises()
 
-      const options = wrapper.findAll('option').map((o) => o.text())
+      const options = wrapper.findAll('[role="option"]').map((o) => o.text())
       expect(options.some((o) => o.includes('Running'))).toBe(true)
       expect(options.some((o) => o.includes('Stopped'))).toBe(false)
     })
@@ -250,7 +233,7 @@ describe('AdsbSdrSourceControl', () => {
       const wrapper = mount(AdsbSdrSourceControl)
       await flushPromises()
 
-      expect(wrapper.findAll('option').map((o) => o.text())).toContainEqual(
+      expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toContainEqual(
         expect.stringContaining('no longer published'),
       )
       expect(wrapper.text()).toContain('no longer public/enabled')
@@ -310,7 +293,7 @@ describe('AdsbSdrSourceControl', () => {
 
       const wrapper = mount(AdsbSdrSourceControl)
       await flushPromises()
-      expect(wrapper.findAll('option').map((o) => o.text())).toContain('Attic Pi — ADSB')
+      expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toContain('Attic Pi — ADSB')
 
       devicesSpy.mockResolvedValue(
         snapshotWith({ device_id: 'serial:AAA', name: 'ADSB', visibility: 'private' }),
@@ -318,7 +301,9 @@ describe('AdsbSdrSourceControl', () => {
       await vi.advanceTimersByTimeAsync(5000)
       await flushPromises()
 
-      expect(wrapper.findAll('option').map((o) => o.text())).not.toContain('Attic Pi — ADSB')
+      expect(wrapper.findAll('[role="option"]').map((o) => o.text())).not.toContain(
+        'Attic Pi — ADSB',
+      )
       vi.useRealTimers()
     })
   })
@@ -333,8 +318,7 @@ describe('AdsbSdrSourceControl', () => {
 
     const wrapper = mount(AdsbSdrSourceControl)
     await flushPromises()
-    const select = wrapper.find('select')
-    await select.setValue('7:serial:97710286')
+    await wrapper.find('[data-value="7:serial:97710286"]').trigger('mousedown')
 
     expect(setSourceSpy).toHaveBeenCalledWith(7, 'serial:97710286')
   })
@@ -353,10 +337,17 @@ describe('AdsbSdrSourceControl', () => {
     const wrapper = mount(AdsbSdrSourceControl)
     await flushPromises()
 
-    expect((wrapper.find('select').element as HTMLSelectElement).value).toBe('1:serial:97710286')
+    expect(wrapper.find('[role="option"][aria-selected="true"]').attributes('data-value')).toBe(
+      '1:serial:97710286',
+    )
   })
 
-  it('does not save when cleared back to the placeholder', async () => {
+  it('does not save when cleared back to "Not set"', async () => {
+    vi.spyOn(adsbSourceApi, 'getAdsbSource').mockResolvedValue({
+      configured: true,
+      sentry_host_id: 1,
+      sentry_device_id: 'serial:AAA',
+    })
     vi.spyOn(sentryApi, 'listSentryHosts').mockResolvedValue([host()])
     vi.spyOn(sentryApi, 'getSentryHostDevices').mockResolvedValue(
       snapshotWith({ device_id: 'serial:AAA', name: 'ADSB' }),
@@ -364,7 +355,7 @@ describe('AdsbSdrSourceControl', () => {
 
     const wrapper = mount(AdsbSdrSourceControl)
     await flushPromises()
-    await wrapper.find('select').setValue('')
+    await wrapper.find('[data-value=""]').trigger('mousedown')
 
     expect(setSourceSpy).not.toHaveBeenCalled()
   })
