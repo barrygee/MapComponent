@@ -569,6 +569,15 @@ const ALL_SETTINGS: SettingItem[] = [
   {
     section: 'land',
     sectionLabel: 'LAND',
+    id: 'land-aprs-sdr-source',
+    label: 'APRS SDR',
+    desc: 'Which SDR radio decodes APRS. Decode runs in the background on it; until one is set, the map\u2019s APRS layer stays off',
+    searchTerms: 'aprs radio receiver direwolf packet land map layer',
+    type: 'aprs-sdr-source',
+  },
+  {
+    section: 'land',
+    sectionLabel: 'LAND',
     id: 'land-aprs-label-fields',
     label: 'Label Data Points',
     desc: 'Choose which data fields appear on APRS station labels on the map',

@@ -22,6 +22,7 @@ import SourceOverrideControl from './SourceOverrideControl.vue'
 import OnlineSourceControl from './OnlineSourceControl.vue'
 import OfflineSourceControl from './OfflineSourceControl.vue'
 import AdsbSdrSourceControl from './AdsbSdrSourceControl.vue'
+import AprsSdrSourceControl from './AprsSdrSourceControl.vue'
 import SentryHostsControl from './SentryHostsControl.vue'
 import SpaceTleOnlineControl from './SpaceTleOnlineControl.vue'
 import SpaceTleManualControl from './SpaceTleManualControl.vue'
@@ -66,6 +67,7 @@ const TYPE_TO_COMPONENT: Array<[string, Component, Partial<SettingItem>?]> = [
   ['online-source', OnlineSourceControl, { ns: 'air', defaultUrl: '' }],
   ['offline-source', OfflineSourceControl, { ns: 'air', defaultUrl: '' }],
   ['adsb-sdr-source', AdsbSdrSourceControl],
+  ['aprs-sdr-source', AprsSdrSourceControl],
   ['sdr-sentry-hosts', SentryHostsControl],
   ['space-tle-online', SpaceTleOnlineControl],
   ['space-tle-manual', SpaceTleManualControl],

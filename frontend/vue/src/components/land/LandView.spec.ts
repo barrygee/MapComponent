@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, enableAutoUnmount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
+import { useSdrStore } from '@/stores/sdr'
 import { defineComponent, h, nextTick } from 'vue'
 import { axe } from 'jest-axe'
 
@@ -197,6 +198,7 @@ const LandSideMenuStub = defineComponent({
     'toggleNames',
     'rangeRingsActive',
     'aprsActive',
+    'aprsSourceConfigured',
     'locationActive',
   ],
   setup(props) {
@@ -267,6 +269,10 @@ enableAutoUnmount(afterEach)
 describe('LandView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    // The APRS layer only runs when an SDR has been chosen as the APRS radio,
+    // so the map-control cases start from a configured receiver; the gating
+    // itself is exercised in its own cases below.
+    useSdrStore().setAprsRadioId(1)
     vi.clearAllMocks()
     shared.emit = null
     shared.connectivityCb = null
@@ -563,5 +569,71 @@ describe('LandView', () => {
     expect(heading.exists()).toBe(true)
     expect(heading.classes()).toContain('sr-only')
     expect(heading.text()).toBe('Land domain')
+  })
+})
+
+// The APRS layer only has data behind it when a radio is named as the APRS
+// receiver in Settings → LAND. Without one the layer is forced off and its rail
+// button disabled, rather than offering a toggle over a permanently empty map.
+describe('LandView — APRS with no receiver', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    useSdrStore().setAprsRadioId(null)
+    vi.clearAllMocks()
+    shared.emit = null
+    sideMenuProps = null
+    localStorage.clear()
+    document.body.innerHTML = ''
+  })
+
+  it('keeps the layer off and tells the rail there is no receiver', () => {
+    const map = makeFakeMap()
+    mountView()
+    shared.emit!('map-created', map)
+
+    expect(aprsSpies.setVisible).toHaveBeenCalledWith(false)
+    expect(sideMenuProps!.aprsSourceConfigured).toBe(false)
+  })
+
+  it('ignores a toggle request while nothing is decoding', async () => {
+    const map = makeFakeMap()
+    mountView()
+    shared.emit!('map-created', map)
+    ;(sideMenuProps!.toggleAprs as () => void)()
+    await nextTick()
+
+    expect(aprsSpies.handleClickPublic).not.toHaveBeenCalled()
+  })
+
+  it('brings the layer back when a receiver is chosen', async () => {
+    const map = makeFakeMap()
+    mountView()
+    shared.emit!('map-created', map)
+    aprsSpies.setVisible.mockClear()
+
+    useSdrStore().setAprsRadioId(3)
+    await nextTick()
+
+    expect(aprsSpies.setVisible).toHaveBeenCalledWith(true)
+    expect(sideMenuProps!.aprsSourceConfigured).toBe(true)
+  })
+
+  it('drops the layer again if the receiver is cleared', async () => {
+    useSdrStore().setAprsRadioId(3)
+    const map = makeFakeMap()
+    mountView()
+    shared.emit!('map-created', map)
+    aprsSpies.setVisible.mockClear()
+
+    useSdrStore().setAprsRadioId(null)
+    await nextTick()
+
+    expect(aprsSpies.setVisible).toHaveBeenCalledWith(false)
+  })
+
+  it('reads the decoding radio back from the database on mount', () => {
+    const spy = vi.spyOn(useSdrStore(), 'hydrateAprsFromDb').mockResolvedValue()
+    mountView()
+    expect(spy).toHaveBeenCalledOnce()
   })
 })

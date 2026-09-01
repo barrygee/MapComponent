@@ -63,6 +63,10 @@
       @commit="emit('commit')"
     />
     <AdsbSdrSourceControl v-else-if="item.type === 'adsb-sdr-source'" />
+    <AprsSdrSourceControl
+      v-else-if="item.type === 'aprs-sdr-source'"
+      @stage="emit('stage', item.id, $event)"
+    />
     <SpaceTleOnlineControl v-else-if="item.type === 'space-tle-online'" />
     <SpaceTleManualControl v-else-if="item.type === 'space-tle-manual'" />
     <SpaceTleDatabaseControl v-else-if="item.type === 'space-tle-db'" />
@@ -137,6 +141,7 @@ import SourceOverrideControl from './SourceOverrideControl.vue'
 import OnlineSourceControl from './OnlineSourceControl.vue'
 import OfflineSourceControl from './OfflineSourceControl.vue'
 import AdsbSdrSourceControl from './AdsbSdrSourceControl.vue'
+import AprsSdrSourceControl from './AprsSdrSourceControl.vue'
 import SpaceTleOnlineControl from './SpaceTleOnlineControl.vue'
 import SpaceTleManualControl from './SpaceTleManualControl.vue'
 import SpaceTleDatabaseControl from './SpaceTleDatabaseControl.vue'
