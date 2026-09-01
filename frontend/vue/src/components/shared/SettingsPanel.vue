@@ -456,7 +456,7 @@ const ALL_SETTINGS: SettingItem[] = [
     desc: 'URL for live air data feed',
     type: 'online-source',
     ns: 'air',
-    defaultUrl: 'https://api.airplanes.live/v2',
+    defaultUrl: 'https://api.adsb.lol/v2',
   },
   {
     section: 'air',

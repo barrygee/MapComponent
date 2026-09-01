@@ -23,7 +23,7 @@ const RETRY_INTERVAL_SECONDS = 30
  * change it — so entering AIR takes a lease on the device and tunes it, and
  * leaving gives it back. See Sentinel ADR-0003.
  *
- * **Only off grid.** Online air data comes from airplanes.live and involves no
+ * **Only off grid.** Online air data comes from adsb.lol and involves no
  * local dongle at all; claiming one then would take hardware away from whatever
  * legitimately wants it, to receive nothing.
  *

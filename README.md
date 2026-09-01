@@ -20,7 +20,7 @@ It is built **offline-first**: each domain has online and offline data sources w
 | **LAND** | 🚧 Stub | Routing/settings scaffolding only — no data integration yet |
 
 ### AIR
-ADS-B aircraft from the [airplanes.live](https://airplanes.live) API are proxied through the backend and cached in SQLite (10 s fresh TTL, 60 s stale window) to limit upstream load. Aircraft render as oriented icons; clicking one opens a detail panel and lets you track it. Map controls add airports (with frequencies), military bases, AWACS lobes, range rings, roads, an overhead-alert zone, and live labels.
+ADS-B aircraft from the [adsb.lol](https://adsb.lol) API are proxied through the backend and cached in SQLite (10 s fresh TTL, 60 s stale window) to limit upstream load. Aircraft render as oriented icons; clicking one opens a detail panel and lets you track it. Map controls add airports (with frequencies), military bases, AWACS lobes, range rings, roads, an overhead-alert zone, and live labels.
 
 Optional **Off Grid** mode decodes 1090 MHz from one of your own SDRs instead, via a separate readsb `adsb-decoder` container — Sentinel claims the dongle and tunes it while AIR is open. See [Off Grid ADS-B](#off-grid-ads-b-optional).
 
@@ -237,7 +237,7 @@ troubleshooting.
 
 ### Off Grid ADS-B (optional)
 
-By default the AIR map gets aircraft from **airplanes.live** over the internet.
+By default the AIR map gets aircraft from **adsb.lol** over the internet.
 **Off Grid** mode instead decodes 1090 MHz locally from one of your own SDRs, in
 its **own opt-in `adsb-decoder` container** built around **readsb**.
 
@@ -391,7 +391,7 @@ Backend settings live in `backend/config.py` (Pydantic Settings) and can be over
 | `DB_PATH` | `backend/sentinel.db` | SQLite database file path |
 | `ADSB_TTL_MS` | `10000` | ADS-B cache fresh window (ms) |
 | `ADSB_STALE_MS` | `60000` | ADS-B stale window — serve old data if upstream fails (ms) |
-| `ADSB_UPSTREAM_BASE` | `https://api.airplanes.live/v2` | ADS-B upstream base URL |
+| `ADSB_UPSTREAM_BASE` | `https://api.adsb.lol/v2` | ADS-B upstream base URL |
 | `TLE_TTL_MS` | `21600000` (6 h) | TLE cache fresh window |
 | `TLE_STALE_MS` | `43200000` (12 h) | TLE stale window |
 | `TLE_MANUAL_TTL_MS` | `2592000000` (30 d) | TTL for manually-uploaded TLE data |
