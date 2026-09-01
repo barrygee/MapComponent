@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
+import { getAdsbSource } from '@/services/adsbSourceApi'
 
 export interface SdrRadio {
   id: number
@@ -509,6 +510,42 @@ export const useSdrStore = defineStore('sdr', () => {
     }
   }
 
+  // ── Domain reservations (AIR's ADS-B receiver, LAND's APRS receiver) ──────
+  // A radio named as a domain's receiver is doing a job for that domain
+  // full-time: ADS-B holds and tunes it to 1090 MHz while AIR is open off grid,
+  // APRS keeps a decode bridge on it. Letting the SDR panel retune the same
+  // dongle would silently break the domain that depends on it, so a reserved
+  // radio is locked out of the panel (padlock, not selectable) until it is
+  // deselected in Settings. The APRS side is `aprsRadioId` above; the ADS-B
+  // side is a Sentry host+device pair, which is matched to a radio by its
+  // mirror fields (ADR-0009).
+  const adsbSourceKey = ref<string | null>(null)
+
+  /** Read which Sentry device AIR uses as its ADS-B receiver, if any. */
+  async function hydrateAdsbSourceFromDb(): Promise<void> {
+    const source = await getAdsbSource()
+    adsbSourceKey.value =
+      source?.configured && source.sentry_host_id !== null && source.sentry_device_id
+        ? `${source.sentry_host_id}:${source.sentry_device_id}`
+        : null
+  }
+
+  /**
+   * Which domain has reserved a radio, or null when it is free to use.
+   *
+   * Returns the domain's operator-facing name so callers can say *why* a radio
+   * is locked — "reserved" with no reason sends people hunting through settings.
+   */
+  function radioReservation(radioId: number): 'APRS' | 'ADS-B' | null {
+    if (aprsRadioId.value === radioId) return 'APRS'
+    if (adsbSourceKey.value === null) return null
+    const radio = radios.value.find((candidate) => candidate.id === radioId)
+    if (!radio || radio.sentry_host_id == null || !radio.sentry_device_id) return null
+    return `${radio.sentry_host_id}:${radio.sentry_device_id}` === adsbSourceKey.value
+      ? 'ADS-B'
+      : null
+  }
+
   // ── Decode audio muting ───────────────────────────────────────────────────
   // Settings → SDR → DECODING → "Mute Audio While Decoding". When ON (the
   // default, and the behaviour before this setting existed) the analog audio of
@@ -990,6 +1027,9 @@ export const useSdrStore = defineStore('sdr', () => {
     aprsRadioId,
     setAprsRadioId,
     hydrateAprsFromDb,
+    adsbSourceKey,
+    hydrateAdsbSourceFromDb,
+    radioReservation,
     muteAudioWhileDecoding,
     setMuteAudioWhileDecoding,
     hydrateMuteAudioWhileDecodingFromDb,

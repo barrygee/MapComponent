@@ -288,3 +288,69 @@ describe('SdrDeviceSelector — accessibility', () => {
     ).toHaveNoViolations()
   })
 })
+
+// A radio named as a domain receiver in Settings (AIR's ADS-B source, LAND's
+// APRS decoder) is doing a job that retuning it from here would silently break,
+// so it is listed for context but cannot be picked.
+describe('SdrDeviceSelector — radios reserved by a domain', () => {
+  function mountWithReservedAprsRadio() {
+    const store = useSdrStore()
+    store.setAprsRadioId(2)
+    return mountSelector({
+      radios: [makeRadio(), makeRadio({ id: 2, name: 'Attic', host: '10.0.0.6' })],
+    })
+  }
+
+  it('says which domain reserved the radio, in place of its host', async () => {
+    const wrapper = mountWithReservedAprsRadio()
+    await wrapper.find('.sdr-device-dropdown').trigger('click')
+    const reservedRow = menuItems()[2]!
+
+    expect(reservedRow.textContent).toContain('RESERVED · APRS RECEIVER')
+    expect(reservedRow.textContent).not.toContain('10.0.0.6')
+  })
+
+  it('padlocks the reserved row and marks it unavailable to assistive tech', async () => {
+    const wrapper = mountWithReservedAprsRadio()
+    await wrapper.find('.sdr-device-dropdown').trigger('click')
+    const items = menuItems()
+
+    expect(items[2]!.classList).toContain('sdr-device-menu-item--reserved')
+    expect(items[2]!.getAttribute('aria-disabled')).toBe('true')
+    expect(items[2]!.querySelector('.sdr-device-menu-item-lock')).not.toBeNull()
+    // The free radio beside it is untouched.
+    expect(items[1]!.getAttribute('aria-disabled')).toBe('false')
+    expect(items[1]!.querySelector('.sdr-device-menu-item-lock')).toBeNull()
+  })
+
+  it('ignores a click on a reserved row, leaving the menu open to pick another', async () => {
+    const wrapper = mountWithReservedAprsRadio()
+    await wrapper.find('.sdr-device-dropdown').trigger('click')
+    menuItems()[2]!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('select')).toBeUndefined()
+    expect(wrapper.find('.sdr-device-dropdown').attributes('aria-expanded')).toBe('true')
+  })
+
+  it('ignores the keyboard selecting a reserved row', async () => {
+    const wrapper = mountWithReservedAprsRadio()
+    const dropdown = wrapper.find('.sdr-device-dropdown')
+    await dropdown.trigger('click')
+    // 0 = placeholder, 1 = free radio, 2 = the reserved one.
+    await dropdown.trigger('keydown', { key: 'ArrowDown' })
+    await dropdown.trigger('keydown', { key: 'ArrowDown' })
+    await dropdown.trigger('keydown', { key: 'Enter' })
+
+    expect(wrapper.emitted('select')).toBeUndefined()
+  })
+
+  it('still lets a free radio be picked while another is reserved', async () => {
+    const wrapper = mountWithReservedAprsRadio()
+    await wrapper.find('.sdr-device-dropdown').trigger('click')
+    menuItems()[1]!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('select')![0]![0]).toMatchObject({ id: 1 })
+  })
+})

@@ -344,6 +344,20 @@ defineExpose({
   color: rgba(255, 255, 255, 0.55);
 }
 
+/* Reserved row: the radio is a domain receiver (AIR's ADS-B source, LAND's APRS
+   decoder), so it is listed for context but cannot be picked here. Dimmed with
+   a default cursor so it does not read as clickable; the keyboard highlight is
+   deliberately left intact so arrowing past it still shows where you are. */
+.sdr-device-menu-item--reserved {
+  cursor: default;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.sdr-device-menu-item--reserved .sdr-device-menu-item-host,
+.sdr-device-menu-item--reserved:hover .sdr-device-menu-item-host {
+  color: #c8ff00;
+}
+
 /* Highlight the currently chosen sample rate in the menu. */
 .sdr-device-menu-item--selected {
   color: #c8ff00;
