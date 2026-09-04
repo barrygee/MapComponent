@@ -1,7 +1,7 @@
 import maplibregl from 'maplibre-gl'
 import type { AirStore, AirNotifStore, NotificationsStore, TrackingStore } from '../types'
 import { createNotifEnabledAdapter, type NotifEnabledAdapter } from '@/stores/airNotif'
-import { parseAlt, isMilitary } from './adsbParse'
+import { parseAlt, isMilitary, type AdsbApiEntry } from './adsbParse'
 import { ADSB_POLL_INTERVAL_MS, ADSB_REFETCH_GUARD_MS } from '@/constants/adsb'
 import type { TrackingField } from '@/stores/tracking'
 import {
@@ -57,29 +57,9 @@ interface AircraftProperties {
   stale: 0 | 1
 }
 
-interface AircraftApiEntry {
-  hex?: string
-  flight?: string
-  r?: string
-  t?: string
-  lat?: number
-  lon?: number
-  alt_baro?: number | string
-  alt_geom?: number
-  gs?: number
-  ias?: number
-  mach?: number
-  track?: number
-  baro_rate?: number
-  nav_altitude_mcp?: number
-  nav_altitude_fms?: number
-  nav_heading?: number
-  category?: string
-  emergency?: string
-  squawk?: string
-  rssi?: number
-  military?: boolean
-}
+// The raw feed entry shape lives with the shared parser: a second copy here is
+// how the phantom `military` field outlived the feed that never sent it.
+type AircraftApiEntry = AdsbApiEntry
 
 interface AircraftGeoFeature {
   type: 'Feature'
@@ -2200,7 +2180,7 @@ export class AdsbLiveControl implements maplibregl.IControl {
         }
 
         const gs = a.gs ?? 0
-        const military = isMilitary(hex, a.military, a.t)
+        const military = isMilitary(hex, a.dbFlags)
 
         const coords = [a.lon!, a.lat!] as [number, number]
 
