@@ -319,6 +319,38 @@ export const useSdrStore = defineStore('sdr', () => {
     }
   }
 
+  // Waterfall time markers — clock labels down the left edge of the raster,
+  // the equivalent of SDR#'s "Use Time Markers" waterfall option. Same
+  // persistence pattern as the other overlay toggles. Default OFF: the labels
+  // sit over the raster, so they are opt-in rather than always-on chrome.
+  function _readShowWaterfallTimestamps(): boolean {
+    try {
+      return localStorage.getItem('sdrShowWaterfallTimestamps') === '1'
+    } catch {
+      return false
+    }
+  }
+  const showWaterfallTimestamps = ref<boolean>(_readShowWaterfallTimestamps())
+  function setShowWaterfallTimestamps(on: boolean) {
+    showWaterfallTimestamps.value = on
+    try {
+      localStorage.setItem('sdrShowWaterfallTimestamps', on ? '1' : '0')
+    } catch {}
+  }
+  async function hydrateShowWaterfallTimestampsFromDb(): Promise<void> {
+    try {
+      const res = await fetch('/api/settings/sdr')
+      if (!res.ok) return
+      const data = await res.json()
+      const v = data?.showWaterfallTimestamps
+      if (typeof v === 'boolean' && v !== showWaterfallTimestamps.value) {
+        setShowWaterfallTimestamps(v)
+      }
+    } catch {
+      /* offline / transient */
+    }
+  }
+
   // Resume delay (seconds) for scan + search auto-resume. When the radio locks
   // on a signal during scan/search, it waits until the signal drops below its
   // threshold AND this many seconds have elapsed before continuing. 0 → resume
@@ -1009,6 +1041,9 @@ export const useSdrStore = defineStore('sdr', () => {
     showKnownFreqs,
     setShowKnownFreqs,
     hydrateShowKnownFreqsFromDb,
+    showWaterfallTimestamps,
+    setShowWaterfallTimestamps,
+    hydrateShowWaterfallTimestampsFromDb,
     resumeDelaySec,
     setResumeDelaySec,
     hydrateResumeDelaySecFromDb,

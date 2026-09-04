@@ -254,6 +254,118 @@ describe('sdr store', () => {
   })
 
   // ── view settings ──────────────────────────────────────────────────────────
+  describe('waterfall timestamps', () => {
+    it('is off unless it was switched on before', () => {
+      expect(useSdrStore().showWaterfallTimestamps).toBe(false)
+    })
+
+    it('remembers the choice locally, so a reload keeps the labels', () => {
+      useSdrStore().setShowWaterfallTimestamps(true)
+      expect(localStorage.getItem('sdrShowWaterfallTimestamps')).toBe('1')
+
+      setActivePinia(createPinia())
+      expect(useSdrStore().showWaterfallTimestamps).toBe(true)
+    })
+
+    it('records the choice when it is switched back off', () => {
+      const store = useSdrStore()
+      store.setShowWaterfallTimestamps(true)
+
+      store.setShowWaterfallTimestamps(false)
+
+      // '0', not a cleared key: an absent key is indistinguishable from never
+      // having chosen, and would let a stale db value win on the next load.
+      expect(localStorage.getItem('sdrShowWaterfallTimestamps')).toBe('0')
+      expect(store.showWaterfallTimestamps).toBe(false)
+    })
+
+    it('still applies the choice when localStorage refuses the write', () => {
+      const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+        throw new Error('private mode')
+      })
+      const store = useSdrStore()
+
+      store.setShowWaterfallTimestamps(true)
+
+      // A private-mode browser still gets the labels for this session.
+      expect(store.showWaterfallTimestamps).toBe(true)
+      setItem.mockRestore()
+    })
+
+    it('falls back to off when localStorage cannot be read at all', () => {
+      const getItem = vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
+        throw new Error('private mode')
+      })
+      setActivePinia(createPinia())
+
+      expect(useSdrStore().showWaterfallTimestamps).toBe(false)
+      getItem.mockRestore()
+    })
+
+    describe('hydrating from the config database', () => {
+      it('adopts a stored choice that differs from the local one', async () => {
+        stubFetch({ showWaterfallTimestamps: true })
+        const store = useSdrStore()
+
+        await store.hydrateShowWaterfallTimestampsFromDb()
+
+        expect(store.showWaterfallTimestamps).toBe(true)
+        expect(localStorage.getItem('sdrShowWaterfallTimestamps')).toBe('1')
+      })
+
+      it('leaves the choice alone when the database already agrees', async () => {
+        stubFetch({ showWaterfallTimestamps: false })
+        const store = useSdrStore()
+        const setItem = vi.spyOn(window.localStorage, 'setItem')
+
+        await store.hydrateShowWaterfallTimestampsFromDb()
+
+        // Nothing changed, so nothing is rewritten.
+        expect(store.showWaterfallTimestamps).toBe(false)
+        expect(setItem).not.toHaveBeenCalled()
+      })
+
+      it('ignores a value that is not a boolean', async () => {
+        stubFetch({ showWaterfallTimestamps: 'yes' })
+        const store = useSdrStore()
+
+        await store.hydrateShowWaterfallTimestampsFromDb()
+
+        expect(store.showWaterfallTimestamps).toBe(false)
+      })
+
+      it('ignores a response with no such key', async () => {
+        stubFetch({})
+        const store = useSdrStore()
+        store.setShowWaterfallTimestamps(true)
+
+        await store.hydrateShowWaterfallTimestampsFromDb()
+
+        // No key is not "cleared" — the local choice stands.
+        expect(store.showWaterfallTimestamps).toBe(true)
+      })
+
+      it('keeps the local choice when the request is rejected', async () => {
+        stubFetch({ showWaterfallTimestamps: true }, false)
+        const store = useSdrStore()
+
+        await store.hydrateShowWaterfallTimestampsFromDb()
+
+        expect(store.showWaterfallTimestamps).toBe(false)
+      })
+
+      it('keeps the local choice when the backend is unreachable', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+        const store = useSdrStore()
+        store.setShowWaterfallTimestamps(true)
+
+        await store.hydrateShowWaterfallTimestampsFromDb()
+
+        expect(store.showWaterfallTimestamps).toBe(true)
+      })
+    })
+  })
+
   describe('view settings', () => {
     it('reads numeric view settings, falling back on bad values', () => {
       localStorage.setItem('sdrViewZoom', '4')

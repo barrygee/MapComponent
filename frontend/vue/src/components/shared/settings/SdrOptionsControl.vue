@@ -18,8 +18,9 @@
 /**
  * Settings control for the SDR panel's on/off options, gathered into one box.
  *
- * Replaces five separate toggle rows (auto-center, snap to known frequencies,
- * band plan, known-frequency labels, decode mute) with a single list built on
+ * Replaces the separate toggle rows (auto-center, snap to known frequencies,
+ * band plan, known-frequency labels, waterfall timestamps, decode mute) with a
+ * single list built on
  * the domains' "Label Data Points" table — name plus the Settings panel's
  * standard toggle switch, with no column headings and no per-option prose.
  *
@@ -77,6 +78,12 @@ const OPTIONS: SdrOption[] = [
     mirrorToStore: sdrStore.setShowKnownFreqs,
   },
   {
+    settingKey: 'showWaterfallTimestamps',
+    label: 'Show Waterfall Timestamps',
+    readFromStore: () => sdrStore.showWaterfallTimestamps,
+    mirrorToStore: sdrStore.setShowWaterfallTimestamps,
+  },
+  {
     settingKey: 'muteAudioWhileDecoding',
     label: 'Mute Audio While Decoding',
     readFromStore: () => sdrStore.muteAudioWhileDecoding,
@@ -106,8 +113,8 @@ const OPTION_ROWS: LabelFieldRow[] = [
 
 /**
  * Adopts the backend's stored values for every option on open, so the box
- * reflects what other devices set. One namespace fetch covers all five rather
- * than the five separate round trips the individual toggles each made.
+ * reflects what other devices set. One namespace fetch covers them all rather
+ * than the separate round trips the individual toggles each made.
  */
 async function hydrateOptionsFromDb(): Promise<void> {
   const persisted = await settingsApi.getNamespace('sdr')

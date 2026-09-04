@@ -19,7 +19,8 @@ const ROW = {
   snapToKnown: 1,
   showBandPlan: 2,
   showKnownFreqs: 3,
-  muteWhileDecoding: 4,
+  showWaterfallTimestamps: 4,
+  muteWhileDecoding: 5,
 } as const
 
 function switches(wrapper: ReturnType<typeof mount>) {
@@ -48,10 +49,10 @@ describe('SdrOptionsControl', () => {
     vi.mocked(settingsApi.put).mockResolvedValue(undefined)
   })
 
-  it('renders one toggle switch for each of the five SDR options', async () => {
+  it('renders one toggle switch for each of the six SDR options', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    expect(switches(wrapper)).toHaveLength(5)
+    expect(switches(wrapper)).toHaveLength(6)
   })
 
   it('names each switch after its option, with no per-option description', async () => {
@@ -63,6 +64,7 @@ describe('SdrOptionsControl', () => {
       'Snap to Known Frequencies',
       'Show Band Plan',
       'Display Known Frequencies',
+      'Show Waterfall Timestamps',
       'Mute Audio While Decoding',
     ])
     // The old per-toggle prose is gone — only the option names are on screen.
@@ -81,11 +83,14 @@ describe('SdrOptionsControl', () => {
   it('drives each option with the Settings panel’s toggle switch', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
-    expect(wrapper.findAll('.toggle-track')).toHaveLength(5)
+    expect(wrapper.findAll('.toggle-track')).toHaveLength(6)
     // Every option is independently on or off — no tick boxes, no radio group.
     expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(0)
     expect(wrapper.findAll('input[type="radio"]')).toHaveLength(0)
+    // Waterfall timestamps are the one option that defaults OFF — the labels
+    // sit over the raster, so they are opt-in chrome.
     expect(wrapper.findAll('.toggle-track.is-on')).toHaveLength(5)
+    expect(wrapper.findAll('.toggle-track.is-on')).not.toHaveLength(6)
   })
 
   it('carries the class its type overrides hang off, matching the device rows', async () => {
@@ -102,7 +107,7 @@ describe('SdrOptionsControl', () => {
     expect(wrapper.find('.lft-wrap').attributes('style')).toContain('--lft-accent: #c8ff00')
   })
 
-  it('shows every option on by default', async () => {
+  it('shows every option except waterfall timestamps on by default', async () => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
     expect(switches(wrapper).map((_box, index) => isOn(wrapper, index))).toEqual([
@@ -110,6 +115,7 @@ describe('SdrOptionsControl', () => {
       true,
       true,
       true,
+      false,
       true,
     ])
   })
@@ -155,17 +161,20 @@ describe('SdrOptionsControl', () => {
   })
 
   it.each([
-    [ROW.autoCenter, 'autoCenterWaterfallOnTune'],
-    [ROW.snapToKnown, 'snapToKnown'],
-    [ROW.showBandPlan, 'showBandPlan'],
-    [ROW.showKnownFreqs, 'showKnownFreqs'],
-    [ROW.muteWhileDecoding, 'muteAudioWhileDecoding'],
-  ])('persists row %i as the %s setting', async (row, settingKey) => {
+    // Each row is toggled away from its default, so the persisted value is the
+    // negation of that default (only waterfall timestamps start off).
+    [ROW.autoCenter, 'autoCenterWaterfallOnTune', false],
+    [ROW.snapToKnown, 'snapToKnown', false],
+    [ROW.showBandPlan, 'showBandPlan', false],
+    [ROW.showKnownFreqs, 'showKnownFreqs', false],
+    [ROW.showWaterfallTimestamps, 'showWaterfallTimestamps', true],
+    [ROW.muteWhileDecoding, 'muteAudioWhileDecoding', false],
+  ])('persists row %i as the %s setting', async (row, settingKey, persisted) => {
     const wrapper = mount(SdrOptionsControl)
     await flushPromises()
     await switches(wrapper)[row]!.trigger('click')
     await runStagedWrite(wrapper)
-    expect(settingsApi.put).toHaveBeenCalledWith('sdr', settingKey, false)
+    expect(settingsApi.put).toHaveBeenCalledWith('sdr', settingKey, persisted)
   })
 
   it('leaves the other options untouched when one is toggled', async () => {
@@ -179,6 +188,7 @@ describe('SdrOptionsControl', () => {
     expect(sdr.snapToKnown).toBe(true)
     expect(sdr.showBandPlan).toBe(true)
     expect(sdr.showKnownFreqs).toBe(true)
+    expect(sdr.showWaterfallTimestamps).toBe(false)
   })
 
   it('stages one write per option when several are toggled', async () => {
@@ -276,10 +286,10 @@ describe('SdrOptionsControl', () => {
       vi.unstubAllGlobals()
     })
 
-    it('renders the delay as a number field, not a sixth toggle', async () => {
+    it('renders the delay as a number field, not a seventh toggle', async () => {
       const wrapper = mount(SdrOptionsControl)
       await flushPromises()
-      expect(switches(wrapper)).toHaveLength(5)
+      expect(switches(wrapper)).toHaveLength(6)
       expect(delayInput(wrapper).element.value).toBe('5')
     })
 
