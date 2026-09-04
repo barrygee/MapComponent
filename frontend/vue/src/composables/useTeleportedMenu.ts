@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import { useDocumentEvent } from '@/composables/useDocumentEvent'
 import { useWindowEvent } from '@/composables/useWindowEvent'
 
@@ -36,7 +36,21 @@ export const MENU_OPEN_SETTLE_MS = 250
  * - `toggleMenu(triggerElement)` — close when open, otherwise openMenu.
  * - `closeMenu()` — dismiss.
  */
-export function useTeleportedMenu() {
+export interface TeleportedMenuOptions {
+  /**
+   * The teleported menu element, when the caller renders one.
+   *
+   * The outside-click dismiss consults it rather than relying on the menu's own
+   * `@click.stop`: that handler is attached during the patch that mounts the
+   * menu, and a click landing before it is bound reaches the document handler
+   * and dismisses a menu the user was clicking *into*. Asking "did this click
+   * come from inside the menu?" cannot race, because it reads the DOM at the
+   * moment of the event.
+   */
+  menuElement?: Ref<HTMLElement | null>
+}
+
+export function useTeleportedMenu(options: TeleportedMenuOptions = {}) {
   const menuOpen = ref(false)
   const menuStyle = ref<Record<string, string>>({})
 
@@ -77,7 +91,15 @@ export function useTeleportedMenu() {
     closeMenu()
   }
 
-  useDocumentEvent('click', closeMenu)
+  /** Dismiss on any click that did not come from inside the menu itself. */
+  function closeOnOutsideClick(event: MouseEvent): void {
+    const menuEl = options.menuElement?.value
+    const target = event.target
+    if (menuEl && target instanceof Node && menuEl.contains(target)) return
+    closeMenu()
+  }
+
+  useDocumentEvent('click', closeOnOutsideClick)
   // Capture phase so scrolls from the inner side-panel container (a
   // descendant, and scroll doesn't bubble) still reach this handler and
   // dismiss the menu.
