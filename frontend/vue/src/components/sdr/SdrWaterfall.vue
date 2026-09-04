@@ -304,6 +304,7 @@ useDocumentEvent('sentinel:sidebar-state', (e: Event) => {
 useDocumentEvent('sentinel:config-uploaded', () => {
   void store.hydrateShowBandPlanFromDb()
   void store.hydrateShowKnownFreqsFromDb()
+  void store.hydrateShowWaterfallTimestampsFromDb()
 })
 
 // ── Min / Max (SDR++ semantics) ──────────────────────────────────────────────
@@ -1317,6 +1318,7 @@ function syncBandInset() {
   // below it). Distance from the canvas/element bottom = height − b.
   bandInsetBottomPx.value = Math.max(0, Math.ceil(mx.height - mx.b))
   bandInsetTopPx.value = Math.max(0, Math.ceil(mx.t) - 1)
+  syncWaterfallDataBox()
   // Band overlay grows up from the data-box bottom to the -100 dB gridline.
   // mx.t..mx.b span the y-axis range SPEC_YMAX_DB..SPEC_YMIN_DB.
   const dataBoxHeightPx = mx.b - mx.t
@@ -1329,6 +1331,21 @@ function syncBandInset() {
       Math.round((dbFromBottom / yRangeDb) * dataBoxHeightPx * 0.1875) + 4,
     )
   }
+}
+
+// Same read as syncBandInset, against the WATERFALL plot: its data box top and
+// height are what the time markers hang off. Kept separate because the two
+// plots only share their horizontal margins — vertically the raster fills its
+// own element.
+function syncWaterfallDataBox() {
+  const mx = (
+    wfPlot as unknown as {
+      _Mx?: { t: number; b: number; height: number }
+    } | null
+  )?._Mx
+  if (!mx || !(mx.b > mx.t)) return
+  wfDataTopPx.value = Math.max(0, Math.round(mx.t))
+  wfDataHeightPx.value = Math.round(mx.b - mx.t)
 }
 
 // Type for poking the plugin's internal drag flags (no public accessor).
@@ -1799,6 +1816,120 @@ const BG = '#0a0d14'
 // crawl; ~400 (~15-30s) gives a responsive scroll closer to the reference.
 const WF_ROWS = 400
 
+// ── Waterfall time markers ───────────────────────────────────────────────────
+// Clock labels down the left edge of the raster, so a signal seen scrolling
+// away can be read off as a wall-clock time. This is SDR#'s "Use Time Markers"
+// waterfall option (date/time down the left side, every 10 s by default);
+// SDR++ has no equivalent — it has only ever been an open feature request
+// (SDRPlusPlus discussion #1047) — so SDR# is the reference behaviour here.
+//
+// Difference from SDR#: the interval adapts instead of being fixed at 10 s.
+// Our raster holds ~16 s (WF_ROWS at WF_ROW_HZ), so a fixed 10 s would leave
+// one lonely label; the step is chosen as the smallest that keeps labels at
+// least WF_TIME_LABEL_MIN_GAP_PX apart.
+const WF_TIME_STEPS_SEC = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600]
+const WF_TIME_LABEL_MIN_GAP_PX = 34
+// Hard ceiling on rendered labels — a defensive bound so a pathological
+// row-time series can never spray hundreds of nodes into the overlay.
+const WF_TIME_MARKER_LIMIT = 40
+
+// Wall-clock push time of each raster row, NEWEST FIRST: index N is the row N
+// rows below the top of the raster (drawmode 'falling' puts new rows at the
+// top). Capped at WF_ROWS so it mirrors exactly what the raster holds.
+// Deliberately non-reactive — it is written up to WF_ROW_HZ times a second and
+// re-rendering on the array itself would make every push a deep-reactivity
+// walk; `rowClockTick` is the single reactive signal that the rows moved.
+const rowPushTimesMs: number[] = []
+const rowClockTick = ref(0)
+
+/** Records the wall-clock time of a raster row just pushed to the waterfall. */
+function recordRowPushTime(atMs: number): void {
+  rowPushTimesMs.unshift(atMs)
+  if (rowPushTimesMs.length > WF_ROWS) rowPushTimesMs.length = WF_ROWS
+  rowClockTick.value++
+}
+
+/** Drops the recorded row times — pairs with clearing the raster's history. */
+function clearRowPushTimes(): void {
+  rowPushTimesMs.length = 0
+  rowClockTick.value++
+}
+
+// The waterfall plot's own data box (top edge and height in element pixels).
+// The raster reserves the same left/right gutters as the spectrum
+// (bandInsetLeftPx/RightPx — both plots share the axis spec) but its own
+// vertical extent, so the markers need these to sit on the right rows.
+const wfDataTopPx = ref(0)
+const wfDataHeightPx = ref(0)
+
+/** A single clock label pinned to the raster row that crossed a time step. */
+interface WaterfallTimeMarker {
+  key: number
+  topPx: number
+  label: string
+}
+
+/** 24-hour HH:MM:SS, matching the radio's other clock readouts. */
+function formatRowClock(atMs: number): string {
+  return new Date(atMs).toLocaleTimeString('en-GB', { hour12: false })
+}
+
+// Overlay rectangle: the raster's data box. Anchored to the waterfall plot's
+// own top/height rather than the element's, so the labels never drift onto the
+// canvas's reserved (invisible) axis gutters.
+const timeMarkerOverlayStyle = computed(() => ({
+  left: `${bandInsetLeftPx.value}px`,
+  right: `${bandInsetRightPx.value}px`,
+  top: `${wfDataTopPx.value}px`,
+  height: `${wfDataHeightPx.value}px`,
+}))
+
+const waterfallTimeMarkers = computed<WaterfallTimeMarker[]>(() => {
+  // Read the tick so the markers re-derive as rows scroll down.
+  void rowClockTick.value
+  if (!store.showWaterfallTimestamps) return []
+  const rowCount = rowPushTimesMs.length
+  const boxHeightPx = wfDataHeightPx.value
+  // Two rows is the minimum that defines a row interval; below that (or before
+  // the plot has been laid out) there is nothing meaningful to place.
+  if (rowCount < 2 || boxHeightPx <= 0) return []
+
+  const newestMs = rowPushTimesMs[0] as number
+  const oldestMs = rowPushTimesMs[rowCount - 1] as number
+  const spanSec = (newestMs - oldestMs) / 1000
+  if (spanSec <= 0) return []
+
+  // Rows are evenly spaced down the box (the raster is WF_ROWS deep whether or
+  // not it is full yet), so pixels-per-second comes from the measured row
+  // interval rather than the nominal WF_ROW_HZ — a slow feed stretches time.
+  const pxPerRow = boxHeightPx / WF_ROWS
+  const secPerRow = spanSec / (rowCount - 1)
+  const pxPerSec = pxPerRow / secPerRow
+  const stepSec =
+    WF_TIME_STEPS_SEC.find((candidate) => candidate * pxPerSec >= WF_TIME_LABEL_MIN_GAP_PX) ??
+    (WF_TIME_STEPS_SEC[WF_TIME_STEPS_SEC.length - 1] as number)
+  const stepMs = stepSec * 1000
+
+  // Walk newest → oldest and mark the first row of each step bucket: the row
+  // that sits just after the clock crossed a whole 5 s / 10 s / … boundary, so
+  // labels land on round times exactly as SDR#'s markers do.
+  const markers: WaterfallTimeMarker[] = []
+  let previousBucket = Math.floor(newestMs / stepMs)
+  for (let rowIndex = 1; rowIndex < rowCount; rowIndex++) {
+    const rowTimeMs = rowPushTimesMs[rowIndex] as number
+    const bucket = Math.floor(rowTimeMs / stepMs)
+    if (bucket === previousBucket) continue
+    previousBucket = bucket
+    markers.push({
+      key: bucket,
+      topPx: Math.round(rowIndex * pxPerRow),
+      label: formatRowClock(rowTimeMs),
+    })
+    if (markers.length >= WF_TIME_MARKER_LIMIT) break
+  }
+  return markers
+})
+
 // Frequency scaling for the current frame. xstart = left-edge Hz, xdelta =
 // Hz per FFT bin. Passing these (with xunits:3 = Hz) makes SigPlot's own
 // x-axis render real tuned frequencies instead of a 0..N bin index.
@@ -2215,6 +2346,7 @@ onMounted(() => {
   // the source of truth across machines).
   void store.hydrateShowBandPlanFromDb()
   void store.hydrateShowKnownFreqsFromDb()
+  void store.hydrateShowWaterfallTimestampsFromDb()
   // Defer until the fixed/flex container has resolved its real pixel size.
   // layer2d derives the waterfall geometry once at init from the plot height,
   // so creating the plots before layout settles breaks the raster.
@@ -2328,6 +2460,7 @@ watch(
     if (now - lastRowMs >= WF_ROW_MIN_MS) {
       lastRowMs = now
       wfPlot.push(wfUuid, frame.bins)
+      recordRowPushTime(Date.now())
       // sigplot's Layer2D push only writes the layer's advancing time-window
       // (this.ymin/this.ymax) back into Mx.stk when Mx.level === 0
       // (sigplot.layer2d.js:409-414). When the user has zoomed, Mx.level > 0
@@ -2379,6 +2512,7 @@ watch(
       /* noop */
     }
     // Rebuild the waterfall pipe to clear its scroll history.
+    clearRowPushTimes()
     try {
       wfPlot.remove_layer(wfUuid)
       wfUuid = wfPlot.overlay_pipe(
@@ -2767,6 +2901,21 @@ onBeforeUnmount(() => {
       @touchstart.capture="onPlotTouchStart"
       @wheel.capture="onPlotWheel"
       @contextmenu.prevent
-    ></div>
+    >
+      <div
+        v-if="waterfallTimeMarkers.length > 0"
+        class="sdr-wf-time-overlay"
+        :style="timeMarkerOverlayStyle"
+      >
+        <div
+          v-for="marker in waterfallTimeMarkers"
+          :key="marker.key"
+          class="sdr-wf-time-marker"
+          :style="{ top: marker.topPx + 'px' }"
+        >
+          <span class="sdr-wf-time-label">{{ marker.label }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
