@@ -1,13 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import type { Map as MapLibreGlMap } from 'maplibre-gl'
 import { LandRangeRingsControl } from './LandRangeRingsControl'
+import type { ResolvedRingOrigin } from '@/composables/useRangeRingOrigin'
 
 const LAYER = 'land-range-rings'
+const LS_KEY = 'sentinel_land_rangeRings'
 
 function makeFakeMap(styleLoaded = true) {
   const state = {
     layers: new Set<string>(),
     sources: new Map<string, { data?: unknown; setData: ReturnType<typeof vi.fn> }>(),
     visibility: {} as Record<string, string>,
+    textField: {} as Record<string, unknown>,
     styleLoadCb: null as null | (() => void),
   }
   const map = {
@@ -24,140 +28,161 @@ function makeFakeMap(styleLoaded = true) {
         data: source.data,
         setData: vi.fn((data) => (state.sources.get(id)!.data = data)),
       }),
-    addLayer: (layer: { id: string; layout?: { visibility?: string } }) => {
+    addLayer: (layer: { id: string; layout?: Record<string, unknown> }) => {
       state.layers.add(layer.id)
-      state.visibility[layer.id] = layer.layout?.visibility ?? 'visible'
+      state.visibility[layer.id] = (layer.layout?.visibility as string) ?? 'visible'
     },
-    setLayoutProperty: (id: string, prop: string, value: string) => {
-      if (prop === 'visibility') state.visibility[id] = value
+    setLayoutProperty: (id: string, prop: string, value: unknown) => {
+      if (prop === 'visibility') state.visibility[id] = value as string
+      if (prop === 'text-field') state.textField[id] = value
     },
     _state: state,
   }
   return map
 }
 
+function origin(overrides: Partial<ResolvedRingOrigin> = {}): ResolvedRingOrigin {
+  return {
+    longitude: -2,
+    latitude: 54,
+    label: 'MY LOCATION',
+    kind: 'user',
+    degraded: false,
+    ...overrides,
+  }
+}
+
+/** The Land control's own map type is narrower than the fake; cast at the seam. */
+const asMap = (map: ReturnType<typeof makeFakeMap>) => map as unknown as MapLibreGlMap
+
 describe('LandRangeRingsControl', () => {
   beforeEach(() => localStorage.clear())
   afterEach(() => localStorage.clear())
 
-  it('starts hidden by default and builds the ring layer on init', () => {
-    const map = makeFakeMap()
-    const control = new LandRangeRingsControl(() => [-2, 54])
-    control.onAdd(map as never)
-    expect(map._state.layers.has(LAYER)).toBe(true)
-    expect(map._state.visibility[LAYER]).toBe('none') // toggle off by default
-  })
-
-  it('restores an ON toggle from localStorage and shows rings when a location exists', () => {
-    localStorage.setItem('sentinel_land_rangeRings', '1')
-    const map = makeFakeMap()
-    const control = new LandRangeRingsControl(() => [-2, 54])
-    control.onAdd(map as never)
-    expect(map._state.visibility[LAYER]).toBe('visible')
-  })
-
-  it('falls back to hidden when localStorage read throws', () => {
-    // Store '1' so a *successful* read would show rings — proving the catch ran
-    // when the result is instead hidden.
-    localStorage.setItem('sentinel_land_rangeRings', '1')
-    const spy = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
-      throw new Error('blocked')
+  describe('its own layer id', () => {
+    it('builds under the land-specific id, not the Air map’s', () => {
+      const map = makeFakeMap()
+      new LandRangeRingsControl(origin()).onAdd(asMap(map))
+      expect([...map._state.layers]).toEqual([
+        LAYER,
+        `${LAYER}-origin`,
+        `${LAYER}-origin-dot`,
+        `${LAYER}-label`,
+      ])
     })
-    const map = makeFakeMap()
-    const control = new LandRangeRingsControl(() => [-2, 54])
-    control.onAdd(map as never)
-    expect(map._state.visibility[LAYER]).toBe('none') // read threw → default hidden
-    spy.mockRestore()
   })
 
-  it('exposes the current toggle state via `visible`', () => {
-    const map = makeFakeMap()
-    const control = new LandRangeRingsControl(() => [-2, 54])
-    control.onAdd(map as never)
-    expect(control.visible).toBe(false)
-    control.handleClickPublic()
-    expect(control.visible).toBe(true)
-  })
-
-  it('toggles rings on click and persists the choice', () => {
-    const map = makeFakeMap()
-    const control = new LandRangeRingsControl(() => [-2, 54])
-    control.onAdd(map as never)
-    control.handleClickPublic()
-    expect(map._state.visibility[LAYER]).toBe('visible')
-    expect(localStorage.getItem('sentinel_land_rangeRings')).toBe('1')
-    control.handleClickPublic()
-    expect(map._state.visibility[LAYER]).toBe('none')
-    expect(localStorage.getItem('sentinel_land_rangeRings')).toBe('0')
-  })
-
-  it('swallows a localStorage write failure on toggle', () => {
-    const map = makeFakeMap()
-    const control = new LandRangeRingsControl(() => [-2, 54])
-    control.onAdd(map as never)
-    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('full')
+  describe('persisting the toggle', () => {
+    it('starts hidden with nothing stored', () => {
+      const control = new LandRangeRingsControl(origin())
+      expect(control.visible).toBe(false)
+      const map = makeFakeMap()
+      control.onAdd(asMap(map))
+      expect(map._state.visibility[LAYER]).toBe('none')
     })
-    expect(() => control.handleClickPublic()).not.toThrow()
-    expect(map._state.visibility[LAYER]).toBe('visible') // still toggled in memory
-    spy.mockRestore()
+
+    it('restores a stored "on" toggle', () => {
+      localStorage.setItem(LS_KEY, '1')
+      const control = new LandRangeRingsControl(origin())
+      expect(control.visible).toBe(true)
+      const map = makeFakeMap()
+      control.onAdd(asMap(map))
+      expect(map._state.visibility[LAYER]).toBe('visible')
+    })
+
+    it('writes the toggle to localStorage, Land having no overlay store', () => {
+      const control = new LandRangeRingsControl(origin())
+      control.onAdd(asMap(makeFakeMap()))
+
+      control.handleClickPublic()
+      expect(localStorage.getItem(LS_KEY)).toBe('1')
+
+      control.handleClickPublic()
+      expect(localStorage.getItem(LS_KEY)).toBe('0')
+    })
+
+    it('falls back to hidden when storage cannot be read', () => {
+      // Seeded "on" first, so this fails if the throwing read is not actually
+      // reached: without the catch the constructor would blow up, and without
+      // the spy it would read '1' and start visible.
+      localStorage.setItem(LS_KEY, '1')
+      const getItem = vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
+        throw new Error('private mode')
+      })
+
+      expect(new LandRangeRingsControl(origin()).visible).toBe(false)
+
+      getItem.mockRestore()
+    })
+
+    it('keeps the in-memory toggle when storage cannot be written', () => {
+      const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+        throw new Error('private mode')
+      })
+      const control = new LandRangeRingsControl(origin())
+      control.onAdd(asMap(makeFakeMap()))
+
+      control.handleClickPublic()
+
+      expect(control.visible).toBe(true)
+      setItem.mockRestore()
+    })
   })
 
-  it('stays hidden when toggled on with no location', () => {
-    const map = makeFakeMap()
-    const control = new LandRangeRingsControl(() => null)
-    control.onAdd(map as never)
-    control.handleClickPublic() // toggle on, but no location
-    expect(map._state.visibility[LAYER]).toBe('none')
-  })
+  describe('following the ring origin', () => {
+    it('re-centres on a new origin', () => {
+      localStorage.setItem(LS_KEY, '1')
+      const control = new LandRangeRingsControl(origin())
+      const map = makeFakeMap()
+      control.onAdd(asMap(map))
 
-  it('shows rings once a location becomes available', () => {
-    localStorage.setItem('sentinel_land_rangeRings', '1')
-    const map = makeFakeMap()
-    const control = new LandRangeRingsControl(() => null)
-    control.onAdd(map as never)
-    expect(map._state.visibility[LAYER]).toBe('none') // no location yet
-    control.setLocationAvailable(true)
-    expect(map._state.visibility[LAYER]).toBe('visible')
-  })
+      control.setOrigin(origin({ latitude: 49, longitude: 2, kind: 'sentry' }))
 
-  it('re-centres the rings on a new fix', () => {
-    const map = makeFakeMap()
-    const control = new LandRangeRingsControl(() => [-2, 54])
-    control.onAdd(map as never)
-    control.updateCenter(-1, 55)
-    expect(map._state.sources.get(LAYER)!.setData).toHaveBeenCalledOnce()
-  })
+      expect(map._state.sources.get(LAYER)!.setData).toHaveBeenCalledOnce()
+      expect(map._state.visibility[`${LAYER}-origin`]).toBe('visible')
+    })
 
-  it('defers layer creation until the style has loaded', () => {
-    const map = makeFakeMap(false) // style not ready
-    const control = new LandRangeRingsControl(() => [-2, 54])
-    control.onAdd(map as never)
-    expect(map._state.layers.has(LAYER)).toBe(false) // not built yet
-    map._state.styleLoadCb?.() // style.load fires
-    expect(map._state.layers.has(LAYER)).toBe(true)
-  })
+    it('hides the rings when the origin goes away', () => {
+      localStorage.setItem(LS_KEY, '1')
+      const control = new LandRangeRingsControl(origin())
+      const map = makeFakeMap()
+      control.onAdd(asMap(map))
 
-  it('replaces a stale ring layer/source left by a previous style', () => {
-    const map = makeFakeMap()
-    // Pre-seed a stale layer + source (e.g. survived a style reload).
-    map._state.layers.add(LAYER)
-    const stale = { data: 'stale', setData: vi.fn() }
-    map._state.sources.set(LAYER, stale)
-    const control = new LandRangeRingsControl(() => [-2, 54])
-    control.onAdd(map as never)
-    // initRings removes the stale layer/source, then re-adds fresh ones.
-    expect(map._state.sources.get(LAYER)).not.toBe(stale)
-    expect(map._state.layers.has(LAYER)).toBe(true)
-  })
+      control.setOrigin(null)
 
-  it('is a no-op when re-centred or toggled before the layer exists', () => {
-    const map = makeFakeMap(false) // style not ready → no layer/source yet
-    const control = new LandRangeRingsControl(() => [-2, 54])
-    control.onAdd(map as never)
-    // Both guard against a missing layer/source rather than throwing.
-    expect(() => control.updateCenter(-1, 55)).not.toThrow()
-    expect(() => control.handleClickPublic()).not.toThrow()
-    expect(map._state.sources.has(LAYER)).toBe(false)
+      expect(map._state.visibility[LAYER]).toBe('none')
+    })
+
+    it('names a Sentry origin on the outer ring', () => {
+      localStorage.setItem(LS_KEY, '1')
+      const control = new LandRangeRingsControl(origin())
+      const map = makeFakeMap()
+      control.onAdd(asMap(map))
+
+      control.setOrigin(origin({ kind: 'sentry', label: 'GATESHEAD' }))
+
+      expect(map._state.textField[`${LAYER}-label`]).toBe('GATESHEAD · 250 NM')
+    })
+
+    it('defers the build until the style loads', () => {
+      const control = new LandRangeRingsControl(origin())
+      const map = makeFakeMap(false)
+      control.onAdd(asMap(map))
+      expect(map._state.sources.size).toBe(0)
+
+      map._state.styleLoadCb!()
+
+      expect(map._state.sources.has(LAYER)).toBe(true)
+    })
+
+    it('is a no-op when re-centred or toggled before the layer exists', () => {
+      const control = new LandRangeRingsControl(origin())
+      const map = makeFakeMap(false)
+      control.onAdd(asMap(map))
+
+      expect(() => control.setOrigin(origin({ latitude: 1 }))).not.toThrow()
+      expect(() => control.handleClickPublic()).not.toThrow()
+      expect(map._state.sources.has(LAYER)).toBe(false)
+    })
   })
 })

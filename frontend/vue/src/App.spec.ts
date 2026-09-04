@@ -41,6 +41,11 @@ vi.mock('@/composables/useUserLocation', async () => {
   }
 })
 
+const hydrateRingOrigin = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+vi.mock('@/composables/useRangeRingOrigin', () => ({
+  useRangeRingOrigin: () => ({ hydrateFromConfig: hydrateRingOrigin }),
+}))
+
 vi.mock('@/composables/useAirAlertsService', () => ({
   useAirAlertsService: () => {
     shared.airStart = vi.fn()
@@ -179,6 +184,9 @@ describe('App', () => {
       mountApp()
       await flushPromises()
       expect(shared.hydrateFromConfig).toHaveBeenCalled()
+      // The ring origin follows the operator to another browser the same way
+      // the location does.
+      expect(hydrateRingOrigin).toHaveBeenCalled()
       expect(shared.startGps).toHaveBeenCalled()
       expect(shared.airStart).toHaveBeenCalled()
       expect(shared.spaceStart).toHaveBeenCalled()

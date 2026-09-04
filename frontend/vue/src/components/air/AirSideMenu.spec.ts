@@ -55,8 +55,6 @@ function makeControls() {
     mil: { toggle: vi.fn() },
     names: { handleClickPublic: vi.fn() },
     clear: { toggle: vi.fn(), _cleared: true },
-    set3DActive: vi.fn(),
-    setTargetPitch: vi.fn(),
   }
 }
 
@@ -74,8 +72,6 @@ function makeAirMap(controls: Controls) {
     getMilBases: () => controls.mil,
     getNamesControl: () => controls.names,
     getClearControl: () => controls.clear,
-    set3DActive: controls.set3DActive,
-    setTargetPitch: controls.setTargetPitch,
   }
 }
 
@@ -117,7 +113,6 @@ describe('AirSideMenu', () => {
         'RANGE RING',
         'A2A REFUELING',
         'AWACS',
-        '3D VIEW',
         'MAP LAYERS',
         'FILTER',
       ]) {
@@ -127,14 +122,11 @@ describe('AirSideMenu', () => {
       }
       // Callsigns is removed entirely.
       expect(wrapper.find(tip('CALLSIGNS')).exists()).toBe(false)
-      // Ground vehicles, towers, location names, airports, military bases and
-      // live inside the LAYERS accordion panel (as icon buttons with
-      // their own tooltips), not as standalone rail icons.
+      // Ground vehicles, towers, location names, airports and military bases
+      // are set once in Settings > Map Layers rather than mid-task, so the rail
+      // no longer carries them; the three worth flipping in flight stay.
       for (const layer of ['ground', 'towers', 'names', 'airports', 'mil']) {
-        const subButton = wrapper.find(`#layers-panel [data-loc="${layer}"]`)
-        expect(subButton.exists()).toBe(true)
-        expect(subButton.attributes('aria-label')).toBeTruthy()
-        expect(subButton.attributes('data-tooltip')).toBeTruthy()
+        expect(wrapper.find(`[data-loc="${layer}"]`).exists()).toBe(false)
       }
       // The aircraft-filter modes live inside the FILTER accordion panel.
       for (const mode of ['all', 'civil', 'mil']) {
@@ -179,13 +171,6 @@ describe('AirSideMenu', () => {
       expect(controls.map.flyTo).not.toHaveBeenCalled()
     })
 
-    it('toggles ground vehicles and towers', async () => {
-      await wrapper.find(tip('GROUND VEHICLES')).trigger('click')
-      expect(controls.adsb.setHideGroundVehicles).toHaveBeenCalledWith(true)
-      await wrapper.find(tip('TOWERS')).trigger('click')
-      expect(controls.adsb.setHideTowers).toHaveBeenCalledWith(true)
-    })
-
     it('toggles the ring, refuelling and AWACS from the rail', async () => {
       await wrapper.find(tip('RANGE RING')).trigger('click')
       await wrapper.find(tip('A2A REFUELING')).trigger('click')
@@ -193,15 +178,6 @@ describe('AirSideMenu', () => {
       expect(controls.rangeRings.handleClickPublic).toHaveBeenCalled()
       expect(controls.aara.toggle).toHaveBeenCalled()
       expect(controls.awacs.toggle).toHaveBeenCalled()
-    })
-
-    it('toggles location names, airports and bases from the LAYERS panel', async () => {
-      await wrapper.find('[data-loc="names"]').trigger('click')
-      await wrapper.find('[data-loc="airports"]').trigger('click')
-      await wrapper.find('[data-loc="mil"]').trigger('click')
-      expect(controls.names.handleClickPublic).toHaveBeenCalled()
-      expect(controls.airports.toggle).toHaveBeenCalled()
-      expect(controls.mil.toggle).toHaveBeenCalled()
     })
 
     it('expands the LAYERS accordion on click and highlights the button while open', async () => {
@@ -219,47 +195,6 @@ describe('AirSideMenu', () => {
       await button.trigger('click')
       expect(button.attributes('aria-expanded')).toBe('false')
       expect(button.classes()).not.toContain('active')
-    })
-
-    it('toggles the 3D view on and off', async () => {
-      await wrapper.find(tip('3D VIEW')).trigger('click')
-      expect(controls.set3DActive).toHaveBeenCalledWith(true)
-      await wrapper.find(tip('3D VIEW')).trigger('click')
-      expect(controls.set3DActive).toHaveBeenCalledWith(false)
-    })
-
-    it('tilts, rotates and resets the bearing via the 3D widget', async () => {
-      await wrapper.find(tip('TILT UP')).trigger('click')
-      expect(controls.setTargetPitch).toHaveBeenCalledWith(30) // 20 + 10
-      expect(controls.map.easeTo).toHaveBeenCalledWith({ pitch: 30, duration: 300 })
-
-      await wrapper.find(tip('TILT DOWN')).trigger('click')
-      expect(controls.setTargetPitch).toHaveBeenCalledWith(10) // 20 - 10
-
-      await wrapper.find(tip('ROTATE LEFT')).trigger('click')
-      expect(controls.map.easeTo).toHaveBeenCalledWith({ bearing: 15, duration: 300 }) // 30 - 15
-
-      await wrapper.find(tip('ROTATE RIGHT')).trigger('click')
-      expect(controls.map.easeTo).toHaveBeenCalledWith({ bearing: 45, duration: 300 })
-
-      await wrapper.find(tip('RESET BEARING')).trigger('click')
-      expect(controls.map.easeTo).toHaveBeenCalledWith({ bearing: 0, duration: 400 })
-    })
-
-    it('clamps the tilt pitch to the 0–85 range', async () => {
-      controls.map.getPitch.mockReturnValue(80)
-      await wrapper.find(tip('TILT UP')).trigger('click')
-      expect(controls.setTargetPitch).toHaveBeenCalledWith(85)
-    })
-  })
-
-  describe('filter accordion', () => {
-    let controls: Controls
-    let wrapper: ReturnType<typeof mountMenu>
-
-    beforeEach(() => {
-      controls = makeControls()
-      wrapper = mountMenu(makeAirMap(controls))
     })
 
     it('expands and collapses the mode accordion on click, highlighting the button while open', async () => {
@@ -344,18 +279,10 @@ describe('AirSideMenu', () => {
         'RANGE RING',
         'A2A REFUELING',
         'AWACS',
-        '3D VIEW',
         'MAP LAYERS',
         'FILTER',
-        'TILT UP',
-        'ROTATE LEFT',
-        'RESET BEARING',
       ]) {
         await expect(wrapper.find(tip(label)).trigger('click')).resolves.not.toThrow()
-      }
-      // The LAYERS panel toggles are also safe without a map.
-      for (const layer of ['ground', 'towers', 'names', 'airports', 'mil']) {
-        await expect(wrapper.find(`[data-loc="${layer}"]`).trigger('click')).resolves.not.toThrow()
       }
     })
 

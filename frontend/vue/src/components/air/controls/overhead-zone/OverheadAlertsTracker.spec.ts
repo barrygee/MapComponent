@@ -11,6 +11,30 @@ type NotificationsStore = ReturnType<typeof useNotificationsStore>
 
 const USER = { lon: -1, lat: 51 }
 
+/** One watched place, defaulting to the operator's own position at 10 nm. */
+function zone(
+  overrides: Partial<{
+    id: string
+    label: string
+    lon: number
+    lat: number
+    civil: boolean
+    mil: boolean
+    radiusNm: number
+  }> = {},
+) {
+  return {
+    id: 'user',
+    label: 'MY LOCATION',
+    lon: USER.lon,
+    lat: USER.lat,
+    civil: false,
+    mil: false,
+    radiusNm: 10,
+    ...overrides,
+  }
+}
+
 // A feature roughly at the user's location (well inside a 10 nm radius).
 function aircraftFeature(
   hex: string,
@@ -58,16 +82,12 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('OverheadAlertsTracker.setEnabled', () => {
+describe('OverheadAlertsTracker.setZones', () => {
   it('raises a civil overhead alert for an in-zone civil aircraft when civil is enabled', () => {
     const features = { features: [aircraftFeature('abc123')] }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
 
-    tracker.setEnabled({ civil: true, mil: false })
+    tracker.setZones([zone({ civil: true, mil: false })])
 
     expect(overheadCount(notifications)).toBe(1)
     expect(notifications.items[0]!.hex).toBe('abc123')
@@ -76,13 +96,9 @@ describe('OverheadAlertsTracker.setEnabled', () => {
 
   it('ignores civil aircraft when only military alerts are enabled', () => {
     const features = { features: [aircraftFeature('abc123', { military: false })] }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
 
-    tracker.setEnabled({ civil: false, mil: true })
+    tracker.setZones([zone({ civil: false, mil: true })])
 
     expect(overheadCount(notifications)).toBe(0)
     tracker.destroy()
@@ -90,13 +106,9 @@ describe('OverheadAlertsTracker.setEnabled', () => {
 
   it('raises a military alert for an in-zone military aircraft', () => {
     const features = { features: [aircraftFeature('mil001', { military: true })] }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
 
-    tracker.setEnabled({ civil: false, mil: true })
+    tracker.setZones([zone({ civil: false, mil: true })])
 
     expect(overheadCount(notifications)).toBe(1)
     tracker.destroy()
@@ -104,11 +116,11 @@ describe('OverheadAlertsTracker.setEnabled', () => {
 
   it('does nothing when called with the same enabled flags twice', () => {
     const getFeatures = vi.fn(() => ({ features: [aircraftFeature('abc123')] }))
-    const tracker = new OverheadAlertsTracker(notifications, getFeatures, () => USER)
+    const tracker = new OverheadAlertsTracker(notifications, getFeatures)
 
-    tracker.setEnabled({ civil: true, mil: false })
+    tracker.setZones([zone({ civil: true, mil: false })])
     const callsAfterFirst = getFeatures.mock.calls.length
-    tracker.setEnabled({ civil: true, mil: false })
+    tracker.setZones([zone({ civil: true, mil: false })])
     // No state change → no extra immediate tick.
     expect(getFeatures.mock.calls.length).toBe(callsAfterFirst)
     tracker.destroy()
@@ -116,15 +128,11 @@ describe('OverheadAlertsTracker.setEnabled', () => {
 
   it('clears all overhead notifications when alerts are turned off', () => {
     const features = { features: [aircraftFeature('abc123')] }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
-    tracker.setEnabled({ civil: true, mil: false })
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(overheadCount(notifications)).toBe(1)
 
-    tracker.setEnabled({ civil: false, mil: false })
+    tracker.setZones([])
     expect(overheadCount(notifications)).toBe(0)
   })
 
@@ -138,10 +146,10 @@ describe('OverheadAlertsTracker.setEnabled', () => {
       () => USER,
     )
 
-    tracker.setEnabled({ civil: true, mil: false }) // timer on, nothing in zone
+    tracker.setZones([zone({ civil: true, mil: false })]) // timer on, nothing in zone
     expect(overheadCount(notifications)).toBe(1) // the stale one survives the tick
 
-    tracker.setEnabled({ civil: false, mil: false }) // disable → sweep dismisses it
+    tracker.setZones([]) // disable → sweep dismisses it
     expect(overheadCount(notifications)).toBe(0)
   })
 
@@ -152,16 +160,12 @@ describe('OverheadAlertsTracker.setEnabled', () => {
         aircraftFeature('mil001', { military: true }),
       ],
     }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
-    tracker.setEnabled({ civil: true, mil: true })
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
+    tracker.setZones([zone({ civil: true, mil: true })])
     expect(overheadCount(notifications)).toBe(2)
 
     // Disable civil: the tracked civil aircraft must be dismissed.
-    tracker.setEnabled({ civil: false, mil: true })
+    tracker.setZones([zone({ civil: false, mil: true })])
     expect(overheadCount(notifications)).toBe(1)
     expect(notifications.items.some((item) => item.hex === 'civ001')).toBe(false)
     tracker.destroy()
@@ -171,24 +175,16 @@ describe('OverheadAlertsTracker.setEnabled', () => {
 describe('OverheadAlertsTracker._tick filtering', () => {
   it('skips aircraft beyond the configured radius', () => {
     const features = { features: [aircraftFeature('far001', { coords: [-1, 60] })] }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
-    tracker.setEnabled({ civil: true, mil: false })
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(overheadCount(notifications)).toBe(0)
     tracker.destroy()
   })
 
   it('skips on-ground aircraft (altitude ≤ 0)', () => {
     const features = { features: [aircraftFeature('gnd001', { alt_baro: 0 })] }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
-    tracker.setEnabled({ civil: true, mil: false })
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(overheadCount(notifications)).toBe(0)
     tracker.destroy()
   })
@@ -209,24 +205,16 @@ describe('OverheadAlertsTracker._tick filtering', () => {
         },
       ],
     }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
-    tracker.setEnabled({ civil: true, mil: false })
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(overheadCount(notifications)).toBe(0)
     tracker.destroy()
   })
 
   it('skips military aircraft when only civil alerts are enabled', () => {
     const features = { features: [aircraftFeature('mil001', { military: true })] }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
-    tracker.setEnabled({ civil: true, mil: false })
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(overheadCount(notifications)).toBe(0)
     tracker.destroy()
   })
@@ -240,46 +228,36 @@ describe('OverheadAlertsTracker._tick filtering', () => {
         },
       ],
     }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
-    tracker.setEnabled({ civil: true, mil: false })
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(overheadCount(notifications)).toBe(0)
     tracker.destroy()
   })
 
-  it('does nothing when there is no user location or no feature collection', () => {
-    const trackerNoLoc = new OverheadAlertsTracker(
-      notifications,
-      () => ({ features: [aircraftFeature('abc123')] }),
-      () => null,
-    )
-    trackerNoLoc.setEnabled({ civil: true, mil: false })
+  it('does nothing with no places to watch', () => {
+    // A location with no fix, or with both classes off, is simply not in the
+    // list — there is no "enabled but nowhere" state to get wrong.
+    const tracker = new OverheadAlertsTracker(notifications, () => ({
+      features: [aircraftFeature('abc123')],
+    }))
+    tracker.setZones([])
     expect(overheadCount(notifications)).toBe(0)
-    trackerNoLoc.destroy()
+    tracker.destroy()
+  })
 
-    const trackerNoFc = new OverheadAlertsTracker(
-      notifications,
-      () => null,
-      () => USER,
-    )
-    trackerNoFc.setEnabled({ civil: true, mil: false })
+  it('does nothing when the feed has not arrived yet', () => {
+    const tracker = new OverheadAlertsTracker(notifications, () => null)
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(overheadCount(notifications)).toBe(0)
-    trackerNoFc.destroy()
+    tracker.destroy()
   })
 
   it('builds the detail string from distance, altitude and ground speed', () => {
     const features = {
       features: [aircraftFeature('abc123', { alt_baro: 12000, gs: 300, flight: 'BAW1' })],
     }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
-    tracker.setEnabled({ civil: true, mil: false })
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
+    tracker.setZones([zone({ civil: true, mil: false })])
     const detail = notifications.items[0]!.detail
     expect(detail).toContain('nm')
     expect(detail).toContain('12,000 ft')
@@ -290,12 +268,8 @@ describe('OverheadAlertsTracker._tick filtering', () => {
 
   it('omits ground speed from the detail when it is zero', () => {
     const features = { features: [aircraftFeature('abc123', { gs: 0 })] }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
-    tracker.setEnabled({ civil: true, mil: false })
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(notifications.items[0]!.detail).not.toContain('kt')
     tracker.destroy()
   })
@@ -307,7 +281,7 @@ describe('OverheadAlertsTracker._tick filtering', () => {
       () => regOnly,
       () => USER,
     )
-    tracker.setEnabled({ civil: true, mil: false })
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(notifications.items[0]!.title).toBe('G-TEST')
     tracker.destroy()
   })
@@ -318,13 +292,9 @@ describe('OverheadAlertsTracker tracking lifecycle', () => {
     let gs = 200
     const features = { features: [aircraftFeature('abc123', { gs: 0 })] }
     Object.defineProperty(features.features[0]!.properties, 'gs', { get: () => gs })
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
 
-    tracker.setEnabled({ civil: true, mil: false })
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(overheadCount(notifications)).toBe(1)
     const firstDetail = notifications.items[0]!.detail
 
@@ -339,9 +309,9 @@ describe('OverheadAlertsTracker tracking lifecycle', () => {
     let present = true
     const getFeatures = () =>
       present ? { features: [aircraftFeature('abc123')] } : { features: [] }
-    const tracker = new OverheadAlertsTracker(notifications, getFeatures, () => USER)
+    const tracker = new OverheadAlertsTracker(notifications, getFeatures)
 
-    tracker.setEnabled({ civil: true, mil: false })
+    tracker.setZones([zone({ civil: true, mil: false })])
     expect(overheadCount(notifications)).toBe(1)
 
     present = false
@@ -353,14 +323,9 @@ describe('OverheadAlertsTracker tracking lifecycle', () => {
   it('invokes the alert click callback with the aircraft hex', () => {
     const onAlertClick = vi.fn()
     const features = { features: [aircraftFeature('abc123')] }
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-      onAlertClick,
-    )
+    const tracker = new OverheadAlertsTracker(notifications, () => features, onAlertClick)
 
-    tracker.setEnabled({ civil: true, mil: false })
+    tracker.setZones([zone({ civil: true, mil: false })])
     notifications.items[0]!.clickAction!()
     expect(onAlertClick).toHaveBeenCalledWith('abc123')
     tracker.destroy()
@@ -368,8 +333,8 @@ describe('OverheadAlertsTracker tracking lifecycle', () => {
 
   it('polls again on the interval', () => {
     const getFeatures = vi.fn(() => ({ features: [aircraftFeature('abc123')] }))
-    const tracker = new OverheadAlertsTracker(notifications, getFeatures, () => USER)
-    tracker.setEnabled({ civil: true, mil: false })
+    const tracker = new OverheadAlertsTracker(notifications, getFeatures)
+    tracker.setZones([zone({ civil: true, mil: false })])
     const callsAfterEnable = getFeatures.mock.calls.length
 
     vi.advanceTimersByTime(2000)
@@ -378,33 +343,23 @@ describe('OverheadAlertsTracker tracking lifecycle', () => {
   })
 })
 
-describe('OverheadAlertsTracker.setRadiusNm', () => {
+describe('OverheadAlertsTracker zone radius', () => {
   it('ignores non-finite or non-positive radii', () => {
     const features = { features: [aircraftFeature('abc123', { coords: [-1, 51.2] })] } // ~12 nm away
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
 
-    tracker.setRadiusNm(Number.NaN)
-    tracker.setRadiusNm(0)
-    tracker.setEnabled({ civil: true, mil: false })
-    // Still default 10 nm radius → the ~12 nm aircraft is out of range.
+    tracker.setZones([zone({ civil: true, mil: false })])
+    // Default 10 nm radius → the ~12 nm aircraft is out of range.
     expect(overheadCount(notifications)).toBe(0)
     tracker.destroy()
   })
 
   it('widens the radius so a previously out-of-range aircraft qualifies', () => {
     const features = { features: [aircraftFeature('abc123', { coords: [-1, 51.2] })] } // ~12 nm away
-    const tracker = new OverheadAlertsTracker(
-      notifications,
-      () => features,
-      () => USER,
-    )
+    const tracker = new OverheadAlertsTracker(notifications, () => features)
 
-    tracker.setRadiusNm(30)
-    tracker.setEnabled({ civil: true, mil: false })
+    // The same aircraft qualifies once the place watches further out.
+    tracker.setZones([zone({ civil: true, mil: false, radiusNm: 30 })])
     expect(overheadCount(notifications)).toBe(1)
     tracker.destroy()
   })
@@ -413,8 +368,8 @@ describe('OverheadAlertsTracker.setRadiusNm', () => {
 describe('OverheadAlertsTracker.destroy', () => {
   it('stops the timer and clears tracked state', () => {
     const getFeatures = vi.fn(() => ({ features: [aircraftFeature('abc123')] }))
-    const tracker = new OverheadAlertsTracker(notifications, getFeatures, () => USER)
-    tracker.setEnabled({ civil: true, mil: false })
+    const tracker = new OverheadAlertsTracker(notifications, getFeatures)
+    tracker.setZones([zone({ civil: true, mil: false })])
 
     tracker.destroy()
     const callsAfterDestroy = getFeatures.mock.calls.length

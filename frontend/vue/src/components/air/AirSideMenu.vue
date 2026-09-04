@@ -155,36 +155,6 @@
       </template>
     </IconRailAccordion>
 
-    <!-- 3D VIEW -->
-    <BaseIconButton
-      class="sm-btn"
-      style="--ba-rail-transition: color 0.15s ease"
-      :class="{ active: tiltActive }"
-      :active="tiltActive"
-      tooltip-side="left"
-      tooltip="3D VIEW"
-      accessible-name="3D view"
-      @click="toggle3D"
-    >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 14 14"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
-        <polygon
-          points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5"
-          stroke="currentColor"
-          stroke-width="1.2"
-          fill="none"
-        />
-        <polyline points="7,1 7,7" stroke="currentColor" stroke-width="1.2" />
-        <polyline points="1,4.5 7,7 13,4.5" stroke="currentColor" stroke-width="1.2" />
-      </svg>
-    </BaseIconButton>
-
     <!-- LAYERS group: a click-to-expand accordion of every map overlay shown
          below the icon — the map-annotation overlays first (range ring, A2A
          refuelling, AWACS), then the data/base-map layers (ground vehicles,
@@ -320,244 +290,15 @@
             />
           </svg>
         </BaseIconButton>
-        <BaseIconButton
-          class="sm-btn sm-sub-btn"
-          :class="{ active: !hideGnd }"
-          :active="!hideGnd"
-          style="
-            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
-            --ba-rail-transition: color 0.15s ease;
-          "
-          data-loc="ground"
-          tooltip-side="left"
-          tooltip="GROUND VEHICLES"
-          accessible-name="Ground vehicles"
-          @click="toggleGround"
-        >
-          <svg
-            width="17"
-            height="13"
-            viewBox="0 0 24 18"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <rect x="1" y="3" width="13" height="9" stroke="currentColor" stroke-width="1.6" />
-            <path
-              d="M14 6h4l3 3v3h-7z"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linejoin="round"
-              fill="none"
-            />
-            <circle cx="6" cy="14" r="2" stroke="currentColor" stroke-width="1.6" />
-            <circle cx="17" cy="14" r="2" stroke="currentColor" stroke-width="1.6" />
-          </svg>
-        </BaseIconButton>
-        <BaseIconButton
-          class="sm-btn sm-sub-btn"
-          :class="{ active: !hideTowers }"
-          :active="!hideTowers"
-          style="
-            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
-            --ba-rail-transition: color 0.15s ease;
-          "
-          data-loc="towers"
-          tooltip-side="left"
-          tooltip="TOWERS"
-          accessible-name="Towers"
-          @click="toggleTowers"
-        >
-          <svg
-            width="14"
-            height="15"
-            viewBox="0 0 20 22"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <path
-              d="M5 21 L9 5 M15 21 L11 5"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-            />
-            <line x1="7.5" y1="13" x2="12.5" y2="13" stroke="currentColor" stroke-width="1.6" />
-            <circle cx="10" cy="3.5" r="1.6" stroke="currentColor" stroke-width="1.6" />
-          </svg>
-        </BaseIconButton>
-        <BaseIconButton
-          class="sm-btn sm-sub-btn"
-          :class="{ active: basemapStore.layers.names }"
-          :active="basemapStore.layers.names"
-          style="
-            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
-            --ba-rail-transition: color 0.15s ease;
-          "
-          data-loc="names"
-          tooltip-side="left"
-          tooltip="LOCATION NAMES"
-          accessible-name="Location name labels"
-          @click="mapRef.value?.getNamesControl()?.handleClickPublic()"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <path
-              d="M12 22C12 22 19 14 19 9A7 7 0 1 0 5 9C5 14 12 22 12 22Z"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linejoin="round"
-              fill="none"
-            />
-            <circle cx="12" cy="9" r="2.4" stroke="currentColor" stroke-width="1.6" fill="none" />
-          </svg>
-        </BaseIconButton>
-        <BaseIconButton
-          class="sm-btn sm-sub-btn"
-          :class="{ active: airStore.overlayStates.airports }"
-          :active="airStore.overlayStates.airports"
-          style="
-            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
-            --ba-rail-transition: color 0.15s ease;
-          "
-          data-loc="airports"
-          tooltip-side="left"
-          tooltip="AIRPORTS"
-          accessible-name="Airports"
-          @click="mapRef.value?.getAirports()?.toggle()"
-        >
-          <svg
-            width="14"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <!-- Control tower — the airport facility. Sized to fill the viewBox so
-                 it matches the visual weight of the other sub-menu icons. -->
-            <path
-              d="M6 13 L18 13 L16 7 L8 7 Z"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linejoin="round"
-              fill="none"
-            />
-            <path
-              d="M10 13 L9 21.5 M14 13 L15 21.5"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-            />
-            <line
-              x1="4.5"
-              y1="21.5"
-              x2="19.5"
-              y2="21.5"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-            />
-            <line
-              x1="12"
-              y1="7"
-              x2="12"
-              y2="2.5"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-            />
-          </svg>
-        </BaseIconButton>
-        <BaseIconButton
-          class="sm-btn sm-sub-btn"
-          :class="{ active: airStore.overlayStates.militaryBases }"
-          :active="airStore.overlayStates.militaryBases"
-          style="
-            --ba-rail-hover-bg: rgba(255, 255, 255, 0.2);
-            --ba-rail-transition: color 0.15s ease;
-          "
-          data-loc="mil"
-          tooltip-side="left"
-          tooltip="MILITARY BASES"
-          accessible-name="Military bases"
-          @click="mapRef.value?.getMilBases()?.toggle()"
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <polygon
-              points="12,2 15,9 22,9 16.5,13.5 18.5,21 12,16.5 5.5,21 7.5,13.5 2,9 9,9"
-              stroke="currentColor"
-              stroke-width="1.4"
-              stroke-linejoin="round"
-              fill="none"
-            />
-          </svg>
-        </BaseIconButton>
       </template>
     </IconRailAccordion>
   </IconRail>
-
-  <!-- 3D controls widget (fixed bottom-right, cleared of the rail). Kept on plain
-       <button>s (not the BaseIconButton atom): its tooltip opens upward/centred, a
-       third position this phase's atoms don't model, and this widget is a distinct
-       control grid rather than an icon rail — out of scope for this migration, and
-       out of scope for the IconRail shell (it sits entirely outside it). -->
-  <div id="map-3d-controls" :class="{ 'map-3d-controls--hidden': !tiltActive }">
-    <span />
-    <button class="map-3d-btn" data-tooltip="TILT UP" aria-label="Tilt up" @click="tiltBy(10)">
-      ↑
-    </button>
-    <span />
-    <button
-      class="map-3d-btn"
-      data-tooltip="ROTATE LEFT"
-      aria-label="Rotate left"
-      @click="rotateBy(-15)"
-    >
-      ↺
-    </button>
-    <button
-      class="map-3d-btn"
-      data-tooltip="RESET BEARING"
-      aria-label="Reset bearing"
-      @click="resetBearing"
-    >
-      ⌖
-    </button>
-    <button
-      class="map-3d-btn"
-      data-tooltip="ROTATE RIGHT"
-      aria-label="Rotate right"
-      @click="rotateBy(15)"
-    >
-      ↻
-    </button>
-    <span />
-    <button class="map-3d-btn" data-tooltip="TILT DOWN" aria-label="Tilt down" @click="tiltBy(-10)">
-      ↓
-    </button>
-    <span />
-  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useAirStore } from '@/stores/air'
 import { useAppStore } from '@/stores/app'
-import { useBasemapStore } from '@/stores/basemap'
 import { useUserLocation } from '@/composables/useUserLocation'
 import MyLocationIcon from '@/components/shared/MyLocationIcon.vue'
 import FilterFunnelIcon from '@/components/shared/FilterFunnelIcon.vue'
@@ -582,14 +323,10 @@ const mapRef = {
 
 const airStore = useAirStore()
 const appStore = useAppStore()
-const basemapStore = useBasemapStore()
 const { location: userLocation } = useUserLocation()
 
-const tiltActive = ref(localStorage.getItem('sentinel_3d') === '1')
 const cleared = ref(false)
 const locActive = computed(() => userLocation.value !== null)
-const hideGnd = ref(false)
-const hideTowers = ref(false)
 
 // FILTER and LAYERS each expand a vertical icon accordion on click; the group
 // button is highlighted (green) while its panel is open. The open/toggle state
@@ -640,48 +377,6 @@ function goToLocation() {
   const loc = userLocation.value
   if (!m || !loc) return
   m.flyTo({ center: [loc.lon, loc.lat], zoom: Math.max(m.getZoom(), 10), duration: 800 })
-}
-
-function toggleGround() {
-  const c = getAdsb()
-  if (!c) return
-  hideGnd.value = !hideGnd.value
-  c.setHideGroundVehicles(hideGnd.value)
-}
-
-function toggleTowers() {
-  const c = getAdsb()
-  if (!c) return
-  hideTowers.value = !hideTowers.value
-  c.setHideTowers(hideTowers.value)
-}
-
-// ---- 3D ----
-function toggle3D() {
-  const airMap = mapRef.value as { set3DActive?: (v: boolean) => void } | null
-  tiltActive.value = !tiltActive.value
-  airMap?.set3DActive?.(tiltActive.value)
-}
-
-function tiltBy(delta: number) {
-  const m = getMap()
-  if (!m) return
-  const newPitch = Math.min(Math.max(m.getPitch() + delta, 0), 85)
-  const airMap = mapRef.value as { setTargetPitch?: (p: number) => void } | null
-  airMap?.setTargetPitch?.(newPitch)
-  m.easeTo({ pitch: newPitch, duration: 300 })
-}
-
-function rotateBy(delta: number) {
-  const m = getMap()
-  if (!m) return
-  m.easeTo({ bearing: m.getBearing() + delta, duration: 300 })
-}
-
-function resetBearing() {
-  const m = getMap()
-  if (!m) return
-  m.easeTo({ bearing: 0, duration: 400 })
 }
 
 // ---- Clear overlays ----
@@ -758,100 +453,4 @@ function _saveFilter() {
 /* 3D controls — pinned bottom-right, shifted left to clear the 44px rail. This
    widget sits outside IconRail entirely (see the template comment above) so it
    keeps its own fixed layout and touch-tooltip suppression. */
-#map-3d-controls {
-  position: fixed;
-  bottom: calc(44px + 14px);
-  right: calc(44px + 14px);
-  z-index: 1002;
-  display: grid;
-  grid-template-columns: repeat(3, 36px);
-  grid-template-rows: repeat(3, 36px);
-  gap: 4px;
-}
-
-#map-3d-controls.map-3d-controls--hidden {
-  display: none;
-}
-
-.map-3d-btn {
-  width: 36px;
-  height: 36px;
-  background: #000;
-  border: none;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: 'Barlow Condensed', 'Barlow', sans-serif;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background 0.15s,
-    color 0.15s;
-  position: relative;
-}
-
-.map-3d-btn:hover {
-  background: #111;
-  color: var(--color-accent);
-}
-
-.map-3d-btn:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -2px;
-}
-
-.map-3d-btn:active {
-  background: #1a1a1a;
-  color: var(--color-accent);
-}
-
-.map-3d-btn[data-tooltip]::before {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: #000;
-  color: var(--color-text-muted);
-  font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-  font-size: 9px;
-  font-weight: 400;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  padding: 0 10px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  z-index: 10001;
-}
-
-.map-3d-btn[data-tooltip]:hover::before {
-  opacity: 1;
-}
-
-/* Touch screens: hover tooltips aren't useful. The rail's own tooltip
-   suppression lives in IconRail/IconRailAccordion now; this widget is outside
-   both, so it keeps its own copy. */
-@media (max-width: 768px) {
-  .map-3d-btn[data-tooltip]::before {
-    display: none !important;
-  }
-}
-
-/* ≤480px: the tab rail is now part of the left drawer (hidden until opened), so
-   the 3D widget no longer needs to clear a bottom strip beyond the footer — it
-   sits just above the footer. (IconRail's own bottom offset already matches
-   the footer height unconditionally, so no override is needed for the rail
-   itself here; only the 3D widget's own offset differs.) */
-@media (max-width: 480px) {
-  #map-3d-controls {
-    bottom: calc(var(--footer-height) + 8px);
-  }
-}
 </style>

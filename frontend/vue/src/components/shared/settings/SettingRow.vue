@@ -17,14 +17,11 @@
       v-if="item.type === 'connectivity-toggle'"
       @stage="emit('stage', item.id, $event)"
     />
-    <OverheadAlertsToggleControl
-      v-else-if="item.type === 'overhead-alerts-toggle'"
+    <!-- Mirrors to the store at once (the zone appears on the map as you
+         switch it on) and stages the config-database write for APPLY CHANGES. -->
+    <OverheadAlertsControl
+      v-else-if="item.type === 'overhead-alerts'"
       @stage="emit('stage', item.id, $event)"
-    />
-    <OverheadAlertRadiusControl
-      v-else-if="item.type === 'overhead-alert-radius'"
-      @stage="emit('stage', item.id, $event)"
-      @commit="emit('commit')"
     />
     <LandAprsRetentionControl
       v-else-if="item.type === 'land-aprs-retention'"
@@ -39,6 +36,17 @@
     <!-- No stage/commit: the location card owns its own SAVE LOCATION button
          (matching Sentry's panel) rather than committing via APPLY CHANGES. -->
     <LocationControl v-else-if="item.type === 'location'" />
+    <!-- No stage/commit either: choosing an origin moves the rings at once,
+         which is the whole point of choosing one. -->
+    <!-- Mirrors to the store at once (the rings move as you choose) and stages
+         the config-database write for APPLY CHANGES. -->
+    <RangeRingOriginControl
+      v-else-if="item.type === 'range-ring-origin'"
+      @stage="emit('stage', item.id, $event)"
+    />
+    <!-- No stage/commit: a layer switch belongs to the map it draws on, so it
+         applies the moment it is flipped, exactly as the rail's does. -->
+    <MapLayersControl v-else-if="item.type === 'map-layers'" />
     <NotificationSoundControl
       v-else-if="item.type === 'notification-sound'"
       @stage="emit('stage', item.id, $event)"
@@ -131,11 +139,12 @@
 <script setup lang="ts">
 import type { SettingItem } from '@/types/settings'
 import ConnectivityToggle from './ConnectivityToggle.vue'
-import OverheadAlertsToggleControl from './OverheadAlertsToggleControl.vue'
-import OverheadAlertRadiusControl from './OverheadAlertRadiusControl.vue'
+import OverheadAlertsControl from './OverheadAlertsControl.vue'
 import LandAprsRetentionControl from './LandAprsRetentionControl.vue'
 import ProbeUrlControl from './ProbeUrlControl.vue'
 import LocationControl from './LocationControl.vue'
+import RangeRingOriginControl from './RangeRingOriginControl.vue'
+import MapLayersControl from './MapLayersControl.vue'
 import NotificationSoundControl from './NotificationSoundControl.vue'
 import SourceOverrideControl from './SourceOverrideControl.vue'
 import OnlineSourceControl from './OnlineSourceControl.vue'
@@ -174,6 +183,9 @@ const emit = defineEmits<{
 // that the sole card under its own LOCATION heading is not a lone 300px sliver.
 const HALF_TYPES = new Set([
   'location',
+  'range-ring-origin',
+  'map-layers',
+  'overhead-alerts',
   'sdr-sentry-hosts',
   'sdr-devices',
   'sdr-options',
@@ -190,7 +202,12 @@ const HALF_STACKED_TYPES = new Set(['sdr-frequencies-file', 'sdr-bandplan-file']
 // The remaining raw-JSON editors take the full row, at the width indented JSON
 // wants — neither has a sibling to pair with.
 const FULL_TYPES = new Set(['space-sat-radio-file', 'config-current'])
-const NATURAL_HEIGHT_TYPES = new Set(['location'])
+const NATURAL_HEIGHT_TYPES = new Set([
+  'location',
+  'range-ring-origin',
+  'map-layers',
+  'overhead-alerts',
+])
 const isTriple = false
 const isHalf = HALF_TYPES.has(props.item.type)
 const isHalfStacked = HALF_STACKED_TYPES.has(props.item.type)

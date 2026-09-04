@@ -36,6 +36,18 @@ const controlMocks = vi.hoisted(() => {
       selectByHex = vi.fn()
       pauseLive = vi.fn()
       setLocationAvailable = vi.fn()
+      setOrigin = vi.fn()
+      ringsVisible = false
+      handleClickPublic = vi.fn()
+      // Settings > Map Layers drives the layer controls through the store, so
+      // the map syncs them via `visible`/`toggle`; names takes `setVisible`,
+      // the ADS-B filters their hide setters, and the zones a zone list.
+      visible = false
+      toggle = vi.fn()
+      namesVisible = false
+      setHideGroundVehicles = vi.fn()
+      setHideTowers = vi.fn()
+      setZones = vi.fn()
       updateCenter = vi.fn()
       setVisible = vi.fn()
       setRadiusNm = vi.fn()
@@ -112,12 +124,13 @@ vi.mock('@/composables/useUserLocation', async () => {
   const { ref } = await import('vue')
   const location = ref<{ lon: number; lat: number } | null>(null)
   shared.locationRef = location as unknown as { value: { lon: number; lat: number } | null }
-  return {
-    useUserLocation: () => {
-      shared.startLocation = vi.fn()
-      return { location, start: shared.startLocation }
-    },
-  }
+  // One spy for the module, not one per call: the composable is shared state in
+  // the app, and more than one consumer asks for it here (AirMap itself, and
+  // the overhead-alert zones) — a fresh spy per call would leave the test
+  // asserting on whichever consumer happened to ask last.
+  const start = vi.fn()
+  shared.startLocation = start
+  return { useUserLocation: () => ({ location, start }) }
 })
 
 vi.mock('@/composables/useMapContextMenu', () => ({
@@ -148,6 +161,7 @@ const MapLibreMapStub = defineComponent({
 import AirMap from './AirMap.vue'
 import { useAppStore } from '@/stores/app'
 import { useAirStore } from '@/stores/air'
+import { useBasemapStore } from '@/stores/basemap'
 import { useSettingsStore } from '@/stores/settings'
 import { usePlaybackStore } from '@/stores/playback'
 import { getAircraftClickHandler } from '@/stores/notifications'
@@ -259,14 +273,6 @@ describe('AirMap', () => {
       expect(controlMocks.instances.adsb).toHaveLength(1)
     })
 
-    it('eases to 3D pitch on load when the 3D flag is set', () => {
-      localStorage.setItem('sentinel_3d', '1')
-      const map = makeFakeMap()
-      mountMap()
-      bringUp(map)
-      expect(map.easeTo).toHaveBeenCalledWith({ pitch: 45, duration: 400 })
-    })
-
     it('runs a corrective style reload when connectivity changed before load', async () => {
       const app = useAppStore()
       const map = makeFakeMap()
@@ -300,17 +306,6 @@ describe('AirMap', () => {
       const syncLabels = adsbArgs[6] as (visible: boolean) => void
       syncLabels(true)
       expect(last('adsbLabels').syncToAdsb).toHaveBeenCalledWith(true)
-    })
-
-    it('seeds the range-ring + overhead-zone centre from an existing fix', () => {
-      const map = makeFakeMap()
-      mountMap()
-      shared.locationRef!.value = { lon: 3, lat: 4 }
-      shared.emit!('map-created', map)
-      shared.emit!('style-loaded', map)
-      // OverheadZoneControl receives [lon, lat] as its initial location arg.
-      const zoneArgs = controlMocks.instances.overheadZone![0]!.args as unknown[]
-      expect(zoneArgs[1]).toEqual([3, 4])
     })
 
     it('exposes every control accessor after style load', () => {
@@ -363,8 +358,175 @@ describe('AirMap', () => {
     })
   })
 
+  describe('following Settings > Map Layers', () => {
+    it.each([
+      ['airports', 'airports'],
+      ['militaryBases', 'mil'],
+      ['aara', 'aara'],
+      ['awacs', 'awacs'],
+    ] as const)('toggles the %s control when the store flag changes', async (flag, controlName) => {
+      const air = useAirStore()
+      const map = makeFakeMap()
+      mountMap()
+      bringUp(map)
+      const control = last(controlName)
+      // These four default to on, so switching them off in Settings is the real
+      // transition; the control still believes it is showing.
+      ;(control as unknown as { visible: boolean }).visible = true
+
+      air.setOverlay(flag, false)
+      await nextTick()
+
+      expect(control.toggle).toHaveBeenCalledOnce()
+    })
+
+    it('leaves a control that already agrees alone', async () => {
+      const air = useAirStore()
+      const map = makeFakeMap()
+      mountMap()
+      bringUp(map)
+      const control = last('airports')
+      // A rail click has already written the store, so the sync must not undo it.
+      ;(control as unknown as { visible: boolean }).visible = false
+
+      air.setOverlay('airports', false)
+      await nextTick()
+
+      expect(control.toggle).not.toHaveBeenCalled()
+    })
+
+    it('toggles the rings when the store flag changes', async () => {
+      const air = useAirStore()
+      const map = makeFakeMap()
+      mountMap()
+      bringUp(map)
+      last('rangeRings').handleClickPublic.mockClear()
+
+      air.setOverlay('rangeRings', true)
+      await nextTick()
+
+      expect(last('rangeRings').handleClickPublic).toHaveBeenCalledOnce()
+    })
+
+    it('leaves the rings alone when the control already agrees', async () => {
+      const air = useAirStore()
+      const map = makeFakeMap()
+      mountMap()
+      bringUp(map)
+      ;(last('rangeRings') as unknown as { ringsVisible: boolean }).ringsVisible = true
+      last('rangeRings').handleClickPublic.mockClear()
+
+      air.setOverlay('rangeRings', true)
+      await nextTick()
+
+      expect(last('rangeRings').handleClickPublic).not.toHaveBeenCalled()
+    })
+
+    it('ignores a store change that lands before the controls exist', async () => {
+      const air = useAirStore()
+      mountMap() // mounted, but no style load yet — no controls
+      await expect(
+        (async () => {
+          air.setOverlay('rangeRings', true)
+          await nextTick()
+        })(),
+      ).resolves.not.toThrow()
+    })
+
+    it('seeds the ADS-B filters from the store as the control is built', () => {
+      const air = useAirStore()
+      air.setOverlay('groundVehicles', false)
+      air.setOverlay('towers', true)
+      const map = makeFakeMap()
+      mountMap()
+      bringUp(map)
+
+      // The store holds them as "shown"; the control takes "hide".
+      expect(last('adsb').setHideGroundVehicles).toHaveBeenCalledWith(true)
+      expect(last('adsb').setHideTowers).toHaveBeenCalledWith(false)
+    })
+
+    it.each([
+      ['groundVehicles', 'setHideGroundVehicles'],
+      ['towers', 'setHideTowers'],
+    ] as const)('inverts %s onto the ADS-B filter when it changes', async (flag, method) => {
+      const air = useAirStore()
+      const map = makeFakeMap()
+      mountMap()
+      bringUp(map)
+      last('adsb')[method]!.mockClear()
+
+      air.setOverlay(flag, false)
+      await nextTick()
+
+      expect(last('adsb')[method]).toHaveBeenCalledWith(true)
+    })
+
+    it('pushes a place-names change onto the shared control', async () => {
+      const basemap = useBasemapStore()
+      const map = makeFakeMap()
+      mountMap()
+      bringUp(map)
+
+      basemap.setLayer('names', true)
+      await nextTick()
+
+      expect(last('names').setVisible).toHaveBeenCalledWith(true)
+    })
+  })
+
+  describe('overhead alert zones', () => {
+    it('seeds the zones from the alert locations already configured', () => {
+      const air = useAirStore()
+      air.setOverheadAlert('user', { civil: true, radiusNm: 12 })
+      const map = makeFakeMap()
+      mountMap()
+      shared.locationRef!.value = { lon: 3, lat: 4 }
+      shared.emit!('map-created', map)
+      shared.emit!('style-loaded', map)
+      // Built with the zones that already resolve, so the first paint after a
+      // style load is not a frame behind.
+      const zoneArgs = controlMocks.instances.overheadZone![0]!.args as unknown[]
+      expect(zoneArgs[0]).toEqual([
+        expect.objectContaining({ lon: 3, lat: 4, radiusNm: 12, civil: true }),
+      ])
+    })
+
+    it('redraws when an alert location is switched on', async () => {
+      const air = useAirStore()
+      const map = makeFakeMap()
+      mountMap()
+      shared.locationRef!.value = { lon: 3, lat: 4 }
+      bringUp(map)
+      last('overheadZone').setZones.mockClear()
+
+      air.setOverheadAlert('user', { mil: true })
+      await nextTick()
+
+      expect(last('overheadZone').setZones).toHaveBeenCalledWith([
+        expect.objectContaining({ lon: 3, lat: 4, mil: true }),
+      ])
+    })
+
+    it('draws nothing while every location is switched off', async () => {
+      const map = makeFakeMap()
+      mountMap()
+      shared.locationRef!.value = { lon: 3, lat: 4 }
+      bringUp(map)
+      last('overheadZone').setZones.mockClear()
+
+      // A location with neither class enabled is not watched, so it has no zone.
+      useAirStore().setOverheadAlert('user', { civil: false, mil: false })
+      await nextTick()
+
+      expect(last('overheadZone').setZones).not.toHaveBeenCalledWith([
+        expect.objectContaining({ lon: 3 }),
+      ])
+    })
+  })
+
   describe('user location visuals', () => {
-    it('clears the marker and overlays when the location is lost', async () => {
+    it('clears the marker when the location is lost', async () => {
       const map = makeFakeMap()
       mountMap()
       bringUp(map)
@@ -373,97 +535,78 @@ describe('AirMap', () => {
       shared.locationRef!.value = { lon: 5, lat: 10 }
       await nextTick()
       shared.marker!.remove.mockClear()
-      last('rangeRings').setLocationAvailable.mockClear()
-      last('overheadZone').setVisible.mockClear()
+      last('rangeRings').setOrigin.mockClear()
+      last('overheadZone').setZones.mockClear()
       shared.locationRef!.value = null
       await nextTick()
       expect(shared.marker!.remove).toHaveBeenCalled()
-      expect(last('rangeRings').setLocationAvailable).toHaveBeenCalledWith(false)
-      expect(last('overheadZone').setVisible).toHaveBeenCalledWith(false)
+      // The rings follow the ring origin, which defaults to the operator — so
+      // losing the fix resolves it to null and hides them.
+      expect(last('rangeRings').setOrigin).toHaveBeenCalledWith(null)
+      // The operator's own alert location goes with the fix, so its zone does too.
+      expect(last('overheadZone').setZones).toHaveBeenCalledWith([])
     })
 
-    it('updates ring + zone centre and restores visibility when a fix arrives', async () => {
+    it('updates the ring centre, marker and zones when a fix arrives', async () => {
       const air = useAirStore()
-      air.overlayStates.overheadAlertsCivil = true
+      air.setOverheadAlert('user', { civil: true })
       const map = makeFakeMap()
       mountMap()
       bringUp(map)
       shared.locationRef!.value = { lon: 5, lat: 10 }
       await nextTick()
-      expect(last('rangeRings').updateCenter).toHaveBeenCalledWith(5, 10)
-      expect(last('overheadZone').updateCenter).toHaveBeenCalledWith(5, 10)
+      expect(last('rangeRings').setOrigin).toHaveBeenCalledWith(
+        expect.objectContaining({ longitude: 5, latitude: 10, kind: 'user' }),
+      )
       expect(shared.marker!.update).toHaveBeenCalledWith(5, 10)
-      expect(last('rangeRings').setLocationAvailable).toHaveBeenCalledWith(true)
-      expect(last('overheadZone').setVisible).toHaveBeenLastCalledWith(true)
+      expect(last('overheadZone').setZones).toHaveBeenLastCalledWith([
+        expect.objectContaining({ lon: 5, lat: 10, civil: true }),
+      ])
     })
 
-    it('clears visuals on the userLocationCleared window event', () => {
+    it('drops the marker on the userLocationCleared window event', () => {
       const map = makeFakeMap()
       mountMap()
       bringUp(map)
-      last('overheadZone').setVisible.mockClear()
+      shared.marker!.remove.mockClear()
       window.dispatchEvent(new CustomEvent('sentinel:userLocationCleared'))
-      expect(last('overheadZone').setVisible).toHaveBeenCalledWith(false)
+      // Deterministic even if the location watcher already ran with a stale
+      // localStorage seed on reload.
+      expect(shared.marker!.remove).toHaveBeenCalled()
     })
 
-    it('toggles the overhead zone when alert overlays change', async () => {
-      const air = useAirStore()
+    it('hands the Sentry markers the operator position, and null without one', () => {
       const map = makeFakeMap()
       mountMap()
+      shared.locationRef!.value = { lon: 3, lat: 4 }
       bringUp(map)
-      last('overheadZone').setVisible.mockClear()
-      air.overlayStates.overheadAlertsMil = true
-      await nextTick()
-      expect(last('overheadZone').setVisible).toHaveBeenCalledWith(true)
-    })
+      const options = (
+        controlMocks.instances.sentrySites![0]!.args as [
+          unknown,
+          unknown,
+          { getUserLocation: () => unknown },
+        ]
+      )[2]
+      expect(options.getUserLocation()).toEqual([3, 4])
 
-    it('updates the overhead zone radius when it changes', async () => {
-      const air = useAirStore()
-      const map = makeFakeMap()
-      mountMap()
-      bringUp(map)
-      air.overheadAlertRadiusNm = 75
-      await nextTick()
-      expect(last('overheadZone').setRadiusNm).toHaveBeenCalledWith(75)
+      shared.locationRef!.value = null
+      expect(options.getUserLocation()).toBeNull()
     })
   })
 
-  describe('exposed 3D API', () => {
-    it('enables 3D: eases to pitch 45 and shows the controls panel', () => {
-      const panel = document.createElement('div')
-      panel.id = 'map-3d-controls'
-      panel.classList.add('map-3d-controls--hidden')
-      document.body.appendChild(panel)
+  describe('the flat map', () => {
+    it('reports 3D as off: the view was removed from the map options', () => {
       const map = makeFakeMap()
       const wrapper = mountMap()
       bringUp(map)
-      ;(wrapper.vm as unknown as { set3DActive: (on: boolean) => void }).set3DActive(true)
-      expect(localStorage.getItem('sentinel_3d')).toBe('1')
-      expect(panel.classList.contains('map-3d-controls--hidden')).toBe(false)
-      expect(map.easeTo).toHaveBeenCalledWith({ pitch: 45, duration: 400 })
-      expect((wrapper.vm as unknown as { is3DActive: () => boolean }).is3DActive()).toBe(true)
-    })
-
-    it('disables 3D: eases pitch and bearing back to zero', () => {
-      const map = makeFakeMap()
-      const wrapper = mountMap()
-      bringUp(map)
-      ;(wrapper.vm as unknown as { set3DActive: (on: boolean) => void }).set3DActive(false)
-      expect(localStorage.getItem('sentinel_3d')).toBe('0')
-      expect(map.easeTo).toHaveBeenCalledWith({ pitch: 0, bearing: 0, duration: 600 })
-    })
-
-    it('ignores set3DActive before the map exists', () => {
-      const wrapper = mountMap()
-      expect(() =>
-        (wrapper.vm as unknown as { set3DActive: (on: boolean) => void }).set3DActive(true),
-      ).not.toThrow()
-    })
-
-    it('setTargetPitch updates the target read back by getTargetPitch', () => {
-      const wrapper = mountMap()
-      ;(wrapper.vm as unknown as { setTargetPitch: (pitch: number) => void }).setTargetPitch(60)
-      expect((wrapper.vm as unknown as { getTargetPitch: () => number }).getTargetPitch()).toBe(60)
+      const vm = wrapper.vm as unknown as {
+        is3DActive: () => boolean
+        getTargetPitch: () => number
+      }
+      // The readers that still ask (ADS-B labels, base extrusions) always get a
+      // flat answer, and a stored `sentinel_3d` flag is deliberately ignored.
+      expect(vm.is3DActive()).toBe(false)
+      expect(vm.getTargetPitch()).toBe(0)
     })
 
     it('getMap returns the live map instance', () => {

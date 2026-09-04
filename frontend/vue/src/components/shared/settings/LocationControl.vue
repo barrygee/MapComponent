@@ -4,50 +4,52 @@
 
     <p v-if="pairError" class="settings-location-notice" role="alert">{{ pairError }}</p>
 
-    <div class="settings-location-field">
-      <label class="settings-location-label" :for="latitudeInputId">LAT</label>
-      <input
-        :id="latitudeInputId"
-        v-model="latitudeDraft"
-        type="text"
-        inputmode="decimal"
-        class="settings-location-input"
-        :class="{ 'settings-location-input--invalid': latitudeError !== null }"
-        :aria-invalid="latitudeError !== null"
-        :aria-describedby="latitudeError !== null ? latitudeErrorId : latitudeHintId"
-        placeholder="0.000"
-        spellcheck="false"
-        @input="onLatitudeInput"
-        @blur="onLatitudeBlur"
-        @keydown.enter="save"
-      />
-      <p v-if="latitudeError !== null" :id="latitudeErrorId" class="settings-location-error">
-        {{ latitudeError }}
-      </p>
-      <p v-else :id="latitudeHintId" class="settings-location-hint">{{ LATITUDE_HINT }}</p>
-    </div>
+    <div class="settings-location-fields">
+      <div class="settings-location-field">
+        <label class="settings-location-label" :for="latitudeInputId">LAT</label>
+        <input
+          :id="latitudeInputId"
+          v-model="latitudeDraft"
+          type="text"
+          inputmode="decimal"
+          class="settings-location-input"
+          :class="{ 'settings-location-input--invalid': latitudeError !== null }"
+          :aria-invalid="latitudeError !== null"
+          :aria-describedby="latitudeError !== null ? latitudeErrorId : latitudeHintId"
+          placeholder="0.000"
+          spellcheck="false"
+          @input="onLatitudeInput"
+          @blur="onLatitudeBlur"
+          @keydown.enter="save"
+        />
+        <p v-if="latitudeError !== null" :id="latitudeErrorId" class="settings-location-error">
+          {{ latitudeError }}
+        </p>
+        <p v-else :id="latitudeHintId" class="settings-location-hint">{{ LATITUDE_HINT }}</p>
+      </div>
 
-    <div class="settings-location-field">
-      <label class="settings-location-label" :for="longitudeInputId">LON</label>
-      <input
-        :id="longitudeInputId"
-        v-model="longitudeDraft"
-        type="text"
-        inputmode="decimal"
-        class="settings-location-input"
-        :class="{ 'settings-location-input--invalid': longitudeError !== null }"
-        :aria-invalid="longitudeError !== null"
-        :aria-describedby="longitudeError !== null ? longitudeErrorId : longitudeHintId"
-        placeholder="0.000"
-        spellcheck="false"
-        @input="onLongitudeInput"
-        @blur="onLongitudeBlur"
-        @keydown.enter="save"
-      />
-      <p v-if="longitudeError !== null" :id="longitudeErrorId" class="settings-location-error">
-        {{ longitudeError }}
-      </p>
-      <p v-else :id="longitudeHintId" class="settings-location-hint">{{ LONGITUDE_HINT }}</p>
+      <div class="settings-location-field">
+        <label class="settings-location-label" :for="longitudeInputId">LON</label>
+        <input
+          :id="longitudeInputId"
+          v-model="longitudeDraft"
+          type="text"
+          inputmode="decimal"
+          class="settings-location-input"
+          :class="{ 'settings-location-input--invalid': longitudeError !== null }"
+          :aria-invalid="longitudeError !== null"
+          :aria-describedby="longitudeError !== null ? longitudeErrorId : longitudeHintId"
+          placeholder="0.000"
+          spellcheck="false"
+          @input="onLongitudeInput"
+          @blur="onLongitudeBlur"
+          @keydown.enter="save"
+        />
+        <p v-if="longitudeError !== null" :id="longitudeErrorId" class="settings-location-error">
+          {{ longitudeError }}
+        </p>
+        <p v-else :id="longitudeHintId" class="settings-location-hint">{{ LONGITUDE_HINT }}</p>
+      </div>
     </div>
 
     <div class="settings-location-actions">
@@ -60,7 +62,7 @@
 
 <script setup lang="ts">
 /**
- * Settings > My Location — a fixed latitude/longitude for your own position.
+ * Settings > Sentinel Location — a fixed latitude/longitude for your own position.
  *
  * Mirrors Sentry's Sentry Location panel: a "last set" line, stacked labelled
  * fields with a decimal-degrees hint apiece, per-field validation on blur, and

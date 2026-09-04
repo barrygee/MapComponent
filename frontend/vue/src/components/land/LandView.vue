@@ -41,6 +41,7 @@ import { useLandStore } from '@/stores/land'
 import { useBasemapStore } from '@/stores/basemap'
 import { useConnectivity } from '@/composables/useConnectivity'
 import { useUserLocation } from '@/composables/useUserLocation'
+import { useRangeRingOrigin } from '@/composables/useRangeRingOrigin'
 import { useMapContextMenu } from '@/composables/useMapContextMenu'
 import MapLibreMap from '@/components/shared/MapLibreMap.vue'
 import NoUrlOverlay from '@/components/shared/NoUrlOverlay.vue'
@@ -70,16 +71,21 @@ const sdrStore = useSdrStore()
 const mapRef = ref<InstanceType<typeof MapLibreMap> | null>(null)
 const { ready: searchPaneReady } = useSidebarPaneTarget('search')
 
-// User location drives the "go to my location" button, the range rings' centre,
-// and the on-map location marker (shared app-wide via useUserLocation).
+// User location drives the "go to my location" button and the on-map location
+// marker (shared app-wide via useUserLocation).
 const { location: userLocation, start: startLocation } = useUserLocation()
 const getUserLocation = (): [number, number] | null =>
   userLocation.value ? [userLocation.value.lon, userLocation.value.lat] : null
 const _locationMarker = new UserLocationMarker('user-location-marker')
 
+// Where the range rings are centred — your own position by default, but equally
+// a Sentry site or a chosen point (see useRangeRingOrigin). Shared app-wide, so
+// the Air map and the Settings panel agree with this one.
+const { origin: ringOrigin } = useRangeRingOrigin()
+
 // Right-click "SET LOCATION" menu (matches the Air/Space maps). Setting a
 // location dispatches sentinel:setUserLocation, which useUserLocation handles
-// app-wide; the marker + range rings then follow via the userLocation watcher.
+// app-wide; the marker then follows via the userLocation watcher.
 const ctxMenu = useMapContextMenu()
 
 let _map: Map | null = null
@@ -120,7 +126,7 @@ function onMapCreated(m: Map) {
   // The map features are IControls that own their layers/markers. We init them
   // directly (onAdd) rather than adding their default buttons — the side menu
   // owns the visible controls — and hide the native control corner.
-  _rangeRingsControl = new LandRangeRingsControl(getUserLocation)
+  _rangeRingsControl = new LandRangeRingsControl(ringOrigin.value)
   _aprsControl = new AprsStationsControl(landStore)
   // Location names and roads are shared base-map layers driven by the
   // cross-domain basemap store, so Land shows whatever the other domains were
@@ -196,20 +202,29 @@ onMounted(() => {
     _aprsControl?.setVisible(hasSource && layers.includes('aprs'))
   })
 
-  // Keep the location marker + range-rings centre in sync with the live fix.
+  // Keep the location marker in sync with the live fix.
   watch(
     userLocation,
     (location) => {
       if (!location) {
         _locationMarker.remove()
-        _rangeRingsControl?.setLocationAvailable(false)
         return
       }
       _locationMarker.update(location.lon, location.lat)
-      _rangeRingsControl?.updateCenter(location.lon, location.lat)
-      _rangeRingsControl?.setLocationAvailable(true)
     },
     { immediate: true },
+  )
+
+  // The rings follow the chosen origin, not the operator. A null origin (no
+  // location set, or a pinned Sentry with no position yet) hides them, which is
+  // the same rule as before — it just now has three ways of being satisfied.
+  watch(ringOrigin, (origin) => _rangeRingsControl?.setOrigin(origin), { immediate: true })
+
+  // Place names are shared across domains, so this map follows the store too —
+  // whether the change came from its own rail button, the Air map, or Settings.
+  watch(
+    () => basemapStore.layers.names,
+    (on) => _namesControl?.setVisible(on),
   )
 })
 

@@ -24,6 +24,15 @@ const SENTRY_SITE_POLL_INTERVAL_MS = 15_000
 export const useSentrySitesStore = defineStore('sentrySites', () => {
   /** Every enabled Sentry host with a known position, newest snapshot wins. */
   const sites = ref<SentrySite[]>([])
+  /**
+   * True once a list has been fetched successfully at least once.
+   *
+   * An empty `sites` means two different things — "no host reports a position"
+   * and "we have not asked yet" — and a consumer that pins itself to one site
+   * (the range-ring origin) has to tell them apart: only the first is grounds
+   * for concluding the site is gone.
+   */
+  const loaded = ref(false)
 
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let pollers = 0
@@ -33,6 +42,7 @@ export const useSentrySitesStore = defineStore('sentrySites', () => {
   async function fetchSites(): Promise<void> {
     try {
       sites.value = await listSentrySites()
+      loaded.value = true
     } catch {
       /* offline / transient — keep the current list */
     }
@@ -55,5 +65,5 @@ export const useSentrySitesStore = defineStore('sentrySites', () => {
     pollTimer = null
   }
 
-  return { sites, fetchSites, startPolling, stopPolling }
+  return { sites, loaded, fetchSites, startPolling, stopPolling }
 })

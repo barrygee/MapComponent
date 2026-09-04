@@ -77,6 +77,41 @@ describe('useMapContextMenu', () => {
     window.removeEventListener('sentinel:setUserLocation', onSet)
   })
 
+  describe('keyboard operability', () => {
+    it('makes every item a named, focusable button', () => {
+      const menu = useMapContextMenu()
+      menu.show(fakeMouseEvent(1, 1))
+      for (const item of [...document.body.firstElementChild!.children] as HTMLElement[]) {
+        // A bare div with a click handler is reachable by mouse alone.
+        expect(item.getAttribute('role')).toBe('button')
+        expect(item.tabIndex).toBe(0)
+        expect(item.getAttribute('aria-label')).toBeTruthy()
+      }
+    })
+
+    it.each(['Enter', ' '])('activates an item on %s', (key) => {
+      const menu = useMapContextMenu()
+      const onSet = vi.fn()
+      window.addEventListener('sentinel:setUserLocation', onSet)
+      menu.show(fakeMouseEvent(2.35, 48.85))
+
+      const item = document.body.firstElementChild!.children[0] as HTMLElement
+      item.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+
+      expect(onSet).toHaveBeenCalledOnce()
+      expect(document.body.children).toHaveLength(0)
+      window.removeEventListener('sentinel:setUserLocation', onSet)
+    })
+
+    it('ignores other keys', () => {
+      const menu = useMapContextMenu()
+      menu.show(fakeMouseEvent(1, 1))
+      const item = document.body.firstElementChild!.children[0] as HTMLElement
+      item.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
+      expect(document.body.children).toHaveLength(1)
+    })
+  })
+
   it('the button adjusts opacity on hover', () => {
     const menu = useMapContextMenu()
     menu.show(fakeMouseEvent(1, 1))

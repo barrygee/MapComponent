@@ -391,10 +391,20 @@
   color: #c23a2d;
 }
 
+/* A latitude and a longitude are one coordinate, so they read as a pair on one
+   line rather than as two unrelated fields stacked down the panel. */
+.settings-location-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  max-width: 464px;
+}
+
 .settings-location-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .settings-location-label {
@@ -408,7 +418,11 @@
 }
 
 .settings-location-input {
+  /* A coordinate is ~10 characters; a full-card-width rule reads as an empty
+     text field rather than a number, so the underline stops where the value
+     plausibly ends. */
   width: 100%;
+  max-width: 220px;
   background: none;
   border: none;
   border-radius: 0;

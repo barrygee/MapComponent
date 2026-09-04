@@ -143,6 +143,7 @@ import SettingsPanel from '@/components/shared/SettingsPanel.vue'
 import SdrTabPanel from '@/components/sdr/SdrTabPanel.vue'
 import { useUserLocation } from '@/composables/useUserLocation'
 import { useDocumentEvent } from '@/composables/useDocumentEvent'
+import { useRangeRingOrigin } from '@/composables/useRangeRingOrigin'
 import { useAirAlertsService } from '@/composables/useAirAlertsService'
 import { useSpaceAlertsService } from '@/composables/useSpaceAlertsService'
 import { useAppStore } from '@/stores/app'
@@ -153,6 +154,7 @@ const route = useRoute()
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
 const { locationUnavailable, start: startGps, hydrateFromConfig } = useUserLocation()
+const { hydrateFromConfig: hydrateRingOriginFromConfig } = useRangeRingOrigin()
 const notificationsStore = useNotificationsStore()
 
 onMounted(async () => {
@@ -160,6 +162,9 @@ onMounted(async () => {
   // marker, an explicitly-cleared one drops any stale manual override so
   // GPS (started next) can reposition rather than pinning the old marker.
   await hydrateFromConfig()
+  // The ring origin follows the operator to another browser the same way the
+  // location does; a missing key leaves the local choice alone.
+  await hydrateRingOriginFromConfig()
   startGps()
   // App-level alert services run independently of the active section so
   // aircraft/overhead/satellite-pass alerts fire from any page.

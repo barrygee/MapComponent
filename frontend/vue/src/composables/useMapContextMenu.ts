@@ -35,7 +35,14 @@ export function useMapContextMenu() {
     el.style.left = cx - markerCenterX + 'px'
     el.style.top = cy - markerCenterY + 'px'
 
+    // The menu's one item: the 60px SENTINEL ⊙ mark with a black pill butted
+    // against it, a circle masked out of the pill's leading edge so the two read
+    // as one object. `role="button"` + a tab stop + Enter/Space, because a bare
+    // `div` with a click handler is reachable by mouse alone (WCAG 2.1.1).
     const setLocBtn = document.createElement('div')
+    setLocBtn.setAttribute('role', 'button')
+    setLocBtn.tabIndex = 0
+    setLocBtn.setAttribute('aria-label', `SET LOCATION — ${latStr} ${lonStr}`)
     setLocBtn.style.cssText = `padding:${PAD_Y}px ${PAD_X}px;cursor:pointer;white-space:nowrap;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:0`
     setLocBtn.innerHTML =
       `<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" overflow="visible" style="flex-shrink:0">` +
@@ -44,18 +51,29 @@ export function useMapContextMenu() {
       `<circle cx="30" cy="30" r="13.1" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-dasharray="82.31" stroke-dashoffset="82.31" style="animation: marker-circle-draw 0.6s ease forwards" />` +
       `<circle cx="30" cy="30" r="5.2" fill="#c8ff00" />` +
       `</svg><span style="position:relative;margin-left:-30px;display:inline-flex;flex-direction:column;justify-content:center;align-items:flex-start;min-height:42px;padding:4px 12px 4px 24px;color:rgba(255,255,255,0.7);-webkit-mask-image:radial-gradient(circle 16px at 0px 50%, transparent 16px, black 16.5px);mask-image:radial-gradient(circle 16px at 0px 50%, transparent 16px, black 16.5px);background:#000;border-radius:6px"><span style="line-height:1.2">SET LOCATION</span><span style="line-height:1.2;font-size:9px;font-weight:400;letter-spacing:.12em;color:rgba(255,255,255,0.45);margin-top:2px">${latStr}  ${lonStr}</span></span>`
+
+    function setLocation(): void {
+      window.dispatchEvent(
+        new CustomEvent('sentinel:setUserLocation', { detail: { longitude: lng, latitude: lat } }),
+      )
+      remove()
+    }
+
     setLocBtn.addEventListener('mouseenter', () => {
       setLocBtn.style.opacity = '0.85'
     })
     setLocBtn.addEventListener('mouseleave', () => {
       setLocBtn.style.opacity = ''
     })
-    setLocBtn.addEventListener('click', (ev) => {
-      ev.stopPropagation()
-      window.dispatchEvent(
-        new CustomEvent('sentinel:setUserLocation', { detail: { longitude: lng, latitude: lat } }),
-      )
-      remove()
+    setLocBtn.addEventListener('click', (domEvent) => {
+      domEvent.stopPropagation()
+      setLocation()
+    })
+    setLocBtn.addEventListener('keydown', (domEvent) => {
+      if (domEvent.key !== 'Enter' && domEvent.key !== ' ') return
+      domEvent.preventDefault()
+      domEvent.stopPropagation()
+      setLocation()
     })
     el.appendChild(setLocBtn)
 

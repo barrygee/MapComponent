@@ -46,6 +46,30 @@ describe('sentrySites store', () => {
     expect(store.sites).toEqual([SITE])
   })
 
+  describe('the loaded flag', () => {
+    it('starts false, before any list has been seen', () => {
+      expect(useSentrySitesStore().loaded).toBe(false)
+    })
+
+    it('is set once a list arrives, even an empty one', async () => {
+      stubFetch([])
+      const store = useSentrySitesStore()
+      await store.fetchSites()
+      // "No host reports a position" and "we have not asked yet" are different
+      // facts, and the range-ring origin has to tell them apart before
+      // concluding its pinned host is gone.
+      expect(store.sites).toEqual([])
+      expect(store.loaded).toBe(true)
+    })
+
+    it('stays false while the fetch keeps failing', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+      const store = useSentrySitesStore()
+      await store.fetchSites()
+      expect(store.loaded).toBe(false)
+    })
+  })
+
   it('keeps the last-known list when a refresh fails', async () => {
     stubFetch([SITE])
     const store = useSentrySitesStore()

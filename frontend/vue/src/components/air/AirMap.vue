@@ -27,6 +27,8 @@ import { useSettingsStore } from '@/stores/settings'
 import { useSentrySitesStore } from '@/stores/sentrySites'
 import { useConnectivity } from '@/composables/useConnectivity'
 import { useUserLocation } from '@/composables/useUserLocation'
+import { useRangeRingOrigin } from '@/composables/useRangeRingOrigin'
+import { useOverheadAlertZones } from '@/composables/useOverheadAlertZones'
 import { useMapContextMenu } from '@/composables/useMapContextMenu'
 import MapLibreMap from '@/components/shared/MapLibreMap.vue'
 import { UserLocationMarker } from '@/components/shared/UserLocationMarker'
@@ -63,12 +65,12 @@ const STYLE_OFFLINE = '/assets/fiord.json'
 
 const styleUrl = computed(() => (appStore.isOnline ? STYLE_ONLINE : STYLE_OFFLINE))
 
-// 3D state — plain variables, never reactive
-let _tiltActive = localStorage.getItem('sentinel_3d') === '1'
-let _targetPitch = _tiltActive ? 45 : 0
-
-const is3DActive = () => _tiltActive
-const getTargetPitch = () => _targetPitch
+// The 3D view was removed from the map options, so the map is always flat. The
+// two readers below (ADS-B labels, military-base extrusions) still ask, and a
+// previously-stored `sentinel_3d` flag is deliberately not honoured — without a
+// control to turn it off, a tilted map would be a state with no way out.
+const is3DActive = () => false
+const getTargetPitch = () => 0
 
 // User location
 const { location: userLocation, start: startLocation } = useUserLocation()
@@ -76,6 +78,14 @@ const getUserLocation = (): [number, number] | null =>
   userLocation.value ? [userLocation.value.lon, userLocation.value.lat] : null
 
 const _locationMarker = new UserLocationMarker('user-location-marker')
+
+// Where the range rings are centred — your own position by default, but equally
+// a Sentry site or a chosen point (see useRangeRingOrigin). Shared app-wide, so
+// the Land map and the Settings panel agree with this one.
+const { origin: ringOrigin } = useRangeRingOrigin()
+// One shaded zone per watched place — the map's half of the same list the
+// alert service works from, so the rings and the alerts can never disagree.
+const { activeZones } = useOverheadAlertZones()
 
 const ctxMenu = useMapContextMenu()
 
@@ -126,24 +136,6 @@ defineExpose({
   getClearControl,
   is3DActive,
   getTargetPitch,
-  set3DActive(active: boolean) {
-    const m = _map
-    if (!m) return
-    _tiltActive = active
-    localStorage.setItem('sentinel_3d', active ? '1' : '0')
-    const panel3d = document.getElementById('map-3d-controls')
-    if (panel3d) panel3d.classList.toggle('map-3d-controls--hidden', !active)
-    if (active) {
-      _targetPitch = 45
-      m.easeTo({ pitch: 45, duration: 400 })
-    } else {
-      _targetPitch = 0
-      m.easeTo({ pitch: 0, bearing: 0, duration: 600 })
-    }
-  },
-  setTargetPitch(p: number) {
-    _targetPitch = p
-  },
   getMap: () => _map,
 })
 
@@ -200,13 +192,14 @@ function onStyleLoaded(m: MapLibreGlMap) {
   ;(adsbLabelsControl as unknown as { _adsbControl: AdsbLiveControl | null })._adsbControl =
     adsbControl
 
-  rangeRingsControl = new RangeRingsControl(airStore, getUserLocation)
-  const initialLoc = getUserLocation()
-  overheadZoneControl = new OverheadZoneControl(
-    airStore.overlayStates.overheadAlertsCivil || airStore.overlayStates.overheadAlertsMil,
-    initialLoc,
-    airStore.overheadAlertRadiusNm,
-  )
+  // The ADS-B filters are the one pair the control does not seed from the store
+  // itself, so the stored choice is applied as it is built. (The store holds
+  // them as "shown"; the control takes "hide".)
+  adsbControl.setHideGroundVehicles(!airStore.overlayStates.groundVehicles)
+  adsbControl.setHideTowers(!airStore.overlayStates.towers)
+
+  rangeRingsControl = new RangeRingsControl(airStore, ringOrigin.value)
+  overheadZoneControl = new OverheadZoneControl(activeZones.value)
   // Overhead-alert detection runs app-wide in useAirAlertsService (fires from
   // any section). AirMap keeps only the visual OverheadZoneControl ring. We
   // still register the aircraft-click handler so clicking an overhead alert
@@ -253,9 +246,6 @@ function onStyleLoaded(m: MapLibreGlMap) {
     userMarker: _locationMarker,
   })
   sentrySitesControl.onAdd(m)
-
-  // Restore 3D pitch after initial load
-  if (_tiltActive) m.easeTo({ pitch: 45, duration: 400 })
 
   // If connectivity mode changed between map creation and style load (e.g. the offgrid
   // probe fired before _map was set so the callback was a no-op), the map has loaded
@@ -335,14 +325,14 @@ function _stopPlaybackTimer(): void {
   }
 }
 
-// Drop the marker + hide the location-anchored overlays. Bound both to the
-// userLocation watcher (null transition) and to sentinel:userLocationCleared
-// so a config-clear is deterministic even if the watcher already ran with a
-// stale localStorage seed on reload (ordering-independent).
+// Drop the marker. Bound both to the userLocation watcher (null transition) and
+// to sentinel:userLocationCleared so a config-clear is deterministic even if the
+// watcher already ran with a stale
+// localStorage seed on reload (ordering-independent). The range rings are not
+// handled here: they follow the ring origin, which only tracks the location
+// when that is what the operator chose to centre on.
 function _clearLocationVisuals(): void {
   _locationMarker.remove()
-  rangeRingsControl?.setLocationAvailable(false)
-  overheadZoneControl?.setVisible(false)
 }
 
 onMounted(() => {
@@ -351,43 +341,80 @@ onMounted(() => {
     userLocation,
     (loc) => {
       if (!loc) {
-        // Location was cleared (e.g. config emptied). Drop the marker AND hide
-        // the range rings / overhead zone — otherwise they linger at the old
-        // centre (or snap to map-centre) until GPS provides a new fix.
+        // Location was cleared (e.g. config emptied). Drop the marker; the
+        // overhead zones follow the alert locations, and the operator's own
+        // entry disappears from that list with the fix.
         _clearLocationVisuals()
         return
       }
-      rangeRingsControl?.updateCenter(loc.lon, loc.lat)
-      overheadZoneControl?.updateCenter(loc.lon, loc.lat)
       _locationMarker.update(loc.lon, loc.lat)
-      // Location is back — restore overlays per the user's own toggles.
-      rangeRingsControl?.setLocationAvailable(true)
-      overheadZoneControl?.setVisible(
-        airStore.overlayStates.overheadAlertsCivil || airStore.overlayStates.overheadAlertsMil,
-      )
     },
     { immediate: true },
   )
 
-  // Only the visual ring is driven here; overhead-alert detection lives in
-  // useAirAlertsService.
+  // The rings follow the chosen origin, not the operator. A null origin (no
+  // location set, or a pinned Sentry with no position yet) hides them, which is
+  // the same rule as before — it just now has three ways of being satisfied.
+  watch(ringOrigin, (origin) => rangeRingsControl?.setOrigin(origin), { immediate: true })
+
+  // Settings > Map Layers writes the same overlay flags the rail buttons do, so
+  // the map follows the store rather than either surface. Each control keeps its
+  // own `visible` and flips it through `toggle()`, so the sync is "toggle when
+  // the control and the store disagree" — which also makes a rail click, whose
+  // own toggle already wrote the store, a no-op here.
+  function syncOverlay(
+    isOn: () => boolean,
+    control: () => { visible: boolean; toggle: () => void } | null,
+  ): void {
+    watch(isOn, (on) => {
+      const c = control()
+      if (c && c.visible !== on) c.toggle()
+    })
+  }
+  syncOverlay(
+    () => airStore.overlayStates.airports,
+    () => airportsControl,
+  )
+  syncOverlay(
+    () => airStore.overlayStates.militaryBases,
+    () => militaryBasesControl,
+  )
+  syncOverlay(
+    () => airStore.overlayStates.aara,
+    () => aaraControl,
+  )
+  syncOverlay(
+    () => airStore.overlayStates.awacs,
+    () => awacsControl,
+  )
   watch(
-    () =>
-      [
-        airStore.overlayStates.overheadAlertsCivil,
-        airStore.overlayStates.overheadAlertsMil,
-      ] as const,
-    ([civil, mil]) => {
-      overheadZoneControl?.setVisible(civil || mil)
+    () => airStore.overlayStates.rangeRings,
+    (on) => {
+      if (rangeRingsControl && rangeRingsControl.ringsVisible !== on) {
+        rangeRingsControl.handleClickPublic()
+      }
     },
+  )
+  // Ground vehicles and towers are ADS-B filters rather than layers, and the
+  // store holds them as "shown", which is the inverse of the control's "hide".
+  watch(
+    () => airStore.overlayStates.groundVehicles,
+    (shown) => adsbControl?.setHideGroundVehicles(!shown),
+  )
+  watch(
+    () => airStore.overlayStates.towers,
+    (shown) => adsbControl?.setHideTowers(!shown),
+  )
+  // Place names are a shared base-map layer, so this one follows the basemap
+  // store — and is equally how the Land map's own names button reaches this map.
+  watch(
+    () => basemapStore.layers.names,
+    (on) => namesControl?.setVisible(on),
   )
 
-  watch(
-    () => airStore.overheadAlertRadiusNm,
-    (nm) => {
-      overheadZoneControl?.setRadiusNm(nm)
-    },
-  )
+  // Only the drawn zones are driven here; overhead-alert detection lives in
+  // useAirAlertsService, off the same list.
+  watch(activeZones, (zones) => overheadZoneControl?.setZones(zones), { immediate: true })
 
   watch(
     () => playbackStore.status,
