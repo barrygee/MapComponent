@@ -140,6 +140,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Whole Sentry marker is the button, counted with your own position (#301)
 - Hold a Sentry count until its marks genuinely clear each other (#304)
 - APRS receiver in settings, gated map layer, and reserved-radio locking (#305)
+- Centralise map layers, range ring origin and overhead alerts
 
 ### Bug Fixes
 
@@ -345,6 +346,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Restore the Air domain's live aircraft feed (#293)
 - Back off when the ADS-B upstream returns 429 (#294)
 - Keep map markers on their own coordinates, and lighten the Sentry dot (#300)
+- Dismiss teleported menus only on clicks outside them
 
 ### Chores
 
@@ -369,6 +371,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Rebuild the SPA bundle
 - Prune trunk-tracking settings and record the removal in ADRs (#284)
 - Map host.docker.internal for host-side SDR relays
+- Rebuild SPA bundle
 
 ### Other
 
@@ -1165,6 +1168,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #269 from barrygee/fix/settings-json-editors-two-columns
 - Merge pull request #270 from barrygee/fix/filter-first-row-expanded-gap
 - Merge pull request #286 from barrygee/feat/location-panel-sentry-parity
+- Merge pull request #306 from barrygee/feat/range-ring-origin
 
 ### Refactoring
 
