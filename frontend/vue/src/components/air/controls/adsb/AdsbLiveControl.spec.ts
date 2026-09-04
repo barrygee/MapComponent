@@ -70,7 +70,7 @@ interface ApiEntry {
   category?: string
   emergency?: string
   squawk?: string
-  military?: boolean
+  dbFlags?: number
   [k: string]: unknown
 }
 function apiEntry(overrides: ApiEntry = {}): ApiEntry {
@@ -3002,16 +3002,25 @@ describe('AdsbLiveControl fetch field fallbacks', () => {
     expect(feature.properties.track).toBe(0)
   })
 
-  it('derives military status from the type code', async () => {
+  it('derives military status from the feed dbFlags marker', async () => {
     const { control } = mounted()
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: () =>
-        Promise.resolve({ ac: [apiEntry({ hex: 'mlt', t: 'F15', military: undefined })] }),
+        Promise.resolve({
+          ac: [
+            // A civil-block hex the database marks military — only dbFlags can
+            // classify this one, so it proves the marker is actually read.
+            apiEntry({ hex: 'aab198', t: 'C172', dbFlags: 1 }),
+            apiEntry({ hex: '400f1a', t: 'B738', dbFlags: 0 }),
+          ],
+        }),
     } as Response)
     await priv(control)._fetch()
-    expect(control._geojson.features.find((f) => f.properties.hex === 'mlt')).toBeDefined()
+    const features = control._geojson.features
+    expect(features.find((f) => f.properties.hex === 'aab198')!.properties.military).toBe(true)
+    expect(features.find((f) => f.properties.hex === '400f1a')!.properties.military).toBe(false)
   })
 })
 
