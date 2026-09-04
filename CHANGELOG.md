@@ -141,6 +141,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Hold a Sentry count until its marks genuinely clear each other (#304)
 - APRS receiver in settings, gated map layer, and reserved-radio locking (#305)
 - Centralise map layers, range ring origin and overhead alerts
+- Add optional time labels down the waterfall (#309)
 
 ### Bug Fixes
 
