@@ -22,6 +22,7 @@
   <Teleport to="body">
     <div
       v-if="menuOpen"
+      ref="menuRef"
       class="sdr-device-menu sdr-device-menu--open"
       :class="menuClass"
       :style="menuStyle"
@@ -115,13 +116,14 @@ const emit = defineEmits<{
 }>()
 
 const triggerRef = ref<HTMLElement | null>(null)
+const menuRef = ref<HTMLElement | null>(null)
 const {
   menuOpen,
   menuStyle,
   openMenu: openTeleportedMenu,
   toggleMenu: toggleTeleportedMenu,
   closeMenu,
-} = useTeleportedMenu()
+} = useTeleportedMenu({ menuElement: menuRef })
 
 // Watching the ref (rather than wrapping open/close) catches every state
 // change, including the composable's own dismissals (outside click, scroll,

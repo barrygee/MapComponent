@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import maplibregl from 'maplibre-gl'
-import { OverheadZoneControl, OVERHEAD_ZONE_RADIUS_NM } from './OverheadZoneControl'
+import { OverheadZoneControl } from './OverheadZoneControl'
 
 const SOURCE_ID = 'overhead-zone'
 const FILL_ID = 'overhead-zone-fill'
@@ -56,231 +56,203 @@ function fakeMap(options: { styleLoaded?: boolean } = {}): FakeMap {
   }
 }
 
-const CENTER: [number, number] = [-1, 51]
+/** One drawn zone, defaulting to a 10 nm circle at the operator's position. */
+function zone(overrides: Partial<{ lon: number; lat: number; radiusNm: number }> = {}) {
+  return { lon: -1, lat: 51, radiusNm: 10, ...overrides }
+}
+
+/** The FeatureCollection last written to the source, whether at init or after. */
+function writtenZones(map: FakeMap): GeoJSON.FeatureCollection {
+  if (map.setData.mock.calls.length > 0) {
+    return map.setData.mock.calls.at(-1)![0] as GeoJSON.FeatureCollection
+  }
+  const call = map.addSource.mock.calls.at(-1)!
+  return (call[1] as { data: GeoJSON.FeatureCollection }).data
+}
 
 describe('OverheadZoneControl.onAdd', () => {
-  it('builds the source and fill/line layers immediately when the style is loaded', () => {
-    const control = new OverheadZoneControl(true, CENTER)
+  it('builds the source and both layers when the style is already loaded', () => {
     const map = fakeMap({ styleLoaded: true })
-    control.onAdd(map.map)
+    new OverheadZoneControl([zone()]).onAdd(map.map)
 
     expect(map.addSource).toHaveBeenCalledWith(
       SOURCE_ID,
       expect.objectContaining({ type: 'geojson' }),
     )
-    expect(map.addLayer).toHaveBeenCalledWith(
-      expect.objectContaining({ id: FILL_ID, type: 'fill' }),
-    )
-    expect(map.addLayer).toHaveBeenCalledWith(
-      expect.objectContaining({ id: LINE_ID, type: 'line' }),
-    )
+    expect([...map.layers]).toEqual([FILL_ID, LINE_ID])
   })
 
-  it('defers initialisation to style.load when the style is not ready', () => {
-    const control = new OverheadZoneControl(true, CENTER)
+  it('defers the build to style.load when the style is not ready', () => {
     const map = fakeMap({ styleLoaded: false })
-    control.onAdd(map.map)
+    new OverheadZoneControl([zone()]).onAdd(map.map)
+
     expect(map.addSource).not.toHaveBeenCalled()
     map.styleLoadHandlers[0]!()
     expect(map.addSource).toHaveBeenCalledOnce()
   })
 
-  it('builds an empty source and keeps layers hidden when there is no centre', () => {
-    const control = new OverheadZoneControl(true, null)
+  it('draws the zones it was constructed with, so the first paint is not a frame behind', () => {
     const map = fakeMap()
-    control.onAdd(map.map)
-    const data = map.addSource.mock.calls[0]![1] as { data: GeoJSON.GeoJsonObject }
-    expect((data.data as GeoJSON.FeatureCollection).features).toHaveLength(0)
+    new OverheadZoneControl([zone(), zone({ lat: 55 })]).onAdd(map.map)
+
+    expect(writtenZones(map).features).toHaveLength(2)
+    expect(map.setLayoutProperty).toHaveBeenCalledWith(FILL_ID, 'visibility', 'visible')
+  })
+
+  it('starts hidden and empty with nothing to watch', () => {
+    const map = fakeMap()
+    new OverheadZoneControl().onAdd(map.map)
+
+    expect(writtenZones(map).features).toHaveLength(0)
     expect(map.setLayoutProperty).toHaveBeenCalledWith(FILL_ID, 'visibility', 'none')
   })
 
-  it('removes pre-existing layers/source before rebuilding', () => {
-    const control = new OverheadZoneControl(true, CENTER)
+  it('tears down pre-existing layers and the source before rebuilding', () => {
     const map = fakeMap()
     map.layers.add(FILL_ID)
     map.layers.add(LINE_ID)
     map.sources.add(SOURCE_ID)
-    control.onAdd(map.map)
+
+    new OverheadZoneControl([zone()]).onAdd(map.map)
+
     expect(map.removeLayer).toHaveBeenCalledWith(LINE_ID)
     expect(map.removeLayer).toHaveBeenCalledWith(FILL_ID)
     expect(map.removeSource).toHaveBeenCalledWith(SOURCE_ID)
   })
 })
 
-describe('OverheadZoneControl visibility', () => {
-  it('shows the zone when visible and a centre exists', () => {
-    const control = new OverheadZoneControl(true, CENTER)
+describe('OverheadZoneControl.setZones', () => {
+  it('draws one circle per watched place', () => {
     const map = fakeMap()
+    const control = new OverheadZoneControl()
     control.onAdd(map.map)
+
+    // Each Sentry watches its own patch of sky, so each gets its own circle.
+    control.setZones([zone(), zone({ lat: 55, radiusNm: 40 })])
+
+    expect(writtenZones(map).features).toHaveLength(2)
+  })
+
+  it('shows the layers once there is something to draw', () => {
+    const map = fakeMap()
+    const control = new OverheadZoneControl()
+    control.onAdd(map.map)
+    map.setLayoutProperty.mockClear()
+
+    control.setZones([zone()])
+
     expect(map.setLayoutProperty).toHaveBeenCalledWith(FILL_ID, 'visibility', 'visible')
     expect(map.setLayoutProperty).toHaveBeenCalledWith(LINE_ID, 'visibility', 'visible')
   })
 
-  it('hides the zone when setVisible(false) is called', () => {
-    const control = new OverheadZoneControl(true, CENTER)
+  it('hides them again when every place is switched off', () => {
     const map = fakeMap()
+    const control = new OverheadZoneControl([zone()])
     control.onAdd(map.map)
     map.setLayoutProperty.mockClear()
 
-    control.setVisible(false)
+    control.setZones([])
+
+    expect(writtenZones(map).features).toHaveLength(0)
     expect(map.setLayoutProperty).toHaveBeenCalledWith(FILL_ID, 'visibility', 'none')
-    expect(map.setLayoutProperty).toHaveBeenCalledWith(LINE_ID, 'visibility', 'none')
   })
 
-  it('keeps the zone hidden when visible but no centre exists', () => {
-    const control = new OverheadZoneControl(true, null)
+  it('honours each zone’s own radius', () => {
     const map = fakeMap()
-    control.onAdd(map.map)
-    // Only the 'none' visibility should ever be applied with no centre.
-    const visibleCalls = map.setLayoutProperty.mock.calls.filter((args) => args[2] === 'visible')
-    expect(visibleCalls).toHaveLength(0)
-  })
-
-  it('does nothing when no map is attached', () => {
-    const control = new OverheadZoneControl(true, CENTER)
-    expect(() => control.setVisible(false)).not.toThrow()
-  })
-})
-
-describe('OverheadZoneControl.setRadiusNm', () => {
-  it('ignores non-finite or non-positive radii', () => {
-    const control = new OverheadZoneControl(true, CENTER)
-    const map = fakeMap()
-    control.onAdd(map.map)
-    map.setData.mockClear()
-
-    control.setRadiusNm(Number.NaN)
-    control.setRadiusNm(0)
-    control.setRadiusNm(-5)
-    expect(map.setData).not.toHaveBeenCalled()
-  })
-
-  it('rewrites the source data for a valid radius when a centre and source exist', () => {
-    const control = new OverheadZoneControl(true, CENTER)
-    const map = fakeMap()
+    const control = new OverheadZoneControl()
     control.onAdd(map.map)
 
-    control.setRadiusNm(25)
-    expect(map.setData).toHaveBeenCalledOnce()
+    control.setZones([zone({ radiusNm: 5 }), zone({ radiusNm: 50 })])
+
+    const [small, large] = writtenZones(map).features as GeoJSON.Feature<GeoJSON.Polygon>[]
+    const spread = (feature: GeoJSON.Feature<GeoJSON.Polygon>) => {
+      const lats = feature.geometry.coordinates[0]!.map((coordinate) => coordinate[1]!)
+      return Math.max(...lats) - Math.min(...lats)
+    }
+    expect(spread(large!)).toBeGreaterThan(spread(small!))
   })
 
-  it('reinitialises when a valid radius is set but the source is missing', () => {
-    const control = new OverheadZoneControl(true, CENTER)
-    const map = fakeMap()
-    control.onAdd(map.map)
-    map.sources.delete(SOURCE_ID) // simulate the source vanishing
-    map.addSource.mockClear()
-
-    control.setRadiusNm(25)
-    expect(map.addSource).toHaveBeenCalledOnce()
-  })
-
-  it('only stores the radius when there is no map or centre', () => {
-    const control = new OverheadZoneControl(true, null)
-    // No map attached: setRadiusNm must not throw and must not try to render.
-    expect(() => control.setRadiusNm(25)).not.toThrow()
-  })
-
-  it('defaults the radius to the exported constant', () => {
-    expect(OVERHEAD_ZONE_RADIUS_NM).toBe(10)
-  })
-})
-
-describe('OverheadZoneControl.updateCenter', () => {
-  it('sets the source data when the source already exists', () => {
-    const control = new OverheadZoneControl(true, CENTER)
-    const map = fakeMap()
-    control.onAdd(map.map)
-
-    control.updateCenter(2, 49)
-    expect(map.setData).toHaveBeenCalledOnce()
-  })
-
-  it('reinitialises when no source exists yet', () => {
-    const control = new OverheadZoneControl(true, CENTER)
+  it('builds the layers if the source is not there yet', () => {
     const map = fakeMap({ styleLoaded: false })
-    control.onAdd(map.map) // deferred → no source
-    map.addSource.mockClear()
+    const control = new OverheadZoneControl()
+    control.onAdd(map.map) // deferred — no source
 
-    control.updateCenter(2, 49)
+    control.setZones([zone()])
+
     expect(map.addSource).toHaveBeenCalledOnce()
   })
 
-  it('applies visibility when a centre is gained for the first time', () => {
-    const control = new OverheadZoneControl(true, null)
-    const map = fakeMap()
-    control.onAdd(map.map) // empty source, no centre
-    map.setLayoutProperty.mockClear()
-
-    control.updateCenter(2, 49)
-    // Gaining a centre flips the gate, so the zone becomes visible.
-    expect(map.setLayoutProperty).toHaveBeenCalledWith(FILL_ID, 'visibility', 'visible')
-  })
-
-  it('is a no-op without a map', () => {
-    const control = new OverheadZoneControl(true, CENTER)
-    expect(() => control.updateCenter(2, 49)).not.toThrow()
+  it('is a no-op before the control has a map', () => {
+    const control = new OverheadZoneControl()
+    expect(() => control.setZones([zone()])).not.toThrow()
   })
 })
 
-describe('OverheadZoneControl.reinit and onRemove', () => {
-  it('reinit rebuilds the source when a map is attached', () => {
-    const control = new OverheadZoneControl(true, CENTER)
+describe('OverheadZoneControl teardown and restyle', () => {
+  it('reinit rebuilds after a style swap drops the layers', () => {
     const map = fakeMap()
+    const control = new OverheadZoneControl([zone()])
     control.onAdd(map.map)
-    map.addSource.mockClear()
 
     control.reinit()
-    expect(map.addSource).toHaveBeenCalledOnce()
+
+    expect(map.addSource).toHaveBeenCalledTimes(2)
   })
 
-  it('reinit is a no-op without a map', () => {
-    const control = new OverheadZoneControl(true, CENTER)
+  it('reinit is a no-op with no map', () => {
+    const control = new OverheadZoneControl([zone()])
     expect(() => control.reinit()).not.toThrow()
   })
 
-  it('onRemove tears down layers and source and clears the map', () => {
-    const control = new OverheadZoneControl(true, CENTER)
+  it('onRemove drops both layers and the source', () => {
     const map = fakeMap()
+    const control = new OverheadZoneControl([zone()])
     control.onAdd(map.map)
 
     control.onRemove()
+
     expect(map.removeLayer).toHaveBeenCalledWith(LINE_ID)
     expect(map.removeLayer).toHaveBeenCalledWith(FILL_ID)
     expect(map.removeSource).toHaveBeenCalledWith(SOURCE_ID)
-    // A second onRemove with the map cleared must be a safe no-op.
-    expect(() => control.onRemove()).not.toThrow()
   })
 
-  it('onRemove skips teardown when the layers/source were never created', () => {
-    const control = new OverheadZoneControl(true, CENTER)
-    const map = fakeMap({ styleLoaded: false }) // deferred → nothing built yet
-    control.onAdd(map.map)
-
-    control.onRemove()
-    expect(map.removeLayer).not.toHaveBeenCalled()
-    expect(map.removeSource).not.toHaveBeenCalled()
-  })
-})
-
-describe('OverheadZoneControl deferred lifecycle edge cases', () => {
-  it('applies visibility without touching absent layers before initialisation', () => {
-    const control = new OverheadZoneControl(true, CENTER)
-    const map = fakeMap({ styleLoaded: false }) // deferred → no layers yet
-    control.onAdd(map.map)
-    // setVisible runs _applyVisibility, but the fill/line layers do not exist.
-    expect(() => control.setVisible(false)).not.toThrow()
-    expect(map.setLayoutProperty).not.toHaveBeenCalled()
-  })
-
-  it('ignores a style.load that fires after the control was removed', () => {
-    const control = new OverheadZoneControl(true, CENTER)
+  it('ignores a style.load that arrives after the control was removed', () => {
     const map = fakeMap({ styleLoaded: false })
+    const control = new OverheadZoneControl([zone()])
     control.onAdd(map.map)
-    control.onRemove() // map detached before the deferred init runs
+    control.onRemove()
 
-    // The captured style.load handler now runs against a null map → no-op.
-    expect(() => map.styleLoadHandlers[0]!()).not.toThrow()
+    // The deferred build must not resurrect layers on a map it has left.
+    map.styleLoadHandlers[0]!()
+
     expect(map.addSource).not.toHaveBeenCalled()
+  })
+
+  it('onRemove is a safe no-op when never added', () => {
+    expect(() => new OverheadZoneControl().onRemove()).not.toThrow()
+  })
+
+  it('onRemove tolerates layers a style swap already dropped', () => {
+    const map = fakeMap()
+    const control = new OverheadZoneControl([zone()])
+    control.onAdd(map.map)
+    map.layers.clear()
+    map.sources.clear()
+
+    expect(() => control.onRemove()).not.toThrow()
+    expect(map.removeLayer).not.toHaveBeenCalled()
+  })
+
+  it('setZones tolerates the layers being absent while the source survives', () => {
+    const map = fakeMap()
+    const control = new OverheadZoneControl([zone()])
+    control.onAdd(map.map)
+    // A style reload can drop the layers while the source is still registered.
+    map.layers.clear()
+    map.setLayoutProperty.mockClear()
+
+    control.setZones([zone({ lat: 55 })])
+
+    expect(map.setLayoutProperty).not.toHaveBeenCalled()
   })
 })

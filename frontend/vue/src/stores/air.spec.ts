@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useAirStore, DEFAULT_OVERHEAD_ALERT_RADIUS_NM } from './air'
+import {
+  useAirStore,
+  DEFAULT_OVERHEAD_ALERT_RADIUS_NM,
+  USER_ALERT_LOCATION_ID,
+  sentryAlertLocationId,
+} from './air'
 
 const LS_OVERLAYS = 'overlayStates'
 const LS_LABELS = 'adsbLabelFields'
@@ -20,9 +25,7 @@ describe('air store', () => {
   it('initialises overlay states to the defaults', () => {
     const store = useAirStore()
     expect(store.overlayStates.adsb).toBe(true)
-    expect(store.overlayStates.overheadAlertsCivil).toBe(false)
     expect(store.replayEnabled).toBe(false)
-    expect(store.overheadAlertRadiusNm).toBe(DEFAULT_OVERHEAD_ALERT_RADIUS_NM)
     expect(store.filterQuery).toBe('')
     expect(store.filterOpen).toBe(false)
     expect(store.mapCenter).toBeNull()
@@ -31,29 +34,146 @@ describe('air store', () => {
   })
 
   describe('overlay migration', () => {
-    it('splits a legacy overheadAlerts flag into civil and mil', () => {
-      localStorage.setItem(LS_OVERLAYS, JSON.stringify({ overheadAlerts: true }))
-      const store = useAirStore()
-      expect(store.overlayStates.overheadAlertsCivil).toBe(true)
-      expect(store.overlayStates.overheadAlertsMil).toBe(true)
-      expect(
-        (store.overlayStates as unknown as Record<string, unknown>).overheadAlerts,
-      ).toBeUndefined()
-    })
-
-    it('does not overwrite split flags that already exist', () => {
+    it('drops the legacy overhead flags — they are alert settings now', () => {
       localStorage.setItem(
         LS_OVERLAYS,
-        JSON.stringify({ overheadAlerts: true, overheadAlertsCivil: false }),
+        JSON.stringify({ overheadAlerts: true, overheadAlertsCivil: true, adsb: false }),
       )
-      const store = useAirStore()
-      expect(store.overlayStates.overheadAlertsCivil).toBe(false)
+      const overlays = useAirStore().overlayStates as unknown as Record<string, unknown>
+      // They live on `overheadAlerts`, per location — see the migration below.
+      expect(overlays.overheadAlerts).toBeUndefined()
+      expect(overlays.overheadAlertsCivil).toBeUndefined()
+      expect(overlays.overheadAlertsMil).toBeUndefined()
     })
 
     it('keeps a stored value with no legacy flag', () => {
       localStorage.setItem(LS_OVERLAYS, JSON.stringify({ adsb: false }))
       const store = useAirStore()
       expect(store.overlayStates.adsb).toBe(false)
+    })
+  })
+
+  describe('overhead alerts, per location', () => {
+    it('defaults a location to off at the default radius', () => {
+      const store = useAirStore()
+      expect(store.overheadAlertFor(USER_ALERT_LOCATION_ID)).toEqual({
+        civil: false,
+        mil: false,
+        radiusNm: DEFAULT_OVERHEAD_ALERT_RADIUS_NM,
+      })
+    })
+
+    it('names a Sentry location by its host id', () => {
+      expect(sentryAlertLocationId(7)).toBe('sentry:7')
+    })
+
+    it('patches one field, leaving the rest of that location alone', () => {
+      const store = useAirStore()
+      store.setOverheadAlert(USER_ALERT_LOCATION_ID, { radiusNm: 25 })
+      store.setOverheadAlert(USER_ALERT_LOCATION_ID, { mil: true })
+      expect(store.overheadAlertFor(USER_ALERT_LOCATION_ID)).toEqual({
+        civil: false,
+        mil: true,
+        radiusNm: 25,
+      })
+    })
+
+    it('keeps each location’s settings independent', () => {
+      const store = useAirStore()
+      const sentry = sentryAlertLocationId(1)
+      store.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: true, radiusNm: 5 })
+      store.setOverheadAlert(sentry, { mil: true, radiusNm: 40 })
+      // Each Sentry watches its own patch of sky at its own radius.
+      expect(store.overheadAlertFor(USER_ALERT_LOCATION_ID)).toMatchObject({
+        civil: true,
+        radiusNm: 5,
+      })
+      expect(store.overheadAlertFor(sentry)).toMatchObject({ mil: true, radiusNm: 40 })
+    })
+
+    it.each([0, -5, Number.NaN])('refuses a radius of %s', (radiusNm) => {
+      const store = useAirStore()
+      store.setOverheadAlert(USER_ALERT_LOCATION_ID, { radiusNm })
+      expect(store.overheadAlertFor(USER_ALERT_LOCATION_ID).radiusNm).toBe(
+        DEFAULT_OVERHEAD_ALERT_RADIUS_NM,
+      )
+    })
+
+    it('persists the settings', () => {
+      useAirStore().setOverheadAlert(sentryAlertLocationId(2), { civil: true, radiusNm: 15 })
+      // The operator's own location is always present (the migration seeds it),
+      // so this asserts the Sentry's entry rather than the whole map.
+      expect(JSON.parse(localStorage.getItem('overheadAlerts') ?? '{}')['sentry:2']).toEqual({
+        civil: true,
+        mil: false,
+        radiusNm: 15,
+      })
+    })
+
+    it('restores persisted settings', () => {
+      localStorage.setItem(
+        'overheadAlerts',
+        JSON.stringify({ 'sentry:3': { civil: true, mil: false, radiusNm: 30 } }),
+      )
+      expect(useAirStore().overheadAlertFor('sentry:3')).toEqual({
+        civil: true,
+        mil: false,
+        radiusNm: 30,
+      })
+    })
+
+    it('forgets a location that has left the fleet', () => {
+      const store = useAirStore()
+      const sentry = sentryAlertLocationId(4)
+      store.setOverheadAlert(sentry, { civil: true })
+      store.forgetOverheadAlert(sentry)
+      expect(store.overheadAlertFor(sentry).civil).toBe(false)
+      expect(JSON.parse(localStorage.getItem('overheadAlerts') ?? '{}')[sentry]).toBeUndefined()
+    })
+
+    it('forgetting an unknown location changes nothing', () => {
+      const store = useAirStore()
+      store.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: true })
+      store.forgetOverheadAlert('sentry:999')
+      expect(store.overheadAlertFor(USER_ALERT_LOCATION_ID).civil).toBe(true)
+    })
+
+    describe('migrating the pre-split single configuration', () => {
+      it('carries the old civil/mil flags and radius onto your own location', () => {
+        localStorage.setItem(
+          LS_OVERLAYS,
+          JSON.stringify({ overheadAlertsCivil: true, overheadAlertsMil: false }),
+        )
+        localStorage.setItem('overheadAlertRadiusNm', '18')
+        // An existing setup must keep alerting on exactly what it did before.
+        expect(useAirStore().overheadAlertFor(USER_ALERT_LOCATION_ID)).toEqual({
+          civil: true,
+          mil: false,
+          radiusNm: 18,
+        })
+      })
+
+      it('reads the even older single overheadAlerts flag as both classes', () => {
+        localStorage.setItem(LS_OVERLAYS, JSON.stringify({ overheadAlerts: true }))
+        expect(useAirStore().overheadAlertFor(USER_ALERT_LOCATION_ID)).toMatchObject({
+          civil: true,
+          mil: true,
+        })
+      })
+
+      it('prefers already-migrated settings over the legacy flags', () => {
+        localStorage.setItem(LS_OVERLAYS, JSON.stringify({ overheadAlertsCivil: true }))
+        localStorage.setItem(
+          'overheadAlerts',
+          JSON.stringify({ user: { civil: false, mil: false, radiusNm: 10 } }),
+        )
+        expect(useAirStore().overheadAlertFor(USER_ALERT_LOCATION_ID).civil).toBe(false)
+      })
+
+      it('survives unreadable stored settings', () => {
+        localStorage.setItem('overheadAlerts', '{oops')
+        expect(useAirStore().overheadAlertFor(USER_ALERT_LOCATION_ID).civil).toBe(false)
+      })
     })
   })
 
@@ -115,27 +235,48 @@ describe('air store', () => {
     })
   })
 
-  describe('readPersistedRadius', () => {
+  describe('reading the legacy radius during migration', () => {
+    // The pre-split radius has no setting of its own any more; it survives only
+    // to be carried onto the operator's own alert location.
+    function migratedRadius(): number {
+      localStorage.setItem(LS_OVERLAYS, JSON.stringify({ overheadAlertsCivil: true }))
+      return useAirStore().overheadAlertFor(USER_ALERT_LOCATION_ID).radiusNm
+    }
+
     it('reads a valid positive number', () => {
       localStorage.setItem(LS_RADIUS, '25')
-      expect(useAirStore().overheadAlertRadiusNm).toBe(25)
+      expect(migratedRadius()).toBe(25)
     })
 
-    it('falls back to the default for a non-positive value', () => {
-      localStorage.setItem(LS_RADIUS, '-5')
-      expect(useAirStore().overheadAlertRadiusNm).toBe(DEFAULT_OVERHEAD_ALERT_RADIUS_NM)
-    })
-
-    it('falls back to the default for a non-numeric value', () => {
-      localStorage.setItem(LS_RADIUS, 'abc')
-      expect(useAirStore().overheadAlertRadiusNm).toBe(DEFAULT_OVERHEAD_ALERT_RADIUS_NM)
+    it.each([
+      ['a non-positive value', '-5'],
+      ['a non-numeric value', 'abc'],
+    ])('falls back to the default for %s', (_case, stored) => {
+      localStorage.setItem(LS_RADIUS, stored)
+      expect(migratedRadius()).toBe(DEFAULT_OVERHEAD_ALERT_RADIUS_NM)
     })
 
     it('defaults when localStorage throws', () => {
       vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
         throw new Error('blocked')
       })
-      expect(useAirStore().overheadAlertRadiusNm).toBe(DEFAULT_OVERHEAD_ALERT_RADIUS_NM)
+      expect(useAirStore().overheadAlertFor(USER_ALERT_LOCATION_ID).radiusNm).toBe(
+        DEFAULT_OVERHEAD_ALERT_RADIUS_NM,
+      )
+    })
+
+    it('defaults when only the radius key is unreadable', () => {
+      localStorage.setItem(LS_OVERLAYS, JSON.stringify({ overheadAlertsCivil: true }))
+      const real = localStorage.getItem.bind(localStorage)
+      vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => {
+        if (key === LS_RADIUS) throw new Error('blocked')
+        return real(key)
+      })
+      // The migration still runs; only the radius falls back.
+      expect(useAirStore().overheadAlertFor(USER_ALERT_LOCATION_ID)).toMatchObject({
+        civil: true,
+        radiusNm: DEFAULT_OVERHEAD_ALERT_RADIUS_NM,
+      })
     })
   })
 
@@ -177,28 +318,14 @@ describe('air store', () => {
     })
   })
 
-  describe('setOverheadAlertRadiusNm', () => {
-    it('accepts and persists a valid positive radius', () => {
-      const store = useAirStore()
-      store.setOverheadAlertRadiusNm(30)
-      expect(store.overheadAlertRadiusNm).toBe(30)
-      expect(localStorage.getItem(LS_RADIUS)).toBe('30')
-    })
-
-    it('rejects non-finite or non-positive values', () => {
-      const store = useAirStore()
-      store.setOverheadAlertRadiusNm(0)
-      store.setOverheadAlertRadiusNm(Number.NaN)
-      expect(store.overheadAlertRadiusNm).toBe(DEFAULT_OVERHEAD_ALERT_RADIUS_NM)
-    })
-
-    it('swallows write failures', () => {
+  describe('persisting alert settings', () => {
+    it('swallows write failures, keeping the in-memory settings', () => {
       const store = useAirStore()
       vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
         throw new Error('quota')
       })
-      expect(() => store.setOverheadAlertRadiusNm(30)).not.toThrow()
-      expect(store.overheadAlertRadiusNm).toBe(30)
+      expect(() => store.setOverheadAlert(USER_ALERT_LOCATION_ID, { radiusNm: 30 })).not.toThrow()
+      expect(store.overheadAlertFor(USER_ALERT_LOCATION_ID).radiusNm).toBe(30)
     })
   })
 
@@ -233,5 +360,23 @@ describe('air store', () => {
       localStorage.setItem('sentinel_air_filterCategory', '"bogus"')
       expect(useAirStore().airFilterCategory).toBe('aircraft')
     })
+  })
+})
+describe('air store — ADS-B filter overlays', () => {
+  it('shows ground vehicles and towers by default', () => {
+    const store = useAirStore()
+    // Both are part of the picture until the operator says otherwise; the map
+    // reads them as "shown" and inverts them onto the control's "hide".
+    expect(store.overlayStates.groundVehicles).toBe(true)
+    expect(store.overlayStates.towers).toBe(true)
+  })
+
+  it('persists them like every other overlay', () => {
+    const store = useAirStore()
+    store.setOverlay('groundVehicles', false)
+    store.setOverlay('towers', false)
+    const stored = JSON.parse(localStorage.getItem('overlayStates') ?? '{}')
+    expect(stored.groundVehicles).toBe(false)
+    expect(stored.towers).toBe(false)
   })
 })

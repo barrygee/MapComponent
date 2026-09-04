@@ -7,35 +7,26 @@ const LINE_ID = 'overhead-zone-line'
 
 export const OVERHEAD_ZONE_RADIUS_NM = 10
 
+/** One drawn zone: a circle of `radiusNm` around a watched place. */
+export interface OverheadZone {
+  lon: number
+  lat: number
+  radiusNm: number
+}
+
+/**
+ * The shaded circles marking what counts as "overhead" — one per watched place.
+ *
+ * Every alert location draws its own, because each Sentry watches its own patch
+ * of sky at its own radius; a single ring around the operator would say nothing
+ * about where the other alerts are coming from.
+ */
 export class OverheadZoneControl {
   private _map: maplibregl.Map | null = null
-  private _visible: boolean
-  private _center: [number, number] | null
-  private _radiusNm: number
+  private _zones: OverheadZone[] = []
 
-  constructor(
-    visible: boolean,
-    initialCenter: [number, number] | null = null,
-    radiusNm: number = OVERHEAD_ZONE_RADIUS_NM,
-  ) {
-    this._visible = visible
-    this._center = initialCenter
-    this._radiusNm = radiusNm
-  }
-
-  setRadiusNm(radiusNm: number): void {
-    if (!Number.isFinite(radiusNm) || radiusNm <= 0) return
-    this._radiusNm = radiusNm
-    const m = this._map
-    if (!m || !this._center) return
-    const src = m.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined
-    if (!src) {
-      this._init()
-      return
-    }
-    src.setData(
-      buildCirclePolygon(this._center[0], this._center[1], this._radiusNm) as GeoJSON.Feature,
-    )
+  constructor(initialZones: OverheadZone[] = []) {
+    this._zones = initialZones
   }
 
   onAdd(map: maplibregl.Map): void {
@@ -53,32 +44,9 @@ export class OverheadZoneControl {
     this._map = null
   }
 
-  setVisible(visible: boolean): void {
-    this._visible = visible
-    this._applyVisibility()
-  }
-
-  /**
-   * Single source of truth for layer visibility. The zone marks the area
-   * overhead the user's location, so it only shows when the toggle is on
-   * AND a location exists — toggling overhead alerts on with no location
-   * must not draw a map-centred zone.
-   */
-  private _applyVisibility(): void {
-    const m = this._map
-    if (!m) return
-    const vis = this._visible && this._center !== null ? 'visible' : 'none'
-    if (m.getLayer(FILL_ID)) m.setLayoutProperty(FILL_ID, 'visibility', vis)
-    if (m.getLayer(LINE_ID)) m.setLayoutProperty(LINE_ID, 'visibility', vis)
-  }
-
-  reinit(): void {
-    if (this._map) this._init()
-  }
-
-  updateCenter(lng: number, lat: number): void {
-    const hadCenter = this._center !== null
-    this._center = [lng, lat]
+  /** Replace the drawn zones. With none, the layers are simply empty and hidden. */
+  setZones(zones: OverheadZone[]): void {
+    this._zones = zones
     const m = this._map
     if (!m) return
     const src = m.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined
@@ -86,26 +54,41 @@ export class OverheadZoneControl {
       this._init()
       return
     }
-    src.setData(buildCirclePolygon(lng, lat, this._radiusNm) as GeoJSON.Feature)
-    // Gaining a centre (null → set) changes the visibility gate.
-    if (!hadCenter) this._applyVisibility()
+    src.setData(this._buildZones())
+    this._applyVisibility(m)
+  }
+
+  /** Rebuild after a style swap, which drops the layers with it. */
+  reinit(): void {
+    if (this._map) this._init()
+  }
+
+  private _buildZones(): GeoJSON.FeatureCollection {
+    return {
+      type: 'FeatureCollection',
+      features: this._zones.map(
+        (zone) => buildCirclePolygon(zone.lon, zone.lat, zone.radiusNm) as GeoJSON.Feature,
+      ),
+    }
+  }
+
+  /** Single source of truth for layer visibility: something to draw, or nothing.
+   *  Takes the map from its caller, which has already established there is one. */
+  private _applyVisibility(m: maplibregl.Map): void {
+    const vis = this._zones.length > 0 ? 'visible' : 'none'
+    if (m.getLayer(FILL_ID)) m.setLayoutProperty(FILL_ID, 'visibility', vis)
+    if (m.getLayer(LINE_ID)) m.setLayoutProperty(LINE_ID, 'visibility', vis)
   }
 
   private _init(): void {
     const m = this._map
     if (!m) return
-    // No map-centre fallback: the zone is centred on the user's location.
-    // With none, build an empty source (kept hidden by _applyVisibility)
-    // so a later updateCenter() can populate it.
-    const data: GeoJSON.Feature | GeoJSON.FeatureCollection = this._center
-      ? (buildCirclePolygon(this._center[0], this._center[1], this._radiusNm) as GeoJSON.Feature)
-      : { type: 'FeatureCollection', features: [] }
 
     if (m.getLayer(LINE_ID)) m.removeLayer(LINE_ID)
     if (m.getLayer(FILL_ID)) m.removeLayer(FILL_ID)
     if (m.getSource(SOURCE_ID)) m.removeSource(SOURCE_ID)
 
-    m.addSource(SOURCE_ID, { type: 'geojson', data })
+    m.addSource(SOURCE_ID, { type: 'geojson', data: this._buildZones() })
 
     m.addLayer({
       id: FILL_ID,
@@ -121,6 +104,6 @@ export class OverheadZoneControl {
       layout: { visibility: 'none' },
       paint: { 'line-color': 'rgba(0, 0, 0, 0.35)', 'line-width': 0.6 },
     })
-    this._applyVisibility()
+    this._applyVisibility(m)
   }
 }

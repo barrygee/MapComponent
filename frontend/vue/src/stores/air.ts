@@ -20,8 +20,10 @@ export interface OverlayStates {
   rangeRings: boolean
   aara: boolean
   awacs: boolean
-  overheadAlertsCivil: boolean
-  overheadAlertsMil: boolean
+  /** Ground vehicles in the ADS-B feed (tugs, fire, ops) — shown by default. */
+  groundVehicles: boolean
+  /** Fixed ADS-B ground stations ("towers") — shown by default. */
+  towers: boolean
 }
 
 export type AdsbLabelField = 'type' | 'alt'
@@ -72,8 +74,67 @@ const LS_KEY = 'overlayStates'
 const LS_LABEL_FIELDS_KEY = 'adsbLabelFields'
 const LS_TAG_FIELDS_KEY = 'adsbTagFields_v3'
 const LS_OVERHEAD_RADIUS_KEY = 'overheadAlertRadiusNm'
+const LS_OVERHEAD_ALERTS_KEY = 'overheadAlerts'
 
 export const DEFAULT_OVERHEAD_ALERT_RADIUS_NM = 10
+
+/**
+ * Overhead-alert settings for one place aircraft can be overhead *of*.
+ *
+ * Each Sentry watches its own patch of sky, so "is anything overhead?" is a
+ * question per receiver, not one global one — the civil/military choice and the
+ * radius belong to the location, not to the app.
+ */
+export interface OverheadAlertConfig {
+  civil: boolean
+  mil: boolean
+  radiusNm: number
+}
+
+/** The operator's own position, which is always the first alert location. */
+export const USER_ALERT_LOCATION_ID = 'user'
+
+/** The alert-location key for one Sentry host. */
+export function sentryAlertLocationId(hostId: number): string {
+  return `sentry:${hostId}`
+}
+
+const DEFAULT_OVERHEAD_ALERT: OverheadAlertConfig = {
+  civil: false,
+  mil: false,
+  radiusNm: DEFAULT_OVERHEAD_ALERT_RADIUS_NM,
+}
+
+/**
+ * Read the per-location alert settings, carrying the pre-split single
+ * configuration onto the operator's own location so an existing setup keeps
+ * alerting on exactly what it alerted on before.
+ */
+function readPersistedOverheadAlerts(): Record<string, OverheadAlertConfig> {
+  let stored: Record<string, OverheadAlertConfig> | null = null
+  try {
+    const raw = localStorage.getItem(LS_OVERHEAD_ALERTS_KEY)
+    if (raw) stored = JSON.parse(raw) as Record<string, OverheadAlertConfig>
+  } catch {
+    stored = null
+  }
+  if (stored && typeof stored === 'object') return stored
+
+  try {
+    const legacyOverlays = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') as {
+      overheadAlerts?: boolean
+      overheadAlertsCivil?: boolean
+      overheadAlertsMil?: boolean
+    }
+    const civil = legacyOverlays.overheadAlertsCivil ?? legacyOverlays.overheadAlerts ?? false
+    const mil = legacyOverlays.overheadAlertsMil ?? legacyOverlays.overheadAlerts ?? false
+    return {
+      [USER_ALERT_LOCATION_ID]: { civil, mil, radiusNm: readPersistedRadius() },
+    }
+  } catch {
+    return {}
+  }
+}
 
 const DEFAULT_LABEL_FIELDS: AdsbLabelFields = { civil: ['type'], mil: ['type'] }
 const DEFAULT_TAG_FIELDS: AdsbTagFields = {
@@ -107,21 +168,21 @@ const DEFAULTS: OverlayStates = {
   rangeRings: false,
   aara: true,
   awacs: true,
-  overheadAlertsCivil: false,
-  overheadAlertsMil: false,
+  groundVehicles: true,
+  towers: true,
 }
 
 function migrateOverlays(parsed: unknown): Partial<OverlayStates> {
-  const obj = parsed as Partial<OverlayStates> & { overheadAlerts?: boolean }
-  if (
-    typeof obj.overheadAlerts === 'boolean' &&
-    obj.overheadAlertsCivil === undefined &&
-    obj.overheadAlertsMil === undefined
-  ) {
-    obj.overheadAlertsCivil = obj.overheadAlerts
-    obj.overheadAlertsMil = obj.overheadAlerts
+  const obj = parsed as Partial<OverlayStates> & {
+    overheadAlerts?: boolean
+    overheadAlertsCivil?: boolean
+    overheadAlertsMil?: boolean
   }
+  // Overhead alerts are configured per location now (see `overheadAlerts`), so
+  // their old overlay flags are read there and dropped from this object.
   delete obj.overheadAlerts
+  delete obj.overheadAlertsCivil
+  delete obj.overheadAlertsMil
   return obj
 }
 
@@ -159,6 +220,8 @@ function readPersistedReplayEnabled(): boolean {
   }
 }
 
+/** The pre-split app-wide radius. Read only to migrate it onto the operator's
+ *  own alert location — nothing else uses it now. */
 function readPersistedRadius(): number {
   try {
     const raw = localStorage.getItem(LS_OVERHEAD_RADIUS_KEY)
@@ -182,7 +245,8 @@ export const useAirStore = defineStore('air', () => {
     DEFAULT_TAG_FIELDS,
     migrateTagFields,
   )
-  const overheadAlertRadiusNm = ref<number>(readPersistedRadius())
+  /** Overhead-alert settings per location — see `OverheadAlertConfig`. */
+  const overheadAlerts = ref<Record<string, OverheadAlertConfig>>(readPersistedOverheadAlerts())
   // Replay (flight history recording + REPLAY tab). Opt-in, default OFF.
   // localStorage for instant restore; DB hydrate happens in main.ts at startup.
   const replayEnabled = ref<boolean>(readPersistedReplayEnabled())
@@ -229,12 +293,44 @@ export const useAirStore = defineStore('air', () => {
     } catch {}
   }
 
-  function setOverheadAlertRadiusNm(nm: number) {
-    if (!Number.isFinite(nm) || nm <= 0) return
-    overheadAlertRadiusNm.value = nm
+  /** The settings for one location, falling back to "off, default radius". */
+  function overheadAlertFor(locationId: string): OverheadAlertConfig {
+    return overheadAlerts.value[locationId] ?? { ...DEFAULT_OVERHEAD_ALERT }
+  }
+
+  function _persistOverheadAlerts(): void {
     try {
-      localStorage.setItem(LS_OVERHEAD_RADIUS_KEY, String(nm))
-    } catch {}
+      localStorage.setItem(LS_OVERHEAD_ALERTS_KEY, JSON.stringify(overheadAlerts.value))
+    } catch {
+      /* private-mode storage failure — the in-memory settings still stand */
+    }
+  }
+
+  /** Change part of one location's alert settings, leaving the rest alone. */
+  function setOverheadAlert(locationId: string, patch: Partial<OverheadAlertConfig>): void {
+    const next = { ...overheadAlertFor(locationId), ...patch }
+    if (!Number.isFinite(next.radiusNm) || next.radiusNm <= 0) return
+    overheadAlerts.value = { ...overheadAlerts.value, [locationId]: next }
+    _persistOverheadAlerts()
+  }
+
+  /**
+   * Adopt a whole set of per-location settings, as read back from the config
+   * database. Used on mount so the choice follows the operator to another
+   * browser, the way `app/location` does.
+   */
+  function hydrateOverheadAlerts(stored: Record<string, OverheadAlertConfig>): void {
+    overheadAlerts.value = { ...stored }
+    _persistOverheadAlerts()
+  }
+
+  /** Forget a location's settings — for a Sentry that has left the fleet. */
+  function forgetOverheadAlert(locationId: string): void {
+    if (!(locationId in overheadAlerts.value)) return
+    const next = { ...overheadAlerts.value }
+    delete next[locationId]
+    overheadAlerts.value = next
+    _persistOverheadAlerts()
   }
 
   function setFilter(query: string) {
@@ -259,7 +355,11 @@ export const useAirStore = defineStore('air', () => {
     overlayStates,
     adsbLabelFields,
     adsbTagFields,
-    overheadAlertRadiusNm,
+    overheadAlerts,
+    overheadAlertFor,
+    setOverheadAlert,
+    hydrateOverheadAlerts,
+    forgetOverheadAlert,
     replayEnabled,
     filterQuery,
     filterOpen,
@@ -272,7 +372,6 @@ export const useAirStore = defineStore('air', () => {
     setOverlay,
     setAdsbLabelFields,
     setAdsbTagFields,
-    setOverheadAlertRadiusNm,
     setReplayEnabled,
     setFilter,
     setAirFilterCategory,

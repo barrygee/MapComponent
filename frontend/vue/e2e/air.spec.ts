@@ -34,8 +34,8 @@ test.describe('Air domain', () => {
 
     await layersButton.click()
     await expect(layersButton).toHaveAttribute('aria-expanded', 'true')
-    // A grouped overlay toggle (e.g. Ground vehicles) is now revealed.
-    await expect(page.getByRole('button', { name: /^ground vehicles$/i })).toBeVisible()
+    // A grouped overlay toggle (e.g. Range ring) is now revealed.
+    await expect(page.getByRole('button', { name: /^range ring$/i })).toBeVisible()
 
     await layersButton.click()
     await expect(layersButton).toHaveAttribute('aria-expanded', 'false')
@@ -199,8 +199,8 @@ test.describe('Air domain', () => {
   // needs (and now has) its own copy of the rule for its own trigger/panel slot
   // content. jsdom can't evaluate media queries or pseudo-elements, so this can
   // only be verified in a real browser; it directly exercises both the rail's
-  // own button (Zoom in) and an accordion sub-button (Ground vehicles, inside
-  // the MAP LAYERS panel).
+  // own button (Zoom in) and an accordion sub-button (Range ring, inside the
+  // MAP LAYERS panel).
   test('touch viewport suppresses the tooltip pseudo-element on rail and accordion buttons', async ({
     page,
   }) => {
@@ -209,17 +209,17 @@ test.describe('Air domain', () => {
     await waitForShellHydration(page)
 
     await page.locator('#sm-layers-btn').click()
-    const groundVehiclesButton = page.locator('button[data-tooltip="GROUND VEHICLES"]')
-    await expect(groundVehiclesButton).toBeVisible()
+    const rangeRingButton = page.locator('button[data-tooltip="RANGE RING"]')
+    await expect(rangeRingButton).toBeVisible()
 
     const zoomInTooltipDisplay = await page
       .locator('button[data-tooltip="ZOOM IN"]')
       .evaluate((button) => getComputedStyle(button, '::before').display)
-    const groundVehiclesTooltipDisplay = await groundVehiclesButton.evaluate(
+    const rangeRingTooltipDisplay = await rangeRingButton.evaluate(
       (button) => getComputedStyle(button, '::before').display,
     )
 
     expect(zoomInTooltipDisplay).toBe('none')
-    expect(groundVehiclesTooltipDisplay).toBe('none')
+    expect(rangeRingTooltipDisplay).toBe('none')
   })
 })

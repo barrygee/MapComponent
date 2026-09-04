@@ -50,6 +50,17 @@ export class NamesToggleControl extends SentinelControlBase {
     this._basemapStore.setLayer('names', this.namesVisible)
   }
 
+  /**
+   * Adopt a visibility decided elsewhere — Settings > Map Layers, or the same
+   * layer being toggled on another domain's map. Unlike `handleClick` this does
+   * not write back to the store: the store is where the value came from.
+   */
+  setVisible(visible: boolean): void {
+    if (this.namesVisible === visible) return
+    this.namesVisible = visible
+    this.applyVisibility()
+  }
+
   /** Push the current visibility onto the style. Public because a map that
    *  swaps its style (online↔offline) must re-apply it after the reload. */
   applyVisibility(): void {

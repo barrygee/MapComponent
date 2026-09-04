@@ -10,6 +10,7 @@ import {
 import { setMarkerAccessibleName } from '@/components/shared/map-label/mapMarkerAria'
 import { formatLatitude, formatLongitude } from '@/utils/locationUtils'
 import type { SentrySite } from '@/services/sentryApi'
+import { siteLabel } from '@/utils/sentrySiteLabel'
 import type { useSentrySitesStore } from '@/stores/sentrySites'
 import type { useSettingsStore } from '@/stores/settings'
 
@@ -507,13 +508,6 @@ function siteKey(site: SentrySite): string {
   return String(site.id)
 }
 
-/** What to call a site: its name if it has one, otherwise where it answers.
- *  A host is registered by address and named later, so the address is the only
- *  label some sites ever have. */
-export function siteLabel(site: SentrySite): string {
-  return site.name?.trim() || `${site.address}:${site.port}`
-}
-
 /** Escape text bound for the a11y table's markup — a Sentry's name is set on
  *  the Pi, so it is remote input and never goes into HTML unescaped. */
 function escapeHtml(value: string): string {
@@ -568,3 +562,7 @@ const SENTRY_COUNT_FILL = '#000000'
  *  the count's black centre, so a group of Sentries is recognisably the same
  *  thing as the marks it stands in for. */
 const SENTRY_COUNT_TEXT = SENTRY_MARKER_DOT_COLOR
+
+// Re-exported from its shared home so the map-marker module stays the one
+// place that names a site for callers already importing it from here.
+export { siteLabel }

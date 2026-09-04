@@ -1,10 +1,10 @@
 import { watch } from 'vue'
-import { useAirStore } from '@/stores/air'
 import { useNotificationsStore, getAircraftClickHandler } from '@/stores/notifications'
 import { useAirNotifStore } from '@/stores/airNotif'
 import { useUserLocation } from '@/composables/useUserLocation'
 import { ADSB_POLL_INTERVAL_MS } from '@/constants/adsb'
 import { OverheadAlertsTracker } from '@/components/air/controls/overhead-zone/OverheadAlertsTracker'
+import { useOverheadAlertZones } from '@/composables/useOverheadAlertZones'
 import { AircraftEventDetector } from '@/components/air/controls/adsb/AircraftEventDetector'
 import {
   parseAircraftList,
@@ -56,30 +56,22 @@ function start(): void {
   if (_started) return
   _started = true
 
-  const airStore = useAirStore()
   const notifications = useNotificationsStore()
   const airNotif = useAirNotifStore()
   const { location } = useUserLocation()
 
   const detector = new AircraftEventDetector(notifications, airNotif)
+  const { activeZones } = useOverheadAlertZones()
   const overhead = new OverheadAlertsTracker(
     notifications,
     _featureCollection,
-    () => {
-      const l = location.value
-      return l ? { lon: l.lon, lat: l.lat } : null
-    },
     // When Air is mounted it registers an aircraft-click handler that selects
     // the plane; route overhead-alert clicks through it (no-op otherwise).
     (hex: string) => {
       getAircraftClickHandler()?.(hex)
     },
-    airStore.overheadAlertRadiusNm,
   )
-  overhead.setEnabled({
-    civil: airStore.overlayStates.overheadAlertsCivil,
-    mil: airStore.overlayStates.overheadAlertsMil,
-  })
+  overhead.setZones(activeZones.value)
 
   async function _poll(): Promise<void> {
     const l = location.value
@@ -102,11 +94,7 @@ function start(): void {
   }
 
   function _shouldPoll(): boolean {
-    return (
-      airNotif.count > 0 ||
-      airStore.overlayStates.overheadAlertsCivil ||
-      airStore.overlayStates.overheadAlertsMil
-    )
+    return airNotif.count > 0 || activeZones.value.length > 0
   }
 
   function _syncPolling(): void {
@@ -126,22 +114,12 @@ function start(): void {
     }
   }
 
-  // React to overhead enable/radius changes from anywhere in the app.
-  watch(
-    () =>
-      [
-        airStore.overlayStates.overheadAlertsCivil,
-        airStore.overlayStates.overheadAlertsMil,
-      ] as const,
-    ([civil, mil]) => {
-      overhead.setEnabled({ civil, mil })
-      _syncPolling()
-    },
-  )
-  watch(
-    () => airStore.overheadAlertRadiusNm,
-    (nm) => overhead.setRadiusNm(nm),
-  )
+  // React to a location being switched on or off, its radius changing, or a
+  // Sentry joining or leaving the fleet — from anywhere in the app.
+  watch(activeZones, (zones) => {
+    overhead.setZones(zones)
+    _syncPolling()
+  })
   // Start/stop polling as aircraft opt-ins come and go.
   watch(
     () => airNotif.count,

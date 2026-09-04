@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { mount, enableAutoUnmount, type VueWrapper } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref, type Ref } from 'vue'
 import { useTeleportedMenu, MENU_OPEN_SETTLE_MS } from './useTeleportedMenu'
 
 enableAutoUnmount(afterEach)
@@ -43,6 +43,30 @@ function mountHarness(): { wrapper: VueWrapper; api: HarnessApi } {
   return { wrapper, api: wrapper.vm as unknown as HarnessApi }
 }
 
+/**
+ * A harness that hands the composable its menu element, as BaseSelectMenu does.
+ * The menu is a real node outside the trigger, so a click inside it genuinely
+ * has to be recognised by the guard rather than by `@click.stop`.
+ */
+const MenuElementHarness = defineComponent({
+  setup(props, { expose }) {
+    const menuRef: Ref<HTMLElement | null> = ref(null)
+    const menu = useTeleportedMenu({ menuElement: menuRef })
+    expose({ ...menu, menuRef })
+    return () =>
+      h('div', [
+        h('div', {
+          class: 'harness-trigger',
+          onClick: (event: MouseEvent) => {
+            event.stopPropagation()
+            menu.toggleMenu(event.currentTarget as HTMLElement)
+          },
+        }),
+        h('div', { class: 'harness-menu', ref: menuRef }, [h('button', { class: 'harness-row' })]),
+      ])
+  },
+})
+
 describe('useTeleportedMenu', () => {
   it('opens positioned from the trigger rect and toggles closed on a second call', async () => {
     const { wrapper, api } = mountHarness()
@@ -82,6 +106,45 @@ describe('useTeleportedMenu', () => {
     document.body.click()
     await wrapper.vm.$nextTick()
     expect(api.menuOpen).toBe(false)
+  })
+
+  describe('when the caller hands over its menu element', () => {
+    it('stays open for a click that came from inside the menu', async () => {
+      const wrapper = mount(MenuElementHarness, { attachTo: document.body })
+      const api = wrapper.vm as unknown as HarnessApi
+      await wrapper.find('.harness-trigger').trigger('click')
+      expect(api.menuOpen).toBe(true)
+
+      // The row's own click bubbles to the document; without the guard it would
+      // dismiss the menu the operator is clicking into.
+      wrapper.find('.harness-row').element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await wrapper.vm.$nextTick()
+
+      expect(api.menuOpen).toBe(true)
+    })
+
+    it('still closes for a click outside it', async () => {
+      const wrapper = mount(MenuElementHarness, { attachTo: document.body })
+      const api = wrapper.vm as unknown as HarnessApi
+      await wrapper.find('.harness-trigger').trigger('click')
+
+      document.body.click()
+      await wrapper.vm.$nextTick()
+
+      expect(api.menuOpen).toBe(false)
+    })
+
+    it('closes for an event with no element target', async () => {
+      const wrapper = mount(MenuElementHarness, { attachTo: document.body })
+      const api = wrapper.vm as unknown as HarnessApi
+      await wrapper.find('.harness-trigger').trigger('click')
+
+      // A synthesised event can carry a non-Node target; that is not "inside".
+      document.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await wrapper.vm.$nextTick()
+
+      expect(api.menuOpen).toBe(false)
+    })
   })
 
   it('closes on window resize', async () => {

@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { nextTick } from 'vue'
-import { useAirStore } from '@/stores/air'
+import { useAirStore, USER_ALERT_LOCATION_ID, sentryAlertLocationId } from '@/stores/air'
 import { useAirNotifStore } from '@/stores/airNotif'
 import { ADSB_POLL_INTERVAL_MS } from '@/constants/adsb'
 
 const { locationRef, overheadInstance, detectorInstance } = vi.hoisted(() => ({
   locationRef: { value: null as null | { lon: number; lat: number; accuracy: number } },
-  overheadInstance: { setEnabled: vi.fn(), setRadiusNm: vi.fn() },
+  overheadInstance: { setZones: vi.fn() },
   detectorInstance: { process: vi.fn() },
 }))
 
@@ -58,7 +58,7 @@ describe('useAirAlertsService', () => {
 
   it('start is idempotent', async () => {
     const air = useAirStore()
-    air.setOverlay('overheadAlertsCivil', true)
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: true })
     const service = await loadService()
     service.start()
     const { OverheadAlertsTracker } =
@@ -73,7 +73,7 @@ describe('useAirAlertsService', () => {
     // Response without an `ac` field exercises the `data.ac || []` fallback.
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }))
     const air = useAirStore()
-    air.setOverlay('overheadAlertsMil', true)
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { mil: true })
     const service = await loadService()
     service.start()
     await vi.advanceTimersByTimeAsync(0) // let the immediate _poll run
@@ -87,7 +87,7 @@ describe('useAirAlertsService', () => {
 
   it('skips the request when there is no location', async () => {
     const air = useAirStore()
-    air.setOverlay('overheadAlertsCivil', true)
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: true })
     const service = await loadService()
     service.start()
     await vi.advanceTimersByTimeAsync(0)
@@ -99,7 +99,7 @@ describe('useAirAlertsService', () => {
     locationRef.value = { lon: 0, lat: 0, accuracy: 0 }
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     const air = useAirStore()
-    air.setOverlay('overheadAlertsCivil', true)
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: true })
     const service = await loadService()
     service.start()
     await vi.advanceTimersByTimeAsync(0)
@@ -111,7 +111,7 @@ describe('useAirAlertsService', () => {
     locationRef.value = { lon: 0, lat: 0, accuracy: 0 }
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('aborted')))
     const air = useAirStore()
-    air.setOverlay('overheadAlertsCivil', true)
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: true })
     const service = await loadService()
     service.start()
     await vi.advanceTimersByTimeAsync(0)
@@ -120,28 +120,70 @@ describe('useAirAlertsService', () => {
     service.stop()
   })
 
-  it('reacts to overhead enable/radius changes and aircraft opt-ins', async () => {
+  it('reacts to an alert location being switched on, and to aircraft opt-ins', async () => {
+    locationRef.value = { lon: -0.1, lat: 51.5, accuracy: 0 }
     const air = useAirStore()
     const airNotif = useAirNotifStore()
     const service = await loadService()
     service.start()
-    expect(overheadInstance.setEnabled).toHaveBeenCalledTimes(1) // initial
+    expect(overheadInstance.setZones).toHaveBeenCalledTimes(1) // initial
 
-    air.setOverlay('overheadAlertsCivil', true)
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: true })
     await nextTick()
-    expect(overheadInstance.setEnabled).toHaveBeenCalledTimes(2)
-    expect(fetch).toHaveBeenCalledTimes(0) // no location yet, but polling started
-
-    air.setOverheadAlertRadiusNm(25)
-    await nextTick()
-    expect(overheadInstance.setRadiusNm).toHaveBeenCalledWith(25)
+    expect(overheadInstance.setZones).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: USER_ALERT_LOCATION_ID, civil: true }),
+    ])
 
     airNotif.enable('abc')
     await nextTick()
     // count went >0 → still polling; turning everything off stops it.
-    air.setOverlay('overheadAlertsCivil', false)
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: false })
     airNotif.clear()
     await nextTick()
+    expect(overheadInstance.setZones).toHaveBeenLastCalledWith([])
+    service.stop()
+  })
+
+  it('skips the poll while there is no position to poll around', async () => {
+    // A Sentry can be watched with no operator fix at all, so polling is on
+    // while the point the feed is fetched around does not exist.
+    locationRef.value = null
+    const { useSentrySitesStore } = await import('@/stores/sentrySites')
+    useSentrySitesStore().sites = [
+      {
+        id: 1,
+        name: 'Gateshead',
+        address: '192.168.1.60',
+        port: 8000,
+        reachable: true,
+        latitude: 54.95,
+        longitude: -1.53,
+        updated_at: null,
+      },
+    ]
+    useAirStore().setOverheadAlert(sentryAlertLocationId(1), { civil: true })
+    const service = await loadService()
+    service.start()
+
+    await vi.advanceTimersByTimeAsync(ADSB_POLL_INTERVAL_MS)
+
+    expect(fetch).not.toHaveBeenCalled()
+    service.stop()
+  })
+
+  it('re-zones when a location changes its radius', async () => {
+    locationRef.value = { lon: -0.1, lat: 51.5, accuracy: 0 }
+    const air = useAirStore()
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: true })
+    const service = await loadService()
+    service.start()
+
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { radiusNm: 25 })
+    await nextTick()
+
+    expect(overheadInstance.setZones).toHaveBeenLastCalledWith([
+      expect.objectContaining({ radiusNm: 25 }),
+    ])
     service.stop()
   })
 
@@ -168,7 +210,7 @@ describe('useAirAlertsService', () => {
       }),
     )
     const air = useAirStore()
-    air.setOverlay('overheadAlertsCivil', true)
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: true })
     const { OverheadAlertsTracker } =
       await import('@/components/air/controls/overhead-zone/OverheadAlertsTracker')
     const service = await loadService()
@@ -177,14 +219,9 @@ describe('useAirAlertsService', () => {
 
     const args = vi.mocked(OverheadAlertsTracker).mock.calls[0]!
     const featureCollection = args[1] as () => { features: unknown[] }
-    const locationGetter = args[2] as () => { lon: number; lat: number } | null
-    const clickRouter = args[3] as (hex: string) => void
+    const clickRouter = args[2] as (hex: string) => void
 
     expect(featureCollection().features).toHaveLength(1)
-
-    expect(locationGetter()).toEqual({ lon: -0.1, lat: 51.5 })
-    locationRef.value = null
-    expect(locationGetter()).toBeNull()
 
     // Click router: no handler registered → no-op; then routes to a handler.
     expect(() => clickRouter('abc')).not.toThrow()
@@ -200,7 +237,7 @@ describe('useAirAlertsService', () => {
 
   it('stop tears down and allows a restart', async () => {
     const air = useAirStore()
-    air.setOverlay('overheadAlertsCivil', true)
+    air.setOverheadAlert(USER_ALERT_LOCATION_ID, { civil: true })
     const service = await loadService()
     service.start()
     service.stop()

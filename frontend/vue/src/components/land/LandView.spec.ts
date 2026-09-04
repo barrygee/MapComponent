@@ -68,6 +68,7 @@ const ringsSpies = vi.hoisted(() => ({
   handleClickPublic: vi.fn(),
   updateCenter: vi.fn(),
   setLocationAvailable: vi.fn(),
+  setOrigin: vi.fn(),
   visible: false,
 }))
 vi.mock('@/components/land/controls/range-rings/LandRangeRingsControl', () => ({
@@ -77,6 +78,7 @@ vi.mock('@/components/land/controls/range-rings/LandRangeRingsControl', () => ({
     handleClickPublic = ringsSpies.handleClickPublic
     updateCenter = ringsSpies.updateCenter
     setLocationAvailable = ringsSpies.setLocationAvailable
+    setOrigin = ringsSpies.setOrigin
     get visible() {
       return ringsSpies.visible
     }
@@ -115,6 +117,7 @@ vi.mock('@/components/land/controls/aprs/AprsStationsControl', () => ({
 // own specs — but each keeps the basemap store wired up, since the side menu
 // reads its active state straight off that store rather than from a prop.
 const namesSpies = vi.hoisted(() => ({
+  setVisible: vi.fn(),
   onAdd: vi.fn(),
   onRemove: vi.fn(),
   handleClickPublic: vi.fn(),
@@ -135,6 +138,7 @@ vi.mock('@/components/shared/controls/names/NamesToggleControl', () => ({
     onAdd = namesSpies.onAdd
     onRemove = namesSpies.onRemove
     applyVisibility = namesSpies.applyVisibility
+    setVisible = namesSpies.setVisible
     handleClickPublic = (...args: unknown[]) => {
       this._store.setLayer('names', !this._store.layers.names)
       return namesSpies.handleClickPublic(...args)
@@ -395,6 +399,21 @@ describe('LandView', () => {
       expect(sideMenuProps!.rangeRingsActive).toBe(true)
     })
 
+    it('follows a place-names change made on another map or in Settings', async () => {
+      const basemapStore = useBasemapStore()
+      const map = makeFakeMap()
+      mountView()
+      shared.emit!('map-created', map)
+      await nextTick()
+
+      basemapStore.setLayer('names', true)
+      await nextTick()
+
+      // Names are shared across domains, so this map follows the store rather
+      // than only its own rail button.
+      expect(namesSpies.setVisible).toHaveBeenCalledWith(true)
+    })
+
     it('shows the APRS layer by default per the land.defaultLayers config', () => {
       const map = makeFakeMap()
       mountView()
@@ -522,8 +541,10 @@ describe('LandView', () => {
       locationState.location!.value = { lat: 55, lon: -1.5, accuracy: 10 }
       await nextTick()
       expect(markerSpies.update).toHaveBeenCalledWith(-1.5, 55)
-      expect(ringsSpies.updateCenter).toHaveBeenCalledWith(-1.5, 55)
-      expect(ringsSpies.setLocationAvailable).toHaveBeenCalledWith(true)
+      // The rings follow the ring origin, which defaults to the operator.
+      expect(ringsSpies.setOrigin).toHaveBeenCalledWith(
+        expect.objectContaining({ longitude: -1.5, latitude: 55, kind: 'user' }),
+      )
     })
 
     it('removes the marker when the location is cleared', async () => {
@@ -535,7 +556,7 @@ describe('LandView', () => {
       locationState.location!.value = null
       await nextTick()
       expect(markerSpies.remove).toHaveBeenCalled()
-      expect(ringsSpies.setLocationAvailable).toHaveBeenCalledWith(false)
+      expect(ringsSpies.setOrigin).toHaveBeenCalledWith(null)
     })
 
     it('tears down the controls and marker on unmount', () => {

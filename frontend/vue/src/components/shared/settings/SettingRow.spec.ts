@@ -12,11 +12,12 @@ import { axe } from 'jest-axe'
 import SettingRow from './SettingRow.vue'
 import type { SettingItem } from '@/types/settings'
 import ConnectivityToggle from './ConnectivityToggle.vue'
-import OverheadAlertsToggleControl from './OverheadAlertsToggleControl.vue'
-import OverheadAlertRadiusControl from './OverheadAlertRadiusControl.vue'
+import OverheadAlertsControl from './OverheadAlertsControl.vue'
 import LandAprsRetentionControl from './LandAprsRetentionControl.vue'
 import ProbeUrlControl from './ProbeUrlControl.vue'
 import LocationControl from './LocationControl.vue'
+import RangeRingOriginControl from './RangeRingOriginControl.vue'
+import MapLayersControl from './MapLayersControl.vue'
 import NotificationSoundControl from './NotificationSoundControl.vue'
 import SourceOverrideControl from './SourceOverrideControl.vue'
 import OnlineSourceControl from './OnlineSourceControl.vue'
@@ -57,11 +58,12 @@ function mountRow(item: Partial<SettingItem> & { type: string }) {
 // Each setting type renders exactly one matching child control.
 const TYPE_TO_COMPONENT: Array<[string, Component, Partial<SettingItem>?]> = [
   ['connectivity-toggle', ConnectivityToggle],
-  ['overhead-alerts-toggle', OverheadAlertsToggleControl],
-  ['overhead-alert-radius', OverheadAlertRadiusControl],
+  ['overhead-alerts', OverheadAlertsControl],
   ['land-aprs-retention', LandAprsRetentionControl],
   ['probe-url', ProbeUrlControl],
   ['location', LocationControl],
+  ['range-ring-origin', RangeRingOriginControl],
+  ['map-layers', MapLayersControl],
   ['notification-sound', NotificationSoundControl],
   ['source-override', SourceOverrideControl, { ns: 'air' }],
   ['online-source', OnlineSourceControl, { ns: 'air', defaultUrl: '' }],
@@ -123,15 +125,15 @@ describe('SettingRow', () => {
   })
 
   it('forwards a child stage event with the item id', () => {
-    const wrapper = mountRow({ id: 'radius-1', type: 'overhead-alert-radius', label: 'Radius' })
+    const wrapper = mountRow({ id: 'probe-1', type: 'probe-url', label: 'Probe' })
     const staged = () => {}
-    wrapper.findComponent(OverheadAlertRadiusControl).vm.$emit('stage', staged)
-    expect(wrapper.emitted('stage')).toEqual([['radius-1', staged]])
+    wrapper.findComponent(ProbeUrlControl).vm.$emit('stage', staged)
+    expect(wrapper.emitted('stage')).toEqual([['probe-1', staged]])
   })
 
   it('forwards a child commit event', () => {
-    const wrapper = mountRow({ id: 'radius-1', type: 'overhead-alert-radius', label: 'Radius' })
-    wrapper.findComponent(OverheadAlertRadiusControl).vm.$emit('commit')
+    const wrapper = mountRow({ id: 'probe-1', type: 'probe-url', label: 'Probe' })
+    wrapper.findComponent(ProbeUrlControl).vm.$emit('commit')
     expect(wrapper.emitted('commit')).toHaveLength(1)
   })
 
