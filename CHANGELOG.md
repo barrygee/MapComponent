@@ -348,6 +348,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Back off when the ADS-B upstream returns 429 (#294)
 - Keep map markers on their own coordinates, and lighten the Sentry dot (#300)
 - Dismiss teleported menus only on clicks outside them
+- Classify military aircraft from the feed's dbFlags marker (#308)
 
 ### Chores
 
