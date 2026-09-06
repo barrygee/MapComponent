@@ -83,7 +83,7 @@ describe('useAdsbSourceClaim', () => {
     })
 
     it('does not claim while online', async () => {
-      // Online air data comes from airplanes.live; claiming a dongle then would
+      // Online air data comes from adsb.lol; claiming a dongle then would
       // take hardware away from something that wants it, to receive nothing.
       useAppStore().setConnectivityMode('online')
 

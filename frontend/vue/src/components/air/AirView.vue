@@ -42,7 +42,7 @@ import type { MilitaryBasesToggleControl } from './controls/military-bases/Milit
 
 // Holds the Sentry dongle at 1090 MHz for as long as AIR is showing off-grid
 // aircraft, and gives it back on the way out. No-op online, where the data comes
-// from airplanes.live and no local dongle is involved. See ADR-0003.
+// from adsb.lol and no local dongle is involved. See ADR-0003.
 const adsbSourceClaim = useAdsbSourceClaim()
 
 const airMapRef = ref<InstanceType<typeof AirMap> | null>(null)
