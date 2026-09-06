@@ -1,7 +1,8 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { waitForShellHydration } from './support/hydrationGate'
 import { installDefaultMocks } from './support/mockApi'
 import { clearPersistedState, seedAirReplayEnabled } from './support/seedStore'
+import milClassificationFixture from './fixtures/adsb-mil-classification.json' with { type: 'json' }
 
 /**
  * Air domain tests: map region, AirSideMenu expand/collapse, overlay buttons,
@@ -34,7 +35,8 @@ test.describe('Air domain', () => {
 
     await layersButton.click()
     await expect(layersButton).toHaveAttribute('aria-expanded', 'true')
-    // A grouped overlay toggle (e.g. Range ring) is now revealed.
+    // A grouped overlay toggle is now revealed. The panel keeps only the few
+    // worth flipping mid-task — the rest moved to Settings > Map Layers.
     await expect(page.getByRole('button', { name: /^range ring$/i })).toBeVisible()
 
     await layersButton.click()
@@ -221,5 +223,135 @@ test.describe('Air domain', () => {
 
     expect(zoomInTooltipDisplay).toBe('none')
     expect(rangeRingTooltipDisplay).toBe('none')
+  })
+})
+
+/**
+ * Military-vs-civil classification, end to end.
+ *
+ * The colour an aircraft renders in is the whole point of the distinction —
+ * lime for military, blue for civil — and it is decided from the feed's
+ * `dbFlags` marker. These tests drive that from a stubbed upstream response
+ * through the real AdsbLiveControl to the rendered label, which is the one
+ * path the unit tests cannot cover: they assert the classifier's return value,
+ * not that the map paints it.
+ *
+ * Assertions read the arrow SVG's stroke rather than the MapLibre canvas.
+ * Aircraft icons are drawn into WebGL and are unreadable from the DOM, but the
+ * callsign label beside each one is a real DOM marker carrying the same colour.
+ */
+/** Every aircraft in the classification fixture renders one callsign label. */
+const FIXTURE_AIRCRAFT_COUNT = milClassificationFixture.ac.length
+const MILITARY_LIME = '#c8ff00'
+const CIVIL_BLUE = '#00aaff'
+
+test.describe('Air domain aircraft classification', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearPersistedState(page)
+    await installDefaultMocks(page)
+    // Registered after the defaults so this override wins (Playwright matches
+    // most-recently-registered first) — the default stub serves an empty list.
+    // The basemap style is served by the backend (`/assets` proxies to :8080),
+    // which the e2e run does not start — so on a clean runner the style 502s,
+    // the map never fires `load`, and no map control's `onAdd` ever runs. The
+    // classification tests need the map, not the basemap, so a minimal valid
+    // style stands in for it; everything else under /assets stays unavailable,
+    // exactly as it is on CI.
+    await page.route('**/assets/**', (route) => {
+      if (!route.request().url().endsWith('.json')) return route.abort()
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          version: 8,
+          name: 'e2e-basemap',
+          sources: {},
+          layers: [
+            { id: 'background', type: 'background', paint: { 'background-color': '#0b0e14' } },
+          ],
+        }),
+      })
+    })
+    await page.route('**/api/air/adsb/point/**', (route) => {
+      void route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(milClassificationFixture),
+      })
+    })
+  })
+
+  /** The arrow shape inside the callsign label for one aircraft. */
+  const arrowShapeFor = (page: Page, callsign: string) =>
+    page.locator('.maplibregl-marker').filter({ hasText: callsign }).locator('.adsb-arrow polygon')
+
+  /**
+   * Open the Air map and wait until the feed's aircraft are actually on it.
+   *
+   * The labels only mount once the map style has loaded *and* the first poll
+   * has come back, which on a loaded CI runner runs well past Playwright's 5 s
+   * assertion default (the test budget is 60 s). Waiting for the response and
+   * the first marker makes that a precondition rather than something every
+   * assertion below has to outlast.
+   */
+  async function gotoAirWithAircraft(page: Page): Promise<void> {
+    const firstPoll = page.waitForResponse((response) =>
+      response.url().includes('/api/air/adsb/point/'),
+    )
+    await page.goto('/air/')
+    await waitForShellHydration(page)
+    await firstPoll
+    // Wait for the aircraft themselves, not just any marker: sentry sites and
+    // airports mount their own markers on map load, so `.maplibregl-marker`
+    // alone goes green before a single aircraft label exists.
+    await expect(page.locator('.adsb-arrow')).toHaveCount(FIXTURE_AIRCRAFT_COUNT, {
+      timeout: 30_000,
+    })
+  }
+
+  test('renders a military aircraft lime and a civil aircraft blue', async ({ page }) => {
+    await gotoAirWithAircraft(page)
+
+    await expect(arrowShapeFor(page, 'RCH456')).toHaveAttribute('stroke', MILITARY_LIME)
+    await expect(arrowShapeFor(page, 'BAW123')).toHaveAttribute('stroke', CIVIL_BLUE)
+  })
+
+  test('classifies a military aircraft flying on a civil-block hex', async ({ page }) => {
+    await gotoAirWithAircraft(page)
+
+    // PAT090 is a US Army C172 on an N-number: hex 0xAAB198 sits in a civil
+    // allocation block, so no ICAO hex range can identify it. Only the feed's
+    // dbFlags marker can, which is exactly what the classifier previously
+    // ignored — this aircraft rendered civil blue.
+    await expect(arrowShapeFor(page, 'PAT090')).toHaveAttribute('stroke', MILITARY_LIME)
+  })
+
+  test('gives a military aircraft its lime type badge and leaves a civil one without', async ({
+    page,
+  }) => {
+    await gotoAirWithAircraft(page)
+
+    const militaryLabel = page.locator('.maplibregl-marker').filter({ hasText: 'RCH456' })
+    await expect(militaryLabel.locator('.mil-model-badge')).toHaveText('C17')
+
+    const civilLabel = page.locator('.maplibregl-marker').filter({ hasText: 'BAW123' })
+    await expect(civilLabel).toBeVisible()
+    await expect(civilLabel.locator('.mil-model-badge')).toHaveCount(0)
+  })
+
+  test('the MILITARY filter mode hides civil aircraft and keeps military ones', async ({
+    page,
+  }) => {
+    await gotoAirWithAircraft(page)
+
+    // Both are on the map before any filtering.
+    await expect(arrowShapeFor(page, 'BAW123')).toHaveAttribute('stroke', CIVIL_BLUE)
+
+    // The aircraft-filter modes live inside the FILTER accordion, revealed when
+    // the FILTER icon is clicked.
+    await page.getByRole('button', { name: /^filter aircraft$/i }).click()
+    await page.getByRole('button', { name: /military aircraft only/i }).click()
+
+    await expect(page.locator('.maplibregl-marker').filter({ hasText: 'BAW123' })).toHaveCount(0)
+    await expect(arrowShapeFor(page, 'RCH456')).toHaveAttribute('stroke', MILITARY_LIME)
+    await expect(arrowShapeFor(page, 'PAT090')).toHaveAttribute('stroke', MILITARY_LIME)
   })
 })
