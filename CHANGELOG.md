@@ -1172,6 +1172,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Merge pull request #270 from barrygee/fix/filter-first-row-expanded-gap
 - Merge pull request #286 from barrygee/feat/location-panel-sentry-parity
 - Merge pull request #306 from barrygee/feat/range-ring-origin
+- Merge pull request #311 from barrygee/test/adsb-mil-e2e
 
 ### Refactoring
 
@@ -1282,6 +1283,7 @@ in the branch, and follows [Keep a Changelog](https://keepachangelog.com).
 - Cover per-radio decode muting and the decode-mute setting
 - Update e2e specs for the restored frequency manager tab
 - Put the reconnect-cancel test on fake timers (#262)
+- Restore the map-rendering classification tests
 
 ### Build System
 
