@@ -91,26 +91,26 @@ describe('RingOriginPicker', () => {
       expect(group(wrapper).attributes('aria-label')).toBe('Centre range rings on')
     })
 
-    it('gives each choice its name over its coordinates', () => {
+    it('gives each choice its name beside its coordinates', () => {
       const wrapper = mountPicker({ sites: [site()] })
       // Answers "which one" without hunting on the map. 51.5/-0.12 to
       // 54.95/-1.53 is 3.45° of latitude (207 NM) and 0.84° of longitude at
       // that latitude (51 NM) — 213 NM great-circle.
-      expect(optionDetail(wrapper, 'Gateshead')).toBe('54.95000° N 1.53000° W - 213 NM')
+      expect(optionDetail(wrapper, 'Gateshead')).toBe('(54.95000° N 1.53000° W - 213 NM)')
     })
 
     it('omits the distance when there is no position to measure from', () => {
       userLocation.value = null
       const wrapper = mountPicker({ sites: [site()] })
-      expect(optionDetail(wrapper, 'Gateshead')).toBe('54.95000° N 1.53000° W')
+      expect(optionDetail(wrapper, 'Gateshead')).toBe('(54.95000° N 1.53000° W)')
     })
 
     it('shows your coordinates, or tells you to set them', () => {
-      expect(optionDetail(mountPicker(), 'Sentinel location')).toBe('51.50000° N 0.12000° W')
+      expect(optionDetail(mountPicker(), 'Sentinel location')).toBe('(51.50000° N 0.12000° W)')
 
       userLocation.value = null
       const wrapper = mountPicker()
-      expect(optionDetail(wrapper, 'Sentinel location')).toBe('Set your location first')
+      expect(optionDetail(wrapper, 'Sentinel location')).toBe('(Set your location first)')
       expect(rowNamed(wrapper, 'Sentinel location').attributes('aria-disabled')).toBe('true')
     })
 

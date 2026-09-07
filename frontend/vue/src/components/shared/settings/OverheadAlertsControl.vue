@@ -10,11 +10,13 @@
       class="overhead-alerts-location"
       :class="{ 'overhead-alerts-location--user': location.isUser }"
     >
-      <p class="overhead-alerts-name">
-        {{ location.isUser ? 'Sentinel location' : `Sentry: ${location.label}` }}
-      </p>
-      <p class="overhead-alerts-coords">
-        {{ formatLatitude(location.lat) }} {{ formatLongitude(location.lon) }}
+      <p class="overhead-alerts-heading">
+        <span class="overhead-alerts-name">
+          {{ location.isUser ? 'Sentinel location' : `Sentry: ${location.label}` }}
+        </span>
+        <span class="overhead-alerts-coords">
+          ({{ formatLatitude(location.lat) }} {{ formatLongitude(location.lon) }})
+        </span>
       </p>
 
       <div class="overhead-alerts-controls">
@@ -165,6 +167,9 @@ function onRadiusBlur(locationId: string): void {
   display: flex;
   flex-direction: column;
   gap: 32px;
+  /* Set the first location apart from the section's description, so the list
+     reads as the setting rather than as a continuation of the sentence. */
+  padding-top: 16px;
 }
 
 .overhead-alerts-empty {
@@ -179,6 +184,16 @@ function onRadiusBlur(locationId: string): void {
   flex-direction: column;
   gap: 2px;
   padding-bottom: 4px;
+}
+
+/* Name and coordinates on one line: the coordinates say *which* place this is,
+   so they belong beside the name rather than under it. */
+.overhead-alerts-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
 }
 
 .overhead-alerts-name {

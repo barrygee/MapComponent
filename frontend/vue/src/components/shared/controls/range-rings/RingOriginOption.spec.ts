@@ -24,10 +24,10 @@ describe('RingOriginOption', () => {
     expect(row.attributes('aria-checked')).toBe('false')
   })
 
-  it('shows what the place is called, over where it is', () => {
+  it('shows what the place is called, beside where it is', () => {
     const wrapper = mountOption()
     expect(wrapper.find('.ring-origin-option-name').text()).toBe('Gateshead')
-    expect(wrapper.find('.ring-origin-option-sub').text()).toBe('54.95000° N 1.53000° W - 213 NM')
+    expect(wrapper.find('.ring-origin-option-sub').text()).toBe('(54.95000° N 1.53000° W - 213 NM)')
   })
 
   it('marks itself checked when it is the choice', () => {

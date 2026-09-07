@@ -17,7 +17,7 @@
     <span class="ring-origin-option-radio" aria-hidden="true"></span>
     <span class="ring-origin-option-text">
       <span class="ring-origin-option-name">{{ name }}</span>
-      <span class="ring-origin-option-sub">{{ detail }}</span>
+      <span class="ring-origin-option-sub">({{ detail }})</span>
     </span>
   </div>
 </template>
@@ -93,15 +93,18 @@ function onActivate(): void {
   box-shadow: inset 0 0 0 2px var(--color-accent);
 }
 
+/* Name and coordinates on one line, typed to match Overhead Aircraft Alerts —
+   the two settings list the same kind of place and should read alike. */
 .ring-origin-option-text {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
 }
 .ring-origin-option-name {
   font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -113,7 +116,7 @@ function onActivate(): void {
 }
 .ring-origin-option-sub {
   font-family: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.02em;
   color: rgba(16, 19, 29, 0.45);
   font-variant-numeric: tabular-nums;
